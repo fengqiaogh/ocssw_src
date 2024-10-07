@@ -1,0 +1,188 @@
+1. PACKING LIST for MOD_PR03 (V6.1.0)
+
+
+2. POINTS OF CONTACT:
+
+   Developers:
+   ----------
+   Al Fleig
+   University of Maryland and NASA/GSFC
+   afleig@ltpmail.gsfc.nasa.gov
+
+   James Kuyper Jr.
+   MODIS SCIENCE DATA SUPPORT OFFICE
+   10210 Greenbelt Road, Room 563
+   Lanham, MD 20706
+   tel: 301-867-2064, fax: 301-867-6246
+   email: James.R.Kuyper@nasa.gov
+
+3. New files in MOD_PR03 science algorithm package.
+None
+
+4. Files removed from MOD_PR03 science algorithm package:
+None
+
+5. Files changed in MOD_PR03 science algorithm package:
+INHOUSE/PGE01/MOD_PR03/
+GEO_get_T_inst2ecr.c            ASCII   Calculate transformation matrix 
+GEO_solar_and_lunar_vectors.c   ASCII   compute the celestial body vectors
+HISTORY.txt                     ASCII   Delivery version history  
+MOD_PR03.pcf                    ASCII   Terra Process control file   
+MYD_PR03.pcf                    ASCII   Aqua Process control file 
+PACKINGLIST.txt                 ASCII   Packing list for delivery  
+README.txt                      ASCII   Info on geolocation software    
+version.h			ASCII	Process version information	
+
+Output files.
+-------------
+/SSTG2/pges/PGE01.v6.1.0/UnitTest/Terra/moddev-c64:
+MOD03.A2009127.0800.006.2009150122000.hdf
+MOD03.A2009127.0800.006.2009150122000.hdf.met
+
+/SSTG2/pges/PGE01.v6.1.0/UnitTest/Aqua/moddev-c64:
+MYD03.A2009127.1155.006.2009150124500.hdf
+MYD03.A2009127.1155.006.2009150124500.hdf.met
+
+6. Unchanged and undelivered files in MOD_PR03 science algorithm package.
+None
+
+7. Unchanged and delivered files in MOD_PR03 science algorithm package.
+File Name                       Format  Description                     
+________________________________________________________________________________
+All file names are relative to  INHOUSE/PGE01/MOD_PR03/
+GEO_aggregate.c			ASCII	Aggregates from high to low resolution.
+GEO_check_ea_headers.c		ASCII	Checks for eph/att files
+GEO_create_swath.c              ASCII   Create swath structure in output file
+GEO_DEM.c                       ASCII   DEM access functions
+GEO_DEM.h                       ASCII   DEM access functions
+GEO_derived_products.c          ASCII   Compute the derived products     
+GEO_earth.h                     ASCII   modules which perform the earth location
+GEO_earth_location.c            ASCII   Calculate earth location for    
+                                        one sample in a scan
+GEO_ellip_position.c            ASCII   Calculate the ellipsoid intersection of 
+                                        a pixel's line of sight.
+GEO_ephem_attit.c               ASCII   Retrieves and interpolates    
+                                        ephemeris and attitude data.
+GEO_geo.h                       ASCII   define parameters                 
+GEO_get_ephatt_inputs.c		ASCII	Routine for reading the input file
+					metadata from ephemeris and attitude
+					files.
+GEO_get_geoid.c                 ASCII   Extracts the geoid height above 
+                                        the ellipsoid.
+GEO_global_arrays.h             ASCII   declarations of global arrays    
+GEO_hires.c			ASCII   Calculates high resolution offsets.
+GEO_initialize_product.c        ASCII   Initialize the HDF objects    
+GEO_input.h                     ASCII   input functions geolocation software
+GEO_interp_ECR.c  	        ASCII   Interpolate eph/att in ECR
+GEO_locate_one_granule.c        ASCII   geolocate one granule         
+GEO_location_main.c             ASCII   read parameter file, process control 
+                                        file, and geolocate one granule
+GEO_abs_limit_check.c           ASCII   Validates vs. absolute limits 
+GEO_del_limit_check.c           ASCII   Validate differences vs. limits 
+GEO_find_next_flag.c            ASCII   Find the next unflagged sample 
+GEO_get_bounding_coords.c       ASCII   Calculate granule bounding coordinates
+GEO_get_GRing_points.c          ASCII   Calculate the G-Ring polygon vertices
+GEO_get_inst_mirr_normal.c      ASCII   Calculate the mirror normal vector 
+                                        for a sample
+GEO_get_sample_time.c           ASCII   Calculate the sample time offset
+GEO_get_utcpole_metadata.c	ASCII	Identifies utcpole.dat	
+GEO_get_version_metadata.c	ASCII	Collects versioning metadata	
+GEO_get_view_vec.c              ASCII   Calculate the view vectors     
+GEO_interp_mirr_ang.c           ASCII   Calculate sample mirror angle 
+GEO_interp_mirr_enc.c           ASCII   interpolate the mirror encoder number
+GEO_landsea_mask.c              ASCII   Retrieves granule's land/sea mask
+GEO_locate_one_scan.c           ASCII   geolocate one scan and write to 
+                                        output file
+GEO_main_func.h                 ASCII   functions for main module    
+GEO_maneuver.c			ASCII	Read maneuver list, determine if a given
+					 time is during a maneuver.
+GEO_mat_vec_mul3.c              ASCII   perform multiplication of a 
+                                        matrix and a vector
+GEO_output.h                    ASCII   output functions            
+GEO_parameters.h                ASCII   global parameter variables 
+GEO_product.h                   ASCII   product information        
+GEO_poly_coef1.c                ASCII   generate cubic polynomial coefficients
+GEO_poly_fit.c                  ASCII   evaluate a polynomial orbit and 
+                                        attitude data
+GEO_prepare_l1a_data.c          ASCII   read and process geolocation input data
+GEO_prepare_mirr_data.c         ASCII   unpack the mirror encoder data 
+GEO_read_L1AECS_metadata.c      ASCII   read ECS Inventory metadata      
+                                        from the L1A product file
+GEO_read_L1Apacket_data.c       ASCII   read L1A scan-level metadata    
+                                        from the L1A product file
+GEO_read_L1Ascan_metadata.c     ASCII   read L1A scan-level metadata   
+                                        from the L1A product file
+GEO_read_L1Aspecific_metadata.c ASCII   read L1A specific granule     
+                                        metadata from the L1A product file
+GEO_read_L1Atemp_data.c		ASCII	read L1A temperature data
+GEO_read_param_file.c           ASCII   open, read, and close the parameter file
+GEO_terrain_correct.c           ASCII   perform terrain correction  
+GEO_update_L1A_metadata.c       ASCII   write the geolocated metadata 
+GEO_validation.h                ASCII   validation functions      
+GEO_write_ECS_metadata.c        ASCII   set ECS Inventory and Archive metadata
+GEO_write_geospecific_metadata.cASCII   write geolocation specific    
+                                        granule metadata
+GEO_write_granule_metadata.c    ASCII   write the granule-level metadata
+GEO_write_input_metadata.c	ASCII	write input-pointer metadata	
+GEO_write_scan_data.c           ASCII   write one scan of spatial    
+                                        element geolocation data
+GEO_util.h                      ASCII   utility functions          
+GEO_validate_derived_products.c ASCII   validate the derived products  
+GEO_validate_earth_location.c   ASCII   validate the pixel earth locations
+GEO_vec_length3.c               ASCII   calculate the length of a 3-vector
+GEO_vec_mul3.c                  ASCII   calculate the cross product of 
+                                        two 3 element vectors
+GEO_vec_prod3.c                 ASCII   calculate the products of two 
+                                        3 element vectors
+GEO_vec_unit3.c                 ASCII   calculate the unit vector of a
+                                        3 element vector
+GEO_write_one_scan.c            ASCII   write scan-level data          
+GEO_write_parameters.c          ASCII   write geolocation processing parameters
+GEO_write_scan_metadata.c       ASCII   write one scan of scan-level metadata
+GEO_basic.h                     ASCII   basic include file              
+GEO_inst.h                      ASCII   prototypes which implement the
+                                        instrument model
+GEO_main.h                      ASCII   parameters for main module    
+imsl_d_lin_sol_gen.c		ASCII	Pseudo-IMSL solver for general
+					systems of linear equations.
+imsl_d_spline_interp.c		ASCII	Pseudo-IMSL routine for	
+					calculating spline interpolant
+imsl_d_spline_value.c		ASCII	Pseudo-IMSL routine for	
+					evaluating spline interpolant
+imsl_error.c			ASCII	Pseudo-IMSL routines for error handling
+imsl_wrap.h			ASCII	pseudo-IMSL declarations
+L1a_data.h                      ASCII   Level 1A product information 
+MOD_PR03.mk                     ASCII   Geolocation product make file
+MOD_PR03.pff.doc                ASCII   Processing file format for the
+					geolocation parameters LUT files.
+MOD_PR03_pr.txt			ASCII	Production Rules	
+MOD03.mcf                       ASCII   Geolocation Terra MCF file
+MYD03.mcf                       ASCII   Geolocation Aqua MCF file  
+MODIS_35251.t                   ASCII   Primary seed file          
+pseudo_imsl.h			ASCII	pseudo-IMSL internals	
+
+TLCF Location: /L1A/INHOUSE/PGE01/SHR_MCF/
+MOD01.mcf                       ASCII   Level 1A Terra MCF file      
+MYD01.mcf                       ASCII   Level 1A Aqua MCF file      
+
+TLCF Location: /L1A/INHOUSE/PGE01/coeff
+MOD03LUT.coeff		ASCII	Geolocation Terra parameters
+MYD03LUT.coeff		ASCII	Geolocation Aqua parameters
+
+Input files.
+------------
+TLCF Location: /SSTG2/pges/TestData/PGE01/inputs.v6.1.0/
+AM1ATTN0.A2009127.0600.002.2009127124346	Terra S/C Attitude
+AM1ATTN0.A2009127.0800.002.2009127151345
+AM1EPHN0.A2009127.0600.002.2009127124346	Terra S/C Ephemeris
+AM1EPHN0.A2009127.0800.002.2009127151345
+PM1ATTNR.P2009127.1000.003.2009128101025	Aqua S/C Attitude
+PM1ATTNR.P2009127.1200.003.2009128101214
+PM1EPHND.P2009126.1200.003.2009127095735	Aqua S/C Ephemeris
+PM1EPHND.P2009127.1200.003.2009128100844
+
+MOD01.A2009127.0800.005.2009149205920.hdf
+MYD01.A2009127.1155.005.2009149205933.hdf
+
+8. Files renamed in this delivery
+None.

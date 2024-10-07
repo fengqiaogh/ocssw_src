@@ -1,0 +1,65 @@
+
+
+The initial states of the 5 buttons are:
+'true'  'true'  'true'  'false'  'false'
+
+Note that the db_get removed from the init code for dialogShell1
+
+
+init_flag(set_flag.c): unable to find environmental variable
+FLG_FIL naming default flag settings
+
+set_flag, no flag descs found
+No initial file in use
+# colors available: 73
+iu_fnd_wim: there are no image structures defined yet
+iu_fnd_wim: widget not found among registered widgets
+iu_fnd_wim: widget not found among registered widgets
+iu_fnd_wim: widget not found among registered widgets
+iu_fnd_wim: widget not found among registered widgets
+iu_fnd_wim: widget not found among registered widgets
+iu_fnd_wim: widget not found among registered widgets
+iu_fnd_wim: widget not found among registered widgets
+iu_fnd_wim: widget not found among registered widgets
+iu_fnd_wim: widget not found among registered widgets
+iu_refresh: refresh with no image yet
+Query database button pressed
+make_stat_str: Code string = '21,13,40'
+number of database entries: 219
+
+iu_refresh: refresh with no image yet
+file = '/embargo/seawifsp/l1/S1999084141442.L1A_LAC        '
+line_rng_init: file name: '/embargo/seawifsp/l1/S1999084141442.L1A_LAC'
+line_rng: center lat, long gotten: 53.300884  -21.885599
+# pixels: 1285, # lines: 180
+iu_refresh: refresh with no image yet
+iu_refresh: refresh with no image yet
+iu_refresh: refresh with no image yet
+Create image button pressed
+c:S1999084141442.L1A_LAC
+cc:LAC
+filetype:2
+cpudisp: cpu time: 0.000000, location: 'start l1_rd_datnav'
+l1_rd_datnav: env var N_ITEM_GUESS does not exist
+l1_rd_datnav: n_item_guess = 2056000
+l1_rd_datnav: # lines computed for read: 200
+cpudisp: cpu time: 0.120000, location: 'end l1_rd_datnav'
+total pixel/line: 1285  180
+boundary: 47.144196 55.921017 -43.999428 1.131497
+cpudisp: cpu time: 0.400000, location: 'from gethdf_coast at start'
+This shouldn't happen but wvs_out got -9999.0 or ll_error
+cpudisp: cpu time: 0.940000, location: 'gethdf_coast, after wvs_coast'
+out of get_hdf_coast
+cpudisp: cpu time: 1.000000, location: 'end gethdf_coast'
+start to put to widgets
+main_im_ld: iu_imgld_g ret code = 0
+load_hdf: iu_imgld small band 0 ret code = 0
+load_hdf: iu_imgld small band 1 ret code = 0
+load_hdf: iu_imgld small band 2 ret code = 0
+load_hdf: iu_imgld small band 3 ret code = 0
+load_hdf: iu_imgld small band 4 ret code = 0
+load_hdf: iu_imgld small band 5 ret code = 0
+load_hdf: iu_imgld small band 6 ret code = 0
+load_hdf: iu_imgld small band 7 ret code = 0
+load_hdf: iu_imgld small band 8 ret code = 0
+WDR logging OK button pressed

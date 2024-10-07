@@ -1,0 +1,8 @@
+from distutils.core import setup
+
+setup(name='seabass2L1B',
+      version='${PACKAGE_VERSION}',
+      package_dir={ '': '${CMAKE_CURRENT_BINARY_DIR}' },
+      packages=['seabass'],
+      scripts=['$ENV{OCSSWROOT}/src/matchup_tools/seabass2L1B.py']
+)

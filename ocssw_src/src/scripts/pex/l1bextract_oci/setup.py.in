@@ -1,0 +1,8 @@
+from distutils.core import setup
+
+setup(name='l1bextract_oci',
+      version='${PACKAGE_VERSION}',
+      package_dir={ '': '${CMAKE_CURRENT_BINARY_DIR}' },
+      packages=['seadasutils'],
+      scripts=['$ENV{OCSSWROOT}/src/scripts/l1bextract_oci.py']
+)

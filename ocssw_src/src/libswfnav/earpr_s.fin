@@ -1,0 +1,24 @@
+c
+c  include file: earpr_s.fin 
+c
+c  Purpose: define structure for processed earth sensor data
+c       This data is the fitted earth width and phase for 
+c       each scan line
+c
+c  By: W. Robinson, GSC, 12 Apr 93 
+c
+c  Modification History:
+c
+
+c
+      type earproc_struct
+c       
+c
+         real(4) :: widphse(2,maxlin)   ! earth width and phase for all lines
+         integer(4) :: flag(maxlin) ! quality flags for the angles
+                                    ! 0 - good, 1 - bad
+      end type
+c
+c       record should probably be called earproc(2) for 2 sensors
+c
+c       and end

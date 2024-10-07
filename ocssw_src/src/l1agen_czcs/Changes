@@ -1,0 +1,22 @@
+version 1.0 - April, 2005 - initial development complete
+
+version 1.1 - Dec 2005 - add Nimbus 7 SMMR navigation position input
+asap_int2.f     new routine to interpolate position, velocity data to get 
+                navigation position for each line
+cz_clean.c      change to add position error array
+cz_dat_alloc.c  change to add position error array allocation
+czl1merge.c     change to add version update and to fix size of num_used
+cz_l1_read.c    change to add position error array reading
+cz_mov_scn.c    change to add position error array management
+day_to_ofile.c  new routine to construct orbit file name
+fill_orb_dat.c  new routine to read proper orbit files and interpolate 
+                it to the scan lines
+l1czcs.c        change to add version update
+l1czcs.h        change to include position error array to structure
+l1czcs.mk       change to add new routines
+rd_smmr_orb.c   new routine to read orbit data
+read_crtt.c     change to call the orbit data read, interpolate routine, 
+                fill_orb_dat
+set_czcs_ctl_data.c  change to write the position error array
+time_utl.c      new routine to perform some time conversions
+time_utl.h      new include used by time_utl.c

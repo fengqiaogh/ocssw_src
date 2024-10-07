@@ -1,0 +1,92 @@
+List of files that will need some minor/major modification:
+
+oel_util/libpiutils/sensorDefs.h
+oel_util/libpiutils/sensorInfo.c
+oel_hdf4/filetype/filetype.h
+oel_hdf4/filetype/filetype.c
+oel_hdf4/libl1/l1_io.c
+oel_hdf4/libl1/l1_mysensor.h
+oel_hdf4/libl1/l1_mysensor.c
+oel_hdf4/libl1/CMakeLists.txt
+l2gen/CMakeLists.txt
+l2gen/Changelog.md
+l2gen/get_chl.c
+l2gen/get_l2prod_index.c
+$OCDATAROOT/mysensor
+$OCDATAROOT/common/SensorInfo.json
+$OCDATAROOT/common/SensorInfo.txt
+$OCDATAROOT/common/missionList.xml
+
+
+1) Modify oel_util/libpiutils/sensorDefs.h
+        - increment sensor count:
+            #define SENSOR_NUM #
+        - add definition for new sensor:
+            #define MYSENSOR #
+
+2) Modify oel_util/libpiutils/sensorInfo.c
+        - add a string for the new sensor to the end of sensorName[][],
+        - add a string for the new sensor to the end of instrumentName[][]
+        - add a string for the new sensor to the end of platformName[][]
+        - add a string for the directory name to the end of sensorDir[][]
+        - add a string to sensorSub[][] if necessary
+
+3) Modify oel_util/filetype/filetype.h
+        - Add format definition to enum file_type:
+            FT_MYSENSOR,
+
+4) Modify oel_util/filetype/filetype.c
+        - Add code to identify the file
+
+5) Modify src/l2gen/CMakesLists.txt and Changelog.md
+    - in CMakeLists.txt:
+        - set (VERSION_MAJOR #)
+        - set (VERSION_MINOR #)
+        - set (VERSION_PATCH #)
+    - in Changelog.md
+        - ## #.#.# - YYYY-MM-DD
+
+6) Create an L1 reader function for the sensor in oel_hdf4/libl1
+        - l1_mysensor.c, include the following functions:
+          * openl1_mysensor
+          * readl1_mysensor
+          * closel1_mysensor
+        - l1_mysensor.h, with prototypes for above
+
+        The functions need to deal with populating the navigation fields
+        (lat,lon, senz, solz, sena, sola) as well as the Lt records in the
+        l1rec structure
+
+7) Modify oel_hdf4/libl1/l1_io.c
+
+        - Add include:
+          #include "l1_mysensor.h"
+
+        - Add FT_MYSENSOR to case statements for:
+          open:
+            case FT_MYSENSOR:
+                status = openl1_mysensor(l1file);
+                break;
+          read:
+            case FT_MYSENSOR:
+                status = readl1_mysensor(l1file,recnum,l1rec);
+                break;
+          close:
+            case FT_MYSENSOR:
+                closel1_mysensor(l1file);
+                break;
+
+8) add pointer to default chlorophyll algorithm for sensor
+        - default_iprod_chl in function get_l2prod_index in l2gen/get_l2prod_index.c
+        - chl in function get_chl_ocx in l2gen/get_chl.c
+        - default chl in function findProductInfo in oel_util/libpiutils/productInfo.c
+
+9) add l1_mysensor.c to the CMakeLists.txt "add_executable" entries for the
+   l2gen suite.
+
+10) add sensor data definition files to $OCDATAROOT/run/data/mysensor/msl12_sensorinfo.dat
+
+    - For hyperspectral sensors a helpful template script is located in $OCDATAROOT/run/scripts
+      called makelambda4sens.py.
+
+11) add the new sensor to the data files in $OCDATAROOT/* listed at the top of this file. 

@@ -1,0 +1,4 @@
+#
+# test run of the o3qc program with current inputs
+#
+o3qc ../o3nrt/S199717712_EPTOMS.OZONE $SWFDAT/climatology/S19891991_TOMS.OZONE out_qc.hdf June OZONE 40. 50. 60. 700 100 500 300 95.

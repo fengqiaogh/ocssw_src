@@ -1,0 +1,7 @@
+from distutils.core import setup
+
+setup(name='cyan_alaska_tiles',
+      version='${PACKAGE_VERSION}',
+      package_dir={ '': '${CMAKE_CURRENT_SOURCE_DIR}' },
+      scripts=['$ENV{OCSSWROOT}/src/scripts/cyan_alaska_tiles.py']
+)

@@ -1,0 +1,37 @@
+# ===========================================================================
+#	Begin Program Specific Block
+# ===========================================================================
+
+MAKEFILE = Makefile
+
+# Progam to make
+EXE	= ancnrt_aquarius
+
+# Object modules for EXE
+OBJ	= ancnrt_aquarius.o \
+	  readgrib.o \
+	  fillenv.o \
+	  ANCroutines.o \
+	  rdattr.o \
+	  countann.o \
+	  rdfiles.o \
+	  rdsdsid.o \
+	  pexit.o \
+	  julian.o \
+	  lnstrg.o \
+	  leap.o \
+	  resize_oz.o
+
+# Include file locations
+INCLUDE	= -I$(INCDIR)/swfinc -I$(HDFINC)
+
+# Library locations
+LIBS 	= -L$(LIBDIR) -L$(HDFLIB)
+
+# Libraries required to link
+LLIBS 	= -lmfhdf -ldf -ljpeg -lz
+
+#FC = gfortran
+#LD = gfortran
+
+include $(MAKEFILE_APP_TEMPLATE)

@@ -1,0 +1,59 @@
+NOTE(V5.0): In this version, the values 'median' and 'mode' have been 
+		removed for attribute 'Measure'.  The byte values for
+	 	Nodata pixels are set to 255.  Valid byte value = 0 to 254.
+		
+
+NOTE(V4.4):In this version, palette has been removed from the interface call & 
+	has been defined in an include file.  Added input arguments orbit
+	and flag_names to put_l3m call.  Added them as global attributes.
+	Added output argument "orbit" to get_l3m call.  
+	Changed the eps_68 to eps_78.
+----------------------------------------------------------------------------
+
+      SeaWiFS LEVEL-3 STANDARD MAPPED DATA WRITE AND READ ROUTINES
+			    (Version 5.0)	
+
+This set of routines is comprised of Level-3 standard mapped data write and
+read routines and associated include files  in /include and test files in 
+/test sub directories.  The files are as follow:
+
+put_l3m.c : Standard Map Image output functions
+get_l3m.c : Standard Map Image Input functions
+Makefile  : to build SMI I/O library
+/include  
+	map.h     : defins some constants, include files and l3m meta 
+		    structure 
+	mapattr.h : defines all the global attributes 
+	maplists.h: defines some global variables
+ 	mapproto.h: defines prototypes of all the functions 
+	palette.h : defines map_palette
+/test	  
+	README    : Gives information about test directory and how to build
+	 	    the test tools
+	Makefile  : to build "putl3m" and "getl3m" test tools
+	tput_l3m.c: output test routine
+	tget_l3m.c: input test routine
+	daily.hdf : sample level 3 daily bin file (input data file)
+	map_palette.h: a palette file
+
+The data file that gets created using this library will be in HDF format and 
+follows the Level-3 Standard Mapped data specifications given in "SeaWiFS 
+Operational Archive Product Specification", v2.8, by F.S. Patt, 
+J.K.Firestone, B. Schieber, L. Kumar, D. Ilg, and M. Darzi.  
+
+The interfaces to the routines are given in the specifications for Level-3 
+Standard Mapped data write and read routines given in "Interface 
+Specifications for SeaWiFS Operational Product Input, Output, and Sensor 
+Calibration Software", v4.4, by F.S. Patt, J.K. Firestone, and M. Darzi.  
+
+------------------------------------------------------------
+For more information or questions, please contact:
+
+  Lakshmi Kumar, (301) 286-9996, lakshmi@calval.gsfc.nasa.gov
+  or Mike Darzi, (301) 286-9150, darzi@calval.gsfc.nasa.gov
+
+        SeaWiFS Project Office
+        Code 970.2
+        NASA Goddard Space Flight Center
+        Greenbelt, Maryland 20771
+

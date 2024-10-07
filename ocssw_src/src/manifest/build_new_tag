@@ -1,0 +1,292 @@
+#! /usr/bin/bash
+
+# T=test, V=operational
+#export tag_type=T
+#export THETAG="T2023.26"
+#export THEMESSAGE="
+#- fixed OCI rayleigh files, no longer symlinks
+#"
+
+export TAGDIR=~/tagdir
+
+if [ ! -f $TAGDIR/tag_comment ]; then
+    echo "Comment file not found!"
+    exit 1
+fi
+source $TAGDIR/tag_comment
+
+#-----------------------------------------------------------
+# nothing to edit below here
+#
+export OCSSWROOT=$TAGDIR/ocssw
+source $OCSSWROOT/OCSSW_bash.env
+
+if [[ $tag_type = "V" ]]
+then
+    export BRANCH_OCSSW=R2020
+    export BRANCH_OEL_UTIL=R2020
+    export BRANCH_OEL_HDF4=R2020
+    export BRANCH_VIIRS_L1=R2020
+    export BRANCH_FOCS=R2020
+    export BRANCH_DTDB=R2020
+    export BRANCH_POLARIMETRY=R2020
+    export BRANCH_UAA=R2020
+else
+    export BRANCH_OCSSW=develop
+    export BRANCH_OEL_UTIL=develop
+    export BRANCH_OEL_HDF4=develop
+    export BRANCH_VIIRS_L1=master
+    export BRANCH_FOCS=develop
+    export BRANCH_DTDB=master
+    export BRANCH_POLARIMETRY=develop
+    export BRANCH_UAA=develop
+fi
+
+#
+# nice function to check the return value
+#
+check_return () {
+    if [[ $? -ne 0 ]]
+    then
+        echo "-E- $1"
+        exit 1
+    fi
+}
+
+#
+# Checkout the correct branches for repos and submodules
+#
+cd $TAGDIR/ocssw
+check_return "ocssw dir does not exist"
+git checkout $BRANCH_OCSSW
+check_return "ocssw checkout is bad"
+git pull
+cd oel_util && git checkout $BRANCH_OEL_UTIL && git pull && cd ..
+check_return "oel_util checkout is bad"
+cd oel_hdf4 && git checkout $BRANCH_OEL_HDF4 && git pull && cd ..
+check_return "oel_hdf4 checkout is bad"
+
+cd $TAGDIR/viirs_l1
+check_return "viirs_l1 dir does not exist"
+git checkout $BRANCH_VIIRS_L1
+check_return "viirs_l1 checkout is bad"
+git pull
+cd oel_util; git checkout $BRANCH_OEL_UTIL; git pull; cd ..
+
+cd $TAGDIR/focs
+check_return "focs dir does not exist"
+git checkout $BRANCH_FOCS
+check_return "focs checkout is bad"
+git pull
+cd oel_util; git checkout $BRANCH_OEL_UTIL; git pull; cd ..
+cd oel_hdf4; git checkout $BRANCH_OEL_HDF4; git pull; cd ..
+
+cd $TAGDIR/dtdb
+check_return "dtdb dir does not exist"
+git checkout $BRANCH_DTDB
+check_return "dtdb checkout is bad"
+git pull
+cd oel_util; git checkout $BRANCH_OEL_UTIL; git pull; cd ..
+cd oel_hdf4; git checkout $BRANCH_OEL_HDF4; git pull; cd ..
+
+cd $TAGDIR/polarimetry/harp
+check_return "harp dir does not exist"
+git checkout $BRANCH_POLARIMETRY
+check_return "harp checkout is bad"
+git pull
+
+cd $TAGDIR/polarimetry/pyspex
+check_return "pyspex dir does not exist"
+git checkout $BRANCH_POLARIMETRY
+check_return "pyspex checkout is bad"
+git pull
+
+cd $TAGDIR/polarimetry/spex
+check_return "spex dir does not exist"
+git checkout $BRANCH_POLARIMETRY
+check_return "spex checkout is bad"
+git pull
+
+cd $TAGDIR/polarimetry/pex
+check_return "polarimetry pex dir does not exist"
+git checkout $BRANCH_POLARIMETRY
+check_return "pex checkout is bad"
+git pull
+
+cd $TAGDIR/polarimetry/fastmapol
+check_return "polarimetry fastmapol dir does not exist"
+git checkout $BRANCH_POLARIMETRY
+check_return "fastmapol checkout is bad"
+git pull
+
+cd $TAGDIR/sat/unified_dtdb_aerosol
+check_return "UAA dir does not exist"
+git checkout $BRANCH_UAA
+check_return "UAA checkout is bad"
+git pull
+
+#
+# make sure all root repos are checked in and clean
+#
+cd $TAGDIR/ocssw
+git status | grep "nothing to commit, working tree clean"
+check_return "ocssw is not clean"
+
+cd $TAGDIR/viirs_l1
+git status | grep "nothing to commit, working tree clean"
+check_return "viirs_l1 is not clean"
+
+cd $TAGDIR/focs
+git status | grep "nothing to commit, working tree clean"
+check_return "focs is not clean"
+
+cd $TAGDIR/dtdb
+git status | grep "nothing to commit, working tree clean"
+check_return "dtdb is not clean"
+
+#
+# build viirs_l1
+#
+cd $TAGDIR/viirs_l1
+rm -rf build
+mkdir build
+cd build
+cmake ..
+check_return "viirs_l1 cmake failed"
+make -j 20 install
+check_return "viirs_l1 make failed"
+
+#
+# build focs
+#
+cd $TAGDIR/focs
+rm -rf build
+mkdir build
+cd build
+cmake ..
+check_return "focs cmake failed"
+make -j 20 install
+check_return "focs make failed"
+
+#
+# build dtdb
+#
+cd $TAGDIR/dtdb
+rm -rf build
+mkdir build
+cd build
+cmake ..
+check_return "dtdb cmake failed"
+make -j 20 install
+check_return "dtdb make failed"
+
+#
+# build ocssw
+#
+cd $TAGDIR/ocssw
+rm -rf build
+mkdir build
+cd build
+cmake .. -DBUILD_ALL=1
+check_return "ocsssw cmake failed"
+make -j 20 install
+check_return "ocssw make failed"
+
+#
+# build harp
+#
+cd $TAGDIR/polarimetry/harp/hipp
+rm -rf build
+mkdir build
+cd build
+cmake ..
+check_return "harp hipp cmake failed"
+# somehow a parallel make does not quite work (deleted -j 20)
+make install
+check_return "harp hipp make failed"
+
+#
+# build UAA
+#
+cd $TAGDIR/sat/unified_dtdb_aerosol
+rm -rf build
+mkdir build
+cd build
+cmake ..
+check_return "UAA cmake failed"
+# somehow a parallel make does not quite work (deleted -j 20)
+make install
+check_return "UAA make failed"
+
+
+#
+# make the ocssw/scripts PEX files
+#
+
+
+
+#
+# make the polarimetry PEX files
+#
+
+
+
+#
+# make the tag in git
+#
+cd $TAGDIR/ocssw &&           git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
+check_return "ocssw tag failed"
+cd $TAGDIR/ocssw/oel_util &&  git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
+check_return "oel_util tag failed"
+cd $TAGDIR/ocssw/oel_hdf4 &&  git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
+check_return "oel_hdf4 tag failed"
+cd $TAGDIR/viirs_l1 &&        git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
+check_return "viirs_l1 tag failed"
+cd $TAGDIR/focs &&            git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
+check_return "focs tag failed"
+cd $TAGDIR/dtdb &&            git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
+check_return "dtdb tag failed"
+
+cd $TAGDIR/polarimetry/harp &&   git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
+check_return "harp tag failed"
+cd $TAGDIR/polarimetry/pyspex && git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
+check_return "pyspex tag failed"
+cd $TAGDIR/polarimetry/spex &&   git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
+check_return "spex tag failed"
+cd $TAGDIR/polarimetry/pex &&    git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
+check_return "polarimetry/pex tag failed"
+cd $TAGDIR/polarimetry/fastmapol &&    git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
+check_return "polarimetry/fastmapol tag failed"
+
+cd $TAGDIR/sat/unified_dtdb_aerosol && git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
+check_return "UAA tag failed"
+
+# build the tag for all archetecures
+# make sure build is clean
+cd
+build_manifest_ocssw -t $THETAG
+check_return "build_manifest_ocssw failed"
+
+#
+# transfer the new code to the manifest directory
+# check what files are actually copied
+#
+
+cd ~/ocssw-manifest
+update_manifest_dirs --live
+manifest_ocssw status
+
+echo
+read -p "Do you want to continue (y/n) " answer
+if [[ $answer != "y" ]]
+then
+    echo "Exiting..."
+    exit 1
+fi
+
+#
+# create the tag
+#
+cd ~/ocssw-manifest
+manifest_ocssw push $THETAG
+

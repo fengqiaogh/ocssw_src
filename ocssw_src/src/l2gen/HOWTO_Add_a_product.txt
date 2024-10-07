@@ -1,0 +1,128 @@
+1) Create an index ID number for the product catalogue
+
+        - edit l2prod.h
+        - add a unique entry for your product in the list of #defines
+          e.g., #define CAT_myprod 49
+
+2) Add a catalogue entry for your product function
+
+      Add a new XML entry to ocssw/share/common/product.xml
+      using CAT_xxx from above for <cat_ix>
+
+      Note: look at "product-1.0.xsd" for definitions
+
+3) Some extra elements of the product structure you might want to set:
+
+   l2prod->param_type = PARAM_TYPE_NONE;
+     PARAM_TYPE_NONE
+       Default value.  No parameter is buried in the product name.
+       name_prefix is case insensitive string compared to the product name.
+
+     PARAM_TYPE_VIS_WAVE
+       The visible wavelength bands from the sensor are buried in the
+       product name.  The product name is compared by appending name_prefix,
+       wavelength, and name_suffix.  ie "aph_412_giop" where
+       name_prefix="aph_" and name_suffix="_giop".  When your function is
+       called the element prod_ix in the product structure is set to the
+       0 based band number associated with the wavelength. In our example
+       for SeaWiFS wavelength 412, prod_ix will be set to 0.
+
+     PARAM_TYPE_IR_WAVE
+       same search method as PARAM_TYPE_VIS_WAVE except only wavelength above
+       3000nm are looped through.  prod_ix = bandNum - numVisibleBands
+
+     PARAM_TYPE_ALL_WAVE
+       same search method as PARAM_TYPE_VIS_WAVE except all wavelengths
+       are looped through.
+
+     PARAM_TYPE_BAND
+       same search method as PARAM_TYPE_ALL_WAVE except all bands are
+       looped through instead of wavelengths. The Band number in the
+       product name is 1 based, but prod_ix is still 0 based.
+       ie. "aph_2_giop" for the second band, and prod_ix set to 1.
+
+     PARAM_TYPE_INT
+       name_prefix is compared with the beginning of the product name.  If
+       name_suffix is not empty the it must match the end of the product
+       name.  The characters right after the prefix are read as an integer
+       and prod_ix is set to that number.
+
+   strncpy(l2prod->name_prefix, "myprod", UNITLEN);
+     First part of the product name.  Case-independent compares are used
+     to match products.
+
+   strncpy(l2prod->name_suffix, "myprod", UNITLEN);
+     Last part of the product name.  This is appended after the parameter
+     part.  This is also case independent.  Default is empty string.
+
+   l2prod->prod_ix = -1;
+     Extra parameter that your function can use.  Default is -1.  For
+     param_type==PARAM_TYPE_NONE you can set it in the product definition.
+     For the other param_types see the documentation above to see how
+     prod_ix is set.
+
+   l2prod->datatype = DFNT_FLOAT32;
+     HDF4 data type of the output SDS.  Default is DFNT_FLOAT32.  Common
+     types used are:
+       DFNT_INT8, DFNT_INT16, DFNT_INT32, DFNT_FLOAT32, DFNT_FLOAT64
+
+   l2prod->slope = 1.0;
+   l2prod->offset = 0.0;
+     These are used to scale the SD before writing it to the HDF4 file.  The
+     default is 1.0 and 0.0 which means the product is not scaled at all.
+     Since the product is usually stored as a float inside of l2gen, this is
+     a way to write the float out as a integer.
+
+   l2prod->min = 0;
+   l2prod->max = 0;
+     Extra metadata that will be written to the HDF4 file.  Default 0.0, 0.0
+
+   l2prod->rank = 2;
+     How many dimensions is the output array.  Default is 2.  Not sure if
+     anything above 3 will work correctly.
+
+   strcpy(l2prod->title, "no title yet");
+     Set this as the descriptive title for the product ONLY for
+     param_type=PARAM_TYPE_NONE.  For all other param_type use title_format.
+
+   strcpy(l2prod->title_format, "no title format yet (%d)");
+     Set this as the descriptive title for the product if param_type is
+     not equal to PARAM_TYPE_NONE.  Before your function is called title is
+     set by calling:
+        sprintf(product->title, product->title_format, prod_ix);
+     Put a %d in the string to print the prod_ix.
+
+   strcpy(l2prod->units, "undefined units");
+     Every product should define the units.
+
+   l2prod->badData = BAD_FLT;
+     What value is used by your function when the data value is bad.
+     Default is BAD_FLT.
+
+   l2prod->product_id[0] = '\0';
+   l2prod->algorithm_id[0] = '\0';
+     These two strings are used for the product XML output.  If product_id
+     is not set then prefix is used.  If the last char of the name_prefix is
+     "_" then it is removed.  If algorithm_id is not set then name_suffix is
+     used.  If the first char is "_" then it is removed.
+
+   l2prod->standard_name[0] = '\0';
+     This should be set to the NetCDF standard name if exists for this
+     product.
+
+
+4) Create a function that computes your product.
+
+        - edit get_myprod.c
+        - add prototype to l12_proto.h
+        - add get_myprod.c to L2GEN_PRODUCT_FILES in CMakeLists.txt
+
+5) Add an entry to the output routine to call your function
+
+        - edit prodgen.c
+        - edit function prodgen()
+
+      case CAT_myprod:
+        get_myprod(l2rec, p, fbuf);
+        pbuf = (VOIDP) fbuf;
+        break;

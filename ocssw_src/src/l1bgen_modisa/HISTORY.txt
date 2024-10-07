@@ -1,0 +1,1160 @@
+                 ********************************************
+                 *     HISTORY FILE for MOD_PR02AQUA        *
+                 *             Version 6.2.1                *
+                 *             August 1, 2017               *
+                 *                                          *
+                 *           Point of Contact:              *
+                 *               Xu Geng                    *
+                 *                SSAI                      *
+                 *   MODIS Characterization Support Team    *
+                 *        EMAIL: xu.geng@ssaihq.com         *
+                 *           TEL: 301-867-2057              *
+                 ********************************************
+
+
+  ============================================================================
+
+    This history file includes code changes to calibration code written for
+  MODIS/AQUA only and also changes made to common MODIS/TERRA/AQUA code
+  predating the split in code application made in February 2002.  It does not
+  include changes made to MODIS/TERRA-specific code after February 2002.
+
+    Most code changes to MOD_PR02 do in fact apply to both MODIS/TERRA and
+  MODIS/AQUA.  Changes which are satellite platform-specific are noted in the
+  narrative.
+
+  This file shows the following:
+  (a) What was changed in the PGE
+  (b) Why was it changed
+  (c) How the output product will be affected by the change
+  (d) The date of the change.
+
+  ============================================================================
+  V6.2.1 (Aqua)                                                     08/01/2017
+       Changes shown below are differences from MOD_PR02 V6.1.37 (Aqua)
+  ============================================================================
+  Only version number and some look-up tables are updated for C6.1 
+  re-processing, no algorithm change is made in this delivery. 
+
+  ============================================================================
+  V6.1.37 (Aqua)                                                    04/19/2017
+       Changes shown below are differences from MOD_PR02 V6.1.35 (Aqua)
+  ============================================================================
+  Only PGE02 version is updated for MODIS processing on CentOS 7 system with
+  SDP toolkit 5.2.19
+
+  ============================================================================
+  V5.0.43 (Aqua)                                                    03/23/2015
+       Changes shown below are differences from MOD_PR02 V5.0.41 (Aqua)
+  ============================================================================
+  Changes noted for V6.1.35 (Aqua) below were also instituted for this
+  version.
+
+  ============================================================================
+  V6.1.35 (Aqua)                                                    03/12/2015
+       Changes shown below are differences from MOD_PR02 V6.1.33 (Aqua)
+  ============================================================================
+  Changes from v6.1.33 which may affect scientific output:
+  A situation can occur in which a scan which contains sector rotated data has
+  a telemetry value indicating the completeness of the sector rotation. This 
+  issue is caused by the timing of the instrument command to perform the 
+  sector rotation and the recording of the telemetry point that reports the 
+  status of sector rotation. In this case a scan is considered valid by L1B 
+  and pass through the calibration - reporting extremely high radiances. 
+  Operationally the TEB calibration uses a 40 scan average coefficient, 
+  so the 20 scans (one mirror side) after the sector rotation are contaminated 
+  with anomalously high radiance values. A similar timing issue appeared
+  before the sector rotation was fixed in V6.1.3. 
+
+  Our analysis indicates the ‘SET_FR_ENC_DELTA’ telemetry correlates well with
+  the sector rotation encoder position. The use of this telemetry point to 
+  determine scans that are sector rotated should fix the anomaly occured 
+  before and after the sector rotation (usually due to the lunar roll maneuver). 
+  The fix related to the sector rotation in V6.1.3 is removed in this version.    
+
+  ============================================================================
+  V6.1.33 (Aqua)                                                    10/01/2014
+       Changes shown below are differences from MOD_PR02 V6.1.31 (Aqua)
+  ============================================================================
+  Added doi attributes to NRT (Near-Real-Time) product.
+
+  ============================================================================
+  V6.1.31 (Aqua)                                                    01/27/2014
+       Changes shown below are differences from MOD_PR02 V6.1.17 (Aqua)
+  ============================================================================
+  Migrate to SDP Toolkit 5.2.17
+
+  ============================================================================
+  V6.1.17 (Aqua)                                                    06/26/2012
+       Changes shown below are differences from MOD_PR02 V6.1.15 (Aqua)
+  ============================================================================
+  Added the doi metadata to L1B product
+ 
+  ============================================================================
+  V6.1.15 (Aqua)                                                    07/28/2011
+      Changes shown below are differences from MOD_PR02 V6.1.13 (Aqua)
+  ============================================================================
+  Changes noted for V5.0.41 (Aqua) below were also instituted for V6.1.15.
+  There were no other changes.
+
+  ============================================================================
+  V5.0.41 (Aqua)                                                   07/25/2011
+  ============================================================================
+  Changes from v5.0.39 which may affect scientific output:
+  The default b1 values are currently used for Aqua bands 33, 35 and 36 when 
+  the blackbody temperature is above a threshold. Since the LWIR FPA 
+  temperature oscillates on-orbit, its impact to the default b1 increases 
+  gradually. A new algorithm to calculate the default b1 on-orbit considering 
+  the impact of the real time LWIR FPA temperature is applied in this code 
+  change.
+
+  ============================================================================
+  V6.1.13 (Aqua)                                                    04/15/2011
+       Changes shown below are differences from MOD_PR02 V6.1.11 (Aqua)
+  ============================================================================
+  A minor code typo error correction.
+
+  ============================================================================
+  V6.1.11 (Aqua)                                                    03/31/2011
+       Changes shown below are differences from MOD_PR02 V6.1.9 (Aqua)
+  ============================================================================
+  1. The algorithm to calculate uncertainties for reflective solar bands (RSB)
+     is updated. The current uncertainty in L1B code includes 9 terms from
+     prelaunch analysis. The new algorithm regroups them with the new added
+     contributions into 5 terms:
+     u1: the common term (AOI and time independent);
+     u2: the contribution due to calibrations using calibrators and the linear
+         approximation in RVS AOI dependence;
+     u3: the temperature impact;
+     u4: scene dependent noise to signal ratio;
+     u5: the uncertainty due to cross talk correction for SWIR bands.
+     The new uncertainty is calculated from the above five terms,
+     Uncertainty = sqrt(u1*u1+u2*u2+u3*u3+u4*u4+u5*u5)
+
+     There are 6 new reflective LUTs added and 8 old LUTs made obsolete.
+     The change will affect RSB UI (uncertainty index) field in L1B product.
+
+  2. The algorithm to calculate uncertainties for Theramal Emissive bands 
+     (TEB) is also updated. The perturbation method used to derive UI terms 
+     in the current L1B is replaced with an analytical expression approach.
+     There are 11 new emissive LUTs added and 5 old LUTs made obsolete.
+     The change will affect TEB UI (uncertainty index) field in L1B product.
+
+  3. The quadratic reflective solar bands (RSB) RVS is changed to 4th order.
+
+  ============================================================================
+  V6.1.9 (Aqua)                                                     11/15/2010
+  ============================================================================
+  Changes from v6.1.9 which do not affect scientific output:
+  1. A fatal error occurs when both sides of PCLW electronics are on 
+     simultaneously in the previous L1B code. The case is actually permissible
+     according to the MODIS design. A change is made to drop the scan affected 
+     instead of the whole granule.
+
+  ============================================================================
+  V5.0.39 (Aqua)                                                   02/25/2010
+  ============================================================================
+  Changes from v5.0.37 which may affect scientific output:
+  1. Fixed the sector rotation anomaly, which has been done in V6.1.3.
+          
+  ============================================================================
+  V6.1.7 (Aqua)                                                     12/15/2009
+  ============================================================================
+  Changes from v6.1.5 which do not affect scientific output:
+  1. Excluded the fill value from the valid range check of LAST_VALID_SCAN in
+     the function of Check_If_Sector_Rotated in Preprocess.c.  
+
+  ============================================================================
+  V6.1.5 (Aqua)                                                     08/28/2009
+  ============================================================================
+  Changes from v6.1.3 which do not affect scientific output:
+  1. A bug from the output of dead and noisy subframe list in Metadata.c 
+     is fixed. 
+  2. Fixed a minor bug for the log message in a few header files.  
+
+  ============================================================================
+  V6.1.3 (Aqua)                                                     07/22/2009
+  ============================================================================
+  Changes from v6.1.1 which do not affect scientific output:
+     (same change as V5.0.37)
+  1. If the ReprocessingActual from pcf is "Near Real Time",
+     the LOCALGRANULEID metadata should have an extension ".NRT".
+     It is requested to identify the NRT production.
+
+  Changes from v6.1.1 which may affect scientific output:
+  1. The sector rotation telemetry point is sampled at a frequency of 8
+     seconds (about 5 scans). However, the sector rotation may actually occur
+     during one of the scans earlier than the one where it is first reported.
+     As a result, the b1 values are inaccurate, about 20 scans (one mirror
+     side) prior to the sector rotation are contaminated with anomalously high
+     radiance values.
+     The code change in this update will use the LAST_VALID_SCAN field to find
+     the last synchronized scan (the scan number matches the value in the
+     LAST_VALID_SCAN field) before the sector rotation is reported. The scans
+     in between the last synchronized scan (not inclusive) and the first 
+     reported sector rotation should be flagged as sector-rotated to minimize 
+     its impact.
+
+  ============================================================================
+  V5.0.37 (Aqua)                                                   06/29/2009
+  ============================================================================
+  Changes from v5.0.35 which do not affect scientific output:
+  1. If the ReprocessingActual from pcf is "Near Real Time",
+     the LOCALGRANULEID metadata should have an extension ".NRT".
+     It is requested to identify the NRT production.
+
+  ============================================================================
+  V6.1.1 (Aqua)                                                     12/18/2008
+  ============================================================================
+  Changes from v6.0.1 which do not affect scientific output:
+
+  1. Extended rvs ascii lut validation limitation from [-2.0E-4, 1.2] to
+     [-4.0E-4, 2.4].
+
+  ============================================================================
+  V6.0.1 (Aqua)         NEVER USED FOR DATA PRODUCTION              05/23/2008
+  ============================================================================
+  Changes from v5.0.35 which affect scientific output:
+
+  1.  Added a new QA LUT, detector_quality_flag2_values_table,
+      to fill pixels affected by dead subframes with a special value 65525. 
+  2.  Output the metadata of noisy and dead subframe lists,
+      Dead Subframe EV Data %, and Detector Quality Flag2.
+  3.  Removed the function call of Fill_Dead_Detector_SI to stop interpolating
+      SI values for dead detectors.
+
+  ============================================================================
+  V5.0.35 (Aqua)                                                    01/15/2008
+  ============================================================================
+  Changes from v5.0.33 which do not affect scientific output:
+
+  1.  Relax the RVS correction limit range from [0.8, 1.2] to [0.4, 2.4].
+
+  ============================================================================
+  V5.1.1 (Aqua)    NEVER USED IN DATA PRODUCTION                    02/28/2007
+  ============================================================================
+  This is a prototype code version to be used it to create test data not only
+  for PGE02, but also for all downstream products for science test only.
+  Changes from v5.0.7 which will affect scientific output:
+
+  1.  Removed the function call of Fill_Dead_Detector_SI to stop interpolating
+      SI values for dead detectors.
+
+  ============================================================================
+  V5.0.33 (Aqua)    NEVER USED IN DATA PRODUCTION                   10/30/2006
+  ============================================================================
+  Changes from v5.0.7 which do not affect scientific output:
+
+  1. Changed to write PGEVersion value which is extracted from the PCF file
+     instead of from the QA LUT, to conform to MODIS requirements.
+
+  2. Removed the "Mixed" option from the ScanType in the code because the L1A
+     "Scan Type" is never "Mixed".
+
+  3. Changed for ANSI-C compliance and comments correction.
+
+  ============================================================================
+  V5.0.7 (Aqua)                                                     03/01/2005
+  ============================================================================
+  Changes from v5.0.5 which do not affect scientific output:
+
+  1.  Corrected setting of the geo to data dimension mapping offset value
+      (track direction for 250m band data only) in the current PGE02 code
+      (Collect 4 and 5).
+
+  ============================================================================
+  V5.0.5 (Aqua)                                                     2005-01-13
+  ============================================================================
+  Changes from 5.0.1 which do not affect scientific output:
+
+  1.  Added new file attributes prefixed with HDFEOS_FractionalOffset to each
+      dimension of the swath in every MODIS product file, to better document
+      the fact that when the HDF_EOS metadata is stricly interpreted, the
+      500m and 250m products are off by 250m and 125m in the track direction,
+      respectively.
+
+  2.  Corrected some misspelling of RCS keywords.
+
+  ============================================================================
+  V4.3.15 (Aqua)                                                     2004-12-30
+  ============================================================================
+  Changes from 4.3.1 which do not affect scientific output:
+
+  1. Changed makefile to allow building with SDP Toolkit 5.2.9.
+
+  ============================================================================
+  V5.0.1 (Aqua)                                                     12/10/2004
+  ============================================================================
+
+  Changes which affect scientific output:
+
+  1.  Code change for adding a new look-up-table,"swir_oob_sending_detector"
+      to the Reflective LUTs to enable the SWIR OOB correction detector
+      dependency, so that if any of the sending detectors becomes noisy or
+      non-functioning, near-by "good" detectors from the same sending band can
+      be specified as the substitute in the new look-up-table.
+
+  2.  Code change for adding an additional dimension of mirror side to the
+      Band_21_b1 LUT to separate the coefficient of the two mirror sides for
+      Band 21, just like other thermal emissive bands, so that the L1B code
+      can calibrate Band 21 scan-to-scan with mirror side dependency which
+      leads better calibration result.
+
+  Changes which do not affect scientific output:
+
+  3.  Casted Int32 variables and changed their format specifier in all the
+      sprintf calls to type "long" in the code to improve the code portability.
+
+  4.  Added "void" in the main function's parameter list to make the code
+      comply with the ESDIS guideline.
+
+  ============================================================================
+  V4.3.1_OC (Aqua) SPECIFIC CODE VERSION FOR OCEAN COLOR TEAM       06/07/2004
+  ============================================================================
+  Change which affects scientific output:
+
+      Logic was added to turn off the Band5 to Band_26 Crosstalk Correction 
+      when SDS EV_500m is absent from L1A output. Therefore, when the 500m EV 
+      data are not provided in L1A, this Crosstalk Correction will not be 
+      performed to the Band 26 calibration data.
+
+  Changes which do not affect scientific output:
+
+  1.  The code was changed to be able to ingest subsetted L1A file which might
+      not contain high-resolution bands EV and OBC SDSs so that it can
+      automatically detect the absence of these high-resolution SDSs. Data
+      processing dependent on these high-resolution bands is skipped and no
+      corresponding L1B EV and OBC data output are generated when these EV and
+      OBC SDSs are absent from L1A.
+
+  2.  New flags "res_250m_EV_exist" and "res_500m_EV_exist" were added to
+      record the existence of EV_250m and EV_500m SDSs in L1A input. New flags
+      "res_250m_OBC_exist" and "res_500m_OBC_exist" were added to detect the
+      existence of the high-resolution OBC SDSs (SD_250m, SV_250m, SRCA_250m,
+      BB_250m, SD_500m, SV_500m, SRCA_500m, and BB_500m) in L1A.
+
+  3.  Logic was added to turn off the 250m to 500m, 250m to 1000m, or 500m to
+      1000m spatial aggregation processes and the EV_250m_Aggr1km_RefSB and
+      EV_500m_Aggr1km_RefSB fields were set to fill values when SDSs EV_250m
+      and EV_500m are absent in L1A file.
+
+  4.  Logic was added to skip the processing and turn off the output of the
+      L1B QKM and HKM EV data when EV_250m and EV_500m are absent from L1A. In
+      this case, the new process avoids accessing and reading the 250m and
+      500m L1A EV data, skips creating, opening, and writing to the L1B 250m
+      and 500m EV output, omits reading and subsampling SDSs from geolocation
+      file and writing them to the L1B 250m and 500m output, omits writing
+      metadata to L1B 250m and 500m EV file, and skips closing the L1A and L1B
+      EV 250m and 500m SDSs.
+
+  5.  Logic was added to turn off the L1B OBC output when the high resolution
+      OBC SDSs are absent from L1A. This is accomplished by skipping the
+      openning of, the writing of metadata to, and the closing of the L1B OBC
+      hdf files.
+  ============================================================================
+  V4.3.1 (Aqua)                                                     11/07/2003
+  ============================================================================
+
+  Changes which do not affect scientific output:
+
+  1.  The derivation of the maneuver flag, which is Bit 1 in the scan-by-scan
+      bit QA flags, has been changed.  Until now, Level 1B has set the
+      "maneuver" bit flag on a scan-by-scan basis by  keying on the
+      SS_FR_SCIABNORM flag passed to Level 1B by the Level 1A  telemetry
+      data.  This flag is manually set by Flight Operations personnel,  who
+      have been primarily using it to indicate when a configuration change
+      has  been made to the instrument that would affect the science data
+      (e.g. sector  rotation). They do not, however, set the flag during
+      maneuvers, contrary to  the impression most data users had.  Since
+      there are many downstream users of the data who presume that the 
+      "maneuver" bit flag is set whenever the spacecraft undergoes maneuvers,
+      the  Level 1B code has been changed so that non-nadir pointing is
+      reflected by  this flag.  The flag is now set if any one of the yaw,
+      pitch, or roll angles is greater than a given threshold angles, which
+      are determined by QA LUTs.  The threshold angles given by the LUTs are
+      each currently set to 1 degree.  
+
+  2.  Added a new bit flag, Bit 26, to the scan-by-scan data quality flags.
+      The bit is the "Sci Abnormal" bit and indicates when  SS_FR_SCIABNORM
+      is set, thus preserving the information previously conveyed by the
+      "maneuver" bit.
+
+  3.  Two previously overlooked readings of NAD_OPEN were changed to read
+      NAD_CLSD (see V4.2.1 below).  This will affect *only* metadata output in
+      the rare instance that the telemetry mnemonic "CR_DR_NAD_OPEN" is
+      incorrect.
+
+  4.  The syntax of the metadata variable "ProductionHistory" was changed to
+      MODIS SDST's new "MODIS Convention for Setting ProductionHistory
+      Metadata Attribute" (by Shirley Read, August 15, 2003).  Examples of
+      the variable are
+      
+          "PGE02:1.2.3.4;PGE01:6.7.8", indicating that PGE02 Version 1.2.3.4 
+          and PGE01 Version 6.7.8 were used to produce the granule
+          
+          "PGE02:1.2.3.4;PGE01:6.7.8:mod01;PGE01:2.3.4:mod03", indicating that 
+          PGE02 Version 1.2.3.4, PGE01 V6.7.8 for MOD01, and PGE01 V2.3.4 for 
+          MOD03 were used to produce the granule.
+          
+      By convention adopted in late 2002, all MODIS/Terra PGE02 code versions
+      are even (e.g. 4.2.0, 5.6.8) and all MODIS/Aqua PGE02 code versions are 
+      odd (e.g. 4.2.1, 4.6.1).  The fourth digit of the PGE02 version denotes
+      the LUT version used to produce the granule.  
+
+  5.  The source of the metadata environment variable "ProcessingCenter" was
+      changed from a QA LUT value to the Process Configuration File (PCF) so
+      that direct broadcast users may change it if they wish.
+      
+  6.  The metadata environment variable "ProcessingEnvironment" was added. 
+      Its value is obtained by calling the appropriate POSIX function.
+      
+  7.  New metadata configuration files were introduced which change the PGE 
+      Collection number to "4" and add the "ProcessingEnvironment" variable.
+      
+  ============================================================================
+  V4.2.1                                                            06/04/2003
+  ============================================================================
+  Change which affects scientific output:
+  
+  The Earth-Sun distance calculation in L1B_Setup.c was changed to conform to
+  the MCST internal memo "The Earh_Sun Distance Correction for the MODIS
+  Reflective Product" by R. Clark, March 30, 1999. A "+" sign used in
+  error in the second-order term was changed to a "-".
+  
+  ============================================================================
+  V4.1.5                                                            04/25/2003
+  ============================================================================
+  Changes which affect scientific output:
+  
+  1.  Changed SWIR out-of-band correction "sending" band from being
+      hard-coded as Band 28 to being determined by a LUT value.  This was
+      done because MODIS/AQUA data shows significantly better SWIR
+      out-of-band correction if Band 25 is the "sending" band.  
+
+  2.  The destriping algorithm devised by C. Moeller for Band 26, already in
+      place for MODIS/TERRA code, was implemented for MODIS/AQUA. A
+      time-dependent LUT was added which gives coefficients for a
+      detector-specific crosstalk correction based on the aggregated Band 5
+      radiances.  The Band 26 scaled integers are adjusted by the Band 5
+      correction term, which is the product of the Band 5 radiance times the
+      ratio of the Band 5 to Band 26 scaling factors times the LUT correction
+      value for that detector.  In addition a new LUT which allows for a
+      frame offset with regard to the Band 5 radiance was added.  A LUT which
+      switches the correction off or on was also added.
+
+  Changes which very rarely affect scientific output:
+  
+  1.  Corrected the nominal platform height (the code had ~750 km; actual height is
+      ~705 km).  The height is used only once, to determine whether the Moon is in
+      the Space View Keep-Out Box (SV KOB).  If the Moon is in the KOB, the SV data
+      average, which is subtracted from Earth View data before calibration, is
+      calculated using only lower values.  Using the correct rather than the
+      incorrect height will result in the Moon being determined to be in the KOB
+      about 11% more than it is now, overall from about 0.41% of the time to about
+      0.45% of the time.  The effect on the product, while not zero, will be
+      minimal.
+
+  2.  Changed the telemetry mnemonic which determines whether the nadir aperture
+      door (NAD) is open to an equivalent mnemonic and altered the L1B code logic to
+      correctly use the new value.  It was discovered that at two different times in
+      the history of the MODIS/Terra instrument the mnemonic "CR_DR_NAD_OPEN" did
+      not correctly reflect the state of the NAD, whereas the mnemonic
+      "CR_DR_NAD_CLSD" has been consistently reliable.  The code has been changed
+      to use "CR_DR_NAD_CLSD" as a result.
+
+  Changes which do not affect output:
+
+  1.  Changed code to eliminate ANSI-C compliance warning messages to bring
+      the code into line with GDAAC requirements.  
+
+  2.  Changed the lower bound of "m1" from 0 to a small positive value
+      because division by m1 is performed in the code.
+
+  ============================================================================
+  V4.1.3                                                            12/18/2002
+  ============================================================================
+  Changes which do not affect scientific output:
+
+  1.  The R* LUT was eliminated and the equivalent formulation for R*, i.e.
+      1/(m1*e_sun_over_pi), was substituted for it in the only instance of its
+      use, which is in the calculation of the RSB uncertainty index.  This
+      reduces the size of the Reflective LUT HDF file by approximately 1/4 to
+      1/3.  The equivalent formulation of R* differed from the new by at most
+      0.056% in test granules and uncertainty differences of at most 1 count
+      (out of a range of 0-15) were found in no more than 1 in 100,000
+      pixels. 
+
+  2.  In Preprocess.c, a small error where the trailing dropped scan counter
+      was incremented when the leading dropped scan counter should have been
+      was fixed.  This counter is internal only and is not yet used for any
+      purpose.
+
+  3.  NEW MYD02OBC Metadata Configuration Files.  MCST wishes to have the OBC
+      files archived even when the Orbit Number is recorded as "-1". 
+      Accordingly, ECS has delivered new MCF files for OBC output having all
+      elements in the OrbitCalculatedSpatialDomain container set to
+      "MANDATORY=FALSE".  
+
+  4.  pgs_in.version is now reset to "1" in Metadata.c before the call to
+      look up the geolocation gringpoint information.
+
+  ============================================================================
+  V4.1.1    CODE SPECIFIC TO MODIS/AQUA (FM1)                       10/03/2002
+  ============================================================================
+  Two changes were made to the code which do not affect scientific output:
+
+  1.  A bug which caused PGE02 to fail when scans were dropped between granules
+      was fixed.  (The length of the error message generated was shortened.)
+
+  2.  Messages regarding an invalid MCST LUT Version or an invalid Write
+      High Resolution Night Mode Output value in the PCF file were added.
+
+  ==============================================================================
+  V4.1.0 CODE SPECIFIC TO MODIS/AQUA (FM1) (NEVER USED IN PRODUCTION) 07/30/2002
+  ==============================================================================
+
+  Changes which impact scientific output of code:
+
+  1.  The LUT type of the RVS corrections was changed to piecewise linear. 
+      In addition the RVS LUTs were changed from listing the RVS corrections
+      to  listing the quadratic coefficients necessary to make the RVS
+      corrections. The coefficients are now calculated by interpolating on
+      the granule collection time and the RVS corrections are then generated
+      using the interpolated coefficients.  Previously used Emissive and
+      Reflective RVS LUT tables were eliminated and new ones introduced.
+
+  Several changes were made to the code which should not affect scientific
+  output.  They are:
+
+  1.  The ADC correction algorithm and related LUTs were stripped from the
+      code.  (The ADC correction has always been set to "0" so this has no
+      scientific impact.)
+
+  2.  Some small changes to the code, chiefly to casting of variables, were
+      added to make it LINUX-compatible.  Output of code run on LINUX
+      machines displays differences of at most 1 scaled integer (SI) from
+      output of code run on IRIX machines.  The data type of the LUT
+      "dn_sat_ev" was changed to float64 to avoid discrepancies seen between
+      MOD_PR02 run on LINUX systems and IRIX systems where values were
+      flagged under one operating system but not the other.
+
+  3.  Checking for non-functioning detectors, sector rotation, incalculable
+      values of the Emissive calibration factor "b1", and incalculable values
+      of SV or BB averages was moved outside the loop over frames in
+      Emissive_Cal.c since none of these quantities are frame-dependent.
+
+  4.  The code was altered so that if up to five scans are dropped between
+      the leading/middle or middle/trailing granules, the leading or trailing
+      granule will still be used in emissive calibration to form a
+      cross-granule average.  QA bits 25 and 26 are set for a gap between the
+      leading/middle and middle/trailing granules respectively.  This may in
+      rare instances lead to a change in emissive calibration coefficients
+      for scans at the beginning or end of a granule.
+
+  5.  (MODIS/AQUA ONLY)  The name of the seed (error message) file was
+      changed from "MODIS_36100.h" to "MODIS_36110.h".    
+
+  6.  Metadata.c was changed so that the source of the geolocation metadata
+      is the input geolocation file rather than the L1A granule.
+
+  7.  To reduce to overall size of the reflective LUT HDF files, fill values
+      were eliminated from all LUTs previously dimensioned "BDSM"
+      ([NUM_REFLECTIVE_BANDS] * [MAX_DETECTORS_PER_BAND] * 
+      [MAX_SAMPLES_PER_BAND] * [NUM_MIRROR_SIDES])  in the LUT HDF files. 
+      Each table piece is stored in the HDF file with dimensions
+      NUM_REFLECTIVE_INDICES, where
+
+      NUM_REFLECTIVE_INDICES = 
+        [NUM_250M_BANDS * DETECTORS_PER_250M_BAND *
+          SAMPLES_PER_250M_BAND * NUM_MIRROR_SIDES] +
+        [NUM_500M_BANDS * DETECTORS_PER_500M_BAND *
+          SAMPLES_PER_500M_BAND * NUM_MIRROR_SIDES] +
+        [NUM_1000M_BANDS * DETECTORS_PER_1KM_BAND *
+          SAMPLES_PER_1KM_BAND * NUM_MIRROR_SIDES]
+
+      with SAMPLES_PER_250M_BAND = 4, SAMPLES_PER_500M_BAND = 2, and
+      SAMPLES_PER_1KM_BAND = 1.
+
+      Values within each table piece appear in the order listed above. The
+      overall dimensions of time dependent BDSM LUTs are now 
+      [NUM_TIMES] * [NUM_REFLECTIVE_INDICES], where NUM_TIMES is the number 
+      of time dependent table pieces.
+
+  8.  Checking for non-functioning detectors, sector rotation, incalculable
+      values of the Emissive calibration factor "b1", and incalculable values
+      of SV or BB averages was moved outside the loop over frames in
+      Emissive_Cal.c since none of these quantities are frame-dependent.
+
+  9.  The code was altered so that if up to five scans are dropped between
+      the leading/middle or middle/trailing granules, the leading or trailing
+      granule will still be used in emissive calibration to form a
+      cross-granule average.  QA bits 25 and 26 are set for a gap between the
+      leading/middle and middle/trailing granules respectively.  This may in
+      rare instances lead to a change in emissive calibration coefficients
+      for scans at the beginning or end of a granule.
+
+  10. The array of b1s in Preprocess.c was being initialized to -1 outside
+      the loop over bands, which meant that if b1 could not be computed, the
+      value  of b1 from the previous band for that scan/detector combination
+      was used.   The initialization was moved inside the band loop.  
+
+  ============================================================================
+  V3.1.0  (Original Aqua-specific code version)                  02/06/2002
+  ============================================================================
+
+    AQUA-Specific changes made:
+
+  1.  A correction to a problem with blackbody warmup on bands 33, 35, and 36 
+      was inserted. PC Bands 33, 35, and 36 on MODIS Aqua saturate on BB 
+      warmup before 310K, which means current code will not provide correct b1 
+      calibration coefficients when the BB temperatures are above the 
+      saturation threshold.  A LUT with default b1s and band-dependent 
+      temperature thresholds will be inserted in code.  If the BB temperature 
+      is over the saturation threshold for the band, the default b1 from the 
+      table is used.
+
+  2.  The number of possible wavelengths in the Emissive LUT RSR file was 
+      changed to 67 in order to accommodate the Aqua RSR tables.  
+
+  3.  Several changes to the upper and lower bound limits on LUT values were
+      inserted.    
+
+    Changes to both Aqua and Terra Code:
+
+  1.  A check was put into Emissive_Cal.c to see whether the value of b1 being
+      used to calibrate a pixel is negative.  If so, the pixel is flagged with
+      the newly created flag TEB_B1_NOT_CALCULATED, value 65526, and the number 
+      of pixels for which this occurs is counted in the QA_common table.
+
+  2.  The array of b1s in Preprocess.c was being initialized to -1 outside the
+      loop over bands, which meant that if b1 could not be computed, the value 
+      of b1 from the previous band for that scan/detector combination was used.  
+      The initialization was moved inside the band loop.  
+
+  3.  Minor code changes were made to eliminate compiler warnings when the code
+      is compiled in 64-bit mode.
+
+  4.  Temperature equations were upgraded to be MODIS/Aqua or MODIS/Terra
+      specific and temperature conversion coefficients for Aqua were inserted.    
+
+  ============================================================================
+  ============================================================================
+     ALL CHANGES BELOW ARE TO COMMON TERRA/AQUA CODE USED BEFORE 02/06/2002
+  ============================================================================
+  ============================================================================
+  v3.0.1                                                         11/26/2001
+  ============================================================================
+    Several small changes to the code were made, none of which changes the 
+    scientific output:
+  1.  The code was changed so that production of 250m and 500m resolution data
+      when all scans of a granule are in night mode may be turned off/on through
+      the PCF file.
+  2.  A check on the times of the leading and trailing granules was inserted.  If
+      a leading or trailing granule does not immediately precede or follow
+      (respectively) the middle granule, it is treated as a missing granule and a
+      warning message is printed.
+  3.  The code now reads the "MCST Version Number" (e.g. "3.0.1.0_Terra") from
+      the PCF file and checks it against the MCST Version number contained in the
+      LUT HDF files.  This was done to allow the user to make sure the code is
+      being run using the correct LUT files.  (The designators "0_Terra",
+      "1_Terra", etc.) refer to the LUT versions.)
+  4.  A small bug in Preprocess.c was corrected; an array had not been
+      initialized.
+  5.  Several spelling and grammar corrections were made.
+
+  ============================================================================
+  v3.0.0                                                          4/01/2001
+  ============================================================================
+  (Principal changes)
+  1. The mechanics of setting some ECS core metadata was changed.
+     ReprocessingPlanned and ReprocessingActual are now set using run-time
+     parameters from the PCF (LUNs 800600 and 800605, respectively).
+     The "vvv" field of the LocalGranuleID is now set from the VersionID,
+     which is read from the appropriate MCF.
+     Previously, the above metadata values were hard-coded.
+  2. A problem calculating the average background DN for SWIR bands when the
+     moon is in the space-view port was corrected.  The new algorithm used to
+     calculate the average background DN for all reflective bands when the
+     moon is in the space-view port is now the same as the algorithm employed
+     by the thermal bands.  For non-SWIR bands, changes in the averages are
+     typically less than 0.1 %.  Also for non-SWIR bands, the black-body DNs
+     remain a backup in case the SV DNs are not available.  For SWIR bands,
+     the changes in computed averages were larger because the old algorithm,
+     which used the black-body DNs, suffered from contamination by the 5.3
+     micron leak. As a consequence of the change, if SV DNs are not available
+     for the SWIR bands, the EV pixels will not be calibrated (i.e., the BB
+     DNs are not used as a backup for the SWIR bands).
+  3. Piecewise linear LUT capability was added to the code.  If a LUT table is
+     marked as piecewise linear, the granule time is used to identify the
+     appropriate tables within the set given for one LUT table (e.g. m1) to be
+     used for interpolation.  The table values will be linearly interpolated
+     using the tables corresponding to the node times bracketing the granule
+     time.  If the granule time falls before the time of the first node or after
+     the time of the last node, the first two or last two tables respectively
+     will be used for the interpolation.  If there is only one LUT in the set of
+     tables, it will be treated as a constant LUT.
+  4. The manner in which Earth View data is checked for saturation was changed. 
+     Previously the raw Earth View DNs and Space View DNs were checked against
+     the lookup table values contained in the table dn_sat.  The change made is
+     to check the raw Earth and Space View DNs to be sure they are less than the
+     maximum saturation value and to check the Space View-subtracted Earth View
+     dns against a set of values contained in the new lookup table dn_sat_ev.
+  5. The metadata configuration files (MCFs) were changed to remove 
+     "ASSOCIATEDPLATFORMSHORTNAME.2", "ASSOCIATEDSENSORSHORTNAME.2", and
+     "ASSOCIATEDINSTRUMENTSHORTNAME.2" from the MOD02HKM product.  The same
+     metatdata with extensions ".3" and ".4" were removed from the MOD021KM and
+     MOD02OBC products.  "ASSOCIATEDSENSORSHORTNAME" was set to "MODIS" in all
+     products.  These changes are reflected in new File Specification documents,
+     which users may consult for exact details.
+
+  (Other changes)
+  1. Following a suggestion by Xinmin Hua of EOS, the "pow" functions were
+     eliminated in Emissive_Cal and Emissive bands preprocessing, replaced
+     by more efficient code.  Other calculations throughout the code were
+     also made more efficient. Aside from a few round-off differences, there
+     was no difference to the product.  The CPU time decreased by about
+     25% for a day case and 50% for a night case.
+  2. A minor bug in calculating the uncertainty index for emissive bands
+     was corrected.  The frame index (0-based) was previously being used
+     the frame number (1-based) should have been used.  There were only a
+     few minor changes to the uncertainty index (maximum of 1 digit).
+  3. Some inefficient arrays (Sigma_RVS_norm_sq) were eliminated and some
+     code lines in Preprocess_L1A_Data were moved into Process_OBCEng_Emiss.
+     There were no changes to the product. Required RAM was reduced by 20 MB.
+     Now, the required RAM for each execution is 57 MB on the DEC ALPHA and
+     47 MB on the SGI Octane.
+
+  v2.5.5                                                          01/12/2001
+  ============================================================================
+  (Principal changes)
+  1. In previous versions, aggregated images were misregistered with respect
+     to the native resolution images. The aggregation algorithm was changed
+     to correct this misregistration.  This affects all aggregated images
+     (250_to_500, 250_to_1km, 500_to_1km).  Correlation coefficients are now
+     typically 98 to 99% whereas before they were typically 80 to 90%.
+  2. The output products follow new file spec versions: V2.5.1, 1/12/2001.
+     The main changes in the file specs were related to adding the new QA
+     and uncertainty attributes described in "Other Changes", below.
+
+  (Other changes)
+  1. Added a global attribute "Granule Average QA Values" (float32, count=50)
+     to hold selected temperatures and voltages that MCST will use in
+     performing QA on the product. (CCR 528).
+  2. Added a new category of scaled integer unusable data value: 65529, which
+     will be set in the product EV scaled integers for thermal bands if the
+     radiance exceeds the maximum used for scaling to the scaled integers or
+     for reflective bands if dn** exceeds the maximum used for scaling.
+     Previously, the scaled integer would have been set to 32767, a number in
+     the valid range.  However, that is not appropriate for these cases
+     because the number is actually invalid.  Now, those instances will have
+     a value that is not in the valid range. (CCR 528)
+  3. Added the following attributes to each uncertainty index (UI) SDS:
+     "specified_uncertainty", float32, count = number of bands in the SDS
+     "scaling_factor", float32, count = number of bands in the SDS
+     "uncertainty_units", string, value = "percent".
+     These may be used to convert the UI into uncertainty in percent.
+  4. Obsolete code lines related to "DN_sat_prime" were removed.  Also, since
+     the new SWIR correction algorithm implemented in V2.5.4 is now a simple
+     one or two line algorithm, it is in-lined in Reflective_Cal. There are
+     no changes in the product.
+  5. Added global attribute "Solar Irradiance on RSB Detectors over pi",
+     which records, for reflective detectors, the RSR-weighted solar
+     irradiance for reflective bands divided by pi, or "Esun".  Also, the
+     computation of the band-dependent radiance_scales for RSBs now uses
+     the average of Esun over the detectors within a band rather than the
+     value for one of the detectors in the band.  While this causes no
+     change to the product scaled integers, the computed radiances from
+     those scaled integers may be changed slightly (< 0.1 %).
+  6. Obsolete code related to overlap scans in emissive preprocessing was
+     deleted.  As part of this, LUT "Number of overlap scans for temperatures"
+     was deleted and the LUT name "Number of overlap scans for b1 and T BB"
+     was changed to "num_overlap_scans_b1".  There was no change
+     in any product.
+  7. A character buffer was added in function "read_attribute" to correct
+     a bad coding practice that was allowed on some machines but not others.
+     There was no change to the product.
+
+  v2.5.4                                                          12/01/2000
+  ============================================================================
+  1. The SWIR OOB leak correction algorithm, implemented in function
+     SWIR_out_of_band_correction, was changed. The new algorithm comes from
+     a memo by Jack Xiong, 12/01/2000.  The correction to SWIR band dn is now
+     based on a quadratic equation in terms of dn_28, the dn determined for
+     band 28.  The coefficients of the quadratic relation are input as LUTs.
+     As part of the new algorithm, there were structural changes to the
+     Reflective LUTs file.  All SWIR correction LUTs except the switch
+     were removed and three new SWIR correction LUTs were added.  This change
+     is expected to improve calibration of the SWIR bands (5,6,7,26) when the
+     leak correction switch is turned ON.  No other bands are affected.
+
+  v2.5.3 (NOT USED IN OPERATIONS)                                 11/22/2000
+  ============================================================================
+  1. In response to a failure of the GDAAC "PDPS" system reading the PGE02
+     V2.5.2 PCF file, the L1B code was changed to avoid reading a long, exact
+     string within the line beginning with LUN 800510.  The function
+     "PGS_MET_GetConfigData" was replaced with "PGS_PC_GetConfigData" for
+     reading the value associated with LUN 800510.  There are no changes to
+     the actual L1B products.
+
+  v2.5.2 (NOT USED IN OPERATIONS)                                 11/01/2000
+  ============================================================================
+  1. Incorporate new MCFs received from ECS (Descriptor revision = "1.2").
+     This version conforms to the new Terra/Aqua product format of file
+     specifications: V2.5.0, Release 2, 8/18/2000.
+  2. Added a QA LUT "Control Options" to allow disabling checks for split
+     scans and invalid scan quality array values.  In the new L1A output
+     product, there are a significant number of the latter (everywhere that
+     split scans were fixed there now are invalid values in the second element
+     of Scan quality array).  However, these invalid values are most likely
+     due to a counting bug in L1A rather than bad data within the scan.  Thus,
+     the LUT will be set to OFF (0) to maximize the amount of data calibrated.
+
+  v2.4.4                                                          09/26/2000
+  ============================================================================
+  The product format for this version follows the L1B V2.4.1, 07/10/2000,
+  file specifications.  This version is intended for Terra operations only.
+  The changes listed below are changes from V2.4.3.
+  1. The HDF-EOS Dimension Name for MOD021KM Geo Data Sets was changed from
+     "Max_EV_frames/5+1" to "1KM_geo_dim". This corrects the problem where
+     "/" is an illegal character in the dimension name.
+  2. Changes were made in emissive bands pre-processing to correct two
+     situations where emissive band radiances may contain errors:
+     a) in the 40 scans immediately before or after a sector rotation, and
+     b) if an ECAL ends in the last 40 scans of the leading granule or begins
+        in the 1st 40 scans of the trailing granule.
+     The magnitude of the errors produced in the above situations could be
+     quite large.  However, since sector-rotation events and ECALs are rare,
+     the total number of scans affected by these situations has been very
+     small compared to the total number of scans collected thus far by MODIS.
+  3. An indexing bug in the SWIR out-of-band correction algorithm was
+     corrected. The bug caused the code to improperly use the band 29 radiance
+     in the algorithm rather than the band 28 radiance. This bug will cause
+     errors in radiances and reflectances of all SWIR bands (bands 5,6,7,26)
+     if the SWIR OOB correction switch is turned ON (value = 1 of the LUT
+     "SWIR_OOB_correction_switch"). Currently, this switch is set to OFF
+     (value = 0).  However, products produced with LUTs prior to V2.4.3.1
+     had the SWIR correction switch turned "ON", and thus contain errors.
+  4. A new algorithm was implemented to compute the average space view (SV)
+     DN for emissive bands when the moon is in the SV port.  Previously, if
+     the moon was determined to be in the SVP, emissive bands were not
+     calibrated (the scaled integers were set to the value 65526).  Now, the
+     emissive bands will be calibrated when the moon is in the SV port.
+     A new LUT was added to define the number of frames to include.
+  5. A bug was corrected in emissive bands preprocessing when calculating the
+     signal to noise ratio (SNR).  This bug caused all values of SNR to be
+     zero.  The effects of the bug were twofold: (1) One term in the
+     calculation of emissive bands uncertainty (NEdL/L_ev) was always zero.
+     Thus, some values in "EV_1KM_Emissive_Uncert_Indexes" will be increased
+     as a consequence of correcting this bug. (2) The values of the metadata
+     "Noise in Thermal Detectors" were always zero.  After correcting the bug,
+     non-zero values appear in this SDS.
+  6. A bug was corrected when calculating values for the metadata "Change in
+     relative responses of thermal detectors".  This bug occurred only if
+     missing scans were present in the granule.  The effect of the bug was to
+     cause some values of this metadata to be erroneously set to zero if
+     there were any missing scans in the granule.  After correcting this bug,
+     it is expected that all values of this metadata will be non-zero.
+  7. A bug in function "Determine_Split_Scans" and its subordinate function
+     was corrected.  The bug applied to the relatively rare case when an
+     abnormally short time gap in "SD start time" was present in the data but
+     was NOT associated with a split scan.  The bug caused MOD_PR02 to fail
+     catastrophically (probable core dump).  Three such failures have been
+     identified during the past month.
+  8. A bug in determining the metadata "% L1A EV RSB DN Not in Day Mode" was
+     corrected.  Erroneous values were present in cases where there were split
+     scans or a bad scan quality flag in the L1A granule.
+  9. The algorithm used to set bits 18-19 (SRCA calibration mode) in the
+     Bit QA Flags was changed to use the macro ID.  The previous method used
+     the SDS "SRCA calibration mode", which was unreliable on a scan-by-scan
+     basis.  Now when bits 18-19 are set to 1-1, this indicates that there is
+     no SRCA macro running.  Whether the SRCA is actually on for these scans
+     may be determined by examining bits 8,9 of the second word of the
+     Electronics Redundancy Vector.
+
+  v2.5.1 (NOT USED IN OPERATIONS)                                 08/24/2000
+  ============================================================================
+  1. A minor bug was fixed in function "Open_and_Read_L1A".  In the previous
+     version, the return status not properly set, which caused a spurious
+     error message to appear in the LogReport file (no other output files
+     were affected).  After correction, the spurious message was removed.
+
+  v2.5.0 (NOT USED IN OPERATIONS)                                 08/15/2000
+  ============================================================================
+  1. Changes were made for Aqua compatibility. Checking the consistency of all
+     the input files and ancillary files in terms of satellite instrument were
+     added in the code. Some inventory metadata are different for Terra and 
+     Aqua in the output products. These differences require that execution of 
+     the code with Aqua data must use a different set of MCF files from an 
+     execution with Terra data.  The structure of the 
+     AssociatedPlatformInstrumentSensor group changed in both the Terra and 
+     Aqua MCF files.  Those values are now defined in the MCF file rather than 
+     in the code.  An input run-time parameter (LUN = 800510) was added to the 
+     PCF file to identify the satellite.
+  2. The HDF-EOS Dimension Name for MOD021KM Geo Data Sets was changed from
+     "Max_EV_frames/5+1" to "1KM_geo_dim" based on CCR 525. There are same
+     changes in the output products.
+  3. The following obsolete metadata were removed based on CCR 526:
+       "Post Processing Indicates Bad data"
+       "Managers VIS/NIR Quality Index"
+       "Managers SWIR Quality Index"
+       "Managers MWIR/LWIR Quality Index"
+       "Discontinuities in linear gain b1 across granules"
+     The following obsolete SDS attributes were removed also based on the 
+     same CCR:
+       "corrected_counts..." attributes of EV_1KM_Emissive SDS
+     All these data are actually removed from the output products.
+  4. The algorithm used to set bits 18-19 (SRCA calibration mode) in the
+     Bit QA Flags was changed to use the macro ID.  The previous method used
+     the SDS "SRCA calibration mode", which was unreliable on a scan-by-scan
+     basis.  Now when bits 18-19 are set to 1-1, this indicates that there is
+     no SRCA macro running.  Whether the SRCA is actually on for these scans
+     may be determined by examining bits 8,9 of the second word of the
+     Electronics Redundancy Vector.
+
+  v2.4.3                                                          07/25/2000
+  ============================================================================
+  1. Logic for invalid values of "Scan quality array" was changed. Previously,
+     an invalid value of Scan quality array would result in a MOD_PR02 error
+     exit (whole granule was lost).  Now, if an invalid value is encountered,
+     the scan is treated as missing and the rest of the scans of the granule
+     are processed normally.
+  2. A logic error in Preprocess was corrected for saving the value of
+     Band 31 dn_bb values.  Previously, the value from the wrong scan and
+     detector was being used for the PC bands cross-talk correction algorithm.
+     Since the values are fairly stable from detector to detector and scan
+     to scan, there will only be a small change in the Emissive bands.
+     In a representative test case, the maximum change was about 0.5%.
+  3. A function was added to fill in interpolated scaled integer (SI) values
+     for pixels that correspond to a dead detector (as flagged in the QA LUT
+     "Detector Quality Flag Values").  The value is a linear average of valid
+     SI values from the two nearest live detectors within the same scan.  If
+     two valid values are not available for the average, then one valid value
+     is used (simply copied). If no valid values are available, then the pixel
+     is set to 65531 (as in previous versions).  Users of the product may
+     identify scan lines that are affected by looking at the attribute
+     "Dead Detector List".  A side effect is that the value of the ECS core
+     metadata field "QAPERCENTINTERPOLATEDDATA" may now be non-zero.
+     The file specifications were updated to describe this change.
+  4. The LUT ingest architecture was changed to incorporate data-collection-
+     time-dependent LUTs.  The LUT file architectures were changed such that
+     scalar, numerical LUTs implemented as global attributes were changed to
+     be SDSs.  There were several such changes in each LUT HDF file.
+     When the values of the LUTs remain the same, there are no changes in the
+     output products.
+  5. In Granule.c, one instance of function "sqrtf" was changed to "sqrt"
+     because some compilers do not support the sqrtf function.  There was no
+     change in the product.
+
+  v2.4.2                                                          06/09/2000
+  ============================================================================
+  1. A bug in Emissive_Cal was fixed.  The indexing of Planck_mir was B_emiss
+     but should have been D_emiss.  This was causing erroneous data in all
+     emissive bands radiances.  Thus, there will be substantial changes in
+     all emissive bands radiances.
+
+  v2.4.1 (NOT USED IN OPERATIONS)                                 05/05/2000
+  ============================================================================
+  The macros controlling the maximum number of scans (Granule.h) were raised
+  to allow processing of a MOD01 granule with up to 208 scans.  Also, an
+  algorithm was included to detect occurances of "split" scans, which are the
+  root cause of the number of scans in a MOD01 granule exceeding 204.  When a
+  "split" scan is detected, the output product scaled integers for that scan
+  will be set to the fill value of 65535.
+
+  v2.4.0 (NOT USED IN OPERATIONS)                                 04/24/2000
+  ============================================================================
+  1. New MCFs were delivered by ECS and incorporated into this version.  There
+     were no code changes required for the new MCFs.  The effect on the
+     product was: (a) a default value of "Not Investigated" was set in the MCF
+     for the core metadata field ScienceQualityFlag, (b) a new archive
+     metadata field, DESCRREVISION, was added and a a value of "1.0" was set
+     in the MCF file.  The file specs were changed to reflect these changes.
+  2. The production rules (MOD_PR02_production_rules.txt) were changed in
+     accordance with CCR 519.  This change formally implements the change
+     described below under version "v2.3.2 (emergency makefile modification)".
+     The makefile "MOD_PR02.mk" was modified as described in that section.
+     The possible changes in the product are described in that section.
+  3. A new MOD_PR02 failure exit code was added as approved in CCR 520.
+     Previously, the only failure exit code was a "1".  Now, when the current
+     MOD01 granule is found to have no scans (empty granule), MOD_PR02 will
+     exit with an exit code of 233.  This failure exit code is passed out as
+     the PGE02 exit code.
+  4. A check on the MOD01 Number of Scans was added to Read_L1A_OBCEng to 
+     enable detection of empty MOD01 current granules and to produce a clear
+     error message.  There were no other changes to the products.
+  5. Several QA attributes approved in CCR 508 were added.  These do not
+     change the product instrument and uncertainty SDSs.  The file specs
+     were changed to reflect these new attributes.
+  6. A bug in the algorithm for determining the moon in the SV port was
+     corrected.  Previous instances where the moon was flagged to be in the
+     SV port for thermal bands were erroneous.  Other than the periods when
+     the moon was erroneously flagged to be in the SV port, there are no
+     changes to the product due to this change.
+
+  v2.3.2 (emergency makefile modification)                        02/25/2000
+  ============================================================================
+  Because of the high number of PGE01 production failures during the checkout
+  phase, some MOD01 data could not be processed under the current production
+  rules of requiring 3 successive MOD01 granules. To try to maximize the data
+  generated, an emergency change to the V2.3.2 makefile was made to allow
+  processing without a previous or following MOD01 granule if the granule is
+  not available at the time of execution for MOD_PR02.  The following is
+  the text of the change as sent to the GDAAC:
+
+       The change is to the MOD_PR02 makefile:
+
+               MOD_PR02.mk
+
+       which is not included in the tar file.  Only the comparison input
+       and output files are included.  GDAAC personnel will modify the
+       MOD_PR02 makefile as follows. Add the following to the "ADD_CFLAGS"
+       macro:
+
+           -DALLOW_MISSING_GRANULES
+
+       MOD_PR02 should then be completely recompiled and re-linked.
+
+       If a previous or following MOD01 granule is not available, then
+       do not define those LUNs in the PCF.  This instruction applies
+       to LUNs 500000 (previous MOD01 granule) and 500002 (following
+       MOD01 granule).  Set the wait timers to zero for both the previous
+       and following granules.
+
+       In the comparison files supplied with this patch, the LUNs
+       500000 (previous MOD01 granule) and 500002 (following MOD01 granule)
+       were not defined in the PCF.
+
+  If the previous and following granules are not included in the execution,
+  there is no effect on the product for 250m and 1km reflective solar bands.
+  For thermal emissive bands there is a small effect on scans near the granule
+  boundary.  To date, using simulated data, typical maximum percentages
+  changes in the "EV_1KM_Emissive" SDS between a product calculated using all
+  three MOD01 granules and a product calculated with the previous and
+  following granules missing are less than 0.1 %.  For the 500m SWIR
+  reflective solar bands, there is an effect on the product because the
+  algorithm uses the band 28 radiance.
+
+  v2.3.2                                                          01/05/2000
+  ============================================================================
+  A printf inside a preprocessor #ifdef block was removed from Granule.c.
+  There were no changes to the product from this code change.
+
+  v2.3.1 (NOT USED IN OPERATIONS)                                 12/28/1999
+  ============================================================================
+  1. The meaning of _FillValue for scaled-integer, uncertainty and samples-
+     used EV SDSs was changed to include reflective band data at night.  This
+     change actually restores the meaning of _FillValue for those SDSs to the
+     meaning prior to V2.3.0.  In V2.3.0, implementation of a unique value
+     for RSB at night (as per CCR 505) resulted in the night mode granules
+     becoming the same size as the day mode granules.  By restoring the
+     meaning of _FillValue to include reflective band data at night, the
+     night-mode granule sizes prduced by V2.3.1 are restored to their reduced
+     sizes of 21 MB for the 250m and 500m products, and 136 MB for the 1km
+     product.
+
+  v2.3.0 (NOT USED IN OPERATIONS)                                 12/14/1999
+  ============================================================================
+  1. The current version reflects changes implemented for the following CCRs
+     which were approved: 470, 491, 498, 501, 502, 505, and part of 508.
+     The following CCRs were rejected but notes were added to the file specs
+     alerting users that certain data items will be removed after launch +
+     6 months: 485, 488, 504, part of 508.  Note that for CCR 508, several
+     new attributes were approved to be added and two bits redefined in the
+     BIT QA flags.  Only the redefinition of the two bits was implemented
+     in this release.
+  2. Both TEB and RSB uncertainty algorithms were substantially revised. Also,
+     bugs in converting uncertainty to uncertainty index were corrected.
+     Thus, there may be substantial changes in the uncertainty index SDSs for
+     this release compared to the last release.
+  3. Several new LUTs were added, several old LUTs were deleted and several
+     LUTs had name changes.  Thus, the LUT files (Emissive_Lookup_Tables_file,
+     Reflective_Lookup_Tables_file and QA_Lookup_Tables_file) for previous
+     releases are not compatible with this release.
+  4. The reflective calibration algorithm changed, resulting in small changes
+     to the reflective bands scaled integer SDSs and their scaling attributes.
+     However, there should be relatively little change in the reflectance and
+     radiance products (except for SWIR bands, described below).
+  5. A new SWIR band calibration algorithm was implemented.  Thus, there may
+     be substantial changes in the SWIR band reflectance and radiance from
+     previous releases.
+  6. Error messages were upgraded to include the LUN of the input or output
+     file when trying to open/close files and for nearly all I/O operations.
+     Fatal error messages also write out operator actions.
+  7. The operator actions (in file "error_messages.txt") were updated.
+  8. The computation of variance for computing "Noise in ..." metadata was
+     found to be inaccurate at the float32 precision level and was upgraded.
+     Thus, some substantial changes in these metadata items may occur from
+     the previous release.
+  9. Added logic to allow the L1A sector DN values to be the HDF fill value
+     of -32767 as an alternative missing DN flag.  This is due to a defect in
+     the MOD_PR01 code when there are completely missing scans (they do not
+     set the value of DN to -1 as described in file specs).
+  10.Implemented code which assumes that the SD Sun azimuth and SD Sun zenith
+     angles in the MOD03 product are in radians rather than in degrees. This
+     is because the current MOD03 product writes these angles in radians,
+     which conflicts with the MOD03 file spec.  CCR 512 has been filed to
+     change the file spec to describe these angles in radians rather than
+     degrees. Depending on the resolution of CCR 512, the assumption may be
+     incorrect.  The only item in the L1B output products that may be affected
+     is bit 11 of the Bit QA Flags.
+
+  v2.2.0                                                           5/30/1999
+  ============================================================================
+  The algorithms for calculate average background DN were changed. The
+  OBC file specification was changed. The uncertainty algorithms was changed.
+  Algorithm about saturation of reflective band detectors was added. 
+  Reflectance and radiance calibration scales of reflective bands algorithm
+  was changed. LUTs were changed due to the new algorithms. The scientists in
+  MCST have better understanding of the system and believe these changes
+  will make the calibration more accurate. The output product for EV
+  files is the same. 
+
+  v2.1.5                                                           4/28/1999
+  ============================================================================
+  1. Fixed a bug by changing some variable type from float32 to
+  int32. The output QAPERCENTMISSINGDATA, QAPERCENTINTERPOLATEDDATA and
+  QAPERCENTOUTOFBOUNDSDATA will be within the range[0,100] after this
+  bug was fixed.
+
+  v2.1.4                                                            4/2/1999
+  ============================================================================
+  1. Changed swir band lookup table values to turn off the swir band correction.
+
+  v2.1.3                                                           3/30/1999
+  ============================================================================
+  1. Assigned realistic numbers in the LUTs so that the output L1B products
+     have reasonable radiances. Output product changed.
+     (a) Incorporated new R_star and L_sd values in LUTs.
+     (b) DN_to_DN_star: The averaged space-view DN is now being subtracted from
+         DN'.  The RVS term involving the space view was removed.
+     (c) Emissive_Cal:  There was a bug in initializing dn_ev involving the block
+         for ADC correction.  After the "if () { ...}", we added:
+         else {
+             dn_ev = DN_ev;
+         }
+         which resolved the issue.
+
+  2. PreprocessP.h:  Reset macro "FIRST_SV_1km_FRAME_TO_USE from 0 to 10. 
+     (no significant change to product).
+
+  3. Get_All_Emiss_Coeff:  There was a bug in the computation of average b1
+  for each scan:  it was missing the divide by num_scans.  This has been
+  fixed. (no significant change to product).
+
+  4.  Get_L1B_SD_SRCA_BB_SV:  There was an indexing problem in how the arrays
+  of the DNs were being filled.  This has been corrected.  As a consequence
+  of fixing this, we removed an extremely inefficient array so that our stack
+  size requirement dropped from 161 MB to 114 MB.  This changes the OBC product
+  only.
+
+  5.  MCF Files:  Made minor changes to the MCF file in order to clean up some
+                  Metadata.
+
+  6.  Metadata.c:  The name of the global attribute:
+          "Post Processing Indicates Bad Data" (the way the code implements)
+          was changed to
+          "Post Processing Indicates Bad data" (the way the file specs read)
+
+
+
+

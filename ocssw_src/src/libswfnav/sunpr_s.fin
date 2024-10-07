@@ -1,0 +1,23 @@
+c
+c  include file: sunpr_s.fin 
+c
+c  Purpose: define structure for processed sun angle data
+c       This data is the fitted sun angles for each scan line
+c
+c  By: W. Robinson, GSC, 5 Apr 93 
+c
+c  Modification History:
+c
+
+c
+      type sunproc_struct
+c       
+c
+         real(4) :: ang(2,maxlin)   ! sun angle 1 and 2 for all lines
+         integer(4) :: flag(maxlin) ! quality flags for the angles
+                                ! 0 - good, 1 - bad
+      end type
+c
+c       record should probably be called sunproc(3) for 3 sensors
+c
+c       and end

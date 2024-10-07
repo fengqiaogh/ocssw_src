@@ -1,0 +1,89 @@
+#include <string.h>
+#include "l1io.h"
+#include <mfhdf.h>
+
+int32 read_sd(l1info_struct l1info, char *arr_name, float *array)
+/*******************************************************************
+
+   read_sd
+
+   purpose: read a full science dataset to a float array
+
+   Returns type: int32 - return status: 0 is good
+
+   Parameters: (in calling order)
+      Type              Name            I/O     Description
+      ----              ----            ---     -----------
+      struct l1info_struct   l1info      I      information  struct
+                                                about the opened file
+      char *            arr_name         I      name of science dataset 
+                                                to read
+      float *           array            O      array of data from the sds
+                                                already allocated outside
+
+   Modification history:
+      Programmer        Date            Description of change
+      ----------        ----            ---------------------
+      W. Robinson       9-Feb-1995      Original development
+
+ *******************************************************************/
+ {
+    int j;
+    int32 index, rank, sdid, numbertype, nattrs, data_dims[5];
+    int32 start[5], edge[5];
+    char name[H4_MAX_NC_NAME]; /*  MAX_NC_NAME is max # chars for this */
+
+    /*
+     *  SDnametoindex is used to zero in on the data we want,
+     *  ie. get the index of the data
+     */
+    if ((index = SDnametoindex(l1info.sdfid, arr_name)) < 0) {
+        printf("read_sd: couldn't find %s in the dataset\n",
+                arr_name);
+        return -1;
+    }
+
+    /*
+     *  next, get the SD ID for the data
+     */
+    if ((sdid = SDselect(l1info.sdfid, index)) < 0) {
+        printf("read_sd: Failed in SDselect for item %s\n",
+                arr_name);
+        return -1;
+    }
+
+    /*
+     *  now, get the size information of the data item
+     */
+    if (SDgetinfo(sdid, name, &rank, data_dims, &numbertype,
+            &nattrs) < 0) {
+        printf("read_sd: Failed in SDgetinfo for item %s\n",
+                arr_name);
+        return -1;
+    }
+
+    if (numbertype != DFNT_FLOAT32) {
+        printf(
+                "read_sd: Type of data to be read is not float32 for item %s\n",
+                arr_name);
+        return -1;
+    }
+
+    /*
+     *  compute the read controls for whole array
+     */
+
+    for (j = 0; j < rank; j++) {
+        start[j] = 0;
+        edge[j] = data_dims[j];
+    }
+
+    /*
+     *  read the data
+     */
+    if (SDreaddata(sdid, start, NULL, edge, array) < 0) {
+        printf("read_sd: failure to read data for item %s\n", arr_name);
+        return -1;
+    }
+    return 0;
+}

@@ -1,0 +1,551 @@
+                        Version History File 
+                              MOD_PR03
+
+This file shows the following:
+(a) What was changed in the PGE
+(b) Why was it changed
+(c) How the output product will be affected by the change
+(d) The date of the change.
+============================================================================
+v6.1.0                                                          2017-03-27
+============================================================================
+Changed ECS metadata items for Collection 6.1.
+Corrected to treat a return of PGSCSC_W_BAD_TRANSFORM_VALUE from
+  PGS_CSC_ECItoECR() as an error.
+
+============================================================================
+v6.0.14                                                         2015-05-27
+============================================================================
+Corrected the resolution of Bug 5334 to set PGSd_GEO_ERROR_VALUE in all
+cases where that value is not copied over from PGS_EPH_GetEphemAttit()
+outputs.
+
+============================================================================
+v6.0.13                                                         2014-12-12
+============================================================================
+Corrected check for NRT processing when updating L1A metadata.
+
+============================================================================
+v6.0.12                                                         2014-10-22
+============================================================================
+Changed to insert ".NRT" in doi metadata when running in Near Real Time
+system.
+Resolve Bug 5334 by setting PGSd_GEO_ERROR_VALUE when PGS_EPH_EphemAttid()
+fails for all specified times; a context in which it is NOT documented to do
+so itself (even though it actually does).
+
+Resolve Bug 5335 by testing delta <= 0 rather than delta < MIN_TIME_OFFSET.
+
+Corrected loop setting quality flags based upon orbit consistency checks.
+
+============================================================================
+v5.0.16                                                         2013-10-29
+============================================================================
+Relaxed limit on the size of a maneuver list LUT file.
+Documented the compatibility with newer versions of SDP Toolkit that was
+actually achieved with the delivery of v5.0.15.
+
+============================================================================
+v6.0.11                                                         2013-08-01
+============================================================================
+Corrected initialization of an array, subscript error.
+
+============================================================================
+v6.0.10                                                         2013-06-17
+============================================================================
+Corrected buffer overflow.
+Resolved Bug 2473 by changing the calculation of the solar elevation angle
+  to avoid using the attitude quaternion, which cannot be easily calculated
+  when extracting TONS attitude data from the Terra L0 files.
+Corrected several defects in extraction of entrained ephemeris and attitude.
+============================================================================
+v6.0.9                                                          2012-06-28
+============================================================================
+Added Digital Object Identifier and authority as PSAs in the ECS inventory
+metadata, and as HDF file attributes, for both the L1A and Geolocation
+products.
+============================================================================
+v6.0.8                                                          2011-12-09
+============================================================================
+Corrected Calculation of the minimum latitude considered valid by the SDP
+Toolkit's DEM routines, enabling retrieval of South Polar DEM data.
+Resolved Bug 4465 by changing to opent the geolocation file only after
+a successful read of the L1A metadata, and also by checking for fatal errors
+from GEO_locate_one_scan().
+============================================================================
+v6.0.7                                                          2011-03-08
+============================================================================
+Corrected to write solar and sensor angles in degrees, not radians,
+restoring C5 behavior.
+============================================================================
+v6.0.6                                                          2011-02-21
+============================================================================
+Changed to determine 1km Land/SeaMask by aggregation from 500m values, and
+to report how many of those high resolution values were water in the new
+WaterPresent SDS.
+Added valid_range attribute to Land/SeaMask.
+Changed to bilinearly interpolate the geoid_height to remove artifacts at
+one-degree lines.
+Made corrections to const-qualification of pointers allowed by new version
+of M-API library. Removed casts that are no longer necessary, for same
+reason.
+
+============================================================================
+v6.0.5                                                          2010-12-21
+============================================================================
+Corrected to always perform Geodetic to ECR conversions using altitude above
+the ellipsoid, not the geoid.
+Corrected off-by-one error in calculation of high-resolution offsets.
+Corrected parsing of maneuver list configuration parameter.
+Corrected to set Height SDS to fill values when geolocation fails.
+
+============================================================================
+v5.0.15                                                         2010-12-02
+============================================================================
+Modified from 5.0.14 to include the changes made in the C6 make file for
+compatibility with SDP Toolkit 5.2.16.
+
+============================================================================
+v6.0.4								2010-08-13
+============================================================================
+Changed to make use of 15 arc second DEM files, when available, for
+elevation and land/water mask.
+
+============================================================================
+v6.0.3								2010-07-06
+============================================================================
+Resolved defect MODxl00595 by removing work-around for an HDF bug that has
+  long since been fixed.
+Partially resolved Bug 17 by adding checks for fill values when processing
+  mirror rotation data.
+Resolved feature request bug 1969 by writing out the thermal attitude
+  correction for each scan to the Geolocation file.
+Resolved feature request Bug 2249 by writting a file attribute to the
+  Geolocation file indicating whether or not terrain correction has been
+  turned on.
+Resolved feature-request Bug 2470 by changing to get maneuver list from the
+  SatelliteManeuvers table, through the PCF, rather than by reading a LUT
+  file.
+Resolved feature request Bug 2471 by getting the names of the input files
+  used to create the ephemeris/attitude file names from the file headers,
+  rather than from the corresponding *.met files.
+Resolved feature-request Bug 2472 by adding information about the quality of
+  the ephemeris and attitude data to the product file.
+While attempting to resolve Bug 2473, introduced fatal defects which only
+  come up when using entrained ephemeris and attitude data. Will have to
+  resolve them in some later version.
+Resolved Bug 2937 by correcting to always store the height above the geoid.
+Resolved Bug 2949 by not bothering to set any of unused elements of
+  sc_ev_frame_state.
+Improved the interface and error handling of many of the routines modified for
+  the other reasons listed above.
+Updated for compatibility with SDP Toolkit 5.2.16, while retaining
+  compatiblity with SDP Toolkit 5.2.9.
+Changed to link to the static rather than the shared object version of the
+  HDF5 library, per request from MODIS CM. The HDF5 library is linked in
+  only because the SDP Toolkit could call functions from that library; this
+  program makes no use of any feature of the SDP Toolkit that could generate
+  such a call.
+
+============================================================================
+v5.0.14                                                           2010-02-05
+============================================================================
+Changed to calculate the correct solar elevation angle when using entrained
+ephemeris and attitude data.
+
+============================================================================
+v5.0.13                                                           2009-11-05
+============================================================================
+Resolve Bug 2674 by correcting numValues argument of GEO_interp_ECR().
+
+============================================================================
+v6.0.2                                                            2009-09-15
+============================================================================
+Changes from v6.0.1:
+Corrected calculation of the cosine of the viewing angle.
+Corrected storage location for Land/Water Mask.
+
+============================================================================
+v5.0.12                                                           2009-07-08
+============================================================================
+Corrections to 5.0.11 to allow use of SDST Toolkit v5.0.0.
+
+============================================================================
+v6.0.1								  2009-06-16
+============================================================================
+Resolved Bug report 2453 by
+1. Correcting sign error in calculation of interpolation factor.
+2. Corrected handling of case where only the second root is usable.
+3. Corrected to write all lines of high-resolution offset SDSs.
+4. Corrected to create dimension maps only if a high-resolution band is
+chosen.
+
+============================================================================
+v6.0.0								  2009-05-29
+============================================================================
+Resolved feature-request Bug 1954 by changing the code to allow the
+band_number parameter to identify a quarter- or half-kilometer band. If it
+does, then geolocation is calculated at that resolution, and then aggregated
+up to 1km.
+
+Resolved feature-request Bug 1968 by adding three new int8 SDSs containing,
+for each high resolution pixel, 3D offsets between the high resolution
+geolocation and a bi-linear interpolation/extrapolation of the 1km positions.
+This can be used to reconstruct the high resolution geolocation.
+
+Resolved Bug 2199 by delaying cumulation of gflags until after validation of
+derived products.
+
+Resolved Bug 2426 by setting Latitude and Longitude to the correct fill
+value (-999.0) when there's a failure of the Geolocation algorithm.
+
+============================================================================
+v5.0.11								  2009-05-15
+============================================================================
+Corrected handling of entrained ephemeris/attitude data, resolving Bug 2403.
+
+============================================================================
+v5.0.10								  2008-12-16
+============================================================================
+Changed to skip orbit number validation if PCF parameter 600281 is "FALSE".
+Increased the number of ephemeris and attitude files allowed to 3, to
+support Near Real Time processing.
+
+============================================================================
+v5.0.9                                                            2008-09-21
+============================================================================
+Changed to accept missing attitude files for Terra runs, because they may be 
+unnecessary if use of entrained ephemeris and attitude data is turned on (as
+it will be in Near-Real-Time processing).
+
+============================================================================
+v5.0.8                                                            2006-12-28
+============================================================================
+Corrected to check against last maneuver in list.
+
+============================================================================
+v5.0.7                                                            2006-11-14
+============================================================================
+Improved performance by calling imsl_d_spline_value() once for each scan.
+Corrected to use the Earth View center time for calculation of solar
+"elevation" angle, resolving bug report 194.
+Corrected to filter out Aqua attitude records with missing status words,
+helping resolve bug report 258.
+
+============================================================================
+v5.0.6                                                            2006-01-27
+============================================================================
+Resolved MODur00125 by ensuring that proper fill values always get set in
+the output file if the ephemeris or attitude data could not be retrieved.
+
+============================================================================
+v5.0.5                                                            2005-11-29
+============================================================================
+Resolved MODur00114 by ensuring that even if the earth view start time
+contains a fill value, MOD_PR03 will still correctly write scan and pixel
+data that does not depend upon the start time.
+
+============================================================================
+v4.1.11                                                           2004-10-21
+============================================================================
+MOD_PR03 subroutines GEO_read_param_file and GEO_write_granule_metadata
+were updated to validate the orbit numbers.  MOD_PR03 will fail if any of
+the orbit numbers is incorrect.
+
+============================================================================
+v5.0.4                                                            2005-10-11
+============================================================================
+MOD_PR03 subroutines GEO_read_param_file and GEO_write_granule_metadata
+were updated to validate the orbit numbers.  MOD_PR03 will fail if the
+orbit numbers are incorrect.
+============================================================================
+v5.0.3                                                            2005-04-20
+============================================================================
+Removed token pasting from GEO_read_param_file that did not result in valid
+pre-processing tokens, thereby resolving MODur00108.
+Changed header guard macro names to avoid reserved name space.
+
+============================================================================
+v5.0.2                                                            2005-01-12
+============================================================================
+Corrected errors in algorithm for applying solar elevation correction,
+resolving MODur00104.
+Maneuver list file for Terra satellite was updated to include 2004 data 
+from Jecue DuChateu. 
+Maneuver list files for both Terra and Aqua were updated to include
+two maneuvers from recent IOT weekly reports.
+The limits for Z component of angular momentum was updated.
+
+============================================================================
+v5.0.1                                                            2004-11-19
+============================================================================
+Corrected to be backward compatible by making it tolerate L1A files with no
+ArchivedMetadata.0 file attribute.
+Corrected to allow planned maneuvers with far future dates.
+
+============================================================================
+v5.0.0                                                            2004-10-28
+============================================================================
+Added a correction to instrument orientation that depends upon the solar
+"elevation" angle.
+Changed to read a list of planned/actual maneuvers, and to set the fourth
+GEO scan quality flag for a scan depending upon whether or not it occurred
+during one of them.
+Added _FillValue attributes to many SDSs, and changed the fill value for the
+sector start times from -1 to -2e9, resolving MODur00072.
+Writes boundingcoordinate metadata to L1A archived metadata.
+For PERCENT* ECS metadata, change to treat 0/0 as 100%, rather than 0%,
+resolving GSFcd01518.
+Added a LogReport.
+Changed to create the Average Temperatures vdata even if the number of scans
+is 0, resolving MODur00093.
+
+============================================================================
+v4.1.10                                                           2004-06-16
+============================================================================
+Corrected to not use bogus first encoder time in linear fit.
+
+============================================================================
+v4.1.9                                                            2004-06-07
+============================================================================
+Corrected mirror encoder processing.
+
+============================================================================
+v4.1.8                                                            2004-06-02
+============================================================================
+Changed to treat single-scan failures as non-fatal, resolving MODur00089.
+
+============================================================================
+v4.1.7                                                            2004-05-21
+============================================================================
+Corrected handling of missing encoder data, attempting to resolve MODur00089.
+
+============================================================================
+v4.1.6                                                            2004-04-09
+============================================================================
+Changed model used for mirror motion - should produce improved geolocation
+    accuracy.
+Corrected to make data gaps in the ephemeris and attitude files non-fatal,
+    resolving GSFcd02691.
+Corrected to put default values for EphemInput and AttitInput, if
+    corresponding *.met files are not staged - resolves MODur00074.
+Corrected value for ReprocessingPlanned metadata, resolving GSFcd02664.
+Corrected UINT16 to MAX_UINT16_VAL, resolving GSFcd02684.
+
+============================================================================
+v4.1.5                                                            2003-12-03
+============================================================================
+Corrected value of ReprocessingPlanned.
+
+============================================================================
+v4.1.3                                                            2003-11-11
+============================================================================
+Changed to produce Collection 4 output for Aqua.
+
+============================================================================
+v4.1.2                                                            2003-10-23
+============================================================================
+Increased expected number of input pointers from ephemeris/attitude files.
+Sufficiently?
+Several small but serious bug fixes; no change in intended functionality.
+
+============================================================================
+v4.1.1                                                            2003-10-07
+============================================================================
+Corrected setting of EquatorCrossingTime, resolving MODur00064.
+Corrected handling of bad ephemeris/attitude data, resolving MODur00065.
+
+============================================================================
+v4.1.0                                                            2003-08-27
+============================================================================
+Added Reprocessing* and ProcessingEnvironment metadata.
+Expanded InputPointers to include ephemeris/attitude files.
+Improved validation/repair of encoder counts.
+Made use of IMSL optional.
+Made Several performance improvements, resolving GSFcd00179.
+Corrected handling of fill values for [Sensor|Solar][Zenith|Azimuth] angles,
+  resolving MODxl01751.
+Changed to validate LUT version against a value retrieved from the PCF,
+  resolving MODxl02056.
+Changed to calculate Solar Diffuser angles without adjustment for estimated
+  post-launch changes in the MODIS orientation relative to spacecraft.
+
+============================================================================
+v4.0.1                                                            2002-07-08
+============================================================================
+Changed to use SDST toolkit to create LocalGranuleID.
+
+============================================================================
+v4.0.0                                                            2002-06-13
+============================================================================
+Changed to provide a time-dependent value of T_inst2sc.
+Added consistency check between LUT version and code version.
+Corrected the second InputPointer ECS metadata for Aqua.
+Corrected several minor bugs.
+
+============================================================================
+v3.0.1                                                            2001-11-19
+============================================================================
+MOD_PR03 update to v3.0.1 is solely because of update of PGE01 version in 
+MOD_PR03 PCFs. 
+ 
+============================================================================
+v3.0.0                                                            2000-04-02
+============================================================================
+
+Changes: from v2.2.1
+Implemented ECS Versioning Metadata in accordance with CCR 507, incidentally
+resolving defects GSFcd01883, MODxl01766. Also resolves MODxl01947.
+
+Changed to ignore fill values in SCI_ABNORM and SCI_STATE fields, rather than
+treating them as errors, resolving MODxl01780.
+
+Changed to use spacecraft ancillary data to recognise when the mirror encoder
+data is being set by side A or side B electronics, and to change calculations
+accordingly. This removes the need for seperate LUTs for Side A and Side B data.However, it makes the new LUTs incompatible with older versions of the code,
+and vice-versa. Also resolves MODxl01685.
+
+A more robust GRing algorithm is being used, which will create a non-default
+GRing anytime there's even a single geolocated pixel in a granule.
+
+Removed obsolete messages from seed file.
+
+============================================================================
+v2.2.1                                                            2000-08-31
+============================================================================
+
+Changes: from v2.2.0
+
+Changed to link in HDF jpeg library, as required for compatibility with version
+5.2.6 of the SDP toolkit.
+
+Corrected test output file names to end in '.out', per delivery guide.
+
+============================================================================
+v2.2.0                                                            2000-08-15
+============================================================================
+
+Changes: from v2.1.5
+
+- Split GEO_parameters.dat into two different files:
+	MOD03LUT.coeff for Terra
+	MYD03LUT.coeff for Aqua
+
+- Added the Satellite Instrument configuration parameter to MOD_PR03.pcf, and
+then split off a new MYD_PR03.pcf file for Aqua.
+
+- Added AssociatedPlatformInstrumentSensor to the inventory metadata in 
+MOD01.mcf and MOD03.mcf. Created new versions named MYD01.mcf and MYD03.mcf,
+where AssociatedPlatformShortName is "Aqua", rather than "Terra".
+
+- The program itself has been changed to read the Satellite Instrument LUN,
+validate it against the input L1A and LUT files, and to use it determine the
+correct files to retrieve the ephemeris and attitude data from.
+
+- Changed to produce a LocalGranuleID starting with MYD03 if run on Aqua data.
+
+- Added the Scan Type file attribute to the Geolocation file, copied from the
+L1A file.
+
+============================================================================
+v2.1.5                                                            04/03/2000
+============================================================================
+
+Changes: from v2.1.4
+
+- The GEO_get_GRing_points.c file was corrected to include all of the last
+scan in the GRing.
+
+- GEO_initialize_product.c was updated to set the "Units" metadata on Solar
+and Sensor Azimuth and Zenith, and attitude_angels to "radians" rather than
+"degrees".
+
+- The accumulation of "Cumulated gflags" was moved from
+GEO_validate_earth_location.c to GEO_locate_one_scan.c, to ensure that all
+gflag bits get accumulated.
+
+- Changed GEO_write_ECS_metadata to write PGEVERSION as 2.1.5
+
+- Changed GEO_locate_one_granule.c to make a failure to find an orbit
+number in the staged ephemeris files be non-fatal.
+
+- Updated GEO_parameters.dat to reflect latest estimate of T_inst2sc, and to
+screen out the jumps in encoder times which occur at the beginning of each
+S/C ancillary data packet.
+
+- Changed GEO_product.h to use mapiL1Bgeo.h as source for CUM_GFLAGS.
+
+============================================================================
+v2.1.4                                                            09/01/1999
+============================================================================
+
+Changes: from v2.1.3
+
+- The MOD01.mcf file was updated to match the ECS baseline.  This involved 
+  changing attribute DayNightFlag from Mandatory = "FALSE" to 
+  Mandatory = "TRUE".  
+
+- The MOD_PR03.pcf file was change to find the MOD01 MCF in directory
+  .../PGE01/MOD_PR01_V2.1. 
+
+
+============================================================================
+v2.1.3                                                            08/27/1999
+============================================================================
+
+Changes: from v2.1.2
+
+- Updated MOD01.mcf to match ECS and moved this shared file to VOB
+  directory SHR_MCF. 
+
+- Removed debug files PGS_IO_Gen_Open.c and makefile from delivery package.
+
+
+============================================================================
+v2.1.2                                                            06/03/1999      
+============================================================================
+
+Changes: from v2.1.1
+- updated GEO_parameters.dat file
+
+- changed directories of input files: GEO_parameters.dat, MOD01.hdf.in 
+  MOD_PR03.pcf, README.txt, and PACKINGLIST.
+
+- Added PGS_IO_Gen_Open.c and makefile (for debugging).
+
+
+============================================================================
+v2.1.1                                                            05/11/1999     
+============================================================================
+
+Changes: from v2.1.0
+- set cumulated_gflags to 0 in GEO_locate_one_granule.c
+- Changed to protect against overly large step sizes in GEO_terrain_correct.c
+- Corrected PGEVERSION and Changed PARAMETERNAME.1 per SDST-CCR 467 
+  in GEO_write_ECS_metadata.c
+- Corrected to continue processing (and then return FAIL) after failed
+  call to GEO_get_GRing_points() and Corrected wording of version number message
+- Changed the default GRing, per SDST-CCR 474
+  in GEO_write_granule_metadata.c
+- changed in MOD_PR03.pcf to reflect input and output files and their pathes in this delivery.
+- Corrected to produce spacecraft position and velocity in ECR coordinates in 
+  GEO_solar_and_lunar_vectors.c
+- added in README.txt to set environment variables to run mOD_PR03 in modis-xl 
+- changed in packinglist to indicate new path for input files
+- removed packinglist and added PACKINGLIST.
+
+ 
+============================================================================
+v2.1.0                                                            03/10/1999	
+============================================================================
+
+Changes: from v2.0.3
+- Added DEM caching and geoid height correction.
+- Corrected several minor defects.
+- Changed to read the new format L1A file.
+- Changed to use SCI_ABNORM to validate ancillary data.
+- Implemented CCR's 425 and 454.
+- Dropped GK toolkit, in favor of SDP Toolkit.
+- Dropped smf.c in favor of SDST toolkit.
+- Shortened character limit to 40 on PARAMETERNAME (in GEO_write_ECS_metadata.c).
+

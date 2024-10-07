@@ -1,0 +1,17 @@
+/**/#
+/**/# Makefile for SeaWiFS ancillary o3qc program
+/**/#
+
+CINCLUDES 	= -I$(HDFINC) -I$(SDSINC)/sdsinc
+
+EXTRA_CFLAGS	= $(STD_ANSICFLAG) -D_NO_PROTO -DSYSV -DHDF -D$(MACHINE) 
+
+LD		= $(FORT)
+
+PROG 		= o3qc
+
+OBJS 		= o3qc.o anc_daymon.o day2mday.o
+
+LINKLIBS 	= $(SDSANCLIB) $(HDF_LIB) $(MATHLIB) $(XDRLIB) $(SDSGENLIB)
+
+SimpleCProgramTarget($(PROG),$(OBJS))

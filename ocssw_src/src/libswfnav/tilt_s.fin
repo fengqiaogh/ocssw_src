@@ -1,0 +1,23 @@
+c
+c  include file:  tilt_s.fin
+c
+c  Purpose:  define tilt data structure to pass to L1A software
+c
+c
+c
+c  By:  Frederick S. Patt, GSC, June 24, 1994
+c
+c  Modification History:
+c
+c
+      type tilt_states
+
+        real(4) ::        tilt(maxlin)  !Tilt angle per scan line
+        integer(4) :: ntilts    !Number of tilt states in this scene
+        integer(2) :: tilt_flags(20) !Tilt indicators for each state in scene
+        integer(2) :: tilt_ranges(2,20) !First and last scan line for each state
+      end type
+c
+c  record name is typically tilts
+c
+c   and end

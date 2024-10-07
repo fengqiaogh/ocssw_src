@@ -1,0 +1,3 @@
+e.g.:
+orbnum_seawifs.csh 2006 150 | tail -1 >> $OCDATAROOT/seawifs/nav/orbit_table.dat
+

@@ -1,0 +1,158 @@
+#!/bin/bash
+
+OCSSW_DIR=ocssw
+VIIRS_DIR=viirs_l1
+
+# where to get the linux binaries for seadas
+# This is now built in a container so need the tunneled ssh port
+OCSSW_LINUX_MACHINE="gs616-container103"
+OCSSW_LINUX=${OCSSW_LINUX_MACHINE}:${OCSSW_DIR}
+OCSSW_LINUX_PORT="10022"
+
+# where to get the linux binaries for ODPS
+OCSSW_ODPS_MACHINE=analysis701
+OCSSW_ODPS=${OCSSW_ODPS_MACHINE}:${OCSSW_DIR}
+
+# where to get the linux binaries for HPC (poseidon)
+OCSSW_HPC_MACHINE=poseidon
+OCSSW_HPC=${OCSSW_HPC_MACHINE}:/mnt/beegfs-temp/hpc/dshea/ocssw
+
+# where to get the mac binaries, only used for seadas
+OCSSW_MAC_MACHINE=seadas4
+OCSSW_MAC=${OCSSW_MAC_MACHINE}:${OCSSW_DIR}
+
+# where to get the mac ARM binaries, only used for seadas
+OCSSW_MACARM64_MACHINE=seadas5
+OCSSW_MACARM64=${OCSSW_MACARM64_MACHINE}:${OCSSW_DIR}
+
+# destination directory where all files are copied to
+MANIFEST_DIR=${HOME}/ocssw-manifest
+
+
+if [ $# -gt 1 ]; then
+    echo "usage: $0 [--live]"
+    exit 1
+fi
+
+DRYRUN="--dry-run"
+if [ $# -eq 1 ]; then
+    if [ "$1" = "--live" ]; then
+        DRYRUN=""
+        echo "GOING LIVE!"
+    else
+        echo "First argument needs to be --live or non existent"
+        echo "usage: $0 [--live]"
+    exit 1
+    fi
+else
+    echo "Just a dry run..."
+fi
+
+echo "#####################################################"
+if [ "$DRYRUN" = "--dry-run" ]; then
+    echo "Dryrun Mode:       --dry-run"
+else
+    echo "Dryrun Mode:       --live"
+    mkdir -p ${MANIFEST_DIR}
+fi
+
+# bin
+echo "#####################################################"
+echo "Grabbing binary files"
+echo "#####################################################"
+rsync -avcO --delete $DRYRUN --exclude=manifest.json --exclude=__pycache__ -e "ssh -p ${OCSSW_LINUX_PORT}" ${OCSSW_LINUX}/bin/ ${MANIFEST_DIR}/bin_linux_64/
+rsync -avcO --delete $DRYRUN --exclude=manifest.json --exclude=__pycache__ ${OCSSW_ODPS}/bin/ ${MANIFEST_DIR}/bin_odps/
+rsync -avcO --delete $DRYRUN --exclude=manifest.json --exclude=__pycache__ ${OCSSW_HPC}/bin/ ${MANIFEST_DIR}/bin_linux_hpc/
+rsync -avcO --delete $DRYRUN --exclude=manifest.json --exclude=__pycache__ ${OCSSW_MAC}/bin/ ${MANIFEST_DIR}/bin_macosx_intel/
+rsync -avcO --delete $DRYRUN --exclude=manifest.json --exclude=__pycache__ ${OCSSW_MACARM64}/bin/ ${MANIFEST_DIR}/bin_macosx_arm64/
+
+# Make a special viirs binary directory
+echo "#####################################################"
+echo "Copying VIIRS bin files..."
+echo "#####################################################"
+VIIRS_TMP=/tmp/update_manifest_dirs.files
+echo "calibrate_viirs" > ${VIIRS_TMP}
+echo "generate_nc4luts" >> ${VIIRS_TMP}
+echo "geolocate_viirs" >> ${VIIRS_TMP}
+echo "install_ocssw" >> ${VIIRS_TMP}
+echo "l1aextract_viirs" >> ${VIIRS_TMP}
+echo "l1agen_viirs" >> ${VIIRS_TMP}
+echo "manifest.py" >> ${VIIRS_TMP}
+echo "nccmp" >> ${VIIRS_TMP}
+echo "ocssw_runner" >> ${VIIRS_TMP}
+echo "scpad_viirs" >> ${VIIRS_TMP}
+echo "scpad_viirs_lsips" >> ${VIIRS_TMP}
+echo "update_luts" >> ${VIIRS_TMP}
+echo "viirs_l1_benchmark" >> ${VIIRS_TMP}
+echo "viirs_obc" >> ${VIIRS_TMP}
+
+rsync -av $DRYRUN --files-from=${VIIRS_TMP} -e "ssh -p ${OCSSW_LINUX_PORT}" ${OCSSW_LINUX}/bin ${MANIFEST_DIR}/viirs_l1_bin_linux_64
+rsync -av $DRYRUN --files-from=${VIIRS_TMP} ${OCSSW_ODPS}/bin ${MANIFEST_DIR}/viirs_l1_bin_odps
+rsync -av $DRYRUN --files-from=${VIIRS_TMP} ${OCSSW_HPC}/bin ${MANIFEST_DIR}/viirs_l1_bin_linux_hpc
+rsync -av $DRYRUN --files-from=${VIIRS_TMP} ${OCSSW_MAC}/bin ${MANIFEST_DIR}/viirs_l1_bin_macosx_intel
+rsync -av $DRYRUN --files-from=${VIIRS_TMP} ${OCSSW_MACARM64}/bin ${MANIFEST_DIR}/viirs_l1_bin_macosx_arm64
+rm -f ${VIIRS_TMP}
+
+rsync -av --delete --exclude=__pycache__ $DRYRUN -e "ssh -p ${OCSSW_LINUX_PORT}" ${OCSSW_LINUX}/bin/viirs/ ${MANIFEST_DIR}/viirs_l1_bin_linux_64/viirs/
+rsync -av --delete --exclude=__pycache__ $DRYRUN ${OCSSW_ODPS}/bin/viirs/ ${MANIFEST_DIR}/viirs_l1_bin_odps/viirs/
+rsync -av --delete --exclude=__pycache__ $DRYRUN ${OCSSW_HPC}/bin/viirs/ ${MANIFEST_DIR}/viirs_l1_bin_linux_hpc/viirs/
+rsync -av --delete --exclude=__pycache__ $DRYRUN ${OCSSW_MAC}/bin/viirs/ ${MANIFEST_DIR}/viirs_l1_bin_macosx_intel/viirs/
+rsync -av --delete --exclude=__pycache__ $DRYRUN ${OCSSW_MACARM64}/bin/viirs/ ${MANIFEST_DIR}/viirs_l1_bin_macosx_arm64/viirs/
+
+rsync -av --delete --exclude=__pycache__ $DRYRUN -e "ssh -p ${OCSSW_LINUX_PORT}" ${OCSSW_LINUX}/bin/seadasutils/ ${MANIFEST_DIR}/viirs_l1_bin_linux_64/seadasutils/
+rsync -av --delete --exclude=__pycache__ $DRYRUN ${OCSSW_ODPS}/bin/seadasutils/ ${MANIFEST_DIR}/viirs_l1_bin_odps/seadasutils/
+rsync -av --delete --exclude=__pycache__ $DRYRUN ${OCSSW_HPC}/bin/seadasutils/ ${MANIFEST_DIR}/viirs_l1_bin_linux_hpc/seadasutils/
+rsync -av --delete --exclude=__pycache__ $DRYRUN ${OCSSW_MAC}/bin/seadasutils/ ${MANIFEST_DIR}/viirs_l1_bin_macosx_intel/seadasutils/
+rsync -av --delete --exclude=__pycache__ $DRYRUN ${OCSSW_MACARM64}/bin/seadasutils/ ${MANIFEST_DIR}/viirs_l1_bin_macosx_arm64/seadasutils/
+
+# lib
+echo "#####################################################"
+echo "Grabbing library files"
+echo "#####################################################"
+rsync -avcO --delete --exclude=manifest.json -e "ssh -p ${OCSSW_LINUX_PORT}" $DRYRUN ${OCSSW_LINUX}/lib/ ${MANIFEST_DIR}/lib_linux_64/
+rsync -avcO --delete --exclude=manifest.json $DRYRUN ${OCSSW_ODPS}/lib/ ${MANIFEST_DIR}/lib_odps/
+rsync -avcO --delete --exclude=manifest.json $DRYRUN ${OCSSW_HPC}/lib/ ${MANIFEST_DIR}/lib_linux_hpc/
+rsync -avcO --delete --exclude=manifest.json $DRYRUN ${OCSSW_MAC}/lib/ ${MANIFEST_DIR}/lib_macosx_intel/
+rsync -avcO --delete --exclude=manifest.json $DRYRUN ${OCSSW_MACARM64}/lib/ ${MANIFEST_DIR}/lib_macosx_arm64/
+
+# opt
+echo "#####################################################"
+echo "Grabbing opt files"
+echo "#####################################################"
+rsync -avcO --delete $DRYRUN --exclude=manifest.json --exclude=cmake --exclude=EOS --exclude=examples --exclude=include --exclude=src -e "ssh -p ${OCSSW_LINUX_PORT}" ${OCSSW_LINUX}/opt/ ${MANIFEST_DIR}/opt_linux_64/
+rsync -avcO --delete $DRYRUN --exclude=manifest.json --exclude=cmake --exclude=EOS --exclude=examples --exclude=include --exclude=src ${OCSSW_ODPS}/opt/ ${MANIFEST_DIR}/opt_odps/
+rsync -avcO --delete $DRYRUN --exclude=manifest.json --exclude=cmake --exclude=EOS --exclude=examples --exclude=include --exclude=src ${OCSSW_HPC}/opt/ ${MANIFEST_DIR}/opt_linux_hpc/
+rsync -avcO --delete $DRYRUN --exclude=manifest.json --exclude=cmake --exclude=EOS --exclude=examples --exclude=include --exclude=src ${OCSSW_MAC}/opt/ ${MANIFEST_DIR}/opt_macosx_intel/
+rsync -avcO --delete $DRYRUN --exclude=manifest.json --exclude=cmake --exclude=EOS --exclude=examples --exclude=include --exclude=src ${OCSSW_MACARM64}/opt/ ${MANIFEST_DIR}/opt_macosx_arm64/
+
+# put libgfortran.so into opt/lib
+rsync -avcO $DRYRUN -e "ssh -p ${OCSSW_LINUX_PORT}" ${OCSSW_LINUX_MACHINE}:/usr/lib64/libgfortran* ${MANIFEST_DIR}/opt_linux_64/lib
+rsync -avcO $DRYRUN -e "ssh -p ${OCSSW_LINUX_PORT}" ${OCSSW_LINUX_MACHINE}:/usr/lib64/libquadmath* ${MANIFEST_DIR}/opt_linux_64/lib
+rsync -avcO $DRYRUN ${OCSSW_ODPS_MACHINE}:/usr/lib/x86_64-linux-gnu/libgfortran* ${MANIFEST_DIR}/opt_odps/lib
+rsync -avcO $DRYRUN ${OCSSW_ODPS_MACHINE}:/usr/lib/x86_64-linux-gnu/libquadmath* ${MANIFEST_DIR}/opt_odps/lib
+#rsync -avcO $DRYRUN ${OCSSW_HPC_MACHINE}:/usr/lib/x86_64-linux-gnu/libgfortran* ${MANIFEST_DIR}/opt_linux_hpc/lib
+#rsync -avcO $DRYRUN ${OCSSW_HPC_MACHINE}:/usr/lib/x86_64-linux-gnu/libquadmath* ${MANIFEST_DIR}/opt_linux_hpc/lib
+#mac done by fix_mac_rpath
+#rsync -avcO $DRYRUN ${OCSSW_MAC_MACHINE}: ${MANIFEST_DIR}/opt_macosx_intel/lib
+
+# ocssw_src
+# assume the OCSSW_LINUX has the correct version of the code checked out
+echo "#####################################################"
+echo "Grabbing src files"
+echo "#####################################################"
+rsync -avcO --delete $DRYRUN --exclude=.git --exclude=.gitignore --exclude=.gitmodules --exclude=.gitattributes --exclude=manifest.json --exclude=__pycache__ --exclude=OCSSW_bash.env --exclude=OCSSW.env --exclude=bin --exclude=build --exclude=idl --exclude=lib --exclude=opt --exclude=share --exclude=testdata --exclude=var -e "ssh -p ${OCSSW_LINUX_PORT}" ${OCSSW_LINUX}/ ${MANIFEST_DIR}/ocssw_src/
+
+# Copy special files to the root directory for pushing to the outside
+echo "#####################################################"
+echo "Copying special files..."
+echo "#####################################################"
+
+rsync -avc $DRYRUN -e "ssh -p ${OCSSW_LINUX_PORT}" ${OCSSW_LINUX}/OCSSW_bash.env ${MANIFEST_DIR}/
+rsync -avc $DRYRUN -e "ssh -p ${OCSSW_LINUX_PORT}" ${OCSSW_LINUX}/OCSSW.env ${MANIFEST_DIR}/
+
+# copy the pex binaries in place of the python scripts for ODPS
+echo "#####################################################"
+echo "Copying pex binary files from /glusteruser/analyst/pex ..."
+echo "#####################################################"
+
+rsync -av $DRYRUN /glusteruser/analyst/pex/* ${MANIFEST_DIR}/bin_odps

@@ -1,0 +1,25 @@
+#! /bin/bash -l
+# usage ocssw_runner [--ocsswroot <dir>] <command ...>
+#
+# This is a shell script used to run any program after sourcing 
+# the standard OCSSW enviroment script.
+#
+# only requirement is that $OCSSWROOT is already set or passed
+# in with the option --ocsswroot <dir>
+
+if [ $1 = --ocsswroot ]; then
+    export OCSSWROOT=$2
+    shift
+    shift
+fi
+
+source $OCSSWROOT/OCSSW_bash.env
+if [ "$OCSSW_ARCH" = "linux" -o "$OCSSW_ARCH" = "linux_64" ] ; then
+  if [ "x`uname -r | grep Microsoft`" == "x" ]; then
+    ulimit -s unlimited 2>/dev/null || echo "Warning: could not set the stack size"
+  fi
+fi
+
+$*
+
+

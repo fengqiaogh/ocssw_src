@@ -1,0 +1,17 @@
+c
+c  include file: nav_cnst.fin
+c
+c  Purpose: define constants for navigation 
+c
+c  By: W. Robinson, GSC, 18 Mar 93
+c
+c  Modification History:
+c
+c  Nov 21 2002: updated value for maxlin to 16000 -JGW
+c
+      integer*4 maxlin
+      real*8 pi,radeg,re,rem,f,omf2,omegae
+      common /gconst/pi,radeg,re,rem,f,omf2,omegae
+      parameter (maxlin = 16000)
+c
+c       and end

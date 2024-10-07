@@ -1,0 +1,78 @@
+c
+c  include file: navctl_s.fin
+c
+c  Purpose: define structure for navigation conversions and processing
+c               control
+c
+c  By: W. Robinson, GSC, 18 Mar 93
+c
+c  Modification History:
+c
+
+      type navctl_struct
+c
+c          processing control values
+c
+         integer(4) :: procatt ! flag to process attitude using sensor telemetry,
+                           ! 0 - use S/C provided pitch, roll, yaw
+                           ! 1 - use sensor data to compute pitch, roll, yaw
+         integer(4) :: redoyaw ! number of loops improving nadir 
+                           ! vector with yaw value found
+         real(4) :: yawtol     ! yaw diff above which to re-calculate nadir vec
+c
+c          controls for the running fit (runfit3t)
+c          Earth scanner data
+c
+         integer(4) :: nefpts  ! fit range length, must be 4 or more
+         integer(4) :: neskip  ! amount to move the fit range, must not be
+                           ! larger than nfpts
+c
+c          Sun sensor data
+c
+         integer(4) :: nsfpts  ! fit range length, must be 4 or more
+         integer(4) :: nsskip  ! amount to move the fit range, must not be
+                           ! larger than nfpts
+c
+c          conversion between sensor frames...
+c
+         real(4) :: msenoff(3,3)  ! SeaWiFS sensor offset matrix from S/C frame
+c            *** for next two, we may have another set as there are 
+c            *** 2 tilts in tlm doc
+         real(4) :: tiltcos(3)    ! tilt axis cosine angles (0,0,1 for no 
+                              ! problems)
+         real(4) :: tiltcos2(3)   ! just in case, second tilt angle set
+
+         real(4) :: tiltfor             !forward tilt angle
+
+         real(4) :: tiltaft             !aft tile angle
+
+         real(4) :: sun_mat(3,3,3)  ! transform matrix to convert the Sun
+                                ! vector from sensor to spacecraft 
+                                ! coordinates.  the last index is for
+                                ! the 3 sensors. 
+
+         real(4) :: sun_scal(2,3)       ! scale factors for Sun sensor angles
+
+         real(4) :: sun_bias(2,3)       ! scale factors for Sun sensor angles
+
+
+         real(4) :: ear_mat(3,3,2)  ! transform matrix earth sensor 1 and
+                                ! 2 to S/C frame
+
+         real(4) :: ear1sca       ! earth sensor 1 scan cone angle in degrees
+         real(4) :: ear2sca       ! earth sensor 2 scan cone angle in degrees
+
+         real(4) :: e1biasic      ! in-crossing angle bias in deg for earth sens 1
+         real(4) :: e2biasic      ! in-crossing angle bias in deg for earth sens 2
+         real(4) :: e1biasoc      ! out-crossing angle bias in deg for earth sens 1
+         real(4) :: e2biasoc      ! out-crossing angle bias in deg for earth sens 2
+c
+c       Debug output level
+c
+         integer(4) :: lvdbug     ! gt 0 to write intermediate output files
+c 
+      end type
+c
+c      navctl is usually the structure name
+c
+c       and end

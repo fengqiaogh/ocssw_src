@@ -1,0 +1,814 @@
+1.0.0	18 November 1997
+- Initial Release
+
+1.0.1	02 December 1997
+- minor SDPS fixes and enhancements
+
+1.0.2	03 December 1997
+- navtlm.f, fixed for bad tilt at start of tilt change
+- mkmeta.c, data_type fixed in .meta files
+
+1.1	08 December 1997
+- Makefile for Solaris changed to link with static libraries, use cc
+  with sunmath flag.
+- navtlm.f, corrected for potential overflow of tilt states array
+- earcnst.f, suncnst.f, navqc.dat corrections to improve navigation
+- swl1_hdf.c, change hdf tag type from DFTAG_SD to DFTAG_NDG, to 
+  make L1A file compatible with extract routine of seadas.
+
+1.2	15 December 1997
+- swl0_parms.h, version number updated, added DELSCENE thresholds.
+- geonav.f, out-of-plane correction and radians/pixel update.
+- navctl.dat, minor changes to the SeaWiFS instrument alignment.
+- orbcomp.f, fixed missing parameter in call to vec2mean causing 
+  sporadic core dumps on Solaris.
+- SWl01.c, reports version number with usage message.  Added excplicit
+  calls to acs_block() and ins_block() to simplify linking.
+- getl1rec.c, changed LAC frame number from 0 to 1-based for
+  compatibility with L1A spec.  
+- swl0_utils.c, don't generate time sequence error when time range
+  error is already detected or when switch from GAC to LAC.
+- instlm.h, updated limits on instrument telemetry from H. Runge.
+- instlm.c, add missing math.h prototype
+- getl0scene.c, changed LAC scene break from 30 to 1-second.
+- attcmp.f, navigation flag set when yaw limit exceeded.
+- getl0scene_nav.c, changed definition of easternmost, westernmost 
+  longitudes in meta data.  Changed return status to good for 
+  lunar and solar cal data, regardless of navigation quality. 
+  Changed lunar, solar cal coordinate meta-data to -999.0.
+- getl0indx, allow processing to proceed with limited range checking
+  on the frame times when the L0 header AOS and LOS are nonsensical.
+  Allows processing of some erroneously formatted HRPT files. 
+- swl0_proto.h, added missing prototype for getorbnum().
+- SWl01.mk, changed Irix link to use cc.
+- added modification comments to many swfnav files.
+
+1.3	22 December 1997
+- swl0_parms.h, version number updated.
+- getl0scene_nav.c, added additional checking of navigation quality
+  prior to setting scene metadata, to avoid 999 for scan past horizon.
+  Minor mods to eastermost, westermost, northernmost southernmost logic.
+- mkmeta.c, added version number reporting to metadata file.
+- initnav.f, changed return to include error status.
+- SWl01.c, handle error return from initnav().
+- swl0_proto.h, added error status to initnav_ prototype.
+
+1.4	29 December 1997
+- swl0_parms.h, version number updated.
+- getl1rec.c, limit 999 values in elon, elat, slon, slat, clon, clat.
+
+  Navigation Library Changes (Fred Patt)
+- runfit3t.f, correction to averaging logic.
+- earcomp.f, set larger smoothing interval for LAC and HRPT data.
+- suncomp.f, set larger smoothing interval for LAC and HRPT data.
+- navqc.dat, increase the consistency tolerance for the Sun sensor data.
+
+
+1.5	31 December 1997
+- swl0_parms.h, version number updated.
+- getorbnum.c, maintenance update to orbit number table.
+- swl0_utils.c, identify bad frame times at start or end of file when
+  the AOS/LOS times in the L0 header are not correct.
+- getl0indx.c, adjusted range checking to handle bogus header from DCF
+  PC ingest machines.
+- printnav.c, added data type and start, end times to nav summary report.
+
+
+1.5.1	09 January 1998
+- swl0_parms.h, version number updated.
+- getl0scene_nav.c, changed lat metadata for SOL and LUN from -999. to
+  -99., on request of the DAAC.
+- swl1_hdf.c, fix to time-string metadata formatter to prevent 0.99999
+  seconds from becoming 1000 millisecs.
+
+
+1.5.2	12 January 1998
+- swl0_parms.h, version number updated.
+- getl0scene_nav.c, added explicit test for NaN to lon/lats returned
+  from geonav().
+
+
+1.6	10 March 1998
+- swl0_parms.h, version number updated. Added PROGRAM variable.
+- swl1_hdf.c, switched from trunc() to floor() for Sun/seadas compatibility.
+- getstationinfo.c, handle case of no LF at end of station ID file.
+- get_elements.f, improved update logic to elements.dat file.
+- getl0scene_nav.f, set nflag(1), nflag(2) when NaN or scan passed
+  horizon conditions are detected on geonav evaluation.
+- attcmp.f, set nflag(5) on yaw-out-of-range.
+- SWl01.c, added option flag for meta data generation for seadas.
+- mkmeta.c, changed program version identifier for seadas.
+- getstationinfo.c, conditional compile for seadas mods.
+- swl1_hdf.c, conditional compile for seadas mods.
+- swl0_struc.h, added telemetry quality index to scene structure.  
+- getl0scene.c, set a flag rather than tossing the frame when telemetry 
+  of mnf 1 looks suspicious.
+- getnavdata.c, transfer telemetry quality index to nav input structure.
+- swl0_utils.c, added stop-pixel bit error test.
+- swl0_utils.h, added stop-pixel bit error test.
+
+  Navigation Library Changes (Fred Patt)
+- attdet.f, improved yaw-angle handling near sub-solar point.
+- swfnav.f, added orbit flag to nflag(1) and nflag(5), so frames with
+  bogus orbit data will be properly flagged and propogation of associated
+  attitude errors to subsequent frames will not occur.
+- navtlm.f, filter-out tilt state changes of < 4 scan lines.
+- proctim2.f, eliminate consecutive frame check and add 4-line time
+  offset.
+- navctl.dat, pitch angle adjustment.
+
+
+1.6.1	21 April 1998
+- swl0_parms.h, version number updated.
+- SWl01.c, changed setvbuf to setlinebuf for non-seadas version
+- getstationinfo.c, changed seadas variable to upper case.
+- swl1_hdf.c, changed seadas variable to upper case.
+
+
+1.7	27 May 1998
+- swl0_parms.h, version number updated, added S/C clock tolerance parameter. 
+- SWl01.c, changed meta-data control parameter to -m flag.
+- getl0indx.c, changed time-tag range checking limits to use contiguous
+  frame times to establish valid time range, rather than using the L0
+  header AOS and LOS times.  This also required modification to the 
+  general control structure. GAC time-tag range limits reset to max of 
+  < 60 secs after LOS.  Test for time difference errors was added. 
+- swl0_utils.c, added functions for timetag consistency and contiguity and
+  reworked the time sequence test.
+- swl0_utils.h, added new prototypes.
+- getorbdata.c, avoid frames with time-difference errors.
+- getl0scene.c, toss frames with time-difference errors.
+- getnavdata.c, navigation quality flag was getting reinitialized, it will
+  now pass time and header error information to the navigation block.
+- SWl0info.c, changed some informational messages.
+
+
+1.8	22 June 1998
+- swl0_parms.h, version number updated.
+- swl0_utils.c, improved time sequence check at start/end frames.
+- sunvec.f, corrected bug which caused the same bias to be used for
+  both sun sensor angles. 
+- getl0indx.c, prevent infinite loop when no contiguous timetags exist.
+
+  Navigation Library Changes (Fred Patt)
+- tiltcomp.f, fixed bug in initializing counter for end-of-scene processing.
+- attdet.f, rewritten to implement attitude determination using a Kalman
+  filter instead of the deterministic algorithm used previously.  This was
+  done to resolve multiple issues:  reduce jitter at sensor transitions,
+  improve yaw accuracy at the subsolar point and handle sensor gaps.
+- attcmp.f, modified to work with new (Kalman filter) version of attdet. 
+  Added two-pass (forward and backward) filtering. Fixed bug which caused 
+  incorrect initialization for flagged frames at
+  start of scene.
+- earcnst.f, corrected a bug which caused the same consistency check to
+  be used for both Earth width and phase.
+- earth.f, modified horizon angle calculation based on analysis of 
+  horizon scanner data.
+- navctl.dat, adjusted the roll alignments of all the sensors and SeaWiFS
+  to align the spin axis with the spacecraft Z axis.
+
+
+1.9	9 July 1998
+- swl0_parms.h, version number updated.
+- SWl01.c, added -h command argument to force HRPT processing when the
+  level-0 header is wrong. Also -g flag to force GAC type processing. Added
+  -t argument to allow over-ride of GAC timerange limits when dumping
+  old data recorders after a spacecraft anomaly. Changed meaning of second 
+  commandline parameter to be output dir or full output filename.  Moved 
+  filename generation logic up to the main level.
+- getl0indx.c, added fileType and GAC timerange control logic, with new
+  control structure argument.
+- swl0_proto.h, change to getl0indx calling sequence.
+- swl0_struc.h, new control structure defined.
+- SWl0info.c, change to getl0indx calling sequence.
+- swl1_hdf.c, input argument is now full filename, and new file will now
+  overwrite any previous file of the same name.
+- mkmeta.c, input argument is now full filename.
+- getl0scene_nav.c, eliminate bad nav messages on LUN and SOL cal frames.
+- swl0_utils.c, improved time-difference test for HRPT data.
+
+  Navigation Library Changes (Fred Patt)
+- navtlm.f, improved recognition of tilt-changing state.
+- proctim2.f, added a check on the input flag set by the L1A code.
+
+
+2.0	13 August 1998
+- swl0_parms.h, version number updated.
+- swl0_utils.c, time contiguity test now requires no S/C ID errors or 
+  previous timing errors in all three frames. Time sequence test 
+  modified to use only non-flagged timetags for sequence boundaries.
+  Added timeError function.
+- swl0_utils.h, new timeError function prototype.
+- getl0indx.c, improved S/C ID error test and moved it to first pass,
+  so scid error information is available to time contiguity test.
+  Added strict requirement that HRPT frames are increasing in time and
+  incorporated a two-pass time sequence test.
+- SWl0info.c, change to informational message.
+- SWl01.c, fixed logic error in metafile directory determination.
+- mkmeta.c, improved metafile naming logic.
+- swl0_proto.h, mkmeta() prototype change.
+- getl1rec.c, changed s_flags to use bit errors computed from the image
+  data, and to put navinp.flag into byte 3 (in place of missing band).
+
+  Navigation Library Changes (Fred Patt)
+- read_gps.f, modified to reject any GPS samples with time tags later
+  than the corresponding scan line time tags.
+- orbcomp.f, added a limit on the number of iterations to be performed 
+  on the orbit fit.
+- tiltcomp.f, limit tilts to allowable range.
+- suncomp.f, bug fix to prevent occasional smoothing of invalid Sun 
+  sensor samples at the end of a file.
+- navtlm.f, tilts limited to valid range.
+- earth.f, modifications to support single-string ACE operations.
+- suncnst.f, modifications to support single-string ACE operations.
+- navctl.dat, minor refinements to the sensor alignments.
+- navqc.dat, updates from FSP.
+
+
+2.1	19 October 1998
+
+src mods
+- swl0_parms.h, version number updated.
+- getl0scene_nav.c, return OK status for any LAC/GAC scene, even
+  when no valid navigation is found.
+- mkmeta.c, added navstat indicator (0=OK, 1=BAD).
+
+swfnav library mods
+- attcmp.f, sets navigation flags if attitude uncertainty 
+  exceeds a limit.
+- earcnst.f, minor changes to improve detection and rejection of 
+  invalid telemetry. 
+- suncnst.f, minor changes to improve detection and rejection of 
+  invalid telemetry.
+- navtlm.f, minor changes to improve detection and rejection of 
+  invalid telemetry.
+
+
+2.2	1 December 1998
+
+src mods
+- swl0_parms.h, version number updated.
+- getorbnum.c, maintenance update.
+
+swfnav library mods
+- attdet.f, minor change to reduce the roll/yaw state noise value, 
+  which should improve performance slightly with the single ACE.
+- put_elements.f, correction for year change.
+
+
+2.3	6 December 1998
+
+src mods
+- swl0_parms.h, version number updated.
+- swl1_struc.h, fixed error in dimensions of sc_dis and inst_dis
+  which was resulting in loss of earth sensor timetags.
+- getl1rec.c, corrected error in transfer of ins_dis and ins_ana
+  between navinp and l1rec for GAC data.
+- instlm.c, eng qual flags were shifted by 1-bit.
+
+swfnav library mods
+- ins_block.f, corrected temperature conversion offset.
+- attcmp.det, bug-fix for large attitude deviation on last scan.
+
+
+2.4	23 January 1999
+
+src mods
+- swl0_parms.h, version number updated.
+- mkmeta.c, dataday indicator in .meta switched to 4-digit year 
+  (this change was made previously, but it was not recorded).
+
+swfnav library mods
+- proctim.f, modified to adjust the time offset used for navigation.
+- navctl.dat, updated to adjust the pitch (in conjunction with
+  the time offset) and to make small alignment corrections to the 
+  attitude sensors.  
+
+
+2.5	 6 April 1999
+
+src mods
+- swl0_parms.h, version number updated.
+- getl1rec.c, corrected error in scan_temp, off by one instrument
+  telemetry word.
+- getorbnum.c, maintenance update to orbit number tables.
+- instlm.c, added u to unsigned long literal to eliminate warning 
+  message on Solaris version.
+- getl0scene_nav.c, change requirement from 2 to 3 navigable scans
+  before scene will be generated.
+
+swfnav library mods
+- earcnst.f, modified to reset the valid data range to correspond 
+  to the first and last unflagged values.
+- fit3t.f, modified to output fitted values only within the range 
+  of the valid input points, and to check for a poorly-conditioned 
+  fit using the covariance of the fitted polynomial.
+
+
+2.6	28 October 1999
+
+src mods
+- swl0_parms.h, version number updated.
+- getorbnum.c, maintenance update to orbit number table.
+
+swfnav library mods
+
+
+2.7	19 January 1999
+
+src mods
+- swl0_parms.h, version number updated.
+- getorbnum.c, maintenance update to orbit number table.
+- getl0indx.c, fixed missing arg in am error message.
+
+swfnav library mods
+- attdet.f, modified calculation of the Sun vector covariance to avoid 
+  numerical round-off errors; increased the state noise for roll and yaw.
+- earth.f, modified the horizon sensor calibration to use the vendor-
+  supplied tables; modified the horizon angle model.
+- asaps.f, moved SAVE statement for compiler compatibility.
+- geonav.f, added call to cdata for benefit of MSl12.
+- navctl.dat, revised alignments for all sensors.
+- hs_cal.dat, new parameter file containing the horizon sensor 
+  calibration tables; needs to be in the same directory as navctl.dat.
+
+hdf library mods
+- switch to HDF4.1r1.
+
+2.8	7 March 2000
+
+src mods
+- swl0_parms.h, version number updated.
+- getorbnum.c, maintenance update to orbit number table.
+- getl0indx.c, limit hrpt scene length to 30-minutes.
+
+swfnav library mods
+- earth.f, eliminate use of defaultdir in fortran open. Not supported on
+  solaris.
+
+
+3.0	2 May 2000
+
+src mods
+- swl0_parms.h, version number updated.
+- swl0_struc.h, added maxBitErrors parameter to control structure and 
+  added maxErrBits flag to index structure. 
+- getl0indx.c, set maxErrBits flag.
+- getl0scene.c, check maxErrBits flag in goodFrame() function.
+- SWl01.c, allow command-line passage of maxBitErrors parameter.
+- SWl0info.c, initialize maxBitErrors parameter.
+- getl1rec.c, force HRPT to tdi=0 and gain=0.
+- getorbnum.c, maintainence update to orbit number table.
+
+
+3.1	05 June 2000
+
+src mods
+- swl0_parms.h, version number updated.
+- SWl01.c, allow command-line passage of fixed gain setting.
+- getl1rec.c, pass in control structure and use content to set gain
+  for HRPT.
+- getl0scene.c, comments changed.
+- getorbdata.c, include first frame with valid time-tag in frame-set
+  used for orbit determination, regardless of minor frame number or
+  other quality checks. This fixes a rare problem in the buffering of 
+  orbit vectors.
+- swl0_proto.h, added control structure to getl1rec().
+- swl0_struc.h, added gainSetting field to control structure.
+- getorbnum.c, maintainence update to orbit number table.
+
+swfnav library mods
+- read_gps.f, remove all checks on the minor frame time code; these 
+  checks are unnecessary since SWl01 now ensures that the time codes 
+  are valid.
+- orb_interp.f, limit the index on the scan line time array to the 
+  number of lines in the file, when checking the scan line times against 
+  the orbit time range.
+- swfnav.f, set the navigation flags if any orbit interpolation errors 
+  occur.
+
+3.1.1	05 June 2000
+
+src mods
+- swl0_parms.h, version number updated.
+- *.f, *.c, assorted changes to support linux port.
+
+3.2	17 October 2000
+
+src mods
+- swl0_parms.h, version number updated.
+- swl1_hdf.c, eliminate filling of calibration table meta-data. SWl01
+  will no longer read the calibration table file.
+- swl1_hdf.h, getcal_proto.h removed.
+- getorbnum.c, maintainence update to orbit number table.
+
+libswfcal mods
+- this lib is no longer required for SWl01.
+
+
+3.2.1	31 October 2000
+- swl0_parms.h, version number updated.
+- getstationinfo.c, fix to string allocation length.
+
+
+3.3	01 December 2000
+src mods
+- swl0_parms.h, version number updated.
+- getl1rec.c, use TDI telemetry from preceding scan when processing
+  igc and tdi data.
+- getorbnum.c, maintainence update to orbit number table.
+- getstationinfo.c, linux port fix.
+
+swfnav library mods
+- readctl.f, increase filename allocation from 80 to 256 characters.
+- get_elements.f, increase filename allocation from 80 to 256 characters.
+- asaps.f, increase filename allocation from 80 to 256 characters.
+- earth.f, increase filename allocation from 80 to 256 characters.
+- read_gps.f, linux port fix.
+
+3.4	24 January 2001
+src mods
+- swl0_parms.h, version number updated.
+- printindx.c, added start_time and end_time messages.
+- getorbnum.c, maintainence update to orbit number table.
+- swl1_hdf.c, remove multiple instance of ydhmsf().
+
+swfnav library mods
+- read_gps.f, fixed rare bug in indexing of input array.
+- orbcomp.f, don't process if elements are more then N days old.
+
+3.5	4 April 2001
+src mods
+- swl0_parms.h, version number updated.
+- SWl01.c, added date of compilation to informational messages.
+- getorbnum.c, maintainence update to orbit number table.
+
+swfnav library mods
+- earth.f, modified to improve the Earth horizon model used to process 
+  the horizon scanner data.
+
+data files
+- navctl.dat, modified to incorporate changes to the horizon scanner 
+  and Sun sensor alignments.
+
+
+3.6	6 July 2001
+src mods
+- swl0_parms.h, version number updated.
+- getorbnum.c, maintainence update to orbit number table.
+- getl0indx.c, fix for forced GAC option, -g.
+
+swfnav library mods
+- proctim2.f, moved addition of time offset to end of routine to fix 
+  occasional problem with flagged frames at the end of the day.
+  Fixed bug in logic which determined if first unflagged time is after 
+  a day crossing (changed .gt. to .ge.). 
+
+3.7 	28 May 2002
+
+src mods
+- swl0_parms.h, version number updated. Changed clock tolerance on
+  timing error detection from 5 msecs to 10.
+- getorbnum.c, maintainence update to orbit number table.
+- swl1_hdf.c, handle station IDs that don't start with H.
+- getstationinfo.c, handle station IDs that don't start with H.
+- getl0indx.c, check for time shifts in GAC.
+- getorbdata.c, close L0 file after reading.
+- swl0_proto.h, new protos to locate and correct timing errors.
+- swl0_struc.h, new fields to store time shift flag, size. New time
+  table record structure. 
+- swl0_utils.h, added new timeShifted() time shift detection utility,
+  and unix2ydhms() time conversion utility. 
+- SWl01.c, new command-line args.
+- getl0scene_nav.c, limit those bad navigation messages to 10.
+- getnavdata.c, apply time shift corrections to msec and set related
+  flags in input.nflags. Also, close L0 file after reading.
+- input_s.h, added nflag field.
+- swl0_utils.c, added new timeShifted() time shift detection utility,
+  and unix2ydhms() time conversion utility. 
+- temporal_anomaly.c, new functions to locate and correct and/or flag
+  timing errors or other time-dependent anomalies.
+- SWl01.mk, added temporal_anomaly.c.
+
+swfnav library mods
+- input_s.fin, added nflags field to carry precomputed nflag info
+  into swfnav.
+- swfnav.f, init navblock.nflag from input.nflag.
+- attcmp.f, set nflag(8) to indicate warning when tilt changing.
+
+3.8 	10 June 2002
+
+src mods
+- swl0_parms.h, version number updated. LAC scene break tolerance 
+  increased from 1 to 5 seconds, to avoid scene breaks on 1-sec time
+  shifts.
+- getnavdata.c, don't set NAVWARN for fixed timing anamolies.
+- temporal_anomaly.c, bug fix in table search.
+
+
+3.9	1 October 2002
+
+src mods
+- swl0_parms.h, version number updated.
+- getorbnum.c, maintainence update to orbit number table.
+- SWl0merge.c, new facility to merge multiple L0 file, SWl0merge.
+- SWl0merge.mk, makefile for SWl0merge.
+- swl0_struc.h, added structure definition for the L0 merge index.
+
+libswfnav
+- proctim2.f, added capability to apply fixed time shifts for specified 
+  periods to correct extended spacecraft time error periods.
+
+
+3.9.1	22 November 2002
+
+src mods
+- swl0_parms.h, version number updated.
+  increased value of MAXFRAMES to 16000 (was 10000) to accomodate 
+  full-orbit LAC scenes.
+- swl0_struc.h, added stopTimeDelta to l0ctl structure.
+- getl0indx.c, use stopTimeDelta in l0ctl structure instead of 1800.
+- SWl01.c, support -d option for specifying stop-time delta value.
+- SWl0info.c, initialize stop-time delta value.
+- SWl0merge.c, initialize stop-time delta value.
+
+libswfnav
+- nav_cnst.fin, value of maxlin increased to 16000
+- attdet.f, reduce the attitude uncertainty in the 1-km navigation, 
+  without changing it for the GAC data.
+
+3.9.2 	26 February 2003
+
+src mods
+- swl0_parms.h, version number updated.
+- getorbnum.c, maintainence update to orbit number table.
+
+libswfnav
+- proctim2.f, added correction for extended timing error following SCM reset
+  of 2003 052 17:13:40.
+
+
+3.9.3 	1 April 2003
+
+src mods
+- swl0_parms.h, version number updated.
+- getl0indx.c, for HRPT, when computing stop time, ignore frames with
+  time preceeding the start time. This fixes cases of HRPT data with 
+  extraneous frames from a previous pass tacked onto the end (HKUS).
+
+libswfnav
+- attcmp.f, modified to recompute yaw covariance from forward and back
+  forward passes before checking against limit.
+- orbcomp.f, modified to better handle HRPT files that  precede GAC dump.
+
+
+3.9.4 	21 May 2003
+
+Changes to allow single executable which can operate in either the
+SDPS or SEADAS environments.
+
+src mods
+- swl0_parms.h, version number updated. Eliminated PROGRAM define.
+- swl0_struc.h, added environment and station info filename to swl0ctl,
+  the processing control structure..
+- swl1_hdf.c, changed #ifdefs for SEADAS to runtime switch.
+- swl1_hdf.h, prototype updates to include swl0ctl.
+- getstationinfo.c, merged SEADAS and SDPS station info file readers.
+- SWl01.c, changed #ifdefs for SEADAS to runtime switch. usage().
+- mkmeta.c, pass info through l0ctl.
+- SWl0merge.c, minor fix for messaging.
+
+
+3.9.5 	4 June 2003
+
+Changes to improve selection of "best quality" scans in SWl0merge.
+
+src mods
+- swl0_parms.h, version number updated.
+- swl0_utils.c, add function to compute pixel-to-pixel variance within a scan.
+- swl0_struc.h, added pixVariance field to swl0indx_struct.
+- getl0indx.c, call pixVariance().
+- SWl0merge.c, add comparitive tests for pixel variance and SOH header errors
+  to the scan selection process.
+- SWl0info.c, expand timerange for HRPT to full orbit, to allow SWl0info to
+  run properly on merged LAC files.
+
+3.9.6 	30 July 2003
+
+src mods
+- swl0_parms.h, version number updated.
+- getorbnum.c, maintainence update to orbit number table.
+
+3.9.7 	09 February 2004
+
+src mods
+- swl0_parms.h, version number updated.
+- getorbnum.c, maintainence update to orbit number table.
+
+3.9.8 	13 September 2004
+
+src mods
+- swl0_parms.h, version number updated.
+- getorbnum.c, maintainence update to orbit number table.
+- SWl0merge.c, fix time-limits to allow input files longer than 30-minutes.
+
+3.9.9 	18 November 2004
+
+Fixes for OSX port.
+
+src mods
+- swl0_parms.h, version number updated.  Limit scans for OSX.
+- getorbnum.c, maintainence update to orbit number table.
+- SWl01.c, removed call to old data block routines.
+
+libswfnav
+- add_elements.f, set word length for OSX.
+- conv_ins.f, moved ins_block() data inline to simplify OSX port.
+- conv_soh.f, moved acs_block() data inline to simplify OSX port.
+- conv_tel.f, removed from library.
+- earth.f, remove "readonly" from open statement.
+- get_elements.f, set word length for OSX.
+- make_el_file.f, set word length for OSX.
+- nav_cnst.fin, limit maxlin to 14000 lines for OSX (removed change on 12/07).
+- orbcomp.f, enable namelists for OSX. removed readonly from open, set
+  word length for OSX.
+- readqc.f, informational.
+- swfnav.f, use file rather than name in open statments.
+
+4.0 	7 December 2004
+
+OSX support.  Standardized version reporting.
+
+src mods
+- swl0_parms.h, version number updated.  Remove OSX scan limits.
+- getorbnum.c, maintainence update to orbit number table.
+- SWl01.c, version message.
+- SWlinfo.c, version message.
+- SWl0merge.c, version message.
+
+libswfnav
+- nav_cnst.fin, removed OSX maxlin limitation.
+
+4.0.1 	25 January 2005
+
+"Final?" maintainence update.  Revised version reporting.
+
+src mods
+- swl0_parms.h, version number updated.
+- getorbnum.c, maintainence update to orbit number table.
+- SWl01.c, version report format.
+- SWl0info.c, version report format.
+- SWl0merge.c, version report format.
+
+
+4.0.2 	20 April 2005
+
+Maintainence update.
+
+src mods
+- swl0_parms.h, version number updated.
+- getorbnum.c, maintainence update to orbit number table.
+
+
+4.0.3 	26 April 2005
+
+Maintainence update.
+
+src mods
+- swl0_parms.h, version number updated.
+- getnavdata.c, fix scene start/end if timing corrections applied are
+  applied to first/last record.
+
+
+
+4.0.4 	17 Nov 2005
+
+Maintainence update. New failed exit status for SWl0info.
+
+src mods
+- swl0_parms.h, version number updated.
+- getorbnum.c, maintainence update to orbit number table.
+- SWl0info.c, change exit status to 1 on failure or nframes. Set
+  failure is number of valid scenes is < 1.
+- swl0_utils.c, change failed exit status to 1.
+- temporal_anomaly.c, change failed exit status to 1.
+
+
+4.0.5	21 Nov 2005
+
+Change exit error codes to 1 from -1.
+
+src mods
+- swl0_parms.h, version number updated.
+- getl0indx.c, exit(1).
+- getl1rec.c, exit(1).
+- getnavdata.c, exit(1).
+- getorbdata.c, exit(1).
+- mkmeta.c, exit(1).
+- SWl0merge.c, exit(1).
+
+
+4.0.6 	7 Mar 2006
+
+Maintainence update. Fixes for MLAC naming conventions.
+
+src mods
+- swl0_parms.h, version number updated.
+- getorbnum.c, maintainence update to orbit number table.
+- swl1_hdf.h, fix mismatched string length for code.
+- getstationinfo.c, removed alpha-numeric check to support MLAC naming.
+
+4.0.7 	17 April 2006
+
+Maintainence update. Fix for large time-shift in recent GPS outage.
+
+src mods
+- swl0_parms.h, version number updated.
+- getorbnum.c, maintainence update to orbit number table.
+
+libswfnav
+- proctim2.f, fix part of the GPS outage period.
+
+4.1 	11 June 2006
+
+Revised orbit number determination based on externalized table, so
+we don't have to keep changing the code.
+
+src mods
+- swl0_parms.h, version number updated.
+- getorbnum.c, externalized orbit number table.
+
+data
+- seawifs/cal/orbit_table.dat, new seawifs orbit table.
+
+4.1.1 	31 July 2006
+
+Fix sscanf to use %hd for INT16, for OSX.
+
+src mods
+- swl0_parms.h, version number updated.
+- getorbnum.c, externalized orbit number table.
+
+4.2	17 July 2007
+
+Change SWl0info to report earliest and latest scan times in file.
+
+src mods
+- swl0_struc.h, added timeFirst, timeLast fields.
+- getl0indx.c, compute timeFirst, timeLast.
+- printindx.c, print Start_Time and Stop_Time as timeFirst, timeLast.
+
+4.3	30 October 2007
+
+Navigation library was modified to compute attitude, if possible, 
+when the navflags are set externally to indicate bad navigation
+(e.g., by the temporal_anomaly file). This was done to allow proper
+atmospheric correction for the browse files.
+
+libswfnav
+- attcmp.f, swf_tel.f, swfnav.f
+
+
+4.4	3 January 2008
+
+Due to problems with SeaWiFS navigation telem, code was modified to 
+to handle extrapolation of orbit vectors. 
+
+src
+- swl0_parms.h, version number change. Change MINORBVEC to 0.
+- getorbdata.c, added dummy last record to extend orbit integeration
+  time to last good mnf time (not last good GPS time).
+- getl0scene_nav.c, allow processing to proceed with 0 GPS vectors.
+
+libswfnav
+- read_gps.f, echo end time of integration period.
+
+4.5	21 August 2008
+
+Add explicit test for endian. Use new libgenutils for swapc_bytes,
+parse_file_name, and time utilities.
+
+src
+- swl0_parms.h, version number change. 
+- getl1rec.c, replace ifdef linux with endianess().
+- getorbdata.c, replace ifdef linux with endianess().
+- getl0indx.c, replace ifdef linux with endianess().
+- main_l0merge.c, replace ifdef linux with endianess().
+- instlm.c, replace ifdef linux with endianess().
+- main_l1agen.c, replace ifdef linux with endianess().
+- getnavdata.c, replace ifdef linux with endianess().
+- swl0_utils.c, move some time utils to libgenutils.
+- swl0_utils.h, remove protos for time utils moved to libgenutils.
+- swl0_proto.h, include genutils.h, add protos for libsdsgen funcs.
+- *.c, clean-up and fix some warning conditions, add swl0_proto.h.
+- *.mk, add inc/utils, -lgenutils.
+
+4.6	27 February 2009
+
+Fix bug in warning message.
+
+src
+- swl0_parms.h, version number change.
+- getorbnum.c, %d to %lf in message format.
+
+

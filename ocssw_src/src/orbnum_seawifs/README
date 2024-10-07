@@ -1,0 +1,6 @@
+This utility generates orbit number table entries for SWl01
+function getorbnum.c.  It requires that the NORAD environment
+var be set to a directory containing seawifs tle files with
+names of the form seldddyy.dat.
+
+BAF

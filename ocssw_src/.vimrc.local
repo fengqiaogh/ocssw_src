@@ -1,0 +1,32 @@
+" In order to automatically source this file, install the plugin from here:
+"   https://github.com/LucHermitte/local_vimrc
+" and place the following in your ~/.vimrc
+"   let g:local_vimrc = ['.vimrc.local']
+"   call lh#local_vimrc#munge('whitelist', $OCSSWROOT)
+
+" Indent settings
+set shiftwidth=4
+set softtabstop=4
+set tabstop=4
+set expandtab
+set autoindent
+
+" Until vim can understand CMake, overkill the settings for syntax checking
+if empty($CPATH)
+    let $CPATH=$LIB3_INC
+    let $CPATH.="\n".expand($OCSSWROOT."/oel_*/lib*")
+    let $CPATH.="\n".expand($OCSSWROOT."/src/**")
+    let $CPATH.="\n".expand($OCSSWROOT."/include/**")
+    let $CPATH.="\n".expand($OCSSWROOT."/include/")
+    let $CPATH.="\n".expand($OCSSWROOT."/opt/**/include/")
+    let $CPATH=join(filter(split($CPATH, '\n'), "isdirectory(v:val)"), ":")
+endif
+
+" cd $OCSSWROOT && ctags -f $OCSSWROOT/.ctags -R $OCSSWROOT/
+set tags+=$OCSSWROOT/.ctags
+" If you want a system-wide tags file, add it to your own .vimrc and run `ctags -R /usr/include /usr/local/include ...`
+" Make sure you use tags+= in your file.
+
+let b:formatdef_custom_c='"astyle --mode=c --options=$OCSSWROOT/.astylerc"'
+let b:formatters_c = ['custom_c']
+

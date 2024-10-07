@@ -1,0 +1,7 @@
+from distutils.core import setup
+
+setup(name='generate_gas_transmittance',
+      version='${PACKAGE_VERSION}',
+      package_dir={ '': '${CMAKE_CURRENT_SOURCE_DIR}' },
+      scripts=['$ENV{OCSSWROOT}/src/scripts/generate_gas_transmittance_tables.py']
+)

@@ -1,0 +1,6 @@
+ifile=defaults_input
+ofile=defaults_output
+efile=defaults_error
+long=-11
+int=-1
+dbl=-1.1

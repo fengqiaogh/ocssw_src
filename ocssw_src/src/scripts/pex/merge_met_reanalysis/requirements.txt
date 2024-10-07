@@ -1,0 +1,2 @@
+pyhdf
+scipy

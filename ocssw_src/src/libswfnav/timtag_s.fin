@@ -1,0 +1,19 @@
+c
+c  include file: timtag_s.fin
+c
+c  Purpose: define structure for navigation time tag parameters
+c
+c  By: W. Robinson, GSC, 18 Mar 93
+c
+c  Modification History:
+c
+
+c
+      type timtag_struct
+         integer(4) :: year  ! year in form yyyy
+         integer(4) :: day   ! day of year in form ddd
+         real(8) :: sec      ! second of the day
+      end type
+c
+c       record usually called timtag
+c       and end

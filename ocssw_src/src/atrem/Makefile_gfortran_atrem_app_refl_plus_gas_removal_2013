@@ -1,0 +1,47 @@
+#  This makefile builds the "atrem_PC" program from source files in the
+#    current directory.  All objects files on which the final executable
+#    depends are listed in the OBJECTS macro.  Any new files needed to
+#    build the executable should have their object-file form listed there
+#    as well.  To actually build the executable version of "atrem_PC",
+#    simply enter "make" at the shell prompt while in this directory.  All
+#    outdated object files will be recompiled and the executable relinked
+#    if this is necessary.  To recompile everything, first type "make clean"
+#    at the shell prompt and this will remove all ".o" files and the "atrem_PC"
+#    executable.  Then type "make" at the shell prompt.
+#
+
+%.o : %.mod
+
+#  Define a macro containing the names of all needed object files.
+OBJECTS=cubeio.o \
+	bndprms.o \
+	solar_irr_PC.o \
+	tpvmr_init.o \
+	6sm1.o
+
+#  Define a macro containing the name of the executable file.
+EXEFIL= atrem_app_refl_plus_gas_removal_2013
+all: $(EXEFIL)
+$(EXEFIL): $(OBJECTS) atrem_app_refl_plus_gas_removal_2013.o
+	gfortran -fno-automatic -o $(EXEFIL) $(OBJECTS) atrem_app_refl_plus_gas_removal_2013.o
+	chmod 774 $(EXEFIL)
+
+.SUFFIXES: .f90 .f .o
+
+.f.o:
+	gfortran -c -fno-automatic -o $*.o $<
+        
+.f90.o:
+	gfortran -c -fno-automatic -o $*.o $<
+
+#6sm1.o : 6sm1.f
+#bndprms.o : bndprms.f
+#solar_irr_PC.o : solar_irr_PC.f
+#tpvmr_init.o : tpvmr_init.f
+#cubeio.o : cubeio.f90
+#atrem_app_refl_plus_gas_removal_2013.o: atrem_app_refl_plus_gas_removal_2013.f cubeio.o
+
+clean:
+	rm -f $(EXEFIL) *.o *.mod
+
+

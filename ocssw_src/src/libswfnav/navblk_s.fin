@@ -1,0 +1,42 @@
+c
+c  include file: navblk_s.fin
+c
+c  Purpose: define structure for processed navigation block
+c       values
+c
+c  By: W. Robinson, GSC, 19 Mar 93
+c
+c  Modification History:
+c
+
+c
+      type navblk_struct
+c       
+c
+         real(4) :: orb_vec(3)      ! filtered GPS position data
+         real(4) :: l_vert(3)       ! local vertical vector in rotating 
+                                    ! geocentric coordinate system
+         real(4) :: sun_ref(3)      ! sun vector in rotating geocentric 
+                                    ! coordinate system
+         real(4) :: att_ang(3)      ! yaw, roll, pitch attitude angles
+         real(4) :: sen_mat(3,3)    ! attitude matrix or sensor frame
+         real(4) :: scan_ell(6)     ! scan ellipse coefficients
+         integer(4) :: nflag(8)     ! attitude flags: including-
+c                                   ! (1) no available solution due to 
+c                                   !     problems in (2) - (6)
+c                                   ! (2) spacecraft position not available
+c                                   ! (3) sun sensor data not available
+c                                   ! (4) earth sensor data not available
+c                                   ! (5) spacecraft attitude angles
+c                                   !     not available
+c                                   ! (6) time tags not available
+c                                   ! (7) spare
+c                                   ! (8) method of processing: 0 - 
+c                                   !     spacecraft supplied attitude
+c                                   !     1 - sensor derived attitude
+
+      end type
+c
+c       record should probably be called navblk(maxlines)
+c
+c       and end

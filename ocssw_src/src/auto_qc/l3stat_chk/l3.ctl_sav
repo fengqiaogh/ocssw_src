@@ -1,0 +1,62 @@
+# Control file for level 3 Bin data files
+# Specifies what portions of the files should be verified
+#
+# Data bin percentage check
+#
+#           Error Low thresh   Error High thresh      
+L3DAT              5.00              80.0
+# Weight check
+#
+L3WT
+#
+# % Gross value check
+#            error thresh (%) Low thresh     High thresh
+L3GCHK1       2.0                0.00          5.0
+L3GCHK2       2.0                0.00          5.0
+L3GCHK3       2.0                0.00          2.5
+L3GCHK4       2.0                0.00          1.2
+L3GCHK5       2.0                0.00          1.0
+L3GCHK6       2.0                0.00          0.9
+L3GCHK7       2.0                0.00          4.0
+L3GCHK8       2.0                0.00         10.0
+#L3GCHK9       2.0                0.00          0.2
+L3GCHK9       4.0                0.00          0.2
+L3GCHK10      2.0                0.00         50.0
+L3GCHK11      2.0                0.80          1.1
+#L3GCHK12      2.0                0.00          0.25
+L3GCHK12      7.0                0.00          0.25
+#
+# % Statistical check
+#      
+L3STAT1  
+L3STAT2 
+L3STAT3
+L3STAT4  
+L3STAT5 
+L3STAT6
+L3STAT7  
+L3STAT8 
+L3STAT9 
+L3STAT10
+L3STAT11
+L3STAT12
+#
+# Climatology check
+#             Thresh1   Thresh2   Thresh3  
+L3CCHK1        40.0       7.0       1.0          
+L3CCHK2        40.0       7.0       1.0
+L3CCHK3        40.0       7.0       1.0
+L3CCHK4        40.0       7.0       1.0
+L3CCHK5        40.0       7.0       1.0
+L3CCHK6        40.0       7.0       1.0
+L3CCHK7        40.0       7.0       1.0
+#L3CCHK8        40.0       7.0       1.0
+L3CCHK8        70.0      30.0      20.0
+L3CCHK9        40.0       7.0       1.0
+#L3CCHK10       40.0       7.0       1.0
+L3CCHK10       60.0      30.0      20.0
+L3CCHK11       40.0       7.0       1.0
+#L3CCHK12       40.0       7.0       1.0
+L3CCHK12       40.0      15.0      10.0
+#
+############### End of file

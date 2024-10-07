@@ -1,0 +1,30 @@
+# PGSTK_FOUND - true if library and headers were found
+# PGSTK_INCLUDE_DIRS - include directories
+# PGSTK_LIBRARIES - library directories
+
+find_path(PGSTK_INCLUDE_DIR PGS_IO.h
+  HINTS $ENV{LIB3_DIR}/EOS/include
+  )
+
+find_library(PGSTK_LIBRARY NAMES PGSTK
+  HINTS $ENV{LIB3_DIR}/EOS/lib/${EOS_ARCH}
+  )
+
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(PGSTK DEFAULT_MSG PGSTK_LIBRARY PGSTK_INCLUDE_DIR)
+if(PGSTK_FOUND)
+  set(PGSTK_LIBRARIES ${PGSTK_LIBRARY})
+  set(PGSTK_INCLUDE_DIRS ${PGSTK_INCLUDE_DIR})
+endif()
+
+find_package(HDFEOS REQUIRED)
+list(APPEND PGSTK_INCLUDE_DIRS ${HDFEOS_INCLUDE_DIRS})
+list(APPEND PGSTK_LIBRARIES ${HDFEOS_LIBRARIES})
+
+find_package(HDFEOS5 REQUIRED)
+list(APPEND PGSTK_INCLUDE_DIRS ${HDFEOS5_INCLUDE_DIRS})
+list(APPEND PGSTK_LIBRARIES ${HDFEOS5_LIBRARIES})
+
+list(APPEND PGSTK_LIBRARIES dl m)
+
+mark_as_advanced(PGSTK_INCLUDE_DIR PGSTK_LIBRARY)

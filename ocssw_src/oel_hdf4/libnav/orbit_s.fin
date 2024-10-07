@@ -1,0 +1,30 @@
+c  include file:  orbit_str.fin
+c
+c $Header: /app/shared/RCS/irix-5.2/seawifsd/src/mops/mopsV4.1/inc/orbit_s.fin,v 1.1 1995/01/17 23:03:28 seawifsd Exp seawifsd $
+c $Log: orbit_s.fin,v $
+c Revision 1.1  1995/01/17 23:03:28  seawifsd
+c Initial revision
+c
+c
+c  Purpose:  define orbit data structure for navigation
+c
+c
+c
+c  By:  Frederick S. Patt, GSC, August 13, 1993
+c
+c  Modification History:
+c
+c
+      type orbit_struct
+
+        real(8) ::    torb(maxlin)      !Time tag (floating point seconds of day)
+        real(8) ::    pos(3,maxlin)     !Orbit position (km)
+        real(8) ::        vel(3,maxlin) !Orbit velocity (km)
+        integer(4) :: nvec              !Number of orbit vectors in structure   
+        integer(4) :: iyr               !Time tag year
+        integer(4) :: iday              !Time tag day
+      end type
+c
+c  record name is typically orbit
+c
+c   and end

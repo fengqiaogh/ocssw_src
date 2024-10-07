@@ -1,0 +1,9 @@
+from distutils.core import setup
+
+setup(name='renav_hawkeye',
+      version='${PACKAGE_VERSION}',
+      package_dir={ '': '${CMAKE_CURRENT_BINARY_DIR}' },
+      #packages=['hawknav','pyIGRF'],
+      packages=['hawknav'],
+      scripts=['$ENV{OCSSWROOT}/src/nav_seahawk/renav_hawkeye.py']
+)

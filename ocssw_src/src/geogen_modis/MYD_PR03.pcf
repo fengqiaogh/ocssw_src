@@ -1,0 +1,658 @@
+# filename:
+# 	MYD_PR03.pcf
+#
+# description:
+#   	Process Control File (PCF)
+#
+# notes:
+#
+# 	This file supports the Release B version of the toolkit.
+#       It is intended for use with toolkit version "SCF TK5.2.19".
+#
+#       The logical IDs 10000-10999 (inclusive) are reserved for internal
+#       Toolkit/ECS usage, DO NOT add logical IDs with these values.
+#
+# 	Please treat this file as a master template and make copies of it
+# 	for your own testing. Note that the Toolkit installation script
+#  	sets PGS_PC_INFO_FILE to point to this master file by default.
+#       Remember to reset the environment variable PGS_PC_INFO_FILE to
+#       point to the instance of your PCF.
+#
+#       The toolkit will not interpret environment variables specified
+#       in this file (e.g. ~/database/$OSTYPE/TD is not a valid reference).
+#       The '~' character, however, when appearing in a reference WILL be
+#       replaced with the value of the environment variable PGSHOME.
+#
+#       The PCF file delivered with the toolkit should be taken as a
+#       template.  User entries should be added as necessary to this
+#       template.  Existing entries may (in some cases should) be altered
+#       but generally should not be commented out or deleted.  A few
+#       entries may not be needed by all users and can in some cases
+#       be commented out or deleted.  Such entries should be clearly
+#       identified in the comment(s) preceding the entry/entries.
+#
+#       Entries preceded by the comment: (DO NOT REMOVE THIS ENTRY)
+#       are deemed especially critical and should not be removed for
+#       any reason (although the values of the various fields of such an
+#       entry may be configurable).
+#
+# -----------------------------------------------------------------------
+?   SYSTEM RUNTIME PARAMETERS
+# -----------------------------------------------------------------------
+#########################################################################
+#
+# This section contains unique identifiers used to track instances of
+# a PGE run, versions of science software, etc.  This section must
+# contain exactly two entries.  These values will be inserted by
+# ECS just before a PGE is executed.  At the SCF the values may be set
+# to anything but these values are not normally user definable and user
+# values will be ignored/overwritten at the DAAC.
+#
+#########################################################################
+#
+# Production Run ID - unique production instance identifier
+# (DO NOT REMOVE THIS ENTRY)
+# -----------------------------------------------------------------------
+1
+# -----------------------------------------------------------------------
+# Software ID - unique software configuration identifier
+# (DO NOT REMOVE THIS ENTRY)
+# -----------------------------------------------------------------------
+1
+#
+?   PRODUCT INPUT FILES
+#########################################################################
+#
+# This section is intended for standard product inputs, i.e., major
+# input files such as Level 0 data files.
+#
+# Each logical ID may have several file instances, as given by the
+# version number in the last field.
+#
+#########################################################################
+#
+# Next non-comment line is the default location for PRODUCT INPUT FILES
+# WARNING! DO NOT MODIFY THIS LINE unless you have relocated these
+# data set files to the location specified by the new setting.
+!  ~/runtime
+#
+# -----------------------------------------------------------------------
+# These are actual ancillary data set files - supplied by ECS or the
+# user.  The following are supplied for purposes of tests and as a useful
+# set of ancillary data.  These entries may be removed IF the AA tools
+# are not being used.
+# -----------------------------------------------------------------------
+10780|usatile12|AA_DATA_INSTALL_DIR|||10751|12
+10780|usatile11|AA_DATA_INSTALL_DIR|||10750|11
+10780|usatile10|AA_DATA_INSTALL_DIR|||10749|10
+10780|usatile9|AA_DATA_INSTALL_DIR|||10748|9
+10780|usatile8|AA_DATA_INSTALL_DIR|||10747|8
+10780|usatile7|AA_DATA_INSTALL_DIR|||10746|7
+10780|usatile6|AA_DATA_INSTALL_DIR|||10745|6
+10780|usatile5|AA_DATA_INSTALL_DIR|||10744|5
+10780|usatile4|AA_DATA_INSTALL_DIR|||10743|4
+10780|usatile3|AA_DATA_INSTALL_DIR|||10742|3
+10780|usatile2|AA_DATA_INSTALL_DIR|||10741|2
+10780|usatile1|AA_DATA_INSTALL_DIR|||10740|1
+10951|mowe13a.img|AA_DATA_INSTALL_DIR||||1
+10952|owe13a.img|AA_DATA_INSTALL_DIR||||1
+10953|owe14d.img|AA_DATA_INSTALL_DIR||||1
+10954|owe14dr.img|AA_DATA_INSTALL_DIR||||1
+10955|etop05.dat|AA_DATA_INSTALL_DIR||||1
+10956|fnocazm.img|AA_DATA_INSTALL_DIR||||1
+10957|fnococm.img|AA_DATA_INSTALL_DIR||||1
+10958|fnocpt.img|AA_DATA_INSTALL_DIR||||1
+10959|fnocrdg.img|AA_DATA_INSTALL_DIR||||1
+10960|fnocst.img|AA_DATA_INSTALL_DIR||||1
+10961|fnocurb.img|AA_DATA_INSTALL_DIR||||1
+10962|fnocwat.img|AA_DATA_INSTALL_DIR||||1
+10963|fnocmax.imgs|AA_DATA_INSTALL_DIR||||1
+10964|fnocmin.imgs|AA_DATA_INSTALL_DIR||||1
+10965|fnocmod.imgs|AA_DATA_INSTALL_DIR||||1
+10966|srzarea.img|AA_DATA_INSTALL_DIR||||1
+10967|srzcode.img|AA_DATA_INSTALL_DIR||||1
+10968|srzphas.img|AA_DATA_INSTALL_DIR||||1
+10969|srzslop.img|AA_DATA_INSTALL_DIR||||1
+10970|srzsoil.img|AA_DATA_INSTALL_DIR||||1
+10971|srztext.img|AA_DATA_INSTALL_DIR||||1
+10972|nmcRucPotPres.datrepack|AA_DATA_INSTALL_DIR||||1
+10973|tbase.bin|AA_DATA_INSTALL_DIR|||10915|1
+10974|tbase.br|AA_DATA_INSTALL_DIR|||10919|4
+10974|tbase.bl|AA_DATA_INSTALL_DIR|||10918|3
+10974|tbase.tr|AA_DATA_INSTALL_DIR|||10917|2
+10974|tbase.tl|AA_DATA_INSTALL_DIR|||10916|1
+10975|geoid.dat|AA_DATA_INSTALL_DIR||||1
+#
+# -----------------------------------------------------------------------
+# The following are for the PGS_GCT tool only.  The IDs are #defined in
+# the PGS_GCT.h file.  These entries are essential for the State Plane
+# Projection but can otherwise be deleted or commented out.
+# -----------------------------------------------------------------------
+10200|nad27sp|~/database/common/GCT||||1
+10201|nad83sp|~/database/common/GCT||||1
+# -----------------------------------------------------------------------
+# The following are for the PGS_AA_DCW tool only.
+# The IDs are #defined in the PGS_AA_DCW.h file.
+# These entries may be deleted or commented out IF the AA tools are not
+# being used.
+# -----------------------------------------------------------------------
+10990|eurnasia/|AA_DATA_INSTALL_DIR||||1
+10991|noamer/|AA_DATA_INSTALL_DIR||||1
+10992|soamafr/|AA_DATA_INSTALL_DIR||||1
+10993|sasaus/|AA_DATA_INSTALL_DIR||||1
+#
+# -----------------------------------------------------------------------
+# file for Constant & Unit Conversion (CUC) tools
+# IMPORTANT NOTE: THIS FILE WILL BE SUPPLIED AFTER TK4 DELIVERY!
+# -----------------------------------------------------------------------
+10999|PGS_CUC_maths_parameters|~/database/common/CUC||||1
+#
+#
+#------------------------------------------------------------------------
+# Metadata Configuration File (MCF) is a template to be filled in by the
+# Instrument teams.  MCFWrite.temp is a scratch file used to dump the MCF
+# prior to writing to the hdf file. GetAttr.temp is similarly used to
+# dump metadata from the hdf attributes and is used by PGS_MET_GetPCAttr.
+# (DO NOT REMOVE THESE ENTRIES)
+#------------------------------------------------------------------------
+10250|MCF|||||1
+10252|GetAttr.temp|/L1A/INHOUSE/STORE/PGE01/output||||1
+10254|MCFWrite.temp|/L1A/INHOUSE/STORE/PGE01/output||||1
+10260|XMLstylesheet.temp|||||1
+#
+# -----------------------------------------------------------------------
+# MCF and parameter files used by PGE01.
+# -----------------------------------------------------------------------
+#
+# LUN 500500 is associated with the L1A metadata control file
+500500|MYD01.mcf|/L1A/INHOUSE/STORE/PGE01/SHR_MCF||||1
+# LUN 600020 is associated with the ASCII text geolocation parameter file
+600020|MOD03LUT.coeff|/L1A/INHOUSE/STORE/PGE01/coeff||MOD03LUT.coeff.6.1.0||2
+600020|MYD03LUT.coeff|/L1A/INHOUSE/STORE/PGE01/coeff||MYD03LUT.coeff.6.1.0||1
+# LUN 600111 is associated with the geolocation metadata file
+600111|MYD03.mcf|/L1A/INHOUSE/STORE/PGE01/MOD_PR03||||1
+#
+# -----------------------------------------------------------------------
+# Ephemeris and Attitude files logical IDs.
+# Emphemeris files will be accessed via the logical ID 10501.
+# Attitude files will be accessed via the logical ID 10502.
+# Use file versions to allow for multiple physical ephemeris
+# or attitude files.
+# -----------------------------------------------------------------------
+#
+10501|PM1EPHND.P2009126.1200.003.2009127095735|/raid3/linux/SSTG/UTdata/PGE01/inputs.v6.1.0||UR:10:DsShESDTUR:UR:15:DsShSciServerUR:13:[GSF:DSSDSRV]:24:SC:PM1EPHND.001:11837245||2
+10501|PM1EPHND.P2009127.1200.003.2009128100844|/raid3/linux/SSTG/UTdata/PGE01/inputs.v6.1.0||UR:10:DsShESDTUR:UR:15:DsShSciServerUR:13:[GSF:DSSDSRV]:24:SC:PM1EPHND.001:11837253||1
+10502|PM1ATTNR.P2009127.1000.003.2009128101025|/raid3/linux/SSTG/UTdata/PGE01/inputs.v6.1.0||UR:10:DsShESDTUR:UR:15:DsShSciServerUR:13:[GSF:DSSDSRV]:24:SC:PM1ATTNR.001:11844671||2
+10502|PM1ATTNR.P2009127.1200.003.2009128101214|/raid3/linux/SSTG/UTdata/PGE01/inputs.v6.1.0||UR:10:DsShESDTUR:UR:15:DsShSciServerUR:13:[GSF:DSSDSRV]:24:SC:PM1ATTNR.001:11846223||1
+10503|INSERT_EPHEMERIS_HDF_FILES_HERE|||||1
+10504|INSERT_ATTITUDE_HDF_FILES_HERE|||||1
+#
+#------------------------------------------------------------------------
+# Datasets for PGS_DEM tools.
+# A dataset of a given resolution is accessed via a single logical ID,
+# therefore all physical files comprising a data set must be accessed
+# via the same logical ID.  Use file versions to allow for multiple
+# physical files within a single data set.
+# DEM/Land-sea mask Data files of 30 arc-sec resolution will be accessed via the
+# logical ID 10650.
+# DEM standard deviation Data files of 30 arc-sec resolution will be accessed via the
+# logical ID 10651.
+# DEM/Land-sea mask Data files of 3 arc-sec resolution will be accessed via the
+# logical ID 10653.
+# DEM standard deviation Data files of 3 arc-sec resolution will be accessed via the
+# logical ID 10654.
+# DEM/Land-sea mask Data files of 90 arc-sec resolution will be accessed via the
+# logical ID 10656.
+# DEM/Land-sea mask Data files of 15 arc-sec resolution will be accessed via the
+# logical ID 10659.
+# DEM standard deviation Data files of 15 arc-sec resolution will be accessed via the
+# logical ID 10660.
+# NOTE: The file names in each entry must also appear in the attribute
+#       column of the entry (this is a requirement of the metadata tools).
+#       The entries given below are "template" entries and should be
+#       replaced with actual file name/location data before attempting
+#       to use the DEM tools.
+#------------------------------------------------------------------------
+#
+10650|dem30ARC_E60N90.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem30ARC_E60N90.hdf|6
+10650|dem30ARC_E60N0.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem30ARC_E60N0.hdf|5
+10650|dem30ARC_W60N0.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem30ARC_W60N0.hdf|4
+10650|dem30ARC_W60N90.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem30ARC_W60N90.hdf|3
+10650|dem30ARC_W180N90.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem30ARC_W180N90.hdf|2
+10650|dem30ARC_W180N0.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem30ARC_W180N0.hdf|1
+10659|dem15ARC_W180N90.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_W180N90.hdf|24
+10659|dem15ARC_W180N45.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_W180N45.hdf|23
+10659|dem15ARC_W180N0.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_W180N0.hdf|22
+10659|dem15ARC_W180S45.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_W180S45.hdf|21
+10659|dem15ARC_W120N90.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_W120N90.hdf|20
+10659|dem15ARC_W120N45.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_W120N45.hdf|19
+10659|dem15ARC_W120N0.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_W120N0.hdf|18
+10659|dem15ARC_W120S45.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_W120S45.hdf|17
+10659|dem15ARC_W60N90.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_W60N90.hdf|16
+10659|dem15ARC_W60N45.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_W60N45.hdf|15
+10659|dem15ARC_W60N0.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_W60N0.hdf|14
+10659|dem15ARC_W60S45.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_W60S45.hdf|13
+10659|dem15ARC_E0N90.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_E0N90.hdf|12
+10659|dem15ARC_E0N45.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_E0N45.hdf|11
+10659|dem15ARC_E0N0.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_E0N0.hdf|10
+10659|dem15ARC_E0S45.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_E0S45.hdf|9
+10659|dem15ARC_E60N90.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_E120N45.hdf|8
+10659|dem15ARC_E60N45.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_E120N90.hdf|7
+10659|dem15ARC_E60N0.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_E0N45.hdf|6
+10659|dem15ARC_E60S45.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_E60S45.hdf|5
+10659|dem15ARC_E120N90.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_E120N90.hdf|4
+10659|dem15ARC_E120N45.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_E120N45.hdf|3
+10659|dem15ARC_E120N0.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_E120N0.hdf|2
+10659|dem15ARC_E120S45.hdf|/MODAPSint/SDPToolkit/SDPTK5.2.19v1.00_DEM/SRTMDIR|||dem15ARC_E120S45.hdf|1
+#
+?   PRODUCT OUTPUT FILES
+#########################################################################
+#
+# This section is intended for standard product outputs, i.e., HDF-EOS
+# files generated by this PGE.
+#
+# Each logical ID may have several file instances, as given by the
+# version number in the last field.
+#
+#########################################################################
+#
+# Next line is the default location for PRODUCT OUTPUT FILES
+! /L1A/INHOUSE/STORE/PGE01/output
+#
+# LUN 500100 is associated with L1A granule HDF files. They are  used as both
+# input & output for this process.
+500100|MYD01.A2009127.1155.005.2009149205933.hdf|||UR:5:MYD01:6789||1
+# LUN 600000 is associated with geolocation HDF product files.
+600000|MYD03.A2009127.1155.006.2009150124500.hdf|||||1
+#------------------------------------------------------------------------
+# This file is created when PGS_MET_Write is used with an intention
+# to write an ASCII representation of the MCF in memory. The user is
+# allowed to change the name and path if required.
+#
+# NOTE: THIS IS OBSOLETE, THIS ENTRY IS ONLY HERE FOR BACKWARD
+#       COMPATIBILITY WITH PREVIOUS VERSIONS OF THE TOOLKIT.
+#       THE LOGICAL ID 10255 SHOULD BE MOVED DOWN TO THE RUNTIME
+#       PARAMETERS SECTION OF THIS FILE AND GIVEN A VALUE OF:
+#       <logical_id>:<version_number> WHERE THOSE VALUES REFLECT THE
+#       ACTUAL VALUES FOR THE NON-HDF OUTPUT PRODUCT FOR WHICH THE
+#       ASCII METADATA IS BEING WRITTEN.  e.g.:
+#       10255|reference output product|100:2
+#
+#------------------------------------------------------------------------
+10255|asciidump|||||1
+# -----------------------------------------------------------------------
+#
+?   SUPPORT INPUT FILES
+#########################################################################
+#
+# This section is intended for minor input files, e.g., calibration
+# files.
+#
+# Each logical ID may have several file instances, as given by the
+# version number in the last field.
+#
+#########################################################################
+#
+# Next line is the default location for SUPPORT INPUT FILES
+!  ~/runtime
+#
+#
+# -----------------------------------------------------------------------
+# This ID is #defined in PGS_AA_Tools.h
+# This file contains the IDs for all support and format files (listed
+# below).  This entry may be deleted or commented out if the AA tools are
+# not being used.
+# -----------------------------------------------------------------------
+10900|indexFile|~/database/common/AA||||1
+#
+# -----------------------------------------------------------------------
+# These are support files for the data set files - to be created by user
+# (not necessarily a one-to-one relationship).
+# The IDs must correspond to the logical IDs in the index file (above).
+# These entries may be deleted or commented out if the AA tools are not
+# being used.
+# -----------------------------------------------------------------------
+10901|mowe13aSupport|~/database/common/AA||||1
+10902|owe13aSupport|~/database/common/AA||||1
+10903|owe14Support|~/database/common/AA||||1
+10904|etop05Support|~/database/common/AA||||1
+10905|fnoc1Support|~/database/common/AA||||1
+10906|fnoc2Support|~/database/common/AA||||1
+10907|zobler1Support|~/database/common/AA||||1
+10908|zobler2Support|~/database/common/AA||||1
+10909|nmcRucSupport|~/database/common/AA||||1
+10915|tbaseSupport|~/database/common/AA||||1
+10916|tbase1Support|~/database/common/AA||||1
+10917|tbase2Support|~/database/common/AA||||1
+10918|tbase3Support|~/database/common/AA||||1
+10919|tbase4Support|~/database/common/AA||||1
+10740|usatile1Support|~/database/common/AA||||1
+10741|usatile2Support|~/database/common/AA||||1
+10742|usatile3Support|~/database/common/AA||||1
+10743|usatile4Support|~/database/common/AA||||1
+10744|usatile5Support|~/database/common/AA||||1
+10745|usatile6Support|~/database/common/AA||||1
+10746|usatile7Support|~/database/common/AA||||1
+10747|usatile8Support|~/database/common/AA||||1
+10748|usatile9Support|~/database/common/AA||||1
+10749|usatile10Support|~/database/common/AA||||1
+10750|usatile11Support|~/database/common/AA||||1
+10751|usatile12Support|~/database/common/AA||||1
+10948|geoidSupport|~/database/common/AA||||1
+#
+# -----------------------------------------------------------------------
+# The following are format files for each data set file (not necessarily
+# a one-to-one relationship).  # The IDs must correspond to the logical
+# IDs in the index file (10900, above).
+# These entries may be deleted or commented out if the AA tools are not
+# being used.
+# -----------------------------------------------------------------------
+10920|mowe13a.bfm|~/database/common/AA||||1
+10921|owe13a.bfm|~/database/common/AA||||1
+10922|owe14d.bfm|~/database/common/AA||||1
+10923|owe14dr.bfm|~/database/common/AA||||1
+10924|etop05.bfm|~/database/common/AA||||1
+10925|fnocAzm.bfm|~/database/common/AA||||1
+10926|fnocOcm.bfm|~/database/common/AA||||1
+10927|fnocPt.bfm|~/database/common/AA||||1
+10928|fnocRdg.bfm|~/database/common/AA||||1
+10929|fnocSt.bfm|~/database/common/AA||||1
+10930|fnocUrb.bfm|~/database/common/AA||||1
+10931|fnocWat.bfm|~/database/common/AA||||1
+10932|fnocMax.bfm|~/database/common/AA||||1
+10933|fnocMin.bfm|~/database/common/AA||||1
+10934|fnocMod.bfm|~/database/common/AA||||1
+10935|srzArea.bfm|~/database/common/AA||||1
+10936|srzCode.bfm|~/database/common/AA||||1
+10937|srzPhas.bfm|~/database/common/AA||||1
+10938|srzSlop.bfm|~/database/common/AA||||1
+10939|srzSoil.bfm|~/database/common/AA||||1
+10940|srzText.bfm|~/database/common/AA||||1
+10941|nmcRucSigPotPres.bfm|~/database/common/AA||||1
+10942|tbase.bfm|~/database/common/AA||||1
+10943|tbase1.bfm|~/database/common/AA||||1
+10944|tbase2.bfm|~/database/common/AA||||1
+10945|tbase3.bfm|~/database/common/AA||||1
+10946|tbase4.bfm|~/database/common/AA||||1
+10700|usatile1.bfm|~/database/common/AA||||1
+10701|usatile2.bfm|~/database/common/AA||||1
+10702|usatile3.bfm|~/database/common/AA||||1
+10703|usatile4.bfm|~/database/common/AA||||1
+10704|usatile5.bfm|~/database/common/AA||||1
+10705|usatile6.bfm|~/database/common/AA||||1
+10706|usatile7.bfm|~/database/common/AA||||1
+10707|usatile8.bfm|~/database/common/AA||||1
+10708|usatile9.bfm|~/database/common/AA||||1
+10709|usatile10.bfm|~/database/common/AA||||1
+10710|usatile11.bfm|~/database/common/AA||||1
+10711|usatile12.bfm|~/database/common/AA||||1
+10947|geoid.bfm|~/database/common/AA||||1
+#
+#
+# -----------------------------------------------------------------------
+# leap seconds (TAI-UTC) file (DO NOT REMOVE THIS ENTRY)
+# -----------------------------------------------------------------------
+10301|leapsec.dat|~/database/common/TD||||1
+#
+# -----------------------------------------------------------------------
+# polar motion and UTC-UT1 file (DO NOT REMOVE THIS ENTRY)
+# -----------------------------------------------------------------------
+10401|utcpole.dat|~/database/common/CSC||||1
+#
+# -----------------------------------------------------------------------
+# earth model tags file (DO NOT REMOVE THIS ENTRY)
+# -----------------------------------------------------------------------
+10402|earthfigure.dat|~/database/common/CSC||||1
+#
+# -----------------------------------------------------------------------
+# JPL planetary ephemeris file (binary form) (DO NOT REMOVE THIS ENTRY)
+# -----------------------------------------------------------------------
+10601|de200.eos|~/database/linux64/CBP||||1
+#
+# -----------------------------------------------------------------------
+# spacecraft tag definition file (DO NOT REMOVE THIS ENTRY)
+# -----------------------------------------------------------------------
+10801|sc_tags.dat|~/database/common/EPH||||1
+#
+# -----------------------------------------------------------------------
+# units conversion definition file (DO NOT REMOVE THIS ENTRY)
+# -----------------------------------------------------------------------
+10302|udunits.dat|~/database/common/CUC||||1
+#
+# -----------------------------------------------------------------------
+# Style Sheet for XML INVENTORY Metadata (DO NOT REMOVE THIS ENTRY)
+# -----------------------------------------------------------------------
+10303|science.xsl|~/database/common/MET||||1
+#
+#
+?   SUPPORT OUTPUT FILES
+#########################################################################
+#
+# This section is intended for minor output files, e.g., log files.
+#
+# Each logical ID may have several file instances, as given by the
+# version number in the last field.
+#
+#########################################################################
+#
+# Next line is default location for SUPPORT OUTPUT FILES
+! /L1A/INHOUSE/STORE/PGE01/output
+#
+#
+# -----------------------------------------------------------------------
+# These files support the SMF log functionality. Each run will cause
+# status information to be written to 1 or more of the Log files. To
+# simulate DAAC operations, remove the 3 Logfiles between test runs.
+# Remember: all executables within a PGE will contribute status data to
+# the same batch of log files. (DO NOT REMOVE THESE ENTRIES)
+# -----------------------------------------------------------------------
+10100|LogStatus|||||1
+10101|LogReport|||||1
+10102|LogUser|||||1
+10103|TmpStatus|||||1
+10104|TmpReport|||||1
+10105|TmpUser|||||1
+10110|MailFile|||||1
+#
+# -----------------------------------------------------------------------
+# ASCII file which stores pointers to runtime SMF files in lieu of
+# loading them to shared memory, which is a TK5 enhancement.
+# (DO NOT REMOVE THIS ENTRY)
+# -----------------------------------------------------------------------
+10111|ShmMem|||||1
+#
+#
+?   USER DEFINED RUNTIME PARAMETERS
+#########################################################################
+#
+# This section is intended for parameters used as PGE input.
+#
+# Note: these parameters may NOT be changed dynamically.
+#
+#########################################################################
+#
+# LUN 600001 is used for local version identification
+600001|LOCALVERSIONID|6.0.3
+# LUN 600002 lists the start and stop times of all maneuvers that overlap the
+# time period being processed.
+600002|maneuver list|
+# LUN 600021 is the RCS revision number of the MOD03LUT.coeff file
+600021|Parameters RCS Revision|6.16
+# LUN 600280 is associated with source for spacecraft kinematic state.
+# Valid values for 600280 are "MODIS Packet" or "SDP Toolkit".
+600280|Source for spacecraft kinematic state|SDP Toolkit
+# LUN 600281 controls whether or not orbit number validation is performed.
+# Valid values for 600281 are "TRUE" or "FALSE".
+600281|Validate Orbit Numbers|TRUE
+# LUN 600310 is associated with Terrain Correction Flag.
+600310|Terrain Correction Flag|TRUE
+# LUN 800500 is used for PGE version number
+800500|PGEVERSION|6.1.0
+# LUN 800510 tells a PGE whether to run for Terra or for Aqua data
+800510|SatelliteInstrument; AM1M=Terra, PM1M=Aqua, AP1M=Terra/Aqua|PM1M
+# LUN 800550 contains the output from a 'uname -a' command:
+800550|ProcessingEnvironment|Linux moddev-c7 3.10.0-514.6.2.el7.x86_64 #1 SMP Thu Feb 23 03:04:39 UTC 2017 x86_64 x86_64 x86_64 GNU/Linux
+# LUN 800600 is the value of the ReprocessingActual ECS inventory metadata
+800600|ReprocessingActual|reprocessed once
+# LUN 800605 is the value of the ReprocessingPlanned ECS inventory metadata
+800605|ReprocessingPlanned|further update is anticipated
+#
+# -----------------------------------------------------------------------
+# These parameters are required to support the PGS_SMF_Send...() tools.
+# If the first parameter (TransmitFlag) is disabled, then none of the
+# other parameters need to be set. By default, this functionality has been
+# disabled. To enable, set TransmitFlag to 1 and supply the other 3
+# parameters with local information. (DO NOT REMOVE THESE ENTRIES)
+# -----------------------------------------------------------------------
+10109|TransmitFlag; 1=transmit,0=disable|0
+10106|RemoteHost|sandcrab
+10107|RemotePath|/usr/kwan/test/PC/data
+10108|EmailAddresses|kwan@eos.hitc.com
+#
+# -----------------------------------------------------------------------
+# The following runtime parameters define various logging options.
+# Parameters described as lists should be space (i.e. ' ') separated.
+# The logical IDs 10117, 10118, 10119 listed below are for OPTIONAL
+# control of SMF logging.  Any of these logical IDs which is unused by a
+# PGE may be safely commented out (e.g. if logging is not disabled for
+# any status level, then the line beginning 10117 may be commented out).
+# -----------------------------------------------------------------------
+10114|Logging Control; 0=disable logging, 1=enable logging|1
+10115|Trace Control; 0=no trace, 1=error trace, 2=full trace|0
+10116|Process ID logging; 0=don't log PID, 1=log PID|0
+#10117|Disabled status level list (e.g. W S F)|
+#10118|Disabled seed list|
+# We have a permission to disable the following messages, which otherwise would
+# produce Gigabytes of warning messages per granule, in normal processing.
+10119|Disabled status code list|PGSCSC_W_PREDICTED_UT1 PGSDEM_M_FILLVALUE_INCLUDED
+#
+# -----------------------------------------------------------------------
+# Toolkit version for which this PCF was intended.
+# DO NOT EDIT OR REMOVE THIS ENTRY!
+# -----------------------------------------------------------------------
+10220|Toolkit version string|SCF TK5.2.19
+#
+# -----------------------------------------------------------------------
+# The following parameters define the ADEOS-II TMDF values (all values
+# are assumed to be floating point types).  The ground reference time
+# should be in TAI93 format (SI seconds since 12 AM UTC 1993-01-01).
+# These formats are only prototypes and are subject to change when
+# the ADEOS-II TMDF values are clearly defined.  PGEs that do not access
+# ADEOS-II L0 data files do not require these parameters.  In this case
+# they may be safely commented out, otherwise appropriate values should
+# be supplied.
+# -----------------------------------------------------------------------
+#10120|ADEOS-II s/c reference time|
+#10121|ADEOS-II ground reference time|
+#10122|ADEOS-II s/c clock period|
+#
+# -----------------------------------------------------------------------
+# The following parameter defines the TRMM UTCF value (the value is
+# assumed to be a floating point type).  PGEs that do not access TRMM
+# data of any sort do not require this parameter.  In this case it may be
+# safely commented out, otherwise an appropriate value should be
+# supplied.
+# -----------------------------------------------------------------------
+#10123|TRMM UTCF value|
+#
+# -----------------------------------------------------------------------
+# The following parameter defines the Epoch date to be used for the
+# interpretation (conversion) of NASA PB5C times (the Epoch date should
+# be specified here in CCSDS ASCII format--A or B) (reserved for future
+# use--this quantity is not referenced in TK 5.2).  This entry may be
+# safely commented out or deleted.
+# -----------------------------------------------------------------------
+#10124|NASA PB5C time Epoch date (ASCII UTC)|
+#
+# -----------------------------------------------------------------------
+# The following parameter is a "mask" for the ephemeris data quality
+# flag.  The value should be specified as an unsigned integer
+# specifying those bits of the ephemeris data quality flag that
+# should be considered fatal (i.e. the ephemeris data associated
+# with the quality flag should be REJECTED/IGNORED).
+# -----------------------------------------------------------------------
+10507|ephemeris data quality flag mask|65536
+#
+# -----------------------------------------------------------------------
+# The following parameter is a "mask" for the attitude data quality
+# flag.  The value should be specified as an unsigned integer
+# specifying those bits of the attitude data quality flag that
+# should be considered fatal (i.e. the attitude data associated
+# with the quality flag should be REJECTED/IGNORED).
+# -----------------------------------------------------------------------
+10508|attitude data quality flag mask|65536
+#
+# -----------------------------------------------------------------------
+# ECS DPS trigger for PGE debug runs
+#
+# NOTICE TO PGE DEVELOPERS: PGEs which have a debug mode
+# need to examine this parameter to evaluate activation rule
+# (DO NOT REMOVE THIS ENTRY)
+# -----------------------------------------------------------------------
+10911|ECS DEBUG; 0=normal, 1=debug|0
+#
+# -----------------------------------------------------------------------
+# The following runtime parameters defines generation of XML metadata during
+# the production of .met file for the INVENTORY Metadata. If the flag is
+# set to 0 only ASCII .met file will be created besides writing metadata into 
+# HDF file.If the flag is set to 1 then a .xml file will also be created 
+# in addition to ASCII .met file and metadata that is put into the HDF file.
+# -----------------------------------------------------------------------
+10256|XML METADATA GENERATION FLAG; 0=no, 1=yes|0
+#
+# -----------------------------------------------------------------------
+# This entry defines the IP address of the processing host and is used
+# by the Toolkit when generating unique Intermediate and Temporary file
+# names.  The Toolkit no longer relies on the PGS_HOST_PATH environment
+# variable to otain this information. (DO NOT REMOVE THIS ENTRY)
+# -----------------------------------------------------------------------
+10099|Local IP Address of 'ether'|155.157.31.87
+#
+?   INTERMEDIATE INPUT
+#########################################################################
+#
+# This section is intended for intermediate input files, i.e., files
+# which are output by an earlier PGE but which are not standard
+# products.
+#
+# Each logical ID may have only one file instance.
+# Last field on the line is ignored.
+#
+#########################################################################
+#
+# Next line is default location for INTERMEDIATE INPUT FILES
+!  ~/runtime
+#
+#
+?   INTERMEDIATE OUTPUT
+#########################################################################
+#
+# This section is intended for intermediate output files, i.e., files
+# which are to be input to later PGEs, but which are not standard
+# products.
+#
+# Each logical ID may have only one file instance.
+# Last field on the line is ignored.
+#
+#########################################################################
+#
+# Next line is default location for INTERMEDIATE OUTPUT FILES
+! /L1A/INHOUSE/STORE/PGE01/output
+#
+#
+?   TEMPORARY I/O
+#########################################################################
+#
+# This section is intended for temporary files, i.e., files
+# which are generated during a PGE run and deleted at PGE termination.
+#
+# Entries in this section are generated internally by the Toolkit.
+# DO NOT MAKE MANUAL ENTRIES IN THIS SECTION.
+#
+#########################################################################
+#
+# Next line is default location for TEMPORARY FILES
+! /L1A/INHOUSE/STORE/PGE01/output
+#
+#
+?   END

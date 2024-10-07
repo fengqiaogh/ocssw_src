@@ -1,0 +1,101 @@
+---------------------------------------------------------------------------
+Notes added by Bo-Cai Gao in December, 2014:
+
+a)  The main program for this land version of hyperspectral atmospheric
+correction algorithm is "atrem_f90_cubeio.f". It uses a modified version of 6S
+code for modeling Rayleigh and aerosol effects. The binary files, named
+abscf_h2o_PC, abscf_co2_PC, ..., etc., are files for pre-calculated 19 layer
+high spatial resolution absorption coffecients for H2O, CO2, N2O, CO, CH4, and
+O2. "bndprms.f is a program for specifying atmospheric ozone and NO2 absorption
+coeffcients as a function of wavelength. "sun_binary_PC" is a standard solar
+irradiance curve.  "solar_irr_PC.f" reads in "sun_binary_PC", and coverts the
+data to match the spectral resolution of any imaging spectrometers.
+"tpvmr_init.f" is a program to set up atmospheric temperature, pressure, and
+H2O volumn mixing ratio vertical profiles (similar to the LOWTRAN7 model
+atmospheres).
+   
+      To compile this version of atmospheric correction algorithm, type: make
+-f Makefile_gfortran_atrem_f90_cubeio
+
+      To run the sample case for atmospheric corrections, type:
+run_atrem_refl_f90_sample_HICO & All the input files are located in the
+sub-directory "input", where we have two HICO wavelength files, one sample HICO
+data in BIL storage order, one file named "*.input.txt" (which had about 20
+lines in ASCII, and specified instrument name, date, time, image center lat,
+lon, input imaing data file, output files, etc. This "*.input.txt" file can be
+automatically generated (for many HICO scenes) using IDL procedures stored in
+the directory "IDL_script_for_input_txt_file_generation". In this directory,
+there are detailed instructions and listed steps for the automattic generation
+of "*.input.txt" files. The sub-directory "USGS_HICO_DEM" contains a coarse DEM
+file I created with data downloaded from USGS. The DEM file is used for finding
+the image center surface elevation based on the lat, lon info contained in the
+file "hico ... 100m.hico.hdr". After the automatic generation of input files,
+atmospheric corrections for many scenes can be made in one batch job.  The
+output surface reflectance data cube ("iss ... 100m.hico_refl.bil" is stored
+inside the directory "output". The data can be converted to "bsq" data storage
+order (band sequential) using IDL and ENVI. The "iss...100m.hico_refl.bsq" is
+the surface reflectance data converted to BSQ storage order. The idl procedure
+named "cloud_removal.pro" cna be used to remove thin cloud effects in the
+atmosphere-corrected data.
+
+b)  The program named "atrem_app_refl_f90_cubeio.f" is a program for deriving
+the satellite level apparent reflectance data cube. It does not do any
+atmospheric corrections. It removes the effects of solar irrandiance variation
+with wavelength. The output data cube is useful for dianostic studies of data
+qualities. To compile, type: Makefile_gfortran_atrem_app_refl_f90_cubeio To
+make a test run, type: run_atrem_app_refl_f90_sample_HICO
+
+c)  The program named "atrem_app_refl_plus_gas_removal_2013.f" is a program for
+deriving the satellite level apparent reflectances plus the removal of
+atmospheric gas absorption bands. It does not perform Rayleigh and aerosol
+effect corrections. To compile, type:
+Makefile_gfortran_atrem_app_refl_plus_gas_removal_2013 To make a test run for a
+HICO data set, type: run_atrem_app_refl_plus_gas_removal_2013_sample_HICO To
+make a test run for a sample JPL PRISM data set acquired form a low altitude
+aircraft over Monterey, California, type:
+run_atrem_app_refl_plus_gas_removal_2013_Monterey_PRISM
+
+ !!!*** All the land versions of codes described above work for both aircraft
+and satellite observations. The codes can accept one mean surface elevation per
+scene as input. 
+
+---------------------------------------------------------------------------
+Below are notes written in 2011.
+
+Special notes;
+
+  'atrem_f90_cubeio.f' and 'atrem_app_refl_f90_cubeio.f' are using the new
+'cubeio.f90' for I/O operations. The output data cubes do not have 512 bytes of
+headers.
+
+---------------------------------------------------------------------------
+Steps to compile and run the updated version of atrem code, which uses a F90
+routine named "cubeio.f90" for I/O operations instead of the combination of a
+f77 routine (slice_io.f) and a c routine (f_cubeio.c).  After the
+modifications, atrem can only deal with input bil and bip image cubes, & bsq
+data format is no longer supported.
+
+   To compile, type:
+      make -f Makefile_gfortran_atrem_f90_cubeio 
+
+    If the compilation fails, try first to type:
+         gfortran -fno-automatic -c cubeio.f90    
+                               and then to type
+         make -f Makefile_gfortran_atrem_f90_cubeio
+
+   To run, type:
+      ./atrem_f90_cubeio <./input/input_ASCII_text_file > ./output/zzz_refl_junk &
+
+   ------------------------------------------
+   For apparent reflectance calculations,
+      make -f Makefile_gfortran_atrem_app_refl_f90_cubeio (for apparent
+                                                      reflectance only).
+    To run, type:
+      ./atrem_app_refl_f90_cubeio <./input/input_ASCII_text_file > ./output/zzz_app_refl_junk &
+
+    If the compilation fails, try first to type:
+         gfortran -fno-automatic -c cubeio.f90    
+                               and then to type
+         make -f Makefile_gfortran_atrem_app_refl_f90_cubeio
+ 
+---------------------------------------------------------------------------

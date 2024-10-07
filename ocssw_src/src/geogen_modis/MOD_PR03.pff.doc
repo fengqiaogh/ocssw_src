@@ -1,0 +1,490 @@
+File Format Description
+
+File Name(s) (wildcard if appropriate): MOD03LUT.coeff, MYD03LUT.coeff 
+
+MODIS Product: MOD03, MYD03
+
+File Type (ASCII, Binary): ASCII
+
+File Source (Specify provider if applicable):
+James Kuyper Jr.
+General Sciences Corporation, MODIS Support Office
+7501 Forbes Blvd. Suite 103
+Seabrook, MD 20706
+
+File Content Description:
+File containing Geolocation processing parameters pertaining to
+instrument state, telemetry configuration, and data validation
+criteria.  The parameters are read by the subroutine GEO_read_param_file().
+
+
+
+File Structure Description:
+
+Each parameter in the file is formatted in form 
+"parametername = parametervalue".
+The parametervalue may contain multiple, whitespace delimited values and are
+of the datatype (i.e. string, integer, or floating point) consistent with
+the parameter.
+
+The parameters are normally separated by documenting comment lines.  These
+lines always have a '#' as their first character.
+
+
+Record/Line Format:
+
+The Geolocation Parameters must be in the following order to be read by
+GEO_read_param_file().
+
+#PARAMETER: revision
+#DESCRIPTION: RCS revision number for parameter file
+#UNITS: None DATATYPE: string NUMBER OF ELEMENTS: 1
+#REFERENCE: GEO_read_param_file.PDL walkthrough, 1996/8/28
+#
+#PARAMETER: spacecraft_ID
+#DESCRIPTION: satellite name
+#UNITS: None
+#REFERENCE: CCR 524
+#
+#PARAMETER: band_number
+#DESCRIPTION: band number to geolocate (0 is ideal band). If this is a high
+#resolution band, the high resolution geolocation will not be reported directly.
+#The output geolocation will be aggregated to 1km resolution from the high
+#resolution geolocation, and offsets will be provided to adjust a bi-linear
+#interpolation of the 1km geolocation to match the high resolution geolocation.
+#UNITS: None DATATYPE: integer NUMBER OF ELEMENTS: 1
+#REFERENCE: N/A DATE: N/A	
+#
+#PARAMETER: N_samp
+#DESCRIPTION: number of samples per frame for each band (0 is the ideal band) 
+#UNITS: None DATATYPE: integer NUMBER OF ELEMENTS: 37
+#Geolocation ATBD Version 3.0 Reference: page 3-21.
+#REFERENCE: Figure 30-3, SBRC 151840 (MODIS COMMAND, TELEMETRY, SCIENCE AND
+#		ENGINEERING DESCRIPTION) DATE: 5 May, 1996
+#
+#PARAMETER: band_position (G-001A)
+#DESCRIPTION: Scan IFOV Offsets of band trailing edges wrt/ Optical Center
+#		[0-12, 13a, 14a, 15-36] (0 is the ideal band)
+#UNITS: Kilometers IFOV DATATYPE: float NUMBER OF ELEMENTS: 39
+#Geolocation ATBD Version 3.0 Reference: page 3-19.
+#REFERENCE: Figure 30-3, SBRC 151840 (MODIS COMMAND, TELEMETRY, SCIENCE AND
+#		ENGINEERING DESCRIPTION) DATE: 5 May, 1996
+#
+#PARAMETER: det_position (G-002A & G-003A)
+#DESCRIPTION: Band center x and y offset pairs wrt/ Optical Center in (ATBD)
+#	telescope coordinates [0-12, 13a, 14a, 15-36] (0 is the ideal band) 
+#UNITS: meters DATATYPE: float NUMBER OF ELEMENTS: 74
+#Geolocation ATBD Version 3.0 Reference: page 3-20.
+#REFERENCE: Derived from Figure 30-3, SBRC 151840 (MODIS COMMAND, TELEMETRY, 
+#		SCIENCE AND ENGINEERING DESCRIPTION) DATE: 5 May, 1996
+#		and detector dimensions from the MODIS Technical Description
+#		Document (?) DATE: 1992.
+#
+#PARAMETER: det_space (G-003A)
+#DESCRIPTION: Detector center spacing in the track direction 
+#	(0 is the ideal band)
+#UNITS: meters DATATYPE: float NUMBER OF ELEMENTS: 37
+#Geolocation ATBD Version 3.0 Reference: page 3-20.
+#REFERENCE:	MODIS Technical Description Document (?) DATE: 1992.
+#
+#PARAMETER: focal_length (G-004)
+#DESCRIPTION: Instrument focal length for each band 
+#UNITS: meters DATATYPE: float NUMBER OF ELEMENTS: 37
+#Geolocation ATBD Version 3.0 Reference: page 3-16.
+#REFERENCE:	MODIS Technical Description Document (?) DATE: 1992.
+#
+#PARAMETER: N_reset (G-005)
+#DESCRIPTION: Number of (333 micro-second) frame clock cycles from
+#		sector start to start of data collection
+#UNITS: sample times DATATYPE: integer NUMBER OF ELEMENTS: 1
+#Geolocation ATBD Version 3.0 Reference: page 3-23.
+#REFERENCE: Section 5.1, SBRC 151840 (MODIS COMMAND, TELEMETRY, SCIENCE AND
+#		ENGINEERING DESCRIPTION) DATE: 5 May, 1996
+#
+#PARAMETER: t_reset (G-006)
+#DESCRIPTION: time to reset the sample at the beginning of the frame 
+#UNITS: seconds DATATYPE: float NUMBER OF ELEMENTS: 1
+#UNITS: seconds
+#Geolocation ATBD Version 3.0 Reference: page 3-25.
+#REFERENCE: Sheet A-6, MODIS Data Characteristics, SBRC 151868 DATE: 10/26/93
+#
+#PARAMETER: t_frame (G-007)
+#DESCRIPTION: sample frame time
+#UNITS: seconds DATATYPE: float NUMBER OF ELEMENTS: 1
+#Geolocation ATBD Version 3.0 Reference: page 3-23.
+#REFERENCE: Section 5.1, SBRC 151840 (MODIS COMMAND, TELEMETRY, SCIENCE AND
+#		ENGINEERING DESCRIPTION) DATE: 5 May, 1996
+#
+#PARAMETER: t_vernier (G-008)
+#DESCRIPTION: vernier clock pulse cycle
+#UNITS: seconds DATATYPE: float NUMBER OF ELEMENTS: 1
+#Geolocation ATBD Version 3.0 Reference: page 3-23.
+#REFERENCE: Sheet 30-44, SBRC 151840 (MODIS COMMAND, TELEMETRY, SCIENCE AND
+#		ENGINEERING DESCRIPTION) DATE: 5 May, 1996
+#
+#PARAMETER: t_encoder
+#DESCRIPTION: encoder time data scale factor 
+#UNITS: seconds DATATYPE: float NUMBER OF ELEMENTS: 1
+#Geolocation ATBD Version 3.0 Reference: page 3-25.
+#REFERENCE: Sheet 30-42, SBRC 151840 (MODIS COMMAND, TELEMETRY, SCIENCE AND
+#		ENGINEERING DESCRIPTION) DATE: 5 May, 1996
+#
+#PARAMETER: sample_impulse (G-009)
+#DESCRIPTION: mirror encoder pulses between each encoder sample
+#UNITS: encoder pulses DATATYPE: integer NUMBER OF ELEMENTS: 1
+#Geolocation ATBD Version 3.0 Reference: page (3-25).
+#REFERENCE: Table 30-5A, SBRC 151840 (MODIS COMMAND, TELEMETRY, SCIENCE AND
+#		ENGINEERING DESCRIPTION) DATE: 5 May, 1996
+#
+#PARAMETER: F_offset (G-10A)
+#DESCRIPTION: Offset in IFOV units to get time sample for each band
+#	to adjust for detector size
+#UNITS: Kilometers IFOV DATATYPE: float NUMBER OF ELEMENTS: 37
+#Geolocation ATBD Version 3.0 Reference: page 3-25.
+#REFERENCE: Defined in MODIS Level 1A Earth Location ATBD 3.0, page 3-25
+#	and derived from Figure 30-3, SBRC 151840 (MODIS COMMAND, TELEMETRY, 
+#		SCIENCE AND ENGINEERING DESCRIPTION) DATE: 5 May, 1996
+#
+#PARAMETER: mirr_side1_range
+#DESCRIPTION:    mirror side 1 angle range (radians)
+#UNITS: radians DATATYPE: float NUMBER OF ELEMENTS: 2
+#Geolocation ATBD Version 3.0 Reference: page 3-29.
+#REFERENCE: Table A3 1.2, MODIS Data Characteristics, SBRC 151868 DATE: 10/26/93
+#
+#PARAMETER: poly_degree
+#DESCRIPTION:  degree of the polynomial for mirror encoder-to-angle conversion
+#UNITS: none DATATYPE: integer NUMBER OF ELEMENTS: 1
+#REFERENCE: N/A
+#
+#PARAMETER: poly_coef (G-12B)
+#DESCRIPTION:  polynomial coefficients for mirror encoder-to-angle conversion
+#	for Side A and B Electronics (0 index for side A)
+#UNITS: radians, radians/encoder pulses DATATYPE: float NUMBER OF ELEMENTS: 2*5
+#Geolocation ATBD Version 3.0 Reference: page 3-25.
+#REFERENCE: 151840 Rev B, MODIS COmmand, Telemetry, Science and Engineering
+#     Description, 1997-05-14, Sheets 30-43
+#     PL3095-Y04088, "MODIS Scan Drive Test Results", Joe Kleeburg 1994-06-24
+#
+#PARAMETER: alpha (G-013)
+#DESCRIPTION:  mirror wedge angle about rotation axis
+#UNITS: radians DATATYPE: float NUMBER OF ELEMENTS: 1
+#Geolocation ATBD Version 3.0 Reference: page 3-26.
+#REFERENCE: 405320 Consent to Integrate Package for the Scan Mirror Assembly
+#       Modified to reduce mirror side 1&2 along-scan differences 2002-03-28
+#
+#PARAMETER: beta (G-014A)
+#DESCRIPTION:  mirror wedge angle in the along-track axis
+#UNITS: radians DATATYPE: float NUMBER OF ELEMENTS: 1
+#Geolocation ATBD Version 3.0 Reference: page 3-26.
+#REFERENCE: Under-described in MODIS Level 1A Earth Location ATBD 3.0, page 36.
+#       Modified per Mash Nishihama's e-mail 2001-02-23
+#
+#PARAMETER: gammaa (G-015)
+#DESCRIPTION:  mirror mis-alignment of the mirror center line wrt/ the rotation
+#		axis
+#UNITS: radians DATATYPE: float NUMBER OF ELEMENTS: 1
+#Geolocation ATBD Version 3.0 Reference: page 3-26.
+#REFERENCE: 405320 Consent to Integrate Package for the Scan Mirror Assembly
+#       PL3095-M06023 "Update to MODIS Pointing Budgets," N. J. Therrien,
+#       Modified per Mash Nishihama's e-mail 2001-02-23
+#
+#PARAMETER: T_tel2inst (G-016A)
+#DESCRIPTION:  telescope to instrument frame transformation matrix
+#UNITS: none DATATYPE: float NUMBER OF ELEMENTS: 9
+#Geolocation ATBD Version 2.0 Reference: page 22.
+#REFERENCE: Described in MODIS Level 1A Earth Location ATBD 2.0.
+#	    Need Telescope Boresight Vector wrt/ instrument coodinates.
+#	    Based on photos smuggled out of SBRC.
+#
+#PARAMETER: T_mirr2inst (G-017)
+#DESCRIPTION:  mirror to instrument frame transformation matrix
+#UNITS: none DATATYPE: float NUMBER OF ELEMENTS: 9
+#Geolocation ATBD Version 3.0 Reference: page 3-12.
+#REFERENCE: "Trend Analysis Reports, Performance Data- Volume 1", CDRL 215A, DM
+#       VJ50-0502, SBRS, 1997-05
+#       Modified to reduce off-nadir track shifts with new T_inst2sc 2002-03-28
+#
+#PARAMETER: T_inst2sc (G-018)
+#DESCRIPTION:  instrument to spacecraft frame transformation matrix
+#UNITS: none DATATYPE: float NUMBER OF ELEMENTS: 9
+#Geolocation ATBD Version 3.0 Reference: page 3-13.
+#REFERENCE: PL3095-A0ME, "Protoflight Pointing", J. Neumann, 1997-12-22(Draft)
+#       Modified to reduce scan/track shifts(roll&pitch corrections) 2002-03-28
+#
+#PARAMETER: T_sc2SD (G-019)
+#DESCRIPTION:  spacecraft to solar diffuser frame transformation matrix
+#UNITS: none DATATYPE: float NUMBER OF ELEMENTS: 9
+#Geolocation ATBD Version 3.0 Reference: page 3-12.
+#REFERENCE: "Private communication with Neil Therrien", 1998-01-08
+#Switched from 'inst' to 'sc' per private communication with Robert Wolfe,
+# 2003-08-22.
+#
+#PARAMETER: max_extrap
+#DESCRIPTION:  maximum acceptable temporal extrapolation of spacecraft state
+#		data from polynomials derived from L1A ancillary packets
+#UNITS: seconds DATATYPE: float NUMBER OF ELEMENTS: 1
+#REFERENCE: Corresponds to the major cycle of the command and telemetry bus
+#	    described in Section 6.4, SBRC 151840 (MODIS COMMAND, TELEMETRY,
+#	    SCIENCE AND ENGINEERING DESCRIPTION) DATE: 5 May, 1996
+#
+#PARAMETER: S_angvel
+#DESCRIPTION:  scale factor for converting ancillary input data:
+#       angular velocity (0.5 arcsec/sec/count)
+#UNITS: arcsec/sec DATATYPE: float NUMBER OF ELEMENTS: 1
+#REFERENCE: Table 6-2, EOS GIIS for the EOS observatory, GSFC 420-03-02
+#		DATE: 1 December 1992
+#
+#PARAMETER: S_attitude
+#DESCRIPTION:  scale factor for converting ancillary input data:
+#       attitude angles (1 arcsec/count)
+#UNITS: arcsec DATATYPE: float NUMBER OF ELEMENTS: 1
+#REFERENCE: Table 6-2, EOS GIIS for the EOS observatory, GSFC 420-03-02
+#		DATE: 1 December 1992
+#
+#PARAMETER: S_position
+#DESCRIPTION:  scale factor for converting ancillary input data:
+#       orbit position (1/8 meters/count)
+#UNITS: meters DATATYPE: float NUMBER OF ELEMENTS: 1
+#REFERENCE: Table 6-2, EOS GIIS for the EOS observatory, GSFC 420-03-02
+#		DATE: 1 December 1992
+#
+#PARAMETER: S_velocity
+#DESCRIPTION:  scale factor for converting ancillary input data:
+#       orbit velocity (1/4096 meters/sec/count)
+#UNITS: meters/sec DATATYPE: float NUMBER OF ELEMENTS: 1
+#REFERENCE: Table 6-2, EOS GIIS for the EOS observatory, GSFC 420-03-02
+#		DATE: 1 December 1992 (?)
+#
+#PARAMETER: angle_scale
+#DESCRIPTION:  scale factor for scaling geolocation spatial element azimuth
+#       and solar zenith angles (0.01 degrees/unit)
+#UNITS: degrees DATATYPE: float NUMBER OF ELEMENTS: 1
+#REFERENCE: MODIS GEOLOCATION VERSION 2 PRODUCT FORMAT Version 2.2, June 23, 1997
+#
+#PARAMETER: hires_scale
+#DESCRIPTION: scale factor for scaling hi-resolution offsets (0.006 km/unit)
+#UNITS: kilometers
+#REFERENCE: MODIS SDST Bug 1968
+#
+#PARAMETER: range_scale
+#DESCRIPTION:  scale factor for scaling geolocation spatial element slant-range
+#       range (25 meters/unit)
+#UNITS: meters DATATYPE: float NUMBER OF ELEMENTS: 1
+#REFERENCE: MODIS GEOLOCATION VERSION 2 PRODUCT FORMAT Version 2.2, June 23, 1997
+#
+#PARAMETER: attit_words
+#DESCRIPTION:  location of data words in l1a spacecraft ancillary data segments:
+#       attitude data start word [current/prior]
+#UNITS: Two byte word locations DATATYPE: integer NUMBER OF ELEMENTS: 2
+#UNITS: 
+#REFERENCE: Table 6-3, EOS GIIS for the EOS observatory, GSFC 420-03-02
+#		DATE: 1 December 1992 (?)
+#
+#PARAMETER: orbit_words
+#DESCRIPTION:  location of data words in l1a spacecraft ancillary data segments:
+#       orbit data start word [current/prior]
+#UNITS: Two byte word locations DATATYPE: integer NUMBER OF ELEMENTS: 2
+#REFERENCE: Table 6-3, EOS GIIS for the EOS observatory, GSFC 420-03-02
+#		DATE: 1 December 1992 (?)
+#
+#PARAMETER: time_words
+#DESCRIPTION:  location of data words in l1a spacecraft ancillary data segments:
+#       ancillary time stamp word [current/prior]
+#UNITS: Two byte word locations DATATYPE: integer NUMBER OF ELEMENTS: 2
+#REFERENCE: Table 6-3, EOS GIIS for the EOS observatory, GSFC 420-03-02
+#		DATE: 1 December 1992 (?)
+#
+#PARAMETER: sector_word
+#DESCRIPTION:   location of data words in l1a View Sector Start Packet Data:
+#       Earth sector encoder word [side 1/side 2]
+#	for Side A Electronics
+#UNITS: Two byte word locations DATATYPE: integer NUMBER OF ELEMENTS: 2
+#REFERENCE: Table 30-5E, SBRC 151840 (MODIS COMMAND, TELEMETRY, SCIENCE AND
+#		ENGINEERING DESCRIPTION) DATE: 5 May, 1996
+#
+#PARAMETER: vernier_word
+#DESCRIPTION:   location of data words in l1a View Sector Start Packet Data:
+#       Vernier count word [side 1/side 2]
+#	for Side A Electronics
+#UNITS: Two byte word locations DATATYPE: integer NUMBER OF ELEMENTS: 2
+#REFERENCE: Table 30-5E, SBRC 151840 (MODIS COMMAND, TELEMETRY, SCIENCE AND
+#		ENGINEERING DESCRIPTION) DATE: 5 May, 1996
+#
+#PARAMETER: max_non_gap
+#DESCRIPTION:   The maximum gap between ancillary data packets that is not
+#       not considered a gap.
+#UNITS: seconds
+#REFERENCE: Bug 2742, 500-EMD-001 (Terra Spacecraft Ephemeris and Attitude Data
+#       Preprocessing) DATE: 2003-10
+#
+#PARAMETER: ang_mom_limit
+#DESCRIPTION:   angular momentum magnitude absolute limits
+#UNITS: meters^2/sec DATATYPE: float NUMBER OF ELEMENTS: 2
+#REFERENCE: Proposed Algorithms for Validating Geolocation Input Data 
+#		DATE: 6/15/95
+#
+#PARAMETER: ang_mom_z_limit
+#DESCRIPTION:   angular momentum Z component absolute limits
+#UNITS: meters^2/sec DATATYPE: float NUMBER OF ELEMENTS: 2
+#REFERENCE: Proposed Algorithms for Validating Geolocation Input Data 
+# Lower limit of -7.60E9 appears to have been too high.
+#             DATE: 2001-06-06
+#
+#PARAMETER: orbit_consistency
+#DESCRIPTION:   orbit position/velocity consistency limit
+#UNITS: meters DATATYPE: float NUMBER OF ELEMENTS: 1
+#REFERENCE: Proposed Algorithms for Validating Geolocation Input Data 
+#		DATE: 6/15/95
+#
+#PARAMETER: position_abs_limit
+#DESCRIPTION:   orbit position absolute limits
+#UNITS: meters DATATYPE: integer NUMBER OF ELEMENTS: 2
+#REFERENCE: Proposed Algorithms for Validating Geolocation Input Data 
+#		DATE: 6/15/95
+#
+#PARAMETER: position_mag_limit
+#DESCRIPTION:   orbit position magnitude limits
+#UNITS: meters DATATYPE: integer NUMBER OF ELEMENTS: 2
+#REFERENCE: Proposed Algorithms for Validating Geolocation Input Data 
+#		DATE: 6/15/95
+#
+#PARAMETER: velocity_abs_limit
+#DESCRIPTION:   orbit velocity absolute limits
+#UNITS: meters/second DATATYPE: integer NUMBER OF ELEMENTS: 2
+#REFERENCE: Proposed Algorithms for Validating Geolocation Input Data 
+#		DATE: 6/15/95
+#
+#PARAMETER: velocity_mag_limit
+#DESCRIPTION:   orbit velocity magnitude limits
+#UNITS: meters/second DATATYPE: integer NUMBER OF ELEMENTS: 2
+#REFERENCE: Proposed Algorithms for Validating Geolocation Input Data 
+#		DATE: 6/15/95
+#
+#PARAMETER: eph_max_short_gap
+#DESCRIPTION:   The maximum gap between ephemereris data packets that is
+#       considered a short gap.
+#UNITS: seconds
+#REFERENCE: Bug 2742, 500-EMD-001 (Terra Spacecraft Ephemeris and Attitude Data
+#       Preprocessing) DATE: 2003-10
+#
+#PARAMETER: angvel_abs_limit
+#DESCRIPTION:   angular velocity absolute limits
+#UNITS: arcseconds/second DATATYPE: float NUMBER OF ELEMENTS: 2
+#REFERENCE: Proposed Algorithms for Validating Geolocation Input Data 
+#		DATE: 6/15/95
+#
+#PARAMETER: angvel_del_limit
+#DESCRIPTION:   angular velocity delta limits
+#UNITS: arcseconds/second DATATYPE: float NUMBER OF ELEMENTS: 1
+#REFERENCE: Proposed Algorithms for Validating Geolocation Input Data 
+#		DATE: 6/15/95
+#
+#PARAMETER: attit_consistency
+#DESCRIPTION:   angle/angular velocity consistency limit
+#UNITS: arcseconds DATATYPE: float NUMBER OF ELEMENTS: 1
+#REFERENCE: Proposed Algorithms for Validating Geolocation Input Data 
+#		DATE: 6/15/95
+#
+#PARAMETER: attitude_abs_limit
+#DESCRIPTION:   attitude angle absolute limits
+#UNITS: arcseconds DATATYPE: integer NUMBER OF ELEMENTS: 2
+#REFERENCE: Proposed Algorithms for Validating Geolocation Input Data 
+#		DATE: 6/15/95
+#
+#PARAMETER: attitude_del_limit
+#DESCRIPTION:   attitude angle delta limits
+#UNITS: arcseconds DATATYPE: integer NUMBER OF ELEMENTS: 1
+#REFERENCE: Proposed Algorithms for Validating Geolocation Input Data 
+#		DATE: 6/15/95
+#
+#PARAMETER: att_valid_range
+#DESCRIPTION:   The minimum and maximum valid values for entrained attitude
+#       data.
+#UNITS: S_attitude.
+#REFERENCE: Bug 2742, 500-EMD-001 (Terra Spacecraft Ephemeris and Attitude Data
+#       Preprocessing) DATE: 2003-10
+#PARAMETER: att_max_short_gap
+#DESCRIPTION:   The maximum gap between attitude data packets that is
+#       considered a short gap.
+#UNITS: seconds
+#REFERENCE: Bug 2742, 500-EMD-001 (Terra Spacecraft Ephemeris and Attitude Data
+#       Preprocessing) DATE: 2003-10
+#PARAMETER: mirr_abs_limit
+#DESCRIPTION:   mirror encoder time absolute limits
+#UNITS: microseconds DATATYPE: integer NUMBER OF ELEMENTS: 2
+#REFERENCE: Proposed Algorithms for Validating Geolocation Input Data 
+#             DATE: 2002-09-25
+#
+#PARAMETER: mirr_del_limit
+#DESCRIPTION:    mirror encoder time delta limits
+#UNITS: microseconds DATATYPE: float NUMBER OF ELEMENTS: 1
+#REFERENCE: Proposed Algorithms for Validating Geolocation Input Data 
+#		DATE: 6/15/95
+#
+#PARAMETER: encoder_gap
+#DESCRIPTION:    upper and lower limits on the time period after an ancillary
+#	data packet during which encoder values need correction.
+#UNITS: seconds DATATYPE: float NUMBER OF ELEMENTS: 2
+#REFERENCE: Encoder analysis
+#		DATE: 2002-09-25
+#
+#PARAMETER: encoder_adjustment
+#DESCRIPTION:    Amount by which encoder counts should be adjusted, should they
+#	fall within the encoder_gap
+#UNITS: seconds DATATYPE: float NUMBER OF ELEMENTS: 1
+#REFERENCE: Encoder analysis
+#		DATE: 2002-09-25
+#
+#PARAMETER: packet_interval
+#DESCRIPTION:    interval between consecutive ancillary data packets
+#UNITS: seconds DATATYPE: float NUMBER OF ELEMENTS: 1
+#REFERENCE: Section 6.4, SBRC 151840 (MODIS COMMAND, TELEMETRY, SCIENCE AND
+#		ENGINEERING DESCRIPTION) DATE: 5 May, 1996
+#		DATE: 2002-09-25
+#
+#PARAMETER: RMS_error
+#DESCRIPTION:    Estimated geolocation rms error.
+#UNITS: meters DATATYPE: float NUMBER OF ELEMENTS: 1
+#Geolocation ATBD Version 3.0 Reference: page 3-44 - 3-50
+#REFERENCE: Geolocation analysis system product.
+#	    No information.
+#
+#PARAMETER: temp_coeff
+#DESCRIPTION:  The coefficients for the appropriate temperature conversion
+# equations:
+# Terra: TA07p83, TA07p85, TA07p88, TP01p,  TP01p,  TP02p,  TP02p
+# Aqua:  TA07f83, TA07f85, TA07f88, TP01fa, TP01fb, TP02fa, TP02fb.
+#UNITS: Kelvins
+#REFERENCE: Tables 20-5A, 20-5B, 20-6A, and 20-6B, SBRC 151840 (MODIS COMMAND,
+#	TELEMETRY, SCIENCE AND ENGINEERING DESCRIPTION) Rev C DATE: 2000-11-09
+#
+#PARAMETER: sol_elev_cor
+#DESCRIPTION:  Corrections to T_inst2sc in the form of roll, pitch, and yaw
+# angles respectively, dependent upon the solar "elevation" angle. The table is
+# tabulated at 10 degree intervals starting at -180.
+#UNITS: radians
+#REFERENCE: Initial estimates from e-mail by Robert Wolfe 2004-11-01
+#
+#PARAMETER: rpy_count
+#DESCRIPTION:  The count of rpy (roll/pitch/yaw) values for rpy_inst2sc
+#UNITS: records DATATYPE: integer NUMBER OF ELEMENTS: 1
+#REFERENCE: e-mail from Mash Nishihama on May 30, 2002
+#
+#PARAMETER: rpy_times
+#DESCRIPTION:  An array of TAI time values corresponding to the rows of
+#              rpy_inst2sc
+#UNITS: YYYY-MM-DDThh:mm:ss DATATYPE: string NUMBER OF ELEMENTS: rpy_count
+#REFERENCE: e-mail from Mash Nishihama on May 30, 2002
+#
+#PARAMETER: rpy_inst2sc
+#DESCRIPTION:  A series (roll/pitch/yaw) values for corrections to T_inst2sc
+#UNITS: radius DATATYPE: float NUMBER OF ELEMENTS: 3*rpy_count
+#REFERENCE: e-mail from Mash Nishihama on May 30, 2002
+#
+#PARAMETER: end_of_parameters
+#DESCRIPTION:	marks end of data - if missing, will produce error message.
+#	If preceded by any unexpected parameter, will produce an error message
+#	Any parameters after this will be ignored.
+#UNITS: None DATATYPE: integer NUMBER OF ELEMENTS: 1
+#Reference: GEO_read_param_file.PDL walkthrough, 1996/8/28
+

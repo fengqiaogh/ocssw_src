@@ -1,0 +1,32 @@
+project(val-extract)
+
+cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(PrintAllVariables)
+include(GetSubdirs)
+
+enable_testing()
+
+#add_subdirectory(src)
+add_subdirectory(tests)
+
+include(SvnRevisionFile)
+
+svn_revision_file(
+	NAME ocssw_data
+	URL svn://svn101/OCSSW/trunk/run/data/ocrvc
+	DIR share
+	FILE data_revision
+	CHECKOUT_CMD svn_up
+	COMMIT_CMD svn_set
+	OUTPUT_VARIABLE data_revision
+	READ PRINT
+)
+
+#add_custom_target(svn COMMAND svn checkout -r ${DATA_VERSION} ${DATA_URL} . WORKING_DIRECTORY ${DATA_DIR})
+
+	# svn checkout -r 1234 url://repository/path
+	# svn udpate -r 1234
+	
+	
+	

@@ -1,0 +1,16 @@
+File Format Description
+
+Input Files:
+  MYD02_Reflective_LUTs.hdf
+  MYD02_QA_LUTs.hdf
+  MYD02_Emissive_LUTs.hdf 
+
+File Type: HDF
+
+File Source: Provided by MODIS Charaterization Support Team 
+
+File Content Description: 
+  The three lookup tables (LUTs) contain input parameters used for Aqua MODIS PGE02 processing. 
+  Please refer to the following website for more detailed information,
+  http://mcst.gsfc.nasa.gov/sites/mcst.gsfc/files/file_attachments/M1056_LUT_INFO_080312_REV_B_Final.pdf
+

@@ -1,0 +1,36 @@
+c
+c  include file:  input_str.fin
+c
+c  Purpose:  define input data structure for navigation
+c
+c
+c
+c  By:  Frederick S. Patt, GSC, August 5, 1993
+c
+c  Modification History:
+c
+c  Changed integer*1 to byte for Sun OS compatibility, B. A. Franz,
+c  GSC, November 14, 1997.
+c
+c  Added nflag field to record saome nav failure or warning  conditions prior to 
+c  calling navigation routines, B. A. Franz, SAIC, October 1, 2001.
+
+      type input_struct
+
+
+        integer(4) :: flag              !Frame flag (0=good, 1=fill)
+        integer(2) :: sc_id(2)  !SeaStar minor frame ID
+        integer(2) :: iyear             !Time tag year
+        integer(2) :: iday              !Time tag day-of-year
+        integer(4) :: msec              !Time tag milliseconds of day
+        real(4) ::    sc_ana(40)        !Spacecraft converted analog data
+        byte ::       sc_dis(40)        !Spacecraft converted discrete data
+        real(4) ::    inst_ana(40,5)!Instrument converted analog data
+        byte  ::      inst_dis(32,5)!Instrument converted analog data
+        integer(4) :: nflag(8)      !Navigation flags per frame
+        
+      end type
+c
+c  record name is typically input
+c
+c   and end

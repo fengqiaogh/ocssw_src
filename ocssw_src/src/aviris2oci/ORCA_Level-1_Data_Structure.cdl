@@ -1,0 +1,179 @@
+netcdf ExampleORCA.L1B {
+
+dimensions:
+        number_of_lines = 18080 ;
+        pixels_per_line = 767  ;
+        number_of_bands = 97 ;
+        number_of_reflective_bands = 91 ;
+
+// global attributes
+                :title = "ORCA Level-1B Data" ;
+                :sensor = "ORCA" ;
+                :product_name = "Pyyyydddhhmmss.L1A.nc" ;
+                :processing_version = "V1.0" ;
+                :Conventions = "CF-1.6" ;
+                :institution = "NASA Goddard Space Flight Center, VIIRS L1 Processing Group" ;
+                :license = "http://science.nasa.gov/earth-science/earth-science-data/data-information-policy/" ;
+                :naming_authority = "gov.nasa.gsfc.someone" ;
+                :date_created = "yyyy-mm-ddThh:mm:ssZ" ;
+                :keywords_vocabulary = "NASA Global Change Master Directory (GCMD) Science Keywords" ;
+                :stdname_vocabulary = "NetCDF Climate and Forecast (CF) Metadata Convention" ;
+                :creator_name = "NASA/GSFC" ;
+                :creator_email = "data@somewhere.gsfc.nasa.gov" ;
+                :creator_url = "http://oceancolor.gsfc.nasa.gov" ;
+                :project = "VIIRS L1 Project" ;
+                :publisher_name = "NASA/GSFC" ;
+                :publisher_url = "http://oceancolor.gsfc.nasa.gov" ;
+                :publisher_email = "data@somewhere.gsfc.nasa.gov" ;
+                :processing_level = "L1A" ;
+                :cdm_data_type = "swath" ;
+                :orbit_number = 0 ;
+                :history = "something relavant goes here";
+                :time_coverage_start = "yyyy-mm-ddThh:mm:ssZ" ;
+                :time_coverage_end = "yyyy-mm-ddThh:mm:ssZ" ;
+                :startDirection = "Descending" ;
+                :endDirection = "Descending" ;
+                :day_night_flag = "Day" ;
+
+group: sensor_band_parameters {
+  variables:
+        int wavelength(number_of_bands) ;
+                wavelength:long_name = "wavelengths" ;
+                wavelength:units = "nm" ;
+                wavelength:_FillValue = -32767 ;
+                wavelength:valid_min = 350 ;
+                wavelength:valid_max = 2250 ;
+} // group sensor_band_parameters
+
+group: scan_line_attributes {
+  variables:
+        double scan_start_time(number_of_lines) ; 
+                scan_start_time:long_name = "Scan start time (UTC)" ;
+                scan_start_time:units = "seconds" ;
+                scan_start_time:_FillValue = -999. ;
+                scan_start_time:valid_min = 0. ;
+                scan_start_time:valid_max = 2000000000. ;
+        double scan_end_time(number_of_lines) ;
+                scan_end_time:long_name = "Scan end time (UTC)" ;
+                scan_end_time:units = "seconds" ;
+                scan_end_time:_FillValue = -999. ;
+                scan_end_time:valid_min = 0. ;
+                scan_end_time:valid_max = 2000000000. ;
+//  This will get filled in when we make a more "real" L1A...
+
+} // group scan_line_attributes
+
+//group: engineering_data {
+//    variables:
+//  This will get filled in when we make a more "real" L1A...
+//} // group engineering_data
+
+group: navigation_data {
+//  This will get filled in when we make a more "real" L1A...
+//  For these "test" L1Bs, this is simply copied from the AVIRIS info
+    variables:
+        float lon(number_of_lines, pixels_per_line);
+                lon:long_name = "Longitude" ;
+                lon:units = "degrees_east" ;
+                lon:_FillValue = -999.f ;
+                lon:valid_min = -180.f ;
+                lon:valid_max = 180.f ;
+        float lat(number_of_lines, pixels_per_line);
+                lat:long_name = "Latitude" ;
+                lat:units = "degrees_north" ;
+                lat:_FillValue = -999.f ;
+                lat:valid_min = -0.f ;
+                lat:valid_max = 90.f ;
+// AVIRIS has path_length, might move this to scan line attributes and only
+// grab the middele value.  The downside to that would be that the path_length
+// varies across the scan as it goes over land
+        float altitude(number_of_lines, pixels_per_line);
+                altitude:long_name = "altitude" ;
+                altitude:units = "meters" ;
+                altitude:_FillValue = -999.f ;
+                altitude:valid_min = -0.f ;
+                altitude:valid_max = 25000.f ;
+        float senz(number_of_lines, pixels_per_line);
+                senz:long_name = "Solar zenith angle" ;
+                senz:units = "degrees" ;
+                senz:_FillValue = -999.f ;
+                senz:valid_min = 0.f ;
+                senz:valid_max = 90.f ;
+        float sena(number_of_lines, pixels_per_line);
+                sena:long_name = "Solar azimuth angle" ;
+                sena:units = "degrees" ;
+                sena:_FillValue = -999.f ;
+                sena:valid_min = 0.f ;
+                sena:valid_max = 90.f ;
+//These (solz,sola) may not be required as we might easily calculate them
+//...but since they're already calculated...
+        float solz(number_of_lines, pixels_per_line);
+                solz:long_name = "Solar zenith angle" ;
+                solz:units = "degrees" ;
+                solz:_FillValue = -999.f ;
+                solz:valid_min = 0.f ;
+                solz:valid_max = 90.f ;
+        float sola(number_of_lines, pixels_per_line);
+                sola:long_name = "Solar azimuth angle" ;
+                sola:units = "degrees" ;
+                sola:_FillValue = -999.f ;
+                sola:valid_min = 0.f ;
+                sola:valid_max = 90.f ;
+} // group navigation_data
+
+
+//group: onboard_calibration_data {
+//    variables:
+//  This will get filled in when we make a more "real" L1A...
+//} //group onboard_calibration_data
+
+group: earth_view_data {
+    variables:
+// whether we go with a 3D array for the 90 vis/nir bands is still a question
+// I chose to do so for now, as it made the CDL easier :)
+        float Lt_visnir(number_of_reflective_bands, number_of_lines, pixels_per_line);
+                Lt_visnir:long_name = "Earth view data for vis-nir bands 350 - 800nm" ;
+                Lt_visnir:units = "W m-2 sr-1" ;
+                Lt_visnir:_FillValue = -999.f ;
+                Lt_visnir:valid_min = 0.f ;
+                Lt_visnir:valid_max = 500.f ;
+        float Lt_940(number_of_lines, pixels_per_line);
+                Lt_940:long_name = "Earth view data for 940nm" ;
+                Lt_940:units = "W m-2 sr-1" ;
+                Lt_940:_FillValue = -999.f ;
+                Lt_940:valid_min = 0.f ;
+                Lt_940:valid_max = 250.f ;
+        float Lt_1240(number_of_lines, pixels_per_line);
+                Lt_1240:long_name = "Earth view data for 1240nm" ;
+                Lt_1240:units = "W m-2 sr-1" ;
+                Lt_1240:_FillValue = -999.f ;
+                Lt_1240:valid_min = 0.f ;
+                Lt_1240:valid_max = 250.f ;
+        float Lt_1378(number_of_lines, pixels_per_line);
+                Lt_1378:long_name = "Earth view data for 1378nm" ;
+                Lt_1378:units = "W m-2 sr-1" ;
+                Lt_1378:_FillValue = -999.f ;
+                Lt_1378:valid_min = 0.f ;
+                Lt_1378:valid_max = 250.f ;
+        float Lt_1640(number_of_lines, pixels_per_line);
+                Lt_1640:long_name = "Earth view data for 1640nm" ;
+                Lt_1640:units = "W m-2 sr-1" ;
+                Lt_1640:_FillValue = -999.f ;
+                Lt_1640:valid_min = 0.f ;
+                Lt_1640:valid_max = 250.f ;
+        float Lt_2130(number_of_lines, pixels_per_line);
+                Lt_2130:long_name = "Earth view data for 2130nm" ;
+                Lt_2130:units = "W m-2 sr-1" ;
+                Lt_2130:_FillValue = -999.f ;
+                Lt_2130:valid_min = 0.f ;
+                Lt_2130:valid_max = 250.f ;
+        float Lt_2250(number_of_lines, pixels_per_line);
+                Lt_2250:long_name = "Earth view data for 2250nm" ;
+                Lt_2250:units = "W m-2 sr-1" ;
+                Lt_2250:_FillValue = -999.f ;
+                Lt_2250:valid_min = 0.f ;
+                Lt_2250:valid_max = 250.f ;
+
+} // group earth_view_data
+
+}

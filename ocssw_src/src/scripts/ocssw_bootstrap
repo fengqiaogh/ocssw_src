@@ -1,0 +1,9 @@
+#! /bin/bash -l
+# usage ocssw_bootstrap <command ...>
+#
+# This is a shell script used to run any program after initializing
+# bash as a login shell.  Mainly to make sure the PATH is correct.
+#
+
+$*
+

@@ -1,0 +1,8 @@
+from distutils.core import setup
+
+setup(name='l1bgen_hico',
+      version='${PACKAGE_VERSION}',
+      package_dir={ '': '${CMAKE_CURRENT_BINARY_DIR}' },
+      packages=['hico'],
+      scripts=['$ENV{OCSSWROOT}/src/l1bgen_hico/l1bgen_hico.py']
+)

@@ -1,0 +1,64 @@
+ice2hdf <northFile> <southFile> <outputHDF>
+
+This program takes a NSIDC north and south ice file and puts the data
+into an HDF file that l2gen can use as input.  All missing data is filled.
+
+
+--------------------------------
+NRT data source:
+
+Documentation web site: 
+http://nsidc.org/data/docs/daac/nsidc0051_gsfc_seaice.gd.html
+
+FTP site: 
+ftp://sidads.colorado.edu/pub/DATASETS/seaice/polar-stereo/nasateam/near-real-time/
+(north and south directories)
+
+
+Naming convention:
+
+nt_yyyymmdd_aaa_nrt_x.bin
+
+yyyy = year
+mm   = month
+dd   = day of month
+aaa  = satalite ID (f13, f15, f17) if duplicate dates use the biggest number
+x    = north or south (n,s)
+
+example file name
+
+nt_20080101_f15_nrt_s.bin
+
+
+
+
+--------------------------------
+There is also a program to create an ice fraction climotology file from the
+monthly data:
+
+make_monthly_ice_hdf.pro
+
+This IDL program that will take a directory full of monthly NSIDC ice 
+north and south files and create an HDF file that l2gen can use for 
+monthly/climatology ice fraction ancillary data.  All missing data is filled.
+
+The program source is located at
+
+svn://svn0.domain.sdps/TOOLS/anc/ice
+
+The ouput climotology file is usually stored in:
+
+$OCSSWROOT/data/common/ice_fraction.hdf
+
+
+
+--------------------------------
+File selection criteria
+
+For operations the closest NRT file within 2 weeks should be used before
+falling back on the new climotology which needs to be specified on the 
+command line or the old climotology will be used.
+
+
+
+Don Shea, SAIC

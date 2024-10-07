@@ -1,0 +1,52 @@
+MOD_PR02 Production Rules:
+--------------------------
+
+MOD_PR02 executes once for each 5 minute granule of MxD01 produced by PGE01,
+where MxD stands for MOD (Terra files) or MYD (Aqua files).
+The total, nominal number of executions is 288 per day.
+
+Each execution requires:
+------------------------
+
+   Input File Characterization:
+   ----------------------------
+
+   MOD_PR02 normally ingests three 5-minute granules of MxD01 data
+   (previous, current, and following) and one granule of MxD03 data
+   (synchronized with the current MxD01 granule).  The current MxD01
+   granule and the MxD03 granule are required.  If the previous MxD01
+   granule and/or following MxD01 granule are not available at execution
+   time for the current granule, then MOD_PR02 may be executed without
+   the missing MxD01 granules.  To enable execution in the event of a
+   missing previous MxD01 granule (LUN 500000) or a following MxD01
+   granule (LUN 500002), omit the appropriate LUN(s) from the PCF.
+
+   Ancillary Data Needs: (none)
+   ---------------------
+
+   Static File Needs:
+   ------------------
+
+   MOD_PR02 requires calibration parameters lookup tables (LUTs).  These
+   consist of three files in HDF format:
+   (1) MxD02_Reflective_LUTs.hdf,
+   (2) MxD02_Emissive_LUTs.hdf, and
+   (3) MxD02_QA_LUTs.hdf.
+   
+
+   Output Product Characterization:
+   --------------------------------
+
+   MOD_PR02 produces the following output granules, in HDF format, which
+   correspond to the temporal boundaries of the current MxD01 input granule:
+   (1) MxD021KM:  MODIS/xxxxx Calibrated Radiances 5-Min L1B Swath 1km
+   (2) MxD02HKM:  MODIS/xxxxx Calibrated Radiances 5-Min L1B Swath 500m
+   (3) MxD02QKM:  MODIS/xxxxx Calibrated Radiances 5-Min L1B Swath 250m, and
+   (4) MxD02OBC:  MODIS/xxxxx On-Board Calibrator and Engineering Data 5-Min L1B
+   where x = "O" for Terra data, "Y" for Aqua data, and xxxxx = Terra or Aqua
+   respectively.
+
+   Associated with each of the above HDF products is an ASCII metadata
+   (".met") file that contains only the ECS inventory metadata for each
+   product.
+

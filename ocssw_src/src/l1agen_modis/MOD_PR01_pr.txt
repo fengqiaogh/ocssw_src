@@ -1,0 +1,86 @@
+MOD_PR01 Production Rules:
+
+Frequency of Execution:
+    MOD_PR01 normally executes 288 times a day, producing one five-minute
+    granule of output data in each run. It can be configured to produce as many
+    as three five-minute granules per run.
+
+Each execution requires:
+    Input File Characterization:
+	The main input is 5-minute MODIS L0 datasets in PDS format, with one
+	construction record and one date file for each dataset.
+	In normal production, these are created by PGE00, which splits them out
+	of the 2-hour datasets.
+	For LANCE-MODIS, they are created by PGE95, which merges all session
+	MODIS L0 datasets overlapping the requested time period, and extracts
+	from the merged data those packets which fall within that time period.
+
+	Each scan of data is stored in the L1A granule that covers the start
+	time of that scan, even if the scan didn't end until after the start
+	time of the next L1A granule. This means that the packets which make up
+	the scans that go into a given L1A granule may be stored in two
+	consecutive L0 datasets. At least one such dataset is mandatory, the
+	other is optional. If only the second data set is available, the output
+	granule may contain data from only a single scan, which will probably
+	be incomplete; but the philosophy of the MODIS L1 routines is that the
+	output granule must be produced, if it contains even a single packet of
+	useable data.
+
+	Some of the spacecraft ancillary data in L0 datasets is available only
+	on a cycle that repeates every 70 seconds. MOD_PR01 therefore looks
+	backwards up to 70 seconds, for such packets. If the 70 seconds
+	preceeding the start of an MOD_PR01 run are covered by a different L0
+	dataset, it is desireable to stage such a dataset, but it is not
+	mandatory. If that dataset is not staged, incomplete spacecraft
+	ancillary data will be stored in the first 70 seconds of the output
+	granule.
+
+	When using 5-minute L0 datasets, this means that at least one L0
+	dataset covering either the requested time period or the immediately
+	following 5-minute time period is mandatory. It is desirable to have
+	all such datasets, as well as the one covering the immediately
+	preceding 5-minute time period, but the additional datasets are
+	optional.
+	In normal production, wait until PGE00 is closed for all of the desired
+	datasets.
+	For LANCE-MODIS, wait for PGE95, rather than PGE00
+
+	All Level 0 datasets must be assigned to LUN 599002; LUN 599001 is a
+	historical artifact, no longer in use. When using multiple 5-minute
+	input datasets, the data files must be merged together into a single
+	dataset described by a single construction record; the CR_reader
+	routine is responsible for creating that construction record.
+
+	If a wait for PGE00 or PGE95 has expired, or if PGE01 is forced by the
+	operators, then if any mandatory dataset is unavailable, the PGE should
+	should be deleted; otherwise it should run using the datasets that are
+	available.
+
+	LANCE-MODIS: in Near Real Time (NRT) processing, it must be possible
+	to leave the system unattended for hours, or even days, without
+	unnecessary production delays. That means that after a certain timeout
+	period, PGE01 should behave exactly as if forced. It should read the
+	value of the parameter named PGE01Timeout from the Config table, and
+	use a RealTimeDelay of that amount on all rules that have QueryDelay,
+	with the same consequences if the delay expires.
+
+    Ancillary Data Needs:
+	N/A
+
+    Static File Needs:
+	The appropriate engineering data list must be staged:
+	ENG_DATA_LIST_TERRA for Terra processing, and ENG_DATA_LIST_AQUA for
+	Aqua processing.
+
+    Output Product Characterization:
+	MOD_PR01 splits the output time range assigned to it in LUNS 10258 and
+	10259 (normally 15 minutes) into blocks of time with the length
+	specified by LUN 50300 (normally 5 minutes). It produces one L1A
+	product file for each of those blocks of time, each containing the full
+	scans whose start times fall withing that block.
+
+	MOD_PR01 converts the raw Level 0 data into reconstructed instrument
+	data. The output L1A product files contain scan and pixel quality data,
+	engineering data, and discarded packets. However, they will not contain
+	valid ECS Geolocation metadata until they have been updated by MOD_PR03.
+

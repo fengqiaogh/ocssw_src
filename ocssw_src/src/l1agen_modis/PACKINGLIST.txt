@@ -1,0 +1,205 @@
+Algorithm - MODIS Level 1A (MOD_PR01)
+Date      - 2015-08-22
+
+1.  PACKING LIST for MOD_PR01 v6.0.6 (Level 1A)
+
+2.  POINTS OF CONTACT:
+    STM:
+      James Kuyper 
+      MODIS Science Data Support Team (SDST)
+      7425 Forbes Blvd, Room 563
+      Seabrook, MD 20706
+      Telephone: (301) 867-2064
+      E-mail: James.R.Kuyper@NASA.gov
+
+
+    SSTG Contact:
+      James Kuyper (see above)
+
+3.  New files in MOD_PR01 science algorithm package.
+    These files should be stored in /cc/cc_vob/INHOUSE/PGE01/MOD_PR01/
+                File Name               |Format | Description
+    ------------------------------------+-------+--------------
+
+    These files are normally delivered seperately:
+    ENG_DATA_LIST_TERRA_V6.0.24         | ASCII  | Input Lookup Table Terra
+    ENG_DATA_LIST_AQUA_V6.0.24          | ASCII  | Input Lookup Table Aqua
+
+    L1A output files:     /L1A/INHOUSE/PGE01/output
+    MOD01.A2009238.0800.006.2010238123456.hdf     |  HDF  |Output L1a file
+    MOD01.A2009238.0800.006.2010238123456.hdf.met | ASCII |Output L1a.met
+    MYD01.A2009238.1155.006.2010238123456.hdf	  |  HDF  |Output L1a file
+    MYD01.A2009238.1155.006.2010238123456.hdf.met |  HDF  |Output L1a file
+
+4.  Files removed from MOD_PR01 science algorithm package.
+    These files are normally delivered seperately:
+    ENG_DATA_LIST_TERRA_V6.0.19          | ASCII  | Input Lookup Table Terra
+    ENG_DATA_LIST_AQUA_V6.0.19           | ASCII  | Input Lookup Table Aqua
+
+
+    L1A output files:     /L1A/INHOUSE/PGE01/output
+    MOD01.A2001001.1555.005.2005135180500000000.hdf     |  HDF  |Output L1a file
+    MOD01.A2001001.1555.005.2005135180500000000.hdf.met | ASCII |Output L1a.met
+    MOD01.A2001001.1600.005.2005135181000000000.hdf     |  HDF  |Output L1a file
+    MOD01.A2001001.1600.005.2005135181000000000.hdf.met | ASCII |Output L1a.met
+    MOD01.A2001001.1605.005.2005135181500000000.hdf     |  HDF  |Output L1a file
+    MOD01.A2001001.1605.005.2005135181500000000.hdf.met | ASCII |Output L1a.met
+    MYD01.A2002194.1155.005.2005135183000000000.hdf     |  HDF  |Output L1a file
+    MYD01.A2002194.1155.005.2005135183000000000.hdf.met | ASCII |Output L1a.met
+    MYD01.A2002194.1200.005.2005135183500000000.hdf     |  HDF  |Output L1a file
+    MYD01.A2002194.1200.005.2005135183500000000.hdf.met | ASCII |Output L1a.met
+    MYD01.A2002194.1205.005.2005135184000000000.hdf     |  HDF  |Output L1a file
+    MYD01.A2002194.1205.005.2005135184000000000.hdf.met | ASCII |Output L1a.met
+
+
+5.  Changed files in MOD_PR01 science algorithm package.
+
+                File Name               | Format |       Description
+    ------------------------------------+--------+------------------------
+    INHOUSE/PGE01/MOD_PR01/
+    check_checksum.c                    | ASCII  | L1A subroutine
+    HISTORY.txt                         | ASCII  | L1A History file
+    init_L1A_scan_meta_HDF_sdss.c       | ASCII  | L1A subroutine
+    MOD_PR01.mk                         | ASCII  | L1A makefile
+    MOD_PR01.pcf                        | ASCII  | PCF Terra
+    MODIS_35005.t                       | ASCII  | L1A seed file
+    MYD_PR01.pcf                        | ASCII  | PCF Aqua
+    PACKINGLIST.txt                     | ASCII  | packing list
+    process_a_scan.c                    | ASCII  | L1A subroutine
+    README.txt                          | ASCII  | readme
+    unpack_MODIS_header.c               | ASCII  | L1A subroutine
+    version.h                           | ASCII  | L1A header
+
+
+    L1A output files:     /L1A/INHOUSE/PGE01/output
+    LogReport                                           | ASCII |Report Log file
+    LogStatus                                           | ASCII |Status Log file
+    LogUser                                             | ASCII |User Log file
+
+6.  Unchanged and undelivered files in MOD_PR01 science algorithm package.
+	None
+
+
+                File Name               | Format |       Description
+    ------------------------------------+--------+------------------------
+    INHOUSE/PGE01/MOD_PR01/
+    accumulate_failed_packets.c         | ASCII  | L1A subroutine
+    attached_Vdata_counter.c            | ASCII  | L1A subroutine
+    close_Vdata.c                       | ASCII  | L1A subroutine
+    close_processing_run.c              | ASCII  | L1A subroutine
+    compute_SD_start_time.c             | ASCII  | L1A subroutine
+    compute_global_time_offsets.c       | ASCII  | L1A subroutine
+    create_L1A_granule.c                | ASCII  | L1A subroutine
+    create_Vdata.c                      | ASCII  | L1A subroutine
+    create_Vdata_field.c                | ASCII  | L1A subroutine
+    create_eng_data_vdata_array.c       | ASCII  | L1A subroutine
+    create_eng_data_vdata_array_field.c | ASCII  | L1A subroutine
+    create_missing_scans.c              | ASCII  | L1A subroutine
+    dequeue.c                           | ASCII  | L1A subroutine
+    end_Vdata_access_to_file.c          | ASCII  | L1A subroutine
+    end_eng_data_access_to_file.c       | ASCII  | L1A subroutine
+    enqueue.c                           | ASCII  | L1A subroutine
+    equal_strings.c                     | ASCII  | L1A subroutine
+    extr_bits.c                         | ASCII  | L1A subroutine
+    finalize_pixel_qual_data.c          | ASCII  | L1A subroutine
+    finalize_scan_metadata.c            | ASCII  | L1A subroutine
+    forget.c                            | ASCII  | L1A subroutine
+    free_queue.c                        | ASCII  | L1A subroutine
+    get_empty_slot.c                    | ASCII  | L1A subroutine
+    get_index.c                         | ASCII  | L1A subroutine
+    get_number_of_attached_Vdatas.c     | ASCII  | L1A subroutine
+    get_pcf_config_data.c               | ASCII  | L1A subroutine
+    get_valid_L0_file.c                 | ASCII  | L1A subroutine
+    handle_missing_scans.c              | ASCII  | L1A subroutine
+    init_L1A_HDF_sdss.c                 | ASCII  | L1A subroutine
+    init_L1A_HDF_vdatas.c               | ASCII  | L1A subroutine
+    init_L1A_pix_qual_HDF_sdss.c        | ASCII  | L1A subroutine
+    init_L1A_scan_data_HDF_sdss.c       | ASCII  | L1A subroutine
+    initialize_global_metadata.c        | ASCII  | L1A subroutine
+    initialize_id_table.c               | ASCII  | L1A subroutine
+    initialize_level1a.c                | ASCII  | L1A subroutine
+    initialize_pixel_qual_data.c        | ASCII  | L1A subroutine
+    initialize_scan.c                   | ASCII  | L1A subroutine
+    initialize_scan_data.c              | ASCII  | L1A subroutine
+    initialize_scan_metadata.c          | ASCII  | L1A subroutine
+    L1A_datatype_to_DFNT.c              | ASCII  | L1A subroutine
+    level1a.c                           | ASCII  | L1A main routine
+    load_eng_data.c                     | ASCII  | L1A subroutine
+    log_fmt_msg.c                       | ASCII  | L1A subroutine
+    make_queue.c                        | ASCII  | L1A subroutine
+    output_daymode_data_to_scan.c       | ASCII  | L1A subroutine
+    output_eng1_pkt1_to_scan.c          | ASCII  | L1A subroutine
+    output_eng1_pkt2_to_scan.c          | ASCII  | L1A subroutine
+    output_eng2_pkt1_to_scan.c          | ASCII  | L1A subroutine
+    output_eng2_pkt2_to_scan.c          | ASCII  | L1A subroutine
+    output_eng_data_to_scan.c           | ASCII  | L1A subroutine
+    output_nightmode_data_to_scan.c     | ASCII  | L1A subroutine
+    packet_of_scan.c                    | ASCII  | L1A subroutine
+    packet_stats.h			| ASCII  | L1A header
+    parse_eng_data_list.c               | ASCII  | L1A subroutine
+    print_stats.c			| ASCII  | L1A subroutine
+    process_a_granule.c                 | ASCII  | L1A subroutine
+    process_a_packet.c                  | ASCII  | L1A subroutine
+    process_cp_hk_tlmy.c                | ASCII  | L1A subroutine
+    process_eng_packet.c                | ASCII  | L1A subroutine
+    process_group2_packet1_vdata.c      | ASCII  | L1A subroutine
+    process_sci_eng_data.c              | ASCII  | L1A subroutine
+    put_cal_data_in_scan.c              | ASCII  | L1A subroutine
+    put_earth_data_in_scan.c            | ASCII  | L1A subroutine
+    put_pkt_cont_in_scan.c              | ASCII  | L1A subroutine
+    read_a_packet.c                     | ASCII  | L1A subroutine
+    recall_id.c                         | ASCII  | L1A subroutine
+    remember.c                          | ASCII  | L1A subroutine
+    reset_last_valid_scan.c             | ASCII  | L1A subroutine
+    set_start_position.c                | ASCII  | L1A subroutine
+    unpack_packet_contents.c            | ASCII  | L1A subroutine
+    unpack_packet_header.c              | ASCII  | L1A subroutine
+    unpack_primary_header.c             | ASCII  | L1A subroutine
+    unpack_secondary_header.c           | ASCII  | L1A subroutine
+    update_eng_data.c                   | ASCII  | L1A subroutine
+    update_eng_data_for_maj_cycle_n.c   | ASCII  | L1A subroutine
+    update_global_metadata.c            | ASCII  | L1A subroutine
+    update_pixel_qual_data.c            | ASCII  | L1A subroutine
+    update_scan_metadata.c              | ASCII  | L1A subroutine
+    validate_L0_header.c                | ASCII  | L1A subroutine
+    write_ECS_metadata.c                | ASCII  | L1A subroutine
+    write_Vdata.c                       | ASCII  | L1A subroutine
+    write_eng_data.c                    | ASCII  | L1A subroutine
+    write_failed_packets.c              | ASCII  | L1A subroutine
+    write_global_metadata.c             | ASCII  | L1A subroutine
+    write_pix_qual.c                    | ASCII  | L1A subroutine
+    write_scan.c                        | ASCII  | L1A subroutine
+    write_scan_data.c                   | ASCII  | L1A subroutine
+    write_scan_metadata.c               | ASCII  | L1A subroutine
+    write_specific_granule_metadata.c   | ASCII  | L1A subroutine
+                                        |        |
+    EN_eng_data.h                       | ASCII  | L1A header
+    FP_failed_pkt_queue.h               | ASCII  | L1A header
+    L1A_prototype.h                     | ASCII  | L1A header
+    MD_metadata.h                       | ASCII  | L1A header
+    MOD_PR01_pr.txt                     | ASCII  | Production Rules
+    MS_misc.h                           | ASCII  | L1A header
+    PC_pcf_info.h                       | ASCII  | L1A header
+    PD_pkt_data.h                       | ASCII  | L1A header
+    PH_pkt_hdr.h                        | ASCII  | L1A header
+    SC_scan.h                           | ASCII  | L1A header
+    VU_vdata_utility.h                  | ASCII  | L1A header
+                                        |        |
+
+    INHOUSE/PGE01/SHR_MCF/
+    MOD01.mcf                           | ASCII  | L1A MCF Terra
+    MYD01.mcf                           | ASCII  | L1A MCF Aqua
+
+    Five minute L0 data files:	/SSTG2/pges/TestData/PGE01/inputs.v5.0.24
+    MOD00F.A2001001.1550.20063171354.000.PDS | Binary | Input L0 Constr. Rec.
+    MOD00F.A2001001.1550.20063171354.001.PDS | Binary | Input L0 data
+    MOD00F.A2001001.1555.20063171354.001.PDS | Binary | Input L0 data
+    MOD00F.A2001001.1600.20063171354.001.PDS | Binary | Input L0 data
+    MOD00F.A2001001.1605.20063171354.001.PDS | Binary | Input L0 data
+    MOD00F.A2001001.1610.20063171354.001.PDS | Binary | Input L0 data
+    MYD00F.A2006293.1150.20062931340.000.PDS | Binary | Input L0 Constr. Rec.
+    MYD00F.A2006293.1150.20062931340.001.PDS | Binary | Input L0 data
+    MYD00F.A2006293.1155.20062931340.001.PDS | Binary | Input L0 data
+    MYD00F.A2006293.1200.20062931543.001.PDS | Binary | Input L0 data
+    MYD00F.A2006293.1205.20062931543.001.PDS | Binary | Input L0 data
+    MYD00F.A2006293.1210.20062931543.001.PDS | Binary | Input L0 data

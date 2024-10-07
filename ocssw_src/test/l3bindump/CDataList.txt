@@ -1,0 +1,6 @@
+# local-path remote-path git-rev sha1-hash
+A2016183.L3b_DAY_CHL.nc testdata/l3bindump/A2016183.L3b_DAY_CHL.nc 8914132a1492abc6d4dd3555ba640b2bedb52c2f 0bb51e6fbbc6fb20ba7129dd8a956bd34ede4038
+box.txt testdata/l3bindump/box.txt 1bd0329218e94156fbc50dd1f17ad4915606451a f8f9e031bb9acf59ed61704e454de7845e4ca6c3
+box.txt.par testdata/l3bindump/box.txt.par 8914132a1492abc6d4dd3555ba640b2bedb52c2f ab821389a59949c672f4eaf63f19fc8531e2d304
+radius.txt testdata/l3bindump/radius.txt 1bd0329218e94156fbc50dd1f17ad4915606451a 2cef62274b8d064fb086007be3695d9da19efe92
+radius.txt.par testdata/l3bindump/radius.txt.par 8914132a1492abc6d4dd3555ba640b2bedb52c2f 5b0d0ac5630ab2d3537a26fcd0bb5046d1a76e0d

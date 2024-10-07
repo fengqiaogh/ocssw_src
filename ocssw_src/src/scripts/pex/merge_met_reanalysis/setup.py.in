@@ -1,0 +1,6 @@
+from distutils.core import setup, Extension
+setup(name='merge_met_reanalysis',
+      version='${PACKAGE_VERSION}',
+      package_dir={ '': '${CMAKE_CURRENT_SOURCE_DIR}' },
+      scripts=['$ENV{OCSSWROOT}/src/anctools/merge_met_reanalysis.py'],
+)

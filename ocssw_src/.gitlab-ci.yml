@@ -1,0 +1,159 @@
+---
+# Define the image
+
+# List of stages 
+stages: 
+- build
+- test
+ 
+variables:
+    CI_REPOSITORY_URL: "https://oceandata.sci.gsfc.nasa.gov/rcs/obpg/ocssw.git"
+    FF_USE_FASTZIP: "true"
+    CACHE_COMPRESSION_LEVEL: "fastest"
+    ARTIFACT_COMPRESSION_LEVEL: "fastest"
+
+.before_template: &before_definition
+    - export OCSSWROOT=$(pwd) && source OCSSW_bash.env 
+    - git clean -xfdd -e share
+    # hack because of fuse-overlayfs issue where opt becomes impossible to remove
+    - if [ -d opt ]; then
+    -   rm -rf opt
+    - fi
+    - ln -s $HOME/opt .
+    - if [[ $(python3 $OCSSWROOT/src/manifest/install_ocssw.py --tag $(cat .manifest_tag) --status --opt_src | wc -l) > 4 ]]; then
+    -   echo "UPDATING OPT"
+    -   python3 $OCSSWROOT/src/manifest/install_ocssw.py --tag $(cat .manifest_tag) --clean --opt_src
+    -   cd opt/src && ./BuildIt.py clean && ./BuildIt.py && ./BuildIt.py # hack for the mac
+    -   cd -
+    - fi
+    - cd ../
+    - if [ -d viirs_l1 ]; then
+    -    rm -rf viirs_l1
+    - fi
+    - git clone --recurse-submodules https://gitlab-ci-token:${CI_JOB_TOKEN}@oceandata.sci.gsfc.nasa.gov/rcs/viirs/viirs_l1.git
+    - cd viirs_l1 
+    - mkdir build && cd build && cmake .. -DBUILD_OCSSW_LIBS=ON && make -j20 install
+    - cd $OCSSWROOT
+
+.rules_template: &rules_definition
+    # Trigger a build if:
+    # 1. There is a push to develop
+    # 2. OR there is a merge request for develop
+    # 3. OR any branch is built manually by the web UI
+    - if:  $CI_COMMIT_BRANCH == "develop" || (($CI_PIPELINE_SOURCE == 'merge_request_event') && ( $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop")) || ($CI_PIPELINE_SOURCE == 'web')
+
+.build_template: &build_definition
+    # We have to use this path for the script because it is not installed until
+    # after build, but we need to update opt/ before build (if necessary)
+    - echo "Compiling the code..."
+    - git submodule update --init
+    - if [ -d build ]; then
+    -   rm -rf build
+    - fi
+    - mkdir build && cd build && cmake .. -DBUILD_ALL=ON
+    - if [ $? != 0 ]; then
+    -   exit 1
+    - fi
+    - make -j20 install
+    - echo "Compile complete."
+    - cd ../
+
+build-ubuntu-job:
+    stage: build
+    tags: 
+    - ubuntu-shell
+    # Cache build artifacts between jobs
+    # Use a per-branch cache
+    cache:
+        - key: $CI_COMMIT_REF_SLUG
+          paths:
+          - build
+          - bin
+          - lib
+    rules: *rules_definition
+    before_script: *before_definition
+    script: *build_definition
+
+build-redhat-job:
+    stage: build
+    tags: 
+    - redhat-runner
+    rules: *rules_definition
+    before_script:
+    - *before_definition
+    script: *build_definition
+
+build-macos-job:
+    stage: build
+    tags:
+    - macos
+    rules: *rules_definition
+    before_script:
+    - export CC=gcc-12 && export CXX=g++-12 && export FC=gfortran-12 && export NM=gcc-nm-12 && export LD=gcc-12 && export AR=gcc-ar-12 && export RANLIB=gcc-ranlib-12
+    - export PATH=/opt/homebrew/bin:/opt/homebrew/sbin:$PATH
+    - *before_definition
+    script: *build_definition
+
+test-job:
+    stage: test
+    tags: 
+    - ubuntu-shell
+    cache:
+        - key: $CI_COMMIT_REF_SLUG
+          paths:
+          - build
+          - bin
+          - lib
+    before_script:
+    - export OCSSWROOT=$(pwd) && source OCSSW_bash.env
+    rules: *rules_definition
+    script:
+    - git submodule update --init
+    - if [ -d opt ]; then
+    -   rm -rf opt
+    - fi
+    - ln -s $HOME/opt .
+    - if [ -d share ]; then
+    -   rm -rf share
+    - fi
+    - ln -s $HOME/share .
+    - if [ -d var ]; then
+    -   rm -rf var
+    - fi
+    - ln -s $HOME/var .
+    #
+    # sym link does not work because of metadata for filenames with $OCSSWROOT
+    #
+    - if [ -d testdata ]; then
+    -   rm -rf testdata
+    - fi
+    - if [ -d $HOME/testdata ]; then
+    -   mv $HOME/testdata .
+    - fi
+    #
+    # update var
+    #
+    - update_luts all
+    #
+    # update share
+    #
+    - install_ocssw --tag $(cat .manifest_tag) --all --clean
+    - echo "Running tests..."
+    - cd build
+    - ctest -R "data"
+    - cmake ..
+    - ctest -R "output"
+    - ctest -j8 -E "output|data" || true
+    - if [ -f Testing/Temporary/LastTestsFailed.log ]; then
+    -   cdata-log --list-failed
+    -   exit 1
+    - fi
+    - exit 0
+    after_script:
+    - cd $OCSSWROOT
+    - if [ -d testdata ]; then
+    -   if [ -d $HOME/testdata ]; then
+    -     rm -rf $HOME/testdata
+    -   fi
+    -   mv testdata $HOME
+    - fi

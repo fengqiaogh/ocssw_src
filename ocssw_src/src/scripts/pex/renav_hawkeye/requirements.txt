@@ -1,0 +1,5 @@
+astropy
+sgp4
+numpy
+netCDF4
+pyIGRF

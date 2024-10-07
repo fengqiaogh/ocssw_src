@@ -1,0 +1,1668 @@
+/* =================================================================== */
+/* module giop.c: generic iop model                                    */
+/*                                                                     */
+/* The module contains the functions to optimize and evaluate a user   */
+/* controlled IOP model, which currently defaults to the GSM 2002.     */
+/*                                                                     */
+/* Implementation:                                                     */
+/* B. Franz, NASA/OBPG/SAIC, May 2008                                  */
+/*                                                                     */
+/* Notes:                                                              */
+/* This code was written with the intent that it may become a base for */
+/* multiple algorithms (to be writtenn as wrappers).  As such, it can't*/
+/* be assumed that the starting config is the only config (e.g.,       */
+/* number of wavelengths to fit), which leads to some inefficiencies.  */
+/* =================================================================== */
+
+#include <stdio.h>
+#include <math.h>
+#include "l12_proto.h"
+#include "giop.h"
+#include "amoeba.h"
+#include <gsl/gsl_errno.h>
+#include <gsl/gsl_vector.h>
+#include <gsl/gsl_blas.h>
+#include <gsl/gsl_multifit_nlin.h>
+#include <gsl/gsl_linalg.h>
+#include <gsl/gsl_poly.h>
+
+typedef struct fit_data_str {
+  double  *y;
+  double  *w;
+  giopstr *g;
+} fitstr;
+
+static int32_t  LastRecNum = -1;
+static float badval = BAD_FLT;
+static float rrsdiff_max  = 0.33;
+static float bbp_s_max = 5.0;
+static float bbp_s_min = 0.0;
+static float adg_s_max = 0.025;
+static float adg_s_min = 0.01;
+static float chl_max   = 10.0;
+static float chl_min   = 0.03;
+
+static float  aw  [NBANDS];
+static float  bbw [NBANDS];
+static float  foq [NBANDS];
+
+static float  aph1[NBANDS*2];
+static float  adg1[NBANDS*2];
+static float  bbp1[NBANDS*2];
+
+// these need to be passed from run_giop if giop is to
+// support simultaneous products (e.g., a gsm wrapper)
+
+static int16  *iter;
+static int16  *iopf;
+static float  *a;
+static float  *bb;
+static float  *aph;
+static float  *adg;
+static float  *bbp;
+static float  *chl;
+static float  *aph_s;
+static float  *adg_s;
+static float  *bbp_s;
+static float  *rrsdiff;
+static float  *mRrs;
+static float  **fit_par;
+static float  *chisqr;
+static int16  max_npar;
+
+/* ------------------------------------------------------------------- */
+/* giop_int_tab_file - reads a table of eigenvectors and interpolates  */
+/* to input wavelengths and returns a 2-D array of vectors,            */
+/* ------------------------------------------------------------------- */
+void giop_int_tab_file(char *file, int nx, float *x, float **y) {
+
+    float *table;
+    float *xtab;
+    float *ytab;
+    int   ncol, nrow;
+    int   i, ivec;
+
+    printf("\nLoading default basis vector from %s\n", file);
+
+
+    nrow = table_row_count(file);
+    if (nrow <= 0) {
+	printf("-E- %s line %d: error opening (%s) file", __FILE__,__LINE__,file);
+    	exit(1);
+    }
+
+    ncol = table_column_count(file);
+    table = table_read_r4(file, ncol, nrow); 
+
+    // Interpolate to input wavelengths (x)
+
+    xtab = &table[nrow*0];
+
+    for (ivec=0; ivec<ncol-1; ivec++) {
+        ytab = &table[nrow*(ivec+1)];    
+        for (i=0; i<nx; i++) {
+            y[ivec][i] = linterp(xtab,ytab,nrow,x[i]);
+        }
+    }
+
+    table_free_r4(table);
+}
+
+
+/* ------------------------------------------------------------------- */
+/* giop_ctl_start - set starting values for optimization               */
+/* ------------------------------------------------------------------- */
+void giop_ctl_start(giopstr *g, float chl) {
+
+  int ipar, ivec;
+
+    // set starting params based on model elements
+
+    ipar = 0;
+
+    for (ivec=0; ivec<g->aph_nvec; ivec++) {
+      g->par[ipar] = chl/g->aph_nvec;
+      g->len[ipar] = 0.5;
+      ipar++;
+    }
+
+    for (ivec=0; ivec<g->adg_nvec; ivec++) {
+      g->par[ipar] = 0.01;
+      g->len[ipar] = 0.1;
+      ipar++;
+    }
+
+    switch (g->bbp_opt) {
+      case BBPLASFIX:
+      case BBPQAAFIX:
+        break;
+      case BBPLAS:
+        g->par[ipar] = 1.0;
+        g->len[ipar] = 0.01;
+        ipar++;
+        break;
+      default:
+        for (ivec=0; ivec<g->bbp_nvec; ivec++) {
+          g->par[ipar] = 0.001;
+          g->len[ipar] = 0.01;
+          ipar++;
+	}
+        break;
+    }
+
+    if (ipar != g->npar) {
+        printf("-E- %s Line %d: number of GIOP fit parameters (%d) does not equal number of initialized parameter (%d)\n",
+               __FILE__,__LINE__,g->npar,ipar);
+        exit(1);
+    } 
+}
+
+/* ------------------------------------------------------------------- */
+/* giop_ctl_init - initialize model control structure                  */
+/*                                                                     */
+/* Provides default values or user-supplied parameters for all static  */
+/* model components.  These may later be over-riden by dynamic model   */
+/* parameters (e.g., band-ratio based bbp_s).                          */
+/*                                                                     */
+/* ------------------------------------------------------------------- */
+void giop_ctl_init(giopstr *g, instr *input, float *Rrs, int nwave, float wave[], 
+                   float aw[], float bbw[]) {
+
+  int iw, iw2;
+
+    float def_aph_w    = 443.0;
+    float def_aph_s    = 0.5; 
+    float def_adg_w    = 443.0;
+    float def_adg_s    = 0.02061;
+    float def_bbp_w    = 443.0;
+    float def_bbp_s    = 1.03373;
+    float def_grd[]    = {0.0949,0.0794};
+
+    // determine indicies of wavelengths to be used (default to all vis)
+    
+    if (input->giop_wave[0] > 0) {
+        for (iw=0; iw<nwave; iw++) {
+  	    if (input->giop_wave[iw] <= 0) break;
+	    g->bindx[iw] = windex(input->giop_wave[iw],wave,nwave);
+	}
+        g->nwave = iw;
+    } else {
+        g->nwave = MIN(windex(671.,wave,nwave)+1,nwave);
+        for (iw=0; iw<g->nwave; iw++)
+	    g->bindx[iw] = iw;
+    }
+
+    // reduce to valid reflectances
+
+    if (Rrs != NULL) {
+        iw2 = 0;
+        for (iw=0; iw<g->nwave; iw++) {
+	    if (Rrs[g->bindx[iw]] > BAD_FLT) {
+	        g->bindx[iw2] = g->bindx[iw];
+//                printf("%d %d %d %f\n",iw,iw2,g->bindx[iw2],Rrs[g->bindx[iw]]);
+                iw2++;
+	    }
+        }
+        g->nwave = iw2;
+    }
+    
+
+    
+
+    // set wavelengths and pure-water values
+
+    for (iw=0; iw<g->nwave; iw++) {
+        g->wave[iw] = wave[g->bindx[iw]];
+        g->aw  [iw] = aw  [g->bindx[iw]];
+        g->bbw [iw] = bbw [g->bindx[iw]];
+    }
+
+    // set input Rrs wts based on specified uncertainties
+
+    if (input->giop_rrs_unc[0] > 0) {
+        g->wt_opt = 1;
+        for (iw=0; iw<nwave; iw++) {
+  	    if (input->giop_rrs_unc[iw] <= 0) break;
+	    g->wts[iw] = 1.0/pow(input->giop_rrs_unc[iw],2);
+	}
+        if (iw != g->nwave) {
+	    printf("-E- %s line %d: number of giop_rrs_unc (%d) must equal number of giop_wave (%d)",
+		   __FILE__,__LINE__,iw,g->nwave);
+    	    exit(1);
+	}
+    } else {
+        g->wt_opt = 0;
+        for (iw=0; iw<g->nwave; iw++)
+	    g->wts[iw] = 1.0;
+    }
+    
+
+    // temperature and salinity
+
+    if (input->giop_ts_opt > 0) 
+        g->ts_opt = input->giop_ts_opt; 
+    else
+        g->ts_opt = 0;
+
+    // maximum iterations
+
+    if (input->giop_maxiter > 0) 
+        g->maxiter = input->giop_maxiter; 
+    else
+        g->maxiter = 500;
+
+    // fitting method
+
+    if (input->giop_fit_opt > 0) 
+        g->fit_opt = input->giop_fit_opt; 
+    else
+        g->fit_opt = LEVMARQ;
+
+    // Rrs to bb/(a+bb) method
+    
+    if (input->giop_rrs_opt > 0) 
+        g->rrs_opt = input->giop_rrs_opt; 
+    else
+        g->rrs_opt = RRSGRD;
+
+
+    // set coefficients of Gordon quadratic
+
+    if (input->giop_grd[0] > -999.0) {
+        g->grd[0] = input->giop_grd[0];
+        g->grd[1] = input->giop_grd[1];
+    } else {
+        g->grd[0] = def_grd[0];
+        g->grd[1] = def_grd[1];
+    }
+
+    // default basis vectors
+
+    strcpy(g->aph_tab_file,input->giop_aph_file);
+    strcpy(g->adg_tab_file,input->giop_adg_file);
+    strcpy(g->bbp_tab_file,input->giop_bbp_file);
+
+    g->aph_opt = APHTAB;
+    g->adg_opt = ADGTAB;
+    g->bbp_opt = BBPTAB;
+
+    // aphstar function
+
+    if (input->giop_aph_opt > 0) 
+        g->aph_opt = input->giop_aph_opt; 
+
+    if (input->giop_aph_w > 0.0) 
+        g->aph_w = input->giop_aph_w;
+    else
+        g->aph_w = def_aph_w;
+
+    if (input->giop_aph_s > -999.0) 
+        g->aph_s = input->giop_aph_s;
+    else
+        g->aph_s = def_aph_s;
+
+
+    // adgstar function
+
+    if (input->giop_adg_opt > 0) 
+        g->adg_opt = input->giop_adg_opt; 
+    else
+        g->adg_opt = ADGS;
+
+    if (input->giop_adg_w > 0.0) 
+        g->adg_w = input->giop_adg_w;
+    else
+        g->adg_w = def_adg_w;
+
+    if (input->giop_adg_s > -999.0) 
+        g->adg_s = input->giop_adg_s;
+    else
+        g->adg_s = def_adg_s;
+
+    // bbpstar function
+  
+    if (input->giop_bbp_opt > 0) 
+        g->bbp_opt = input->giop_bbp_opt; 
+    else
+        g->bbp_opt = BBPS;
+
+    if (input->giop_bbp_w > 0.0) 
+        g->bbp_w = input->giop_bbp_w;
+    else
+        g->bbp_w = def_bbp_w;
+
+    if (input->giop_bbp_s > -999.0) 
+        g->bbp_s = input->giop_bbp_s;
+    else
+        g->bbp_s = def_bbp_s;
+
+    
+    // set number of vectors
+    
+    switch (g->aph_opt) {
+      case APHTAB:
+        g->aph_nvec = table_column_count(g->aph_tab_file)-1;
+	break;
+      default:
+        g->aph_nvec = 1;
+        break;
+    }
+
+    switch (g->adg_opt) {
+      case ADGTAB:
+        g->adg_nvec = table_column_count(g->adg_tab_file)-1;
+	break;
+      default:
+        g->adg_nvec = 1;
+        break;
+    }
+
+    switch (g->bbp_opt) {
+      case BBPTAB:
+        g->bbp_nvec = table_column_count(g->bbp_tab_file)-1;
+	break;
+      case BBPLASFIX:
+      case BBPQAAFIX:
+        g->bbp_nvec = 0;
+        break;
+      default:
+        g->bbp_nvec = 1;
+        break;
+    }
+
+    // total number of parameters to be optimized
+
+    g->npar = g->aph_nvec + g->adg_nvec + g->bbp_nvec;
+
+    // allocate space for vectors (one element per sensor wavelength)
+
+    g->aph_tab_nw = nwave;
+    g->aph_tab_w  = (float  *) calloc(nwave,sizeof(float));
+    g->aph_tab_s  = (float **) allocate2d_float(g->aph_tab_nw, g->aph_nvec);
+
+    g->adg_tab_nw = nwave;
+    g->adg_nvec   = table_column_count(g->adg_tab_file)-1;
+    g->adg_tab_w  = (float  *) calloc(nwave,sizeof(float));
+    g->adg_tab_s  = (float **) allocate2d_float(g->adg_tab_nw, g->adg_nvec);
+
+    g->bbp_tab_nw = nwave;
+    g->bbp_nvec   = table_column_count(g->bbp_tab_file)-1;
+    g->bbp_tab_w  = (float  *) calloc(nwave,sizeof(float));
+    g->bbp_tab_s  = (float **) allocate2d_float(g->bbp_tab_nw, g->bbp_nvec);
+
+    // set vector wavelengths (same as ALL sensor for now)
+
+    for (iw=0; iw<nwave; iw++) {
+        g->aph_tab_w[iw] = wave[iw]; 
+        g->adg_tab_w[iw] = wave[iw]; 
+        g->bbp_tab_w[iw] = wave[iw]; 
+    }
+
+    // load tabulated vectors if requested
+
+    switch (g->aph_opt) {
+      case APHTAB:
+        giop_int_tab_file(g->aph_tab_file,nwave,wave,g->aph_tab_s);
+	break;
+    }
+
+    switch (g->adg_opt) {
+      case ADGTAB:
+        giop_int_tab_file(g->adg_tab_file,nwave,wave,g->adg_tab_s);
+	break;
+    }
+
+    switch (g->bbp_opt) {
+      case BBPTAB:
+        giop_int_tab_file(g->bbp_tab_file,nwave,wave,g->bbp_tab_s);
+	break;
+    }
+
+}
+
+
+/* ------------------------------------------------------------------- */
+/*                                                                     */
+/* ------------------------------------------------------------------- */
+int giop_ran(int recnum)
+{ 
+    if ( recnum == LastRecNum )
+        return 1;
+    else
+        return 0; 
+}
+
+/* ------------------------------------------------------------------- */
+/*                                                                     */
+/* ------------------------------------------------------------------- */
+void giop_model(giopstr *g, double par[],int nwave,float wave[],float aw[],float bbw[],
+		float foq[],float aph[],float adg[],float bbp[],
+       double rrs[],double dfdpar[NBANDS][GIOPMAXPAR],double parstar[NBANDS][GIOPMAXPAR])
+{
+  int    iw, iwtab, ivec, ipar;
+  float  bb, a;
+  float  x;
+  float  aphstar[GIOPMAXPAR];
+  float  adgstar[GIOPMAXPAR];
+  float  bbpstar[GIOPMAXPAR];
+  float  dfdx;
+  float  dxda;
+  float  dxdb;
+
+  // note: input wavelength set can vary between optimization and evaluation calls
+
+  for (iw=0; iw<nwave; iw++) {
+
+      // evaluate model for each IOP component at all wavelengths
+      // also compute and store associated uncertainty, based on fitted paraneter
+      // uncertainties as stored in the second half of the par array
+      // note that we're using a simple summation for uncertainties (for now)
+
+      ipar = 0;
+
+      switch (g->aph_opt) {
+        case APHGAUSS:
+          aphstar[ipar] = exp(-1.*pow(wave[iw] - g->aph_w,2)/(2*pow(g->aph_s,2)));
+          aph[iw] = par[ipar]*aphstar[ipar];
+          aph[iw+nwave] = par[ipar+g->npar]*aphstar[ipar];
+          ipar++;
+          break;
+        default:
+          aph[iw] = 0;
+          aph[iw+nwave] = 0;
+          for (ivec=0; ivec<g->aph_nvec; ivec++) {
+            iwtab = windex(wave[iw],g->aph_tab_w,g->aph_tab_nw);
+            aphstar[ipar] = g->aph_tab_s[ivec][iwtab];
+            aph[iw] += par[ipar]*aphstar[ipar];
+            aph[iw+nwave] += par[ipar+g->npar]*aphstar[ipar];
+            ipar++;
+	  }
+          break;
+      }
+
+      switch (g->adg_opt) {
+        case ADGS:
+        case ADGSQAA:
+        case ADGSOBPG:
+          adgstar[ipar] = exp( - g->adg_s * (wave[iw] - g->adg_w));
+          adg[iw] = par[ipar]*adgstar[ipar];
+          adg[iw+nwave] = par[ipar+g->npar]*adgstar[ipar];
+          ipar++;
+          break;
+        default:
+          adg[iw] = 0;
+          adg[iw+nwave] = 0;
+          for (ivec=0; ivec<g->adg_nvec; ivec++) {
+            iwtab = windex(wave[iw],g->adg_tab_w,g->adg_tab_nw);
+            adgstar[ipar] = g->adg_tab_s[ivec][iwtab];
+            adg[iw] += par[ipar]*adgstar[ipar];
+            adg[iw+nwave] += par[ipar+g->npar]*adgstar[ipar];     // uncertainty (wag)
+            ipar++;
+	  }
+          break;
+      }
+
+      switch (g->bbp_opt) {
+        case BBPLASFIX:
+        case BBPQAAFIX:
+          iwtab = windex(wave[iw],g->bbp_tab_w,g->bbp_tab_nw);
+          bbpstar[ipar] = g->bbp_tab_s[0][iwtab];
+          bbp[iw] = bbpstar[ipar];
+          break;
+        case BBPS:
+        case BBPSLAS:
+        case BBPSHAL:
+        case BBPSQAA:
+        case BBPSCIOTTI:
+        case BBPSMM01:
+          bbpstar[ipar] = pow((g->bbp_w/wave[iw]), g->bbp_s);
+          bbp[iw] = par[ipar]*bbpstar[ipar];
+          bbp[iw+nwave] = par[ipar+g->npar]*bbpstar[ipar];
+          ipar++;
+          break;
+        default:
+          bbp[iw] = 0;
+          bbp[iw+nwave] = 0;
+          for (ivec=0; ivec<g->bbp_nvec; ivec++) {
+            iwtab = windex(wave[iw],g->bbp_tab_w,g->bbp_tab_nw);
+            bbpstar[ipar] = g->bbp_tab_s[ivec][iwtab];
+            bbp[iw] += par[ipar]*bbpstar[ipar];
+            bbp[iw+nwave] += par[ipar+g->npar]*bbpstar[ipar];
+            ipar++;
+	  }
+          break;
+      }
+
+      a  = aw [iw] + aph[iw] + adg[iw];
+      bb = bbw[iw] + bbp[iw];
+      x  = bb/(a+bb);
+
+      switch (g->rrs_opt) {
+        case RRSGRD:
+	  rrs[iw] = g->grd[0]*x + g->grd[1]*pow(x,2); 
+          dfdx    = g->grd[0] + 2*g->grd[1]*x;
+          break;
+        case RRSFOQ:
+	  rrs[iw] = foq[iw]*x;
+          dfdx    = foq[iw];
+          break;
+      }
+
+      if (dfdpar != NULL) {
+
+        ipar = 0;
+
+        dxda = -x*x/bb;
+        dxdb =  x/bb + dxda;
+
+        switch (g->aph_opt) {
+  	  default:
+            for (ivec=0; ivec<g->aph_nvec; ivec++) {
+              dfdpar[iw][ipar] = dfdx*dxda*aphstar[ipar];
+              ipar++;
+            }
+            break;
+        }
+
+        switch (g->adg_opt) {
+          default:
+            for (ivec=0; ivec<g->adg_nvec; ivec++) {
+              dfdpar[iw][ipar] = dfdx*dxda*adgstar[ipar];
+              ipar++;
+	    }
+            break;
+        }
+
+        switch (g->bbp_opt) {
+	  case BBPLASFIX:
+	  case BBPQAAFIX:
+	    break;
+          default:
+            for (ivec=0; ivec<g->bbp_nvec; ivec++) {
+              dfdpar[iw][ipar] = dfdx*dxdb*bbpstar[ipar];
+              ipar++;
+	    }
+            break;
+        }
+      }
+
+      if (parstar != NULL) {
+
+        ipar = 0;
+
+        switch (g->aph_opt) {
+          default:
+            for (ivec=0; ivec<g->aph_nvec; ivec++) {
+              parstar[iw][ipar] = aphstar[ipar];
+              ipar++;
+	    }
+            break;
+        }
+
+        switch (g->adg_opt) {
+          default:
+            for (ivec=0; ivec<g->adg_nvec; ivec++) {
+              parstar[iw][ipar] = adgstar[ipar];
+              ipar++;
+	    }
+            break;
+        }
+
+        switch (g->bbp_opt) {
+	  case BBPLASFIX:
+	  case BBPQAAFIX:
+	    break;
+          default:
+            for (ivec=0; ivec<g->bbp_nvec; ivec++) {
+              parstar[iw][ipar] = bbpstar[ipar];
+              ipar++;
+	    }
+            break;
+        }
+      }
+  
+  }
+
+  return;
+}
+
+/* ------------------------------------------------------------------- */
+/*                                                                     */
+/* ------------------------------------------------------------------- */
+double giop_amb(FITSTRUCT *ambdata, double par[])
+{
+  int iw;
+
+  giopstr *g = (giopstr *) (ambdata->meta);
+
+  giop_model(g,par,g->nwave,g->wave,g->aw,g->bbw,g->foq,aph1,adg1,bbp1,ambdata->yfit,NULL,NULL);
+
+  ambdata->merit = 0.0;
+  for (iw=0; iw<g->nwave; iw++) {
+      ambdata->merit += pow((ambdata->y[iw] - ambdata->yfit[iw]), 2) * ambdata->wgt[iw];
+  }
+
+  return(ambdata->merit);
+}
+
+
+/* ------------------------------------------------------------------- */
+/*                                                                     */
+/* ------------------------------------------------------------------- */
+int fit_giop_amb(giopstr *g, double Rrs[], double wts[], double par[], 
+              double Rrs_fit[], int16 *itercnt )
+{
+  int status = 0;
+
+  static float tol = 1.e-6;             /* fractional change in chisqr */
+  static FITSTRUCT ambdata;             /* amoeba interface structure  */
+  static double init[GIOPMAXPAR*(GIOPMAXPAR+1)]; /* initial simplex    */
+
+  int   i, j;
+  short isml;
+
+  ambdata.niter = g->maxiter; /* max number of iterations          */
+  ambdata.nfunc = g->npar;    /* number of model parameters        */
+  ambdata.npnts = g->nwave;   /* number of wavelengths (Rrs)       */
+  ambdata.y     = Rrs;        /* Input Rrs values (subsurface)     */
+  ambdata.wgt   = wts;        /* Input weights on Rrs values       */
+  ambdata.yfit  = Rrs_fit;    /* Output model predicted Rrs values */
+  ambdata.meta  = g;
+
+  /* initialize simplex with first guess model parameters */
+  for (j=0; j<g->npar+1; j++) 
+      for (i=0; i<g->npar; i++) 
+          init[j*g->npar+i] = g->par[i];
+
+  for (i=0; i<g->npar; i++) {
+      init[g->npar+i*(g->npar+1)] += g->len[i];
+      par[i] = 0.0;
+  }
+
+  /* run optimization */
+  isml = amoeba(init, &ambdata, giop_amb, tol); 
+
+  /* check convergence and record parameter results */
+  if (ambdata.niter >= g->maxiter)
+      status = 1;
+
+  for (i = 0; i < g->npar; i++) {
+      par[i] = init[g->npar * isml + i];
+  }
+
+  *itercnt = ambdata.niter;
+
+  return(status);
+}
+
+
+
+/* ---------------------------------------------------------------------- */
+/* wrapper function for L-M fit to GIOP model                             */ 
+/* ---------------------------------------------------------------------- */
+int giop_lm_fdf(const gsl_vector *parv, void *data, gsl_vector *f, gsl_matrix *J)
+{
+    double *y     = ((fitstr *) data)->y;
+    double *w     = ((fitstr *) data)->w;
+    float  *aw    = ((fitstr *) data)->g->aw;
+    float  *bbw   = ((fitstr *) data)->g->bbw;
+    float  *foq   = ((fitstr *) data)->g->foq;
+    float  *wave  = ((fitstr *) data)->g->wave;
+    size_t nwave  = ((fitstr *) data)->g->nwave;
+    size_t npar   = ((fitstr *) data)->g->npar;
+    giopstr *g    = ((fitstr *) data)->g;
+
+    double par   [GIOPMAXPAR];
+    double yfit  [NBANDS];
+    double dydpar[NBANDS][GIOPMAXPAR];
+
+    double sigma;
+
+    int iw, ipar;
+
+    /* extract model params from vector */
+    for (ipar=0; ipar<npar; ipar++) {
+        par[ipar] = gsl_vector_get(parv,ipar);
+    }
+ 
+    /* run model */
+    giop_model(g,par,nwave,wave,aw,bbw,foq,aph1,adg1,bbp1,yfit,dydpar,NULL);
+
+    /* evaluate and store for lm solver */
+    for (iw=0; iw<nwave; iw++) {
+
+        /* silly, but we need sigma and not sigma-squared */
+        sigma = sqrt(1./w[iw]);
+
+        /* Function to be minimized */
+        if (f != NULL)
+            gsl_vector_set(f, iw, (yfit[iw] - y[iw]) / sigma);
+
+        /* Jacobian matrix */
+        if (J != NULL)
+            for (ipar=0; ipar<npar; ipar++)
+                gsl_matrix_set (J, iw, ipar, dydpar[iw][ipar] / sigma);
+    }   
+
+    return GSL_SUCCESS;
+}
+
+int giop_lm_f (const gsl_vector *parv, void *data, gsl_vector *f)
+{ return (giop_lm_fdf(parv, data, f, NULL)); }
+
+int giop_lm_df(const gsl_vector *parv, void *data, gsl_matrix *J)
+{ return (giop_lm_fdf(parv, data, NULL, J)); }
+
+
+
+/* ---------------------------------------------------------------------- */
+/* fit_giop_lm() - runs Levenburg-Marquart optimization for one pixel     */ 
+/* ---------------------------------------------------------------------- */
+int fit_giop_lm(giopstr *g,double Rrs[],double wts[],double par[],double *chi, int16 *itercnt )
+{
+    int status = 0;
+    int iter;
+
+    static fitstr data;
+
+    size_t npar   = g->npar;
+
+    static gsl_multifit_function_fdf func;
+    const gsl_multifit_fdfsolver_type *t;
+    gsl_multifit_fdfsolver *s;
+    gsl_vector_view x;
+
+    gsl_matrix *cov = gsl_matrix_alloc (npar, npar);
+
+    double sum, dof, c;
+    int ipar;
+
+    /* Set up data structure */
+    data.y = Rrs;
+    data.w = wts;
+    data.g = g;
+
+    /* Set up multifit function structure */
+    func.f      = &giop_lm_f;
+    func.df     = &giop_lm_df;
+    func.fdf    = &giop_lm_fdf;
+    func.n      = g->nwave;
+    func.p      = g->npar;
+    func.params = &data;
+
+    /* Allocate solver space */
+    t = gsl_multifit_fdfsolver_lmsder;
+    s = gsl_multifit_fdfsolver_alloc (t, g->nwave, g->npar);
+
+    /* Set start params */
+    x = gsl_vector_view_array (par, npar);
+    gsl_multifit_fdfsolver_set (s, &func, &x.vector);
+
+    /* Fit model for this pixel */
+    status = 1;
+    for (iter=0; iter<g->maxiter; iter++) {
+        gsl_multifit_fdfsolver_iterate(s);
+        if (gsl_multifit_test_delta (s->dx, s->x, 1e-4, 1e-4) == GSL_SUCCESS) {
+            status = 0;
+            break;
+	}
+    } 
+    *itercnt = iter;
+
+    /* Compute covariance matrix  from Jacobian */
+    gsl_multifit_covar (s->J, 0.0, cov);
+
+    /* Compute chi-square */
+    sum = gsl_blas_dnrm2(s->f);            // quadrature sum of minimization function
+    dof = func.n - func.p;                 // degrees of freedom
+    *chi= pow(sum, 2.0)/dof;               // chi-square per dof
+    
+    if (g->wt_opt == 0) 
+        c = sum / sqrt(dof);               // use variance in fit to estimate Rrs uncertainty
+    else
+        c = 1.0;                           // Rrs uncertainty included in sum 
+
+    /* Retrieve fit params & error estimates */
+    for (ipar=0; ipar<npar; ipar++) {
+        par[ipar] = gsl_vector_get(s->x, ipar);
+        par[ipar+npar] = sqrt(gsl_matrix_get(cov, ipar, ipar))*c;
+	//printf("%d %lf %lf\n",ipar,par[ipar],par[ipar+npar]);
+    }
+
+    gsl_multifit_fdfsolver_free(s);
+    gsl_matrix_free(cov);
+
+    return (status);
+}
+
+
+/* ---------------------------------------------------------------------- */
+/* fit_giop_svd() - constrained matrix solution                           */ 
+/* ---------------------------------------------------------------------- */
+int fit_giop_svd(giopstr *g, double rrs[], double wts[], double par[])
+{
+    int status = 0; /* init to success */
+
+    double rrs_fit[NBANDS];
+    double parstar[NBANDS][GIOPMAXPAR];
+
+    size_t nwave = g->nwave;
+    size_t npar  = g->npar;
+
+    int iw, ipar;
+  
+    double a0, a1, a2;
+    double u0, u1, u;
+
+    gsl_matrix *A = gsl_matrix_alloc(nwave,npar);
+    gsl_matrix *V = gsl_matrix_alloc(npar,npar);
+    gsl_vector *S = gsl_vector_alloc(npar);
+    gsl_vector *W = gsl_vector_alloc(npar);
+    gsl_vector *x = gsl_vector_alloc(npar);
+    gsl_vector *b = gsl_vector_alloc(nwave);
+
+
+    /* run model to get parstar wavelength-dependence terms */
+    giop_model(g,par,g->nwave,g->wave,g->aw,g->bbw,g->foq,aph1,adg1,bbp1,rrs_fit,NULL,parstar);
+
+    /* clear fit parameters */
+    for (ipar=0; ipar<g->npar; ipar++)
+        par[ipar] = BAD_FLT;
+    
+    /* build A matrix and b vector for A x = b */
+
+    for (iw=0; iw<g->nwave; iw++) {
+
+      /* get u = bb/(a+bb) */
+      switch (g->rrs_opt) {
+        case RRSGRD:
+          a2 = g->grd[1];
+          a1 = g->grd[0];
+          a0 = -rrs[iw];
+	  if ((gsl_poly_solve_quadratic(a2, a1, a0, &u0, &u1) == 2) && u1 > 0.0)
+            u = u1;
+          else {
+            status = 1;
+            goto cleanup;
+	  }
+          break;
+        case RRSFOQ:
+	  u = rrs[iw]/g->foq[iw];
+          break;        
+      }    
+
+      gsl_vector_set(b,iw,-(u*g->aw[iw] + (u-1)*g->bbw[iw]));
+
+      for (ipar=0; ipar<g->npar; ipar++) {
+	  if (ipar < (g->aph_nvec + g->adg_nvec))
+  	      gsl_matrix_set(A,iw,ipar,parstar[iw][ipar]*u);          // a
+          else
+	      gsl_matrix_set(A,iw,ipar,parstar[iw][ipar]*(u-1));      // bb
+      }
+    }
+
+    /* solve A x = b for x */
+    status = gsl_linalg_SV_decomp (A, V, S, W);
+    status = gsl_linalg_SV_solve  (A, V, S, b, x);
+
+    /* extract fitted parameters */
+    if (status == 0) {
+        for (ipar=0; ipar<g->npar; ipar++) {
+            par[ipar] = gsl_vector_get(x,ipar);
+	}
+    }
+
+ cleanup:
+
+    gsl_matrix_free(A);
+    gsl_matrix_free(V);
+    gsl_vector_free(S);
+    gsl_vector_free(x);
+    gsl_vector_free(b);
+
+    return(status);
+}
+
+
+/* ------------------------------------------------------------------- */
+/* giop_chl() - returns magnitude of aph* as chl                       */ 
+/* ------------------------------------------------------------------- */
+float32 giop_chl(giopstr *g, int16 iopf, double par[], float *chl_err)
+{
+    float32 chl = badval;
+    int ipar;
+
+    *chl_err = badval;
+
+    switch (g->aph_opt) {        
+      case APHGAUSS:
+          break;        
+      default:
+        if ((iopf & IOPF_FAILED) == 0) {
+          chl = 0.0;
+          *chl_err = 0.0;
+          for (ipar=0; ipar<g->aph_nvec; ipar++) {
+              chl += par[ipar];
+              *chl_err += par[ipar+g->npar];
+	  }
+	}
+        break;
+    }
+
+
+    return(chl);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Convert Rrs[0+] to Rrs[0-]                                             */
+/* ---------------------------------------------------------------------- */
+float rrs_above_to_below(float Rrs) 
+{
+    return(1.0 / (0.52 + 1.7 * Rrs));
+
+}
+    
+
+/* ---------------------------------------------------------------------- */
+/* run_giop - runs optimization using requested method                    */ 
+/* ---------------------------------------------------------------------- */
+void run_giop(l2str *l2rec)
+{
+    static int firstCall = 1;
+    static giopstr giopctl;
+    static giopstr *g = &giopctl;
+
+    double par  [GIOPMAXPAR*2];
+    double Rrs_a[NBANDS]; /* above water, per fit band */
+    double Rrs_b[NBANDS]; /* below water, per fit band */
+    double Rrs_f[NBANDS]; /* modeled Rrs, per fit band */
+    double wts  [NBANDS]; /* weights, per fit band     */
+
+    float Rrs1, Rrs2;
+    int32 i1, i2;
+
+    int16  itercnt;
+    int16  bndcnt;
+    int16  status;
+
+    int32  ipar, ip, iw, ib, ipb, ipb2, ierr;
+    double chi = BAD_FLT;
+
+    float *wave = l2rec->fwave;
+    int32 nwave = l2rec->nbands;
+    int32 npix  = l2rec->npix;
+    
+    float aph_norm = BAD_FLT;
+
+    if (firstCall) {
+
+        int32_t iw;
+
+        firstCall = 0;
+
+        // set pure water absorption and backscatter
+
+        printf("\nSetting pure water aw and bbw for GIOP.\n");
+        if (l2rec->input->outband_opt >= 2) {
+            for (iw=0; iw<nwave; iw++) {
+                aw [iw] = aw_spectra (l2rec->fwave[iw],BANDW);
+                bbw[iw] = bbw_spectra(l2rec->fwave[iw],BANDW);
+                printf("%4.0f %e %e\n",l2rec->fwave[iw],aw[iw],bbw[iw]);
+	    }
+	} else {
+            float *awptr, *bbwptr;
+            rdsensorinfo(l2rec->sensorID,l2rec->input->evalmask,"aw" ,(void **) &awptr );
+            rdsensorinfo(l2rec->sensorID,l2rec->input->evalmask,"bbw",(void **) &bbwptr);
+            for (iw=0; iw<nwave; iw++) {
+                aw [iw] = awptr [iw];
+                bbw[iw] = bbwptr[iw];
+                printf("%f %e %e\n",l2rec->fwave[iw],aw[iw],bbw[iw]);
+	    }
+	}
+
+        // initialize control structure (to get npar)
+
+        giop_ctl_init(g, l2rec->input, NULL, nwave, wave, aw, bbw);
+
+        // allocate static storage for one scanline
+
+        if ((iter = calloc(npix,sizeof(int16))) == NULL) {
+            printf("-E- %s line %d : error allocating memory for GIOP.\n",
+                __FILE__,__LINE__);
+            exit(1);
+	}
+        if ((iopf = calloc(npix,sizeof(int16))) == NULL) {
+            printf("-E- %s line %d : error allocating memory for GIOP.\n",
+                __FILE__,__LINE__);
+            exit(1);
+	}
+        if ((mRrs = calloc(npix*nwave,sizeof(float))) == NULL) {
+            printf("-E- %s line %d : error allocating memory for GIOP.\n",
+                __FILE__,__LINE__);
+            exit(1);
+	}
+        if ((a = calloc(npix*nwave*2,sizeof(float))) == NULL) {
+            printf("-E- %s line %d : error allocating memory for GIOP.\n",
+                __FILE__,__LINE__);
+            exit(1);
+	}
+        if ((aph = calloc(npix*nwave*2,sizeof(float))) == NULL) {
+            printf("-E- %s line %d : error allocating memory for GIOP.\n",
+                __FILE__,__LINE__);
+            exit(1);
+	}
+        if ((adg = calloc(npix*nwave*2,sizeof(float))) == NULL) {
+            printf("-E- %s line %d : error allocating memory for GIOP.\n",
+                __FILE__,__LINE__);
+            exit(1);
+	}
+        if ((bbp = calloc(npix*nwave*2,sizeof(float))) == NULL) {
+            printf("-E- %s line %d : error allocating memory for GIOP.\n",
+                __FILE__,__LINE__);
+            exit(1);
+	}
+        if ((bb = calloc(npix*nwave*2,sizeof(float))) == NULL) {
+            printf("-E- %s line %d : error allocating memory for GIOP.\n",
+                __FILE__,__LINE__);
+            exit(1);
+	}
+        if ((chl = calloc(npix*2,sizeof(float))) == NULL) {
+            printf("-E- %s line %d : error allocating memory for GIOP.\n",
+                __FILE__,__LINE__);
+            exit(1);
+	}
+        if ((rrsdiff = calloc(npix,sizeof(float))) == NULL) {
+            printf("-E- %s line %d : error allocating memory for GIOP.\n",
+                __FILE__,__LINE__);
+            exit(1);
+	}
+        if ((aph_s = calloc(npix,sizeof(float))) == NULL) {
+            printf("-E- %s line %d : error allocating memory for GIOP.\n",
+                __FILE__,__LINE__);
+            exit(1);
+	}
+        if ((adg_s = calloc(npix,sizeof(float))) == NULL) {
+            printf("-E- %s line %d : error allocating memory for GIOP.\n",
+                __FILE__,__LINE__);
+            exit(1);
+	}
+        if ((bbp_s = calloc(npix,sizeof(float))) == NULL) {
+            printf("-E- %s line %d : error allocating memory for GIOP.\n",
+                __FILE__,__LINE__);
+            exit(1);
+	}
+        if ((fit_par = allocate2d_float(npix, g->npar)) == NULL) {
+            printf("-E- %s line %d : error allocating memory for GIOP.\n",
+                __FILE__,__LINE__);
+            exit(1);
+	}
+        max_npar = g->npar;
+        if ((chisqr = calloc(npix,sizeof(float))) == NULL) {
+            printf("-E- %s line %d : error allocating memory for GIOP.\n",
+                __FILE__,__LINE__);
+            exit(1);
+	}
+    }
+
+    for (ip=0; ip<l2rec->npix; ip++) {
+
+        ipb  = ip*nwave;
+        ipb2 = ip*NBANDS;
+        ierr = npix*nwave + ipb;
+
+        // reinitialize optimization control (adapt to missing bands)
+
+        giop_ctl_init(g, l2rec->input, &l2rec->Rrs[ipb2], nwave, wave, aw, bbw);
+
+        // initialize output arrays and counters
+
+        for (ib=0; ib<nwave; ib++) {
+            a   [ipb+ib] = badval;
+            bb  [ipb+ib] = badval;
+            aph [ipb+ib] = badval;
+            adg [ipb+ib] = badval;
+            bbp [ipb+ib] = badval;
+            mRrs[ipb+ib] = badval;
+            a   [ierr+ib] = 0.0;
+            bb  [ierr+ib] = 0.0;
+            aph [ierr+ib] = 0.0;
+            adg [ierr+ib] = 0.0;
+            bbp [ierr+ib] = 0.0;
+         }
+        chl [ip] = badval;
+        iter[ip] = 0;
+        iopf[ip] = 0;
+        status   = 0;
+        bndcnt   = 0;
+        itercnt  = 0;
+        rrsdiff[ip] = badval;
+        chisqr[ip] = badval;
+
+        aph_s[ip] = badval;
+        adg_s[ip] = badval;
+        bbp_s[ip] = badval;
+
+        for (ipar=0; ipar<g->npar; ipar++)
+            fit_par[ip][ipar] = badval;
+
+
+        // flag and skip if pixel already masked
+
+        if (l2rec->mask[ip]) {
+	    iopf[ip] |= IOPF_ISMASKED; 
+	    iopf[ip] |= IOPF_FAILED; 
+            continue;
+	}
+
+        // set values that depend on sea state
+  
+        if (g->ts_opt != 0) {
+  	    if (l2rec->sstref[ip] < BAD_FLT+1 || l2rec->sssref[ip] < BAD_FLT+1) {
+	        iopf[ip] |= IOPF_BADRRS; 
+	        iopf[ip] |= IOPF_FAILED; 
+                continue;         
+	    }
+            for (iw=0; iw<nwave; iw++) {
+	        bbw[iw] = seawater_bb(wave[iw],l2rec->sstref[ip],l2rec->sssref[ip]);
+    	    }
+            for (iw=0; iw<g->nwave; iw++) {
+                g->bbw [iw] = bbw [g->bindx[iw]];
+            }
+	}
+
+        //
+        // set dynamic, non-optimized model parameters
+        //
+
+        aph_s[ip] = g->aph_s;
+        adg_s[ip] = g->adg_s;
+        bbp_s[ip] = g->bbp_s;
+
+        // get starting chlorophyll from default algorithm
+
+        g->chl = MAX(MIN(l2rec->chl[ip],chl_max),chl_min);
+
+        // Rrs function
+
+        switch (g->rrs_opt) {
+	  case RRSFOQ:
+            foqint_morel(wave,nwave,0.0,0.0,0.0,g->chl,foq);
+            for (iw=0; iw<g->nwave; iw++) {
+                g->foq[iw] = foq[g->bindx[iw]];
+            }
+            break;
+	}
+
+        // aph function
+
+        switch (g->aph_opt) {
+	  case APHBRICAUD:
+            // replaces default tabbed values with Bricaud chl-based values
+            for (iw=0; iw<nwave; iw++) {
+                g->aph_tab_w[iw] = wave[iw];
+                // get the aph* normalization factor - the 0.055 is a "typical"
+                // aph* value for 443nm
+                aph_norm =  0.055/get_aphstar(443.,BANDW,APHBRICAUD,g->chl);
+                g->aph_tab_s[0][iw] = aph_norm * get_aphstar(wave[iw],BANDW,APHBRICAUD,g->chl);
+	    }
+            g->aph_tab_nw = nwave;
+            g->aph_nvec = 1;
+            break;
+	case APHCIOTTI: 
+            // replaces default tabbed values with Ciotti size-fraction-based values
+            for (iw=0; iw<nwave; iw++) {
+                g->aph_tab_w[iw] = wave[iw];
+                g->aph_tab_s[0][iw] = get_aphstar(wave[iw],BANDW,APHCIOTTI,g->aph_s);
+	    }
+            g->aph_tab_nw = nwave;
+            g->aph_nvec = 1;
+            break;
+	}
+
+        // adg function
+
+        switch (g->adg_opt) {
+	  case ADGSQAA:
+            // update exponential based on QAA band-ratio relationship
+            i1 = windex(443.0,wave,nwave);
+            i2 = windex(550.0,wave,nwave);
+            Rrs1 = l2rec->Rrs[ipb2+i1];
+            Rrs2 = l2rec->Rrs[ipb2+i2];
+            if (Rrs1 > 0.0 && Rrs2 > 0.0) {
+	        Rrs1 = Rrs1 * rrs_above_to_below(Rrs1);
+	        Rrs2 = Rrs1 * rrs_above_to_below(Rrs2);
+  	        g->adg_s = MAX(MIN(0.015+0.002/(0.6+Rrs1/Rrs2),adg_s_max),adg_s_min);
+	    } else if (Rrs2 > 0.0) {
+	        g->adg_s = adg_s_min;
+            } else {
+	        g->adg_s = BAD_FLT;
+                iopf[ip] |= IOPF_BADRRS;
+                status = 1;
+	    }
+            break;
+	  case ADGSOBPG:
+            // update exponential based on OBPG band-ratio relationship
+            i1 = windex(412.0,wave,nwave);
+            i2 = windex(550.0,wave,nwave);
+            Rrs1 = l2rec->Rrs[ipb2+i1];
+            Rrs2 = l2rec->Rrs[ipb2+i2];
+            if (Rrs1 > 0.0 && Rrs2 > 0.0) {
+  	        g->adg_s = MAX(MIN(0.015+0.0038*log10(Rrs1/Rrs2),adg_s_max),adg_s_min);
+	    } else if (Rrs2 > 0.0) {
+	        g->adg_s = adg_s_min;
+            } else {
+	        g->adg_s = BAD_FLT;
+                iopf[ip] |= IOPF_BADRRS;
+                status = 1;
+	    }
+            break;
+	}
+
+        // bbp function
+
+        switch (g->bbp_opt) {
+	  case BBPSHAL:
+            // update power-law exponent based on HAL band-ratio relationship
+            i1 = windex(490.0,wave,nwave);
+            i2 = windex(550.0,wave,nwave);
+            Rrs1 = l2rec->Rrs[ipb2+i1];
+            Rrs2 = l2rec->Rrs[ipb2+i2];
+            if (Rrs1 > 0.0 && Rrs2 > 0.0) {
+	        g->bbp_s = MAX(MIN(0.8*(Rrs1/Rrs2)+0.2,bbp_s_max),bbp_s_min);
+	    } else if (Rrs2 > 0.0) {
+	        g->bbp_s = bbp_s_min;
+            } else {
+	        g->bbp_s = BAD_FLT;
+                iopf[ip] |= IOPF_BADRRS;
+                status = 1;
+	    }
+            break;
+	  case BBPSQAA:
+            // update power-law exponent based on QAA band-ratio relationship
+            i1 = windex(443.0,wave,nwave);
+            i2 = windex(550.0,wave,nwave);
+            Rrs1 = l2rec->Rrs[ipb2+i1];
+            Rrs2 = l2rec->Rrs[ipb2+i2];
+            if (Rrs1 > 0.0 && Rrs2 > 0.0) {
+	        Rrs1 = Rrs1 * rrs_above_to_below(Rrs1);
+	        Rrs2 = Rrs2 * rrs_above_to_below(Rrs2);
+	        g->bbp_s = MAX(MIN(2.0*(1.0-1.2*exp(-0.9*Rrs1/Rrs2)),bbp_s_max),bbp_s_min);
+	    } else if (Rrs2 > 0.0) {
+	        g->bbp_s = bbp_s_min;
+            } else {
+	        g->bbp_s = BAD_FLT;
+                iopf[ip] |= IOPF_BADRRS;
+                status = 1;
+	    }
+            break;
+	  case BBPSCIOTTI:
+            // update power-law exponent based on Ciotti chl relationship
+            if (l2rec->chl[ip] > 0.0) {
+	        g->bbp_s = MAX(MIN(1.0 - 0.768 * log10(g->chl),bbp_s_max),bbp_s_min);
+            } else {
+	        g->bbp_s = BAD_FLT;
+                iopf[ip] |= IOPF_BADRRS;
+                status = 1;
+	    }
+            break;
+	  case BBPSMM01:
+            // update power-law exponent based on Morel chl relationship
+            if (l2rec->chl[ip] > 0.0) {
+	        g->bbp_s = MAX(MIN(0.5 * (0.3 - log10(g->chl)),bbp_s_max),bbp_s_min);
+            } else {
+	        g->bbp_s = BAD_FLT;
+                iopf[ip] |= IOPF_BADRRS;
+                status = 1;
+	    }
+            break;
+	  case BBPSLAS:
+            // update power-law exponent based on Loisel & Stramski model
+            if ((g->bbp_s = get_bbp_las_eta(l2rec,ip)) == BAD_FLT) {
+                iopf[ip] |= IOPF_BADRRS;
+                status = 1;
+	    } 
+            g->bbp_nvec = 1;
+            break;
+	  case BBPLAS:
+	  case BBPLASFIX:
+            // replaces default tabbed values with results from Loisel & Stramski model
+            if (get_bbp_las(l2rec,ip,g->bbp_tab_w,g->bbp_tab_s[0],g->bbp_tab_nw) == 0) {
+                iopf[ip] |= IOPF_BADRRS;
+                status = 1;
+	    } 
+            g->bbp_nvec = 1;
+	    break;
+	  case BBPQAAFIX:
+            // replaces default tabbed values with results from QAA model
+            if (get_bbp_qaa(l2rec,ip,g->bbp_tab_w,g->bbp_tab_s[0],g->bbp_tab_nw) == 0) {
+                iopf[ip] |= IOPF_BADRRS;
+                status = 1;
+	    } 
+            g->bbp_nvec = 1;
+	    break;
+	}
+
+        // save updated model config, flag and skip if unable to compute
+
+        aph_s[ip] = g->aph_s;
+        adg_s[ip] = g->adg_s;
+        bbp_s[ip] = g->bbp_s;
+
+        if (status != 0) {
+            iopf[ip] |= IOPF_BADRRS;
+            continue;
+	}
+
+        // convert to subsurface reflectance
+
+        for (iw=0; iw<g->nwave; iw++) {
+	    ib = g->bindx[iw];
+            Rrs_a[iw] = l2rec->Rrs[ipb2+ib];
+            Rrs_b[iw] = Rrs_a[iw]*rrs_above_to_below(Rrs_a[iw]);
+            wts  [iw] = g->wts[iw];       // /rrs_above_to_below(Rrs_a[iw])*sqrt(l2rec->nobs[ip]); 
+            if (Rrs_b[iw] > 0.0) { 
+                bndcnt++;
+	    }
+	}
+                
+        // if less than npar valid reflectances, flag and skip pixel */
+
+        if (bndcnt < g->npar) {
+            iopf[ip] |= IOPF_BADRRS;
+            continue;
+	}
+
+        // initialize model parameters
+
+        giop_ctl_start(g,g->chl);
+
+        for (ipar=0; ipar<g->npar; ipar++) {
+	    par[ipar] = g->par[ipar];      // model params
+	    par[ipar+g->npar] = 0.0;       // model param errors
+	}
+
+        // run model optimization for this pixel
+
+        switch (g->fit_opt) {
+          case AMOEBA:
+	    status = fit_giop_amb(g,Rrs_b,wts,par,Rrs_f,&itercnt);
+            break;
+	  case LEVMARQ:
+            status = fit_giop_lm(g,Rrs_b,wts,par,&chi,&itercnt);
+            break;
+	  case SVDFIT:
+            status = fit_giop_svd(g,Rrs_b,wts,par);
+            break;
+          default:
+            printf("%s Line %d: Unknown optimization method for GIOP %d\n",
+                  __FILE__,__LINE__,g->fit_opt);
+            exit(1);
+            break;
+        }
+
+        // if inversion failed, flag and skip
+
+        if (status != 0) {
+            iopf[ip] |= IOPF_FAILED;
+            if (itercnt >= g->maxiter)
+                iopf[ip] |= IOPF_MAXITER;
+            continue;            
+	}
+
+        // save final params 
+
+        for (ipar=0; ipar<g->npar; ipar++) {
+	    if (isfinite(par[ipar]))
+                fit_par[ip][ipar] = par[ipar];
+	}
+        chisqr[ip] = chi;
+        
+        // evaluate model at fitted bands
+
+  	giop_model(g,par,g->nwave,g->wave,g->aw,g->bbw,g->foq,aph1,adg1,bbp1,Rrs_f,NULL,NULL);
+
+        // bogus evaluation, flag and skip
+
+        for (iw=0; iw<g->nwave; iw++) {
+	    if (!isfinite(Rrs_f[iw])) {
+	        iopf[ip] |= IOPF_NAN;
+                break;
+	    }
+	}
+        if (iopf[ip] & IOPF_NAN) {
+            iopf[ip] |= IOPF_FAILED;
+            continue;            
+	}        
+
+        // check goodness of fit
+         
+        rrsdiff[ip] = 0.0;
+        for (iw=0; iw<g->nwave; iw++) {
+            if (g->wave[iw] >= 400 && g->wave[iw] <= 600) {
+	      if (fabs(Rrs_b[iw]) > 1e-7 && fabs(Rrs_f[iw]-Rrs_b[iw]) > 1e-5)
+	        rrsdiff[ip] += fabs(Rrs_f[iw]-Rrs_b[iw])/fabs(Rrs_b[iw]);
+	    }
+	}
+        rrsdiff[ip] /= g->nwave;
+        if (rrsdiff[ip] > rrsdiff_max) {
+	    iopf[ip] |= IOPF_RRSDIFF;
+        }
+
+        // evaluate model at ALL visible bands
+
+  	giop_model(g,par,nwave,wave,aw,bbw,foq,aph1,adg1,bbp1,Rrs_f,NULL,NULL);
+
+
+        // store in static globals
+
+        for (ib=0; ib<nwave; ib++) {
+
+	    mRrs[ipb+ib] = Rrs_f[ib]/rrs_above_to_below(l2rec->Rrs[ipb2+ib]);
+
+            if (isfinite(aph1[ib])) {
+                aph[ipb +ib] = aph1[ib];
+                aph[ierr+ib] = aph1[ib+nwave];
+            } else { 
+                iopf[ip] |= IOPF_NAN;
+	    }
+            if (isfinite(adg1[ib])) {
+                adg[ipb +ib] = adg1[ib];
+                adg[ierr+ib] = adg1[ib+nwave];
+            } else { 
+                iopf[ip] |= IOPF_NAN;
+	    }
+            if (isfinite(aph1[ib]) && isfinite(adg1[ib])) {
+	        a[ipb +ib] = aw[ib] + aph1[ib] + adg1[ib];
+	        a[ierr+ib] = aph1[ib+nwave] + adg1[ib+nwave];
+            } else {
+                iopf[ip] |= IOPF_NAN;
+	    }
+            if (isfinite(bbp1[ib])) {
+                bbp[ipb +ib] = bbp1[ib];
+                bbp[ierr+ib] = bbp1[ib+nwave];
+                bb [ipb +ib] = bbw[ib] + bbp1[ib];
+                bb [ierr+ib] = bbp1[ib+nwave];
+            } else { 
+                iopf[ip] |= IOPF_NAN;
+	    }
+	}                
+        iter[ip] = itercnt;
+
+        // check IOP ranges and set flags
+        
+        set_iop_flag(wave,nwave,&a[ipb],&aph[ipb],&adg[ipb],
+                     &bb[ipb],&bbp[ipb],&iopf[ip]);
+
+        // compute chlorophyll
+
+        chl [ip] = giop_chl(g,iopf[ip],par,&chl[ip+npix]);
+    }
+
+    // fail pixels where any flags were set
+
+    for (ip=0; ip<l2rec->npix; ip++)        
+        if (iopf[ip] != 0) l2rec->flags[ip] |= PRODFAIL;
+
+
+    LastRecNum = l2rec->iscan;
+}
+
+
+/* ------------------------------------------------------------------- */
+/* get_giop() - returns requested GIOP product for full scanline       */ 
+/* ------------------------------------------------------------------- */
+void get_giop(l2str *l2rec, l2prodstr *p, float prod[])
+{
+    int prodID = p->cat_ix;
+    int ib     = p->prod_ix; 
+
+    int32_t ip, ipb, ierr;
+
+    if (!giop_ran(l2rec->iscan))
+        run_giop(l2rec);
+
+    for (ip=0; ip<l2rec->npix; ip++) {
+
+        ipb  = ip*l2rec->nbands+ib;
+        ierr = l2rec->npix*l2rec->nbands+ipb;
+
+        switch (prodID) {
+
+  	  case CAT_mRrs_giop : 
+            prod[ip] = (float) mRrs[ipb];
+            break;
+
+  	  case CAT_aph_giop : 
+            prod[ip] = (float) aph[ipb];
+            break;
+
+	  case CAT_adg_giop : 
+            prod[ip] = (float) adg[ipb];
+            break;
+
+	  case CAT_bbp_giop : 
+            prod[ip] = (float) bbp[ipb];
+            break;
+
+  	  case CAT_a_giop : 
+            prod[ip] = (float) a[ipb];
+            break;
+
+	  case CAT_bb_giop : 
+            prod[ip] = (float) bb[ipb];
+            break;
+
+	  case CAT_chl_giop : 
+            prod[ip] = (float) chl[ip];
+            break;
+
+  	  case CAT_aph_unc_giop : 
+            prod[ip] = (float) aph[ierr];
+            break;
+
+	  case CAT_adg_unc_giop : 
+            prod[ip] = (float) adg[ierr];
+            break;
+
+	  case CAT_bbp_unc_giop : 
+            prod[ip] = (float) bbp[ierr];
+            break;
+
+  	  case CAT_a_unc_giop : 
+            prod[ip] = (float) a[ierr];
+            break;
+
+	  case CAT_bb_unc_giop : 
+            prod[ip] = (float) bb[ierr];
+            break;
+
+	  case CAT_chl_unc_giop : 
+            prod[ip] = (float) chl[ip+l2rec->npix];
+            break;
+
+	  case CAT_aphs_giop : 
+            prod[ip] = (float) aph_s[ip];
+            break;
+
+	  case CAT_adgs_giop : 
+            prod[ip] = (float) adg_s[ip];
+            break;
+
+	  case CAT_bbps_giop : 
+            prod[ip] = (float) bbp_s[ip];
+            break;
+
+	  case CAT_rrsdiff_giop : 
+            prod[ip] = (float) rrsdiff[ip];
+            break;
+
+	  case CAT_chisqr_giop : 
+            prod[ip] = (float) chisqr[ip];
+            break;
+
+	  case CAT_fitpar_giop : 
+            if (ib >= max_npar) {
+              printf("-E- %s line %d : output request for GIOP fit parameter %d exceeds number of fit parameters %d.\n",
+		     __FILE__,__LINE__,ib,max_npar);
+              exit(1);
+	    }
+            prod[ip] = (float) fit_par[ip][ib];
+            break;
+
+          default:
+            printf("-E- %s line %d : erroneous product ID %d passed to GIOP.\n",
+                __FILE__,__LINE__,prodID);
+            exit(1);
+	}
+    }
+
+    return;
+}
+
+
+/* ------------------------------------------------------------------- */
+/* get_iter_giop() - returns iteration count                           */ 
+/* ------------------------------------------------------------------- */
+int16 *get_iter_giop(l2str *l2rec)
+{
+    if ( !giop_ran(l2rec->iscan) )
+        run_giop(l2rec);
+
+    return iter;
+}
+
+
+/* ------------------------------------------------------------------- */
+/* get_flags_giop() - returns iteration count                          */ 
+/* ------------------------------------------------------------------- */
+int16 *get_flags_giop(l2str *l2rec)
+{
+    if ( !giop_ran(l2rec->iscan) )
+        run_giop(l2rec);
+
+    return iopf;
+}
+
+
+/* ------------------------------------------------------------------- */
+/* Interface to convl12() to return GIOP iops                          */
+/* ------------------------------------------------------------------- */
+void iops_giop(l2str *l2rec)
+{
+  int32_t  ib, ip, ipb, ipb2;
+
+    if ( !giop_ran(l2rec->iscan) )
+        run_giop(l2rec);
+
+    for (ip=0; ip<l2rec->npix; ip++) {
+        for (ib=0; ib<l2rec->nbands; ib++) {
+            ipb2 = ip*NBANDS+ib;
+            ipb  = ip*l2rec->nbands+ib;
+            l2rec->a [ipb2] = (float)  a[ipb];
+            l2rec->bb[ipb2] = (float) bb[ipb];
+        }
+    }
+
+    return;
+}
+

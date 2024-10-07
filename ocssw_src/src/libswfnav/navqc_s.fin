@@ -1,0 +1,46 @@
+c
+c  include file: navqc_s.fin
+c
+c  Purpose: define structure for navigation quality control parameters
+c
+c  By: W. Robinson, GSC, 18 Mar 93
+c
+c  Modification History:
+c
+
+c
+      type navqc_struct
+c       
+c         sun sensor qa values
+c
+         real(4) :: sun_tol_1(2)   ! low, high angle 1 tolerences in degrees
+         real(4) :: sun_tol_2(2)   ! low, high angle 2 tolerences in degrees
+         real(4) :: sun_del_1      ! max angle 1 change per scan line in deg
+         real(4) :: sun_del_2      ! max angle 2 change per scan line in deg
+c
+c         earth sensor qa values
+c
+         real(4) :: ear_tol_wd(2)   ! low, high width tolerences in degrees
+         real(4) :: ear_tol_ph(2)   ! low, high phase tolerences in degrees
+         real(4) :: ear_del_wd      ! max width change per scan line in deg
+         real(4) :: ear_del_ph      ! max phase change per scan line in deg
+c
+c         magnetometer sensor qa values (future)
+c
+
+c
+c         time tag qa values
+c
+         integer(4) :: yearmin ! min year
+         integer(4) :: yearmax ! max year
+         real(4) :: sectol1    ! min and max second change per scan line
+         real(4) :: sectol2
+c
+c         spacecraft provided attitude qa
+c
+         real(4) :: sc_att(2,3)  ! min and max tolerences for yaw, roll, pitch
+         real(4) :: att_del(3)   ! max change in attitude per scan line
+
+      end type
+c
+c       and end

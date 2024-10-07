@@ -1,0 +1,226 @@
+1. PACKING LIST for MOD_PR02 (TERRA):
+     Version: 6.2.2 
+     Delivery to SDST: April 25, 2017 
+
+2. POINTS OF CONTACT: 
+
+   Developers:
+   ----------
+     Xu Geng
+     SSAI
+     MODIS Characterization Support Team
+     EMAIL: xu.geng@ssaihq.com
+     TEL: 301-867-2057
+     10210 Greenbelt Road, Suite 600
+     Lanham, Maryland 20706
+
+   SDST Contacts:
+   -------------
+     James Kuyper
+     Global Science and Technology
+     MODIS Science Data Support Team
+     EMAIL: James.R.Kuyper@nasa.gov 
+     TEL: 301-867-2064
+     10210 Greenbelt Road, Suite 600
+     Lanham, Maryland 20706
+
+3. New files in MOD_PR02 science algorithm package:
+       File Name                              Format  Description
+       -------------------------------------------------------------------------
+   a.) Source and Header Files:
+       None new.
+
+   b.) Ancillary Files:
+       None new
+
+   c.) Other files:
+       None new.
+
+   d.) File Specifications:
+       None new.
+
+   e.) Input Files: 
+       None new.
+
+   f.) Output Files:
+       Generated from MOD_PR02 V6.2.2 with lut version 0
+       MOD021KM.2017017.1340.6.2.2.0.hdf
+       MOD021KM.2017017.1340.6.2.2.0.hdf.met
+       MOD02HKM.2017017.1340.6.2.2.0.hdf
+       MOD02HKM.2017017.1340.6.2.2.0.hdf.met
+       MOD02OBC.2017017.1340.6.2.2.0.hdf
+       MOD02OBC.2017017.1340.6.2.2.0.hdf.met
+       MOD02QKM.2017017.1340.6.2.2.0.hdf
+       MOD02QKM.2017017.1340.6.2.2.0.hdf.met
+
+4. Files removed from MOD_PR02 science algorithm package:
+       File Name                                 Format  Description
+       -------------------------------------------------------------------------
+   a.) Source and Header Files:
+       None removed. 
+   
+   b.) Ancillary Files:
+       None
+
+   c.) Other files:
+       None removed.
+
+   d.) File Specifications:
+       None removed.
+
+   e.) Input Files: 
+
+   f.) Output Files:
+       Generated from MOD_PR02 V6.1.20 with lut version 30
+       MOD021KM.2017017.1340.6.1.20.30.hdf
+       MOD021KM.2017017.1340.6.1.20.30.hdf.met
+       MOD02HKM.2017017.1340.6.1.20.30.hdf
+       MOD02HKM.2017017.1340.6.1.20.30.hdf.met
+       MOD02OBC.2017017.1340.6.1.20.30.hdf
+       MOD02OBC.2017017.1340.6.1.20.30.hdf.met
+       MOD02QKM.2017017.1340.6.1.20.30.hdf
+       MOD02QKM.2017017.1340.6.1.20.30.hdf.met
+
+5. Changed files in MOD_PR02 science algorithm package: (wrt V6.2.0)
+       File Name            Format     Description
+       -------------------------------------------------------------------------
+   a.) Source and Header Files: 
+       L1B_Tables.h         ascii   Header file to be included in files where
+                                    the lookup table routines are defined.
+
+   b.) Ancillary Files:
+       All look up tables are changed from V6.1.20.0 to V6.2.0.0
+       MOD02_QA_LUTs.hdf          HDF lookup tables for 
+                                  QA for Terra
+       MOD02_Reflective_LUTs.hdf  HDF lookup tables for 
+                                  reflective calibration 
+                                  algorithm for Terra
+       MOD02_Emissive_LUTs.hdf    HDF lookup tables for 
+                                  emissive calibration 
+                                  algorithm for Terra
+
+	
+   c.) Other files:
+       PGE02_HISTORY.txt    ascii   History file for PGE02 module
+       README.txt           ascii   README file for MOD_PR02AQUA Level 1B code
+       HISTORY.txt          ascii   Change history of Level 1B code
+       PACKINGLIST.txt      ascii   packing list for the Level 1B delivery 
+                                    (this file)
+
+   d.) File Specifications:
+       None changed. 
+
+   e.) Input Files: 
+       MOD_PR02.pcf
+
+   f.) Output Files: 
+       None changed.
+
+6. Unchanged and undelivered files in MOD_PR02 science algorithm package:
+   a.) Source and Header Files:
+       None unchanged and undelivered.
+
+   b.) Ancillary Files:
+       None unchanged and undelivered.
+
+   c.) Other files:
+       None unchanged and undelivered.
+
+   d.) File Specifications:
+       None unchanged and undelivered.
+
+   e.) Input Files:
+       None.
+
+   f.) Output Files: 
+       None unchanged and undelivered.
+
+
+7. Unchanged but delivered files in MOD_PR02 science algorithm package:
+       File Name            Format  Description
+       -------------------------------------------------------------------------
+   a.) Source and Header Files:
+       PreprocessP.h        ascii   private header file for Preprocess.c
+       Preprocess.h         ascii   Header file to be included in files where 
+                                    the preprocess routines and data structures 
+                                    are used
+       L1B_Tables.c         ascii   routines to read/access lookup tables
+       Metadata.c           ascii   routines to read/write metadata
+       Preprocess.c         ascii   routines to read/process/write OBC/
+                                    Engineering data and compute averages/
+                                    statistics
+       Emissive_Cal.c       ascii   routines to do the emissive calibration
+                                    for the earth view data
+       Granule.h            ascii   Public header file containing macros,
+                                    structure definitions and external function
+                                    declarations
+       Metadata.h           ascii   Header file to be included in files where
+                                    to populate and write granule metadata
+       MetadataP.h          ascii   private header file for Metadata.c
+       Granule.c            ascii   L1A/L1B granule data structures and I/O
+                                    routines
+       L1B_Setup.c          ascii   routines to initialize some variables,
+                                    create hdf data for I/O and copy
+       HDF_Lib.c            ascii   routines to read/write data and
+                                    attributes from/to HDF files
+       GranuleP.h           ascii   private header file for Granule.c
+       L1B_SetupP.h         ascii   private header file for L1B_Setup.c
+       L1B_Setup.h          ascii   Public header file containing macros, 
+                                    structure definitions and external function 
+                                    declarations   
+       HDF_Lib.h            ascii   Header file for HDF_Lib.c. Prototypes to 
+                                    read/write science-data-sets 
+                                    (multidimensional arrays), attributes, etc, 
+                                    from/to HDF files and malloc/free memory  
+       Reflective_Cal.h     ascii   Contains external declarations for 
+                                    reflective calculation functions 
+       Reflective_CalP.h    ascii   private header for Reflective_Cal.c
+       Emissive_Cal.h       ascii   Public header file for externals in 
+                                    Emissive_Cal.c 
+       FNames.h             ascii   define pcf numbers for I/O files
+       PGS_Error_Codes.h    ascii   define MODIS error codes
+
+       L1B.c                ascii   main program for L1B calibration
+       Reflective_Cal.c     ascii   routines to do the reflective
+                                    calibration for the earth view data
+
+   b.) Ancillary Files:
+       MOD021KM.mcf         ascii   metadata configuration file for Level 1B
+                                    1km file for Terra
+       MOD02HKM.mcf         ascii   metadata configuration file for Level 1B
+                                    500m file for Terra
+       MOD02QKM.mcf         ascii   metadata configuration file for Level 1B
+                                    250m file for Terra
+       MOD02OBC.mcf         ascii   metadata configuration file for Level 1B
+                                    OBC file for Terra
+
+   c.) Other files:
+       MOD_PR02.mk          ascii   makefile to compile and run L1B
+       MODIS_36100.t        ascii   message seed file for PGS error
+                                    routines
+       error_messages.txt   ascii   Error Code Descriptions (what to do in
+                                    each case)
+       MOD_PR02_pr.txt      ascii   Explanation of input file, static data and
+                                    output file
+
+   d.) File Specifications:
+       MOD021KM.fs          ascii   1km earth view L1B File Specification
+       MOD02HKM.fs          ascii   500m earth view L1B File Specification
+       MOD02QKM.fs          ascii   250m earth view L1B File Specification
+       MOD02OBC.fs          ascii   L1B OBC File Specification
+ 
+   e.) Input Files: 
+       MOD01.A2017017.1335.006.2017018134932.hdf
+       MOD01.A2017017.1340.006.2017018134920.hdf
+       MOD01.A2017017.1345.006.2017018134920.hdf
+       MOD03.A2017017.1340.006.2017017190313.hdf
+
+   f.) Output Files: 
+       MOD021KM.2017017.1340.6.2.0.0.hdf
+       MOD021KM.2017017.1340.6.2.0.0.hdf.met
+       MOD02HKM.2017017.1340.6.2.0.0.hdf
+       MOD02HKM.2017017.1340.6.2.0.0.hdf.met
+       MOD02OBC.2017017.1340.6.2.0.0.hdf
+       MOD02OBC.2017017.1340.6.2.0.0.hdf.met
+       MOD02QKM.2017017.1340.6.2.0.0.hdf
+       MOD02QKM.2017017.1340.6.2.0.0.hdf.met

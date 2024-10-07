@@ -1,0 +1,93 @@
+c
+c  include file: tlm_str.fin
+c
+c  Purpose: define structure for telemetry data used in navigation
+c               subsystem SWFNAV
+c
+c  By: W. Robinson, GSC, 18 Mar 93
+c
+c  Modification History:
+c
+c
+#include "nav_cnst.fin"
+c
+c       include sub-structures
+c
+c       tilt information
+c
+      type tilt_struct
+
+        integer(4) :: flag(5,maxlin)
+        real(4) :: ang(5,maxlin)
+
+      end type
+c
+c       S/C reported pitch, roll, yaw
+c
+      type sc_att_struct
+       
+        real(4) :: att(3,maxlin)   ! yaw (x), roll (y) and pitch (z) of satellite
+                                   ! determined on-board the spacecraft
+        integer(4) :: flag(maxlin) ! flag for bad data: 0 = good, 1 = bad
+
+      end type
+c
+c       sun sensor information
+c
+      type sun_struct
+
+         integer(4) :: active(maxlin)  ! sensor active: 0 sun, 1 no sun
+         integer(4) :: flag(maxlin)    ! bad data flag: 0 good, 1 bad
+         real(4) :: ang(2,maxlin)      ! sun angle 1 and 2 in degrees
+         real(4) :: deltim(maxlin)     ! time offset of measurement in sec
+
+      end type
+c
+c       magnetometer information
+c
+      type mag_struct
+         integer(4) :: active(maxlin)  ! sensor active: 0 active 1 not active
+         integer(4) :: flag(maxlin)    ! bad data flag: 0 good, 1 bad
+         real(4) :: field(4,maxlin)    ! field in x, y, z, and r
+         real(4) :: deltim(maxlin)     ! time offset of measurement in sec
+      end type
+c
+c       earth sensor information
+c
+      type earth_struct
+         integer(4) :: active(maxlin)  ! sensor active: 0 active 1 not active
+         integer(4) :: flag(maxlin)    ! bad data flag: 0 good, 1 bad
+         real(4) :: widphse(2,maxlin)  ! earth width and phase (offset from 
+                                   ! center in degrees
+         real(4) :: deltim(maxlin)     ! time offset of measurement in sec
+      end type
+c
+c       declare the TLM structure
+c
+      type tlm_struct
+
+c       number of TLM records in segment
+      integer(4) :: ntlm                        
+
+c       tilt information: this may get clarified later, but now have
+c       tilt and tilt flag for 2 tilts
+
+      type(tilt_struct) :: tilt(2)
+
+c       S/C reported pitch, roll, yaw
+      type(sc_att_struct) :: sc_att
+
+c       sun sensor information
+      type(sun_struct) :: sun(3)           
+
+c       magnetometer information
+      type(mag_struct) :: mag(2)         
+
+c       earth sensor information
+      type(earth_struct) :: earth(2)     
+
+      end type
+c
+c      record name is typically tlm
+c
+c       and end

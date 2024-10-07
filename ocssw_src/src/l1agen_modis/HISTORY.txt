@@ -1,0 +1,284 @@
+HISTORY.txt for MOD_PR01 (step one of PGE01)
+
+History follows the following convention:
+1. What was changed ?
+2. Why was it changed ?
+3. How was the output affected by the change ?
+4. The date of the change.
+===============================================================================
+V6.0.6	    2015-08-22
+Changed to treat frame counts less than 1 as invalid.
+Finished resolving Bug 1492 by setting two additional _FillValue attribute
+length to 1.
+Improved wording and format of some error messages.
+
+===============================================================================
+V6.0.5	    2014-10-20
+Resolve Bug 5555 by continuing processing even when a packet fails the
+sequence flag/sector ID consistency test.
+Resolve Bug 5570 by printing error message about invalid frame count before
+adjusting the count to -1.
+
+===============================================================================
+V5.0.8	    2013-10-28
+Updated documentation to reflect compatibility with SDP Toolkit 5.2.17.
+The corresponding make file changes were made in MOD_PR01 version 5.0.6, for
+compatibility with SDP Toolkit 5.2.16.
+
+===============================================================================
+V6.0.4	    2012-06-28
+Corrected to initialize a flag in process_a_granule().
+
+===============================================================================
+V6.0.3	    2012-02-03
+Corrected the merge that was supposed to have been done in 6.0.2.
+
+===============================================================================
+V6.0.2	    2011-12-09
+Made the same change in C6 code as was done for C5 in 5.0.7.
+
+===============================================================================
+V5.0.7      2011-10-21
+Changed to not create the output file unless there's at least one packet to be
+written to that file.
+
+===============================================================================
+V6.0.1      2010-12-02
+Changed to resolve Bug 3559 by determining the count of frames in a given scan
+for each view by looking at the maximum of the frame count field, rather than
+the value from the last record.
+
+===============================================================================
+V5.0.6      2010-12-02
+Copied over the changes to the make file for version 6.0.0, except for the
+addition of print_stat to the module list, in order to allow delivery of a C5
+PGE01.pl update for use on systems with SDP Toolkit 5.2.16 installed.
+
+===============================================================================
+V6.0.0      2010-08-25
+Updated make file to work with SDP Toolkit version 5.2.16, and to disable
+  non-POSIX extensions to C that are enabled, on the SGI compiler, by the MODIS
+  project's inappropriate use of -xansi, rather than -ansi.
+Corrected to set _FillValue attribute length to 1, resolving bug 1492.
+Corrected misuse of NULL macro in arithmetic context, resolving bug 1754.
+Corrected to recognise all valid return values from process_a_scan(), halting
+  processing of a granule only if an invalid one is returned, resolving Bug
+  1675.
+Changed to validate consistency of packet lengths with packet types, rather
+  than "correct"ing the length to match the type.
+Added internal consistency checks on sequence_flag and source_ID_type_flag.
+Added packet filtering statistics in LogReport.
+Changed to use new C6 MCF.
+
+===============================================================================
+V5.0.5      2007-01-26
+Finished resolving Bug 199 by not creating missing scans in excess of limit.
+Partially resolved Bug 484 by changing logic for detecting bad scan counts.
+
+===============================================================================
+V5.0.4      2006-11-09
+Changed from version 5.0.3 to stop before writing scans in excess of limit.
+
+===============================================================================
+V5.1.3      2006-02-06
+Changed from version 5.1.2 by modifying the day_shift algorithm to skip over
+gaps in ephemeris file coverage, resolving MODur00127.
+
+===============================================================================
+V5.0.3     2006-01-06
+Changed from version 5.0.2 to define granule lengths in minutes, rather than
+seconds, to handle leap seconds better, resolving MODur00122 and GSFcd02888.
+Corrects ECS metadata initialization, resolving MODur00124.
+
+===============================================================================
+V4.0.2      2006-01-05
+Changed from version 4.0.1 to resolve MODur00121 by changing upper limit for
+valid EV frame counts from 1400 to 1354. Changed to define granule lengths in
+minutes, rather than seconds, to handle leap seconds better, resolving
+MODur00122 and GSFcd02888. Corrects ECS metadata initialization, resolving
+MODur00124.
+
+===============================================================================
+V5.1.2      2006-01-04
+Changed algorithm for determining 5-minute granule boundaries, even with leap
+seconds, so that it will continue to work during Daylight Savings Time,
+resolving MODur00123. Corrects ECS metadata initialization, resolving
+MODur00124.
+
+===============================================================================
+V5.1.1      2006-01-03
+Changed from version 5.1.0 by reverting the scan dimensions of arrays from
+multiples of 1354 to multiples of 1400, as it was in 5.0.14 and earlier.
+Changed to define granule lengths in minutes, rather than seconds, to handle
+leap seconds better, resolving MODur00122 and GSFcd02888.
+
+===============================================================================
+V5.0.2      2005-12-30
+Changed from version 5.0.1 by reverting the scan dimensions of arrays from
+multiples of 1354 to multiples of 1400, as it was in 5.0.0 and earlier.
+
+================================================================================
+V5.1.0      2005-12-27
+Special version, NOT to be used in actual production. It simulates the effects
+of the proposal to reduce data volumes by switching from 50% Night and 50% Day
+mode, to 60% Night and 40% Day. It does this by identifying which Day mode
+scans would be affected, and changing them to Night mode before writing them to
+the output file.
+
+================================================================================
+V5.0.1      2005-12-12
+Changed to treat an invalid packet length as a warning condition.
+Changed to correct invalid packet lengths based upon the packet type (if valid).
+Corrected to not calculate other time values from an EV or SD start time that
+  is itself a fill value.
+Resolved MODur00120 by changing to initialize engineering vdata buffers with
+appropriate fill values.
+Resolved MODur00121 by changing upper limit for valid EV frame counts from 1400
+to 1354.
+
+================================================================================
+V5.0.0      2004-09-30
+Added code to set the _FillValue attribute (-1) on most of the L1A output SDSs.
+Added code to check the L0 construction record to make sure the SCID and
+  the satellite instrument match. The routine will stop processing if they
+  do not match.
+
+================================================================================
+V4.0.1      2003-11-12
+Corrected handling of input_pointers; needed due to new Aqua MCF
+
+================================================================================
+V4.0.0      2003-05-16
+Added ReprocessingPlanned and the ProcessVersion PSA to the ECS Inventory
+    metadata.
+Changed to get LocalVersionID, ReprocessingActual and the expected LUT
+    revision number from PCF.
+Changed to use PGE version for ProductionHistory.
+Added Archive metadata, including ProcessingEnvironment.
+Corrected handling of bad packets, to resovle GSFcd02514.
+Changed to check staged LUT revision number versus the expected LUT revision
+    number from PCF, thereby resolving defect report MODxl02056.
+This change also avoids the memory access violation reported in MODur00039.
+Changed the way output arrays were initialized with fill values, to be more
+    portable.
+======================================================================================================
+V3.0.2        11/09/01
+
+This version fixes invalid frame counts located in the metadata of the L1A output file. The following
+routined were modified:
+	process_a_granule.c
+	process_a_packet.c
+	process_a_scan.c
+
+The problem was caused by invalid packets that were not discarded, but instead, placed into the
+L1A output product and thought of as valid packets. These packets had an invalid frame count in them
+and since only the last valid packet of any specific type gets it frame count data written to the
+output product, and invalid value was being written.
+
+======================================================================================================
+V3.0.1        11/04/01
+
+This version had to be updated solely because the PGE01 versions in the PCFs
+were updated.
+
+====================================================================================================$
+v3.0.0         4/2/01
+
+This version allows a L0 construction record to be larger that 10000 bytes
+without failing the L1A process. This fix is in response to DDTS GSFcd02120.
+
+======================================================================================================
+v2.2.2         3/1/01
+
+The following DDTSs were fixed in this version.
+
+GSFcd001767  Write correct packet counts in product.
+MODx101865   Use LUN 800500 for PGE version and write value in metadata.
+
+Also this version cleaned up the code by eliminating unneeded routines.
+The routines are:
+ initialize_scan_data.c
+ is_empty.c
+ is_eng_group_1.c
+ is_eng_group_2.c
+ is_first_packet_in_group.c
+ is_in_range.c
+ is_second_packet_in_group.c
+
+======================================================================================================
+v2.2.1         9/29/00
+
+This version is capable of handling aqua data.
+
+======================================================================================================
+v2.2.0         8/17/00
+
+This version created 2 new routines packet_of_scan.c and process_nedxt_packet.c
+to help eliminate packets with bit flips. The bit flipped packets caused
+MOD_PR01 to split scans within the L1A product. MODx101733 DDTS.
+
+======================================================================================================
+v2.1.5          3/31/00
+
+The following DDTSs were fixed in this version.
+
+MODx101739  MOD_PR01 exits 1 when oversize packets are encountered
+MODx101696  MOD_PR01 fails to set SRCA Calibration Mode correctly
+MODx101681  MOD-PR01 fails to perform sign extension on ATTITUDE_ANGLE
+                     in the SC Ancillary Vdatas.
+
+======================================================================================================
+v2.1.4         12/03/99
+
+The following DDTSs were fixed in this version.
+
+MODx101445  Misleading Error messages
+MODx101454  MOD_PR01 loses data at L0 file boundaries
+MODx101478  Memory Leaks Galore
+MODx101484  Excessive discarded packets stalls MOD_PR01
+MODx101550  MOD_PR01 sets incorrect fill values
+Bug         Packet Type 3 passes as a valid value when if fact it is not
+
+======================================================================================================
+v2.1.3          9/01/99
+
+The following Metadata Control File (MCF) was updated with the ECS baselined version:
+MOD01.mcf
+The new MCF sets the DayNightFlag to true instead of false.
+
+======================================================================================================
+v2.1.2          8/17/99
+
+The following Metadata Control File (MCF) was updated with the ECS baselined version:
+MOD01.mcf
+This modification sets VersionID field in the Inventory Metadata to 1 instead of 0.
+
+=======================================================================================================
+v2.1.1          3/18/99
+
+The following routine and include files are modified:
+initialize_global_metadata.c
+MD_metadata.h
+The modification corrected the metadata information (i.e. V2.1.1).
+
+=======================================================================================================
+v2.1.0          2/8/99
+
+The following routines are modified:
+process_eng_packet.c
+init_L1A_HDF_vdatas.c
+create_eng_data_vdata_array_field.c
+parse_eng_data_list.c
+write_eng_data.c
+create_eng_data_vdata_array.c
+create_Vdata.c
+
+The following routine is added:
+process_group2_packet1_vdata.c
+
+The changes were implemented to make the L1A output product portable to little endian machines 
+(i.e. DEC Alphas).  The output product is a superset of the previous version.  All the original 
+SDSs are present, the following three addtional Vdata are added:
+Current S/C Ancillary Data
+Prior S/C Ancillary Data
+Command Parameters

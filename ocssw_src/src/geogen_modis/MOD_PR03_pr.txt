@@ -1,0 +1,154 @@
+MOD_PR03 Production Rules:
+
+Frequency of execution:
+    MOD_PR03 normally executes every time that MOD_PR01 does, as they are both
+    run by PGE01. It processes every granule that MOD_PR01 produces. See
+    MOD_PR01_pr.txt for the actual timing requirements, since they are imposed
+    by MOD_PR01's needs, rather than by those of MOD_PR03.
+    MOD_PR03 can be configured to process as many L1A files as desired. However,
+    if configured to process more than one at at time, and using 2-hour or
+    24-hour ancillary data files, the number of runs which require staging of
+    two or more ancillary data files of the same type can be minimized by not
+    giving it a start time that matches the start of one of those files.
+
+Each execution requires:
+    These requirements will be described as if MOD_PR03 were in it's own
+    PGE (as in the now-defunct PGE01B), dependent for input upon a fictional
+    PGE01A, which runs only MOD_PR01. PGE01A is not actually possible, because
+    the L1A files produced by MOD_PR01 cannot be ingested by MODAPS until they
+    have been modified by MOD_PR03 to contain valid geolocation metadata.
+    Something called PGE01A did exist at one time, but only for the purpose of
+    marking the day closed when L1A files produced at the GDAAC were ingested
+    for use by PGE01B.
+    The complete production rules for PGE01 are the result of combining the
+    production rules for PGE01A and and these production rules for PGE01B,
+    removing all references to the intermediate L1A files.
+
+    Input File Characterization:
+	At least one L1A granule whose time period is between the run start and
+	stop times is mandatory.
+
+	L1A granules covering the entire requested period are optional. Wait
+	until all of these files are available, or until PGE01A is closed for
+	the requested time period.
+
+    Ancillary Data Needs:
+	Normally, 2-hour ephemeris (AM1EPHN0, AM1EPNF) and attitude (AM1ATTN0,
+	AM1ATTNF) files are used for Terra processing, while for Aqua, 24-hour
+	ephemeris (PM1EPNHD) and 2-hour attitude (PM1ATTNR) files are used.
+	Where two ESDTS are listed above, the one listed first is normally
+	preferred, the alternative should be used only if necessary.
+
+	For any Terra run which overlaps any part of a maneuver, or the "loss
+	of pointing accuracy" time period immediately following a Terra thrust
+	maneuver, the normal preferences for attitude files are reversed:
+	AM1ATTNF is preferred over AM1ATTN0.
+
+	LANCE-MODIS: in Near Real Time (NRT) processing, none of the Ancillary
+	ESDTs listed above will be available yet, so alternative sources must
+	be used.
+	For Terra NRT processing, attitude and ephemeris data is extracted from
+	MODIS L0 file data copied into the L1A files, but orbital metadata that
+	is not available from that source is still needed to create ingestible
+	products. For reprocessing, the same ephemeris files used in normal
+	production may be staged, and are preferred, but for forward NRT
+	processing the use of extrapolated orbital metadata obtained from the
+	2-hour AM1EPHNE files produced by PGE97 is necessary.
+	There is no entrained ephemeris or attitude data in Aqua MODIS L0 files.
+	Therefore, for Aqua NRT processing, the alternative sources are
+	PM1ATTNR_NRT and PM1EPHND_NRT files produced by PGE96.
+
+	The packets in ephemeris or attitude files will not, in general, cover
+	the entire time from the beginning to the end of the time period they
+	nominally cover. For times up to one second before the first packet, or 
+	up to one second after the last one, extrapolation is used. Staging a
+	file covering the adjacent time period allows the use of interpolation,
+	rather than extrapolation, giving more accurate results for times near
+	the boundary.
+
+	Because of this extrapolation, even if there's no file covering a given
+	5-minute time period, MOD_PR03 may be able to geolocate as much as one
+	full scan of data in that interval if there is file available that
+	covers either the preceding or following 5-minute time period. The
+	Level 1 philosophy is to produce output, regardless of data gaps, so
+	long as even a single pixel of useable data might be produced.
+
+	Therefore, staging ephemeris and attitude files covering the requested
+	time period and the previous and following 5-minute time periods is
+	desireable. Getting all of those files is optional, but getting at
+	least one such ephemeris file and one such attitude file is mandatory.
+
+	The SDP Toolkit does not allow extraction of orbital metadata from
+	ephemeris files for time periods before the first ephemeris data packet
+	of the first file staged, or after the last ephemeris data packet of
+	the last file staged, even though they usually contain orbital metadata
+	records for orbits extending far beyond those limits. I consider this a
+	defect in that library, but it's a deliberate feature, and therefore
+	unlikely to be fixed.
+	MOD_PR03 requests orbital metadata for the nominal start time of the
+	output file. There is almost never an ephemeris data packet matching
+	that time exactly. Therefore, if that time is a boundary between two
+	consecutive ephemeris files, the request will fail unless both of those
+	file are staged, and as a result the product files will not be
+	ingestible. Therefore, ephemeris files covering both the requested time
+	period and the immediately preceding 5-minute time period are mandatory.
+
+	In normal production, PGE01 should be started as soon as all desired
+	files of the preferred ESDTs have been ingested. If forced, if any
+	mandatory file is unavailable, the PGE will fail; otherwise it should
+	go ahead using best available files covering as many of the desired
+	time periods as possible.
+
+	LANCE-MODIS: in NRT production, all ancillary inputs are products of
+	either PGE96 or PGE97. When all input PGEs are closed for the entire
+	desired time period, if any mandatory file is still unavailable, the
+	PGE should be deleted; otherwise, it should go ahead using files
+	covering as many of the desired time periods as possible.
+
+        In NRT processing, it must be possible to leave the system unattended
+	for hours, or even days, without unnecessary production delays. That
+	means that after a certain timeout period, PGE01 should behave exactly
+	as if forced. It should read the value of the parameter named
+	PGE01Timeout from the Config table, and use a RealTimeDelay of that
+	amount on all rules that also have QueryDelay, with the same
+	consequences.
+
+	The accuracy of geolocation depends upon having up-to-date copies of
+	the leapsec.dat and utcpole.dat files used by the SDP Toolkit for
+	time and coordinate conversion.
+
+    Static File Needs:
+	The Geolocation parameters files, named MOD03LUT.coeff and
+	MYD03LUT.coeff, must both be staged for any run. Only MOD03LUT.coeff is
+	actually used on Terra runs. Only MYD03LUT.coeff is actually used in
+	Aqua runs.  However, there must be entries for both in the PCF.
+
+	MOD_PR03 relies upon the following static files provided by and for the
+	SDP Toolkit:
+	Name			Description
+	===============		====================================
+	earthfigure.dat		Earth ellipsoid information
+	de200.eos		Planetary ephemeris
+	sc_tags.dat		Spacecraft Euler angle order
+	dem15ARC_*.hdf		15 arcsecond Digital Elevation Model
+	dem30ARC_*.hdf		30 arcsecond Digital Elevation Model
+
+	The dem* files contain land/water mask information, in addition to
+	elevation data.
+
+    Output Product Characterization:
+	MOD_PR03 creates one Geolocation product file for each input L1A file,
+	and also updates geolocation metadata in each input L1A file it uses.
+	Thus, the L1A files must be writeable, and listed in the output files
+	section of the PCF.
+
+	From the satellite's ephemeris and attitude, the timing data in the
+	L1A file, the earth rotation data stored in the utcpole.dat files, and
+	the digital elevation models, MOD_PR03 calculates the ground location
+	for the center of the area seen by each of the detectors for the
+	fictitious band 0 detector during each frame of data collected. The
+	output geolocation file contains those locations in terms of latitude,
+	longitude, and altitude, and solar and sensor zenith and azimuth. It
+	also carries all the information necessary to adjust the values for
+	that fictitious band, to get the positions for the real bands.
+
