@@ -1,0 +1,84 @@
+name: Auto Update OCSSW
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # 每天 UTC 时间凌晨2点运行
+  workflow_dispatch: # 手动触发工作流
+
+jobs:
+  update-ocssw:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0  # 获取完整历史记录
+
+    - name: Set up dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bash curl # 安装必要工具
+
+    - name: Get latest OCSSW version tag
+      id: get-latest-tag
+      run: |
+        latest_tag=$(./install_ocssw --list_tags | grep -Eo 'V[0-9]+\.[0-9]+' | sort -V | tail -n 1)
+        echo "Latest tag: $latest_tag"
+        echo "::set-output name=tag::$latest_tag"
+
+    - name: Check for previous version
+      id: check-version
+      run: |
+        if [ -f .last_version ]; then
+          last_version=$(cat .last_version)
+          echo "Previous version: $last_version"
+        else
+          echo "No previous version found"
+          last_version=""
+        fi
+        echo "::set-output name=last_version::$last_version"
+
+    - name: Compare versions and skip if no change
+      id: compare-versions
+      run: |
+        if [ "${{ steps.get-latest-tag.outputs.tag }}" == "${{ steps.check-version.outputs.last_version }}" ]; then
+          echo "Latest version is the same as previous version, skipping update."
+          echo "::set-output name=skip_update::true"
+        else
+          echo "New version available, proceeding with update."
+          echo "::set-output name=skip_update::false"
+        fi
+
+    - name: Install latest OCSSW version
+      if: steps.compare-versions.outputs.skip_update == 'false'
+      run: |
+        ./install_ocssw -t ${{ steps.get-latest-tag.outputs.tag }} -i /home/runner/work/${{ github.repository }} --src
+
+    - name: Save the latest version
+      if: steps.compare-versions.outputs.skip_update == 'false'
+      run: echo "${{ steps.get-latest-tag.outputs.tag }}" > .last_version
+
+    - name: Commit and push changes
+      if: steps.compare-versions.outputs.skip_update == 'false'
+      run: |
+        git config --local user.email "qiaofeng@sjtu.edu.cn"
+        git config --local user.name "GitHub Actions"
+        
+        # 设置远程仓库使用 GITHUB_TOKEN 进行认证
+        git remote set-url origin https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+
+        # 拉取远程仓库的最新更改并变基
+        git fetch origin main
+        git rebase origin/main
+
+        # 添加更改
+        git add .last_version
+
+        # 提交更改，如果有更改的话
+        git commit -m "Auto update to version ${{ steps.get-latest-tag.outputs.tag }}" || echo "No changes to commit"
+
+        # 推送更改，使用 --force-with-lease 以确保安全推送
+        git push origin main --force-with-lease
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
