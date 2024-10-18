@@ -2,7 +2,7 @@ name: Auto Update OCSSW
 
 on:
   schedule:
-    - cron: '0 2 * * *' # 每天 UTC 时间凌晨2点运行
+    - cron: '0 2 * * 0' # 每天 UTC 时间凌晨2点运行
   workflow_dispatch: # 手动触发工作流
 
 jobs:
