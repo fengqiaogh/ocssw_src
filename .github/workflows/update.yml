@@ -73,7 +73,7 @@ jobs:
         git rebase origin/main
 
         # 添加更改
-        git add .last_version
+        git add .
 
         # 提交更改，如果有更改的话
         git commit -m "Auto update to version ${{ steps.get-latest-tag.outputs.tag }}" || echo "No changes to commit"
