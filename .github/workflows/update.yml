@@ -69,8 +69,8 @@ jobs:
         git remote set-url origin https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
 
         # 拉取远程仓库的最新更改并变基
-        git fetch origin main
-        git rebase origin/main
+        # git fetch origin main
+        # git rebase origin/main
 
         # 添加更改
         git add .
@@ -79,6 +79,6 @@ jobs:
         git commit -m "Auto update to version ${{ steps.get-latest-tag.outputs.tag }}" || echo "No changes to commit"
 
         # 推送更改，使用 --force-with-lease 以确保安全推送
-        git push origin main --force-with-lease
+        git push origin main # --force-with-lease
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
