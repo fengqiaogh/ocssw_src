@@ -33,7 +33,9 @@ int alloc_uncertainty(int32_t nbands, int32_t nbands_ac, int32_t npix, uncertain
     /*                                                      */
     len =  11 * sizeof (float)*npix
          + 10 * sizeof (float)*npix * nbands
-         + 23 * sizeof (float)* nbands;
+         + 21 * sizeof (float)* nbands
+         + 1 * sizeof (float)* nbands*nbands;
+
 
     /* Force to 4-byte increments for good measure */
     len = (len / 4 + 1)*4;
@@ -105,9 +107,9 @@ int alloc_uncertainty(int32_t nbands, int32_t nbands_ac, int32_t npix, uncertain
     uncertainty->derv_Lg_taua=(float  *)p; p+=sizeof(float)*nbands;
     uncertainty->drhown_nir   =(float  *)p; p+=sizeof(float)*nbands;
     uncertainty->dbrdf        =(float  *)p; p+=sizeof(float)*nbands;
-    uncertainty->corr_nir_s   =(float  *)p; p+=sizeof(float)*nbands;
 
-    uncertainty->corr_nir_l   =(float  *)p; p+=sizeof(float)*nbands;
+    uncertainty->pixel_covariance  =(float * )p; p+=sizeof(float)*nbands*nbands;
+
 
     if ((len - (int32_t) (p - uncertainty->data)) < 0) {
         printf("%s Line %d: bad allocation on error record\n", __FILE__, __LINE__);
@@ -129,6 +131,8 @@ int alloc_uncertainty(int32_t nbands, int32_t nbands_ac, int32_t npix, uncertain
     }
     uncertainty->derv_modrat_rhorc=(float *)malloc(nbands_ac*sizeof(float));
     uncertainty->ratio_rhow       =(float *)malloc(nbands_ac*sizeof(float));
+
+    uncertainty->corr_coef_rhot   =(float *)malloc(nbands*nbands*sizeof(float));
 
     return (0);
 }
@@ -257,10 +261,10 @@ void init_uncertainty(uncertainty_t *uncertainty, int ifscan){
 
             uncertainty->drhown_nir [ib]=0.0;
             uncertainty->dbrdf  [ib]=0.0;
-            uncertainty->corr_nir_s   [ib]=0.0;
-            uncertainty->corr_nir_l  [ib]=0.0;
         }
     }
+    for(ib=0;ib<nbands*nbands;ib++)
+        uncertainty->pixel_covariance[ib]=0.;
 }
 
 void free_uncertainty(uncertainty_t *uncertainty) {
@@ -279,6 +283,7 @@ void free_uncertainty(uncertainty_t *uncertainty) {
 
     free(uncertainty->derv_modrat_rhorc);
     free(uncertainty->ratio_rhow);
+    free(uncertainty->corr_coef_rhot);
 
     free((void *) uncertainty->data);
 

@@ -45,6 +45,9 @@ Usage: nccmp [OPTION...] file1 file2\n\
 \n\
   -A, --Attribute=att1[,...] Ignore attribute(s) att1[,...]\n\
                              for all variables.\n\
+  -a, --all                  Compare all metadata, compare data, forcefully compare\n\
+                             Print up to 10 differences per var (can be overridden)\n\
+  -e, --extent=X             Compare up to X values per var\n\
   -b, --verbose              Print messages to show progress.\n\
   -d, --data                 Compare data (variable values).\n\
   -C, --maxdiff=CNT          Print differences up until CNT messages per var.\n\
@@ -132,6 +135,9 @@ typedef struct NCCMPOPTS {
     char* file1; /* two files to compare */
     char* file2; /*                      */
     char** cmpvarlist; /* list of var names to ultimately compare. */
+    char all; /* equivalent to throwing `-mgdf -C 10` */
+    unsigned int extent; /* how many values to check */
+    unsigned int extentcount; /* how many values have been checked */
     /* Not user input. Derived by processing inputs. */
     int ncmpvarlist; /* length of above array. */
     char warn[NCCMP_W_NUMTAGS]; /* booleans if a warning is on/off */

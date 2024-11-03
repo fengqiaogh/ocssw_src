@@ -187,8 +187,6 @@ void set_error_input(l1str *l1rec, float *sensor_noise)
             case OCI:
             case OCIS:
                 for(ib=0;ib<nbands;ib++){
-                    uncertainty->corr_nir_s[ib]=0.0;
-                    uncertainty->corr_nir_l[ib]=0.0;
 
                     if(wave[ib]<400)
                         dvc_rel[ib]=0.0047;
@@ -266,13 +264,6 @@ void set_error_input(l1str *l1rec, float *sensor_noise)
        return;
     }
 
-   /* for(ib=0;ib<nbands;ib++){
-        uncertainty->corr_nir_s[ib]=0.59;
-        uncertainty->corr_nir_l[ib]=0.53;
-    }
-    uncertainty->corr_nir_s[222]=0.97;
-    uncertainty->corr_nir_l[176]=0.97;*/
-
     for(ip=0;ip<npix; ip++){
 
         for(ib=0;ib<nbands;ib++){
@@ -341,15 +332,14 @@ float *get_uncertainty(l1str *l1rec) {
 
 #define N_anc 7
 
-    int ip,iw,ipb,iw_table;
+    int ip,iw,ib,ipb,iw_table;
     int nbands=l1rec->l1file->nbands;
     uncertainty_t *uncertainty=l1rec->uncertainty;
     int npix=l1rec->npix;
     float *wave=l1rec->l1file->fwave;
     static int firstcall=1;
-    static float *SNR_scale, *noise_coef, *corr_coef_vc, *rel_unc_vc;
-    static int corr_coef_dim[2];
-    static float anc_unc[N_anc], Lr_unc;
+    static float *SNR_scale, *noise_coef, *corr_coef_rhot, *rel_unc_vc,*temp_corr_coef;
+    static float Lr_unc=0.0;
     int polynomial_order=4, iorder;
     float tmp_poly;
     static float *noise_temp=NULL;
@@ -357,11 +347,12 @@ float *get_uncertainty(l1str *l1rec) {
     static int nbands_table=0, *bandindex;
     static float  *wave_table;
     static int sensorID;
-    char anc_name[N_anc][FILENAME_MAX]={"ozone","relative_humidity","stratosphere_no2","surface_pressure","tropospheric_no2","water_vapor","wind_speed"};
 
     float scaled_lt;
     static int uncertainty_lut=1;
 
+    if(firstcall){
+        firstcall=0;
 
    /* if(l1rec->l1file->sensorID==OCI ||l1rec->l1file->sensorID==OCIS  ){
         if(firstcall){
@@ -374,8 +365,9 @@ float *get_uncertainty(l1str *l1rec) {
         return noise_temp;
     }*/
 
-    if(firstcall){
-        firstcall=0;
+
+        if(uncertainty)
+            corr_coef_rhot=uncertainty->corr_coef_rhot;
 
         if(input->uncertaintyfile[0]=='\0'){
             uncertainty_lut=0;
@@ -393,179 +385,107 @@ float *get_uncertainty(l1str *l1rec) {
             noise_temp=(float *)malloc(nbands*npix*sizeof(float));
 
         char filename[FILENAME_MAX];
-        /* char *filedir;
-        const char *subsensorDir;
-        int32_t sensorID=l1rec->l1file->sensorID;
-
-        if ((filedir = getenv("OCDATAROOT")) == NULL) {
-            printf("-E- %s: OCDATAROOT env variable undefined.\n", __FILE__);
-            exit(EXIT_FAILURE);
-        }
-        strcpy(filename, filedir);
-        strcat(filename, "/");
-        strcat(filename, sensorId2SensorDir(sensorID));
-        strcat(filename, "/");
-
-        subsensorDir = subsensorId2SubsensorDir(sensorId2SubsensorId(sensorID));
-        if(subsensorDir) {
-            strcat(filename, subsensorDir);
-            strcat(filename, "/");
-        }
-        strcat(filename, "uncertainty.nc");*/
         sprintf(filename, "%s",input->uncertaintyfile);
         printf("Reading uncertainty from: %s\n", filename);
 
-        hid_t file_id,group_id, set_id, space_id;
-        hsize_t dims[2], maxdims[2];
-        hid_t  mem_space_id, attr_id;
+        int ncid;
+        int32 sds_id,group_id;
+        nc_type rh_type; /* variable type */
+        int rh_dimids[H4_MAX_VAR_DIMS]; /* dimension IDs */
+        int rh_natts; /* number of attributes */
+        int rh_ndims; /* number of dims */
+        int status;
 
-        hsize_t start[2]= {(hsize_t) 0, (hsize_t) 0};
-        hsize_t stride[2]={(hsize_t) 1, (hsize_t) 1};
-        hsize_t count[2] ={(hsize_t) 1, (hsize_t) 1};
+        if (nc_open(filename, NC_NOWRITE, &ncid) == NC_NOERR) {
 
-        hid_t str20 = H5Tcopy (H5T_C_S1);
-        H5Tset_size (str20, 20);
+            status = nc_inq_varid(ncid, "wave", &sds_id);
+            if (status != NC_NOERR) {
+                fprintf(stderr, "-E- %s line %d:  Error reading %s from %s.\n",
+                        __FILE__, __LINE__, "wave", filename);
+                exit(1);
+            }
+            status = nc_inq_var(ncid, sds_id, 0, &rh_type, &rh_ndims, rh_dimids,
+                    &rh_natts);
 
+            size_t tmpSize;
+            DPTB( nc_inq_dimlen( ncid, rh_dimids[0], &tmpSize ) );
+            nbands_table = tmpSize;
 
-        if( (file_id=H5Fopen(filename,H5F_ACC_RDONLY, H5P_DEFAULT))==-1){
-            printf("error in opening -%s-\n", filename);
-            exit(FATAL_ERROR);
-        }
+            wave_table=(float *)malloc(nbands_table*sizeof(float));
+            SNR_scale=(float *)malloc(nbands_table*sizeof(float));
+            noise_coef=(float *)malloc(nbands_table*5*sizeof(float));
 
-        set_id=H5Dopen(file_id,"wave", H5P_DEFAULT);
-        space_id=H5Dget_space(set_id);
-        H5Sget_simple_extent_dims(space_id, dims, maxdims);
+            temp_corr_coef=(float *)malloc(nbands_table*nbands_table*sizeof(float));
+            rel_unc_vc= (float *)malloc (nbands_table*sizeof(float));
 
-        nbands_table=dims[0];
+            if (nc_get_var(ncid, sds_id, wave_table) != NC_NOERR) {
+                fprintf(stderr, "-E- %s line %d:  Error reading %s from %s.\n",
+                        __FILE__, __LINE__, "wave", filename);
+                exit(1);
+            }
+            if(nbands_table!=nbands){
+                printf("The band No. in uncertainty.nc is not equal to the band No. of sensor,interpolation is used\n");
 
-        wave_table=(float *)malloc(nbands_table*sizeof(float));
+                for(iw=0;iw<nbands;iw++) {
 
-        count[0]=nbands_table;
-
-        mem_space_id=H5Screate_simple(1, count, NULL);
-        H5Sselect_hyperslab(space_id, H5S_SELECT_SET, start, stride, count, NULL);
-        H5Dread(set_id,H5T_NATIVE_FLOAT, mem_space_id, space_id, H5P_DEFAULT, (void *)wave_table);
-
-        H5Sclose(space_id);
-        H5Dclose(set_id);
-
-
-        if(nbands_table!=nbands){
-            printf("The band No. in uncertainty.nc is not equal to the band No. of sensor,interpolation is used\n");
-
-            for(iw=0;iw<nbands;iw++) {
-
-                for(iorder=0;iorder<nbands_table;iorder++){
-                    if(wave[iw]<=wave_table[iorder])
-                        break;
+                    for(iorder=0;iorder<nbands_table;iorder++){
+                        if(wave[iw]<=wave_table[iorder])
+                            break;
+                    }
+                    if(iorder==0)
+                        iw_table=0;
+                    else if(iorder==nbands_table)
+                        iw_table=nbands_table-1;
+                    else{
+                        iw_table=iorder;
+                        if(fabs(wave[iw]-wave_table[iorder])>fabs(wave[iw]-wave_table[iorder-1]))
+                            iw_table=iorder-1;
+                    }
+                    bandindex[iw]=iw_table;
                 }
-                if(iorder==0)
-                    iw_table=0;
-                else if(iorder==nbands_table)
-                    iw_table=nbands_table-1;
-                else{
-                    iw_table=iorder;
-                    if(fabs(wave[iw]-wave_table[iorder])>fabs(wave[iw]-wave_table[iorder-1]))
-                        iw_table=iorder-1;
-                }
-                bandindex[iw]=iw_table;
+            }
+
+            status = nc_inq_ncid(ncid,"random_noise",&group_id);
+            status = nc_inq_varid(group_id, "SNR_scale", &sds_id);
+            if (nc_get_var(group_id, sds_id, SNR_scale) != NC_NOERR) {
+                fprintf(stderr, "-E- %s line %d:  Error reading %s from %s.\n",
+                        __FILE__, __LINE__, "SNR_scale", filename);
+                exit(1);
+            }
+            status = nc_inq_varid(group_id, "sensor_noise", &sds_id);
+            if(nc_get_att_text(group_id,sds_id,"model_type",model_type)!=NC_NOERR){
+                fprintf(stderr, "-E- %s line %d:  Error reading model_type attribute from %s.\n",
+                        __FILE__, __LINE__,filename);
+                exit(1);
+            }
+            if (nc_get_var(group_id, sds_id, noise_coef) != NC_NOERR) {
+                fprintf(stderr, "-E- %s line %d:  Error reading %s from %s.\n",
+                        __FILE__, __LINE__, "sensor_noise", filename);
+                exit(1);
+            }
+
+            status = nc_inq_ncid(ncid,"vicarious_cal",&group_id);
+            status = nc_inq_varid(group_id, "correlation_coefficient", &sds_id);
+            if (nc_get_var(group_id, sds_id, temp_corr_coef) != NC_NOERR) {
+                fprintf(stderr, "-E- %s line %d:  Error reading %s from %s.\n",
+                        __FILE__, __LINE__, "correlation_coefficient", filename);
+                exit(1);
+            }
+            status = nc_inq_varid(group_id, "relative_uncertainty", &sds_id);
+            if (nc_get_var(group_id, sds_id, rel_unc_vc) != NC_NOERR) {
+                fprintf(stderr, "-E- %s line %d:  Error reading %s from %s.\n",
+                        __FILE__, __LINE__, "relative_uncertainty", filename);
+                exit(1);
+            }
+
+            if (nc_close(ncid) != NC_NOERR) {
+                fprintf(stderr, "-E- %s line %d: error closing %s.\n",
+                        __FILE__, __LINE__, filename);
+                exit(1);
             }
         }
 
-        SNR_scale=(float *)malloc(nbands_table*sizeof(float));
-        noise_coef=(float *)malloc(nbands_table*5*sizeof(float));
-        rel_unc_vc= (float *)malloc (nbands_table*sizeof(float));
-
-
-        group_id=H5Gopen(file_id,"random_noise", H5P_DEFAULT);
-        set_id=H5Dopen(group_id,"SNR_scale", H5P_DEFAULT);
-        space_id=H5Dget_space(set_id);
-
-        mem_space_id=H5Screate_simple(1, count, NULL);
-        H5Sselect_hyperslab(space_id, H5S_SELECT_SET, start, stride, count, NULL);
-        H5Dread(set_id,H5T_NATIVE_FLOAT, mem_space_id, space_id, H5P_DEFAULT, (void *)SNR_scale);
-
-        H5Sclose(space_id);
-        H5Dclose(set_id);
-
-        set_id=H5Dopen(group_id,"sensor_noise", H5P_DEFAULT);
-        attr_id=H5Aopen_name(set_id,"model_type");
-        H5Aread(attr_id,str20,(void *)model_type);
-        H5Aclose(attr_id);
-
-        space_id=H5Dget_space(set_id);
-
-        count[1]=5;
-
-        mem_space_id=H5Screate_simple(2, count, NULL);
-        H5Sselect_hyperslab(space_id, H5S_SELECT_SET, start, stride, count, NULL);
-        H5Dread(set_id,H5T_NATIVE_FLOAT, mem_space_id, space_id, H5P_DEFAULT, (void *)noise_coef);
-
-        H5Sclose(space_id);
-        H5Dclose(set_id);
-        H5Gclose(group_id);
-
-        group_id=H5Gopen(file_id,"vicarious_cal", H5P_DEFAULT);
-        set_id=H5Dopen(group_id,"correlation_coefficient", H5P_DEFAULT);
-        space_id=H5Dget_space(set_id);
-        H5Sget_simple_extent_dims(space_id, dims, maxdims);
-        corr_coef_dim[0]=maxdims[0];
-        corr_coef_dim[1]=maxdims[1];
-
-        corr_coef_vc=(float *)malloc(corr_coef_dim[0]*corr_coef_dim[1]*sizeof(float));
-
-        count[0]=corr_coef_dim[0];
-        count[1]=corr_coef_dim[1];
-
-        mem_space_id=H5Screate_simple(2, count, NULL);
-        H5Sselect_hyperslab(space_id, H5S_SELECT_SET, start, stride, count, NULL);
-        H5Dread(set_id,H5T_NATIVE_FLOAT, mem_space_id, space_id, H5P_DEFAULT, (void *)corr_coef_vc);
-
-        H5Sclose(space_id);
-        H5Dclose(set_id);
-
-        count[1]=1;
-        set_id=H5Dopen(group_id,"relative_uncertainty", H5P_DEFAULT);
-        space_id=H5Dget_space(set_id);
-
-        mem_space_id=H5Screate_simple(1, count, NULL);
-        H5Sselect_hyperslab(space_id, H5S_SELECT_SET, start, stride, count, NULL);
-        H5Dread(set_id,H5T_NATIVE_FLOAT, mem_space_id, space_id, H5P_DEFAULT, (void *)rel_unc_vc);
-
-        H5Sclose(space_id);
-        H5Dclose(set_id);
-        H5Gclose(group_id);
-
-        group_id=H5Gopen(file_id,"ancillary", H5P_DEFAULT);
-        count[0]=1;
-
-        for(ip=0;ip<N_anc;ip++){
-
-            set_id=H5Dopen(group_id,anc_name[ip], H5P_DEFAULT);
-            space_id=H5Dget_space(set_id);
-            mem_space_id=H5Screate_simple(1, count, NULL);
-            H5Sselect_hyperslab(space_id, H5S_SELECT_SET, start, stride, count, NULL);
-            H5Dread(set_id,H5T_NATIVE_FLOAT, mem_space_id, space_id, H5P_DEFAULT, (void *)&anc_unc[ip]);
-            H5Sclose(space_id);
-            H5Dclose(set_id);
-        }
-        H5Gclose(group_id);
-
-        group_id=H5Gopen(file_id,"model", H5P_DEFAULT);
-        set_id=H5Dopen(group_id,"Rayleigh", H5P_DEFAULT);
-        space_id=H5Dget_space(set_id);
-        mem_space_id=H5Screate_simple(1, count, NULL);
-        H5Sselect_hyperslab(space_id, H5S_SELECT_SET, start, stride, count, NULL);
-        H5Dread(set_id,H5T_NATIVE_FLOAT, mem_space_id, space_id, H5P_DEFAULT, (void *)&Lr_unc);
-        Lr_unc=0.;
-        H5Sclose(space_id);
-        H5Dclose(set_id);
-        H5Gclose(group_id);
-
-        H5Fclose(file_id);
-
     }
-
 
     if(!uncertainty){
         if(!uncertainty_lut)
@@ -586,7 +506,7 @@ float *get_uncertainty(l1str *l1rec) {
                 if(sensorID==OCI || sensorID==OCIS)
                     noise_temp[ipb]=sqrt(tmp_poly)/SNR_scale[iw_table]/10.;
 
-                noise_temp[ipb]+=l1rec->Lt[ipb]*rel_unc_vc[iw_table];
+               // noise_temp[ipb]+=l1rec->Lt[ipb]*rel_unc_vc[iw];
 
             }
         return noise_temp;
@@ -596,11 +516,16 @@ float *get_uncertainty(l1str *l1rec) {
         for(iw=0;iw<nbands;iw++){
             iw_table=bandindex[iw];
 
-            uncertainty->corr_nir_s[iw]=corr_coef_vc[iw_table*corr_coef_dim[1]];
-            //if(iw_table>10)
-              //  uncertainty->corr_nir_s[iw]=corr_coef_vc[10*corr_coef_dim[1]+iw_table];
+            for(ib=0;ib<nbands;ib++)
+                corr_coef_rhot[iw*nbands+ib]=temp_corr_coef[iw_table*nbands_table+bandindex[ib]];
 
-            uncertainty->corr_nir_l[iw]=corr_coef_vc[iw_table*corr_coef_dim[1]+1];
+            if(sensorID==OCI || sensorID==OCIS){
+                for(ib=0;ib<nbands;ib++){
+                    corr_coef_rhot[iw*nbands+ib]=0.;
+                    if(ib==iw)
+                        corr_coef_rhot[iw*nbands+ib]=1.;
+                }
+            }
         }
     }
 
@@ -624,13 +549,6 @@ float *get_uncertainty(l1str *l1rec) {
             uncertainty->dvc[ipb]=rel_unc_vc[iw_table]*l1rec->Lt[ipb];
             uncertainty->dLr[ipb]=l1rec->Lr[ipb]*Lr_unc;
         }
-        uncertainty->drh[ip]=anc_unc[1]*l1rec->rh[ip];
-        uncertainty->doz[ip]=anc_unc[0]*l1rec->oz[ip];
-        uncertainty->dpr[ip]=anc_unc[3]*l1rec->pr[ip];
-        uncertainty->dwv[ip]=anc_unc[5]*l1rec->wv[ip];
-        uncertainty->dws[ip]=anc_unc[6]*l1rec->ws[ip];
-        uncertainty->dno2_tropo[ip]=anc_unc[4]*l1rec->no2_tropo[ip];
-        uncertainty->dno2_strat[ip]=anc_unc[2]*l1rec->no2_strat[ip];
     }
 
     /*  error in gas transmittance */

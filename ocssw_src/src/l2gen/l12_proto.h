@@ -455,6 +455,7 @@ void noise_model_hmodisa(l1str *l1rec, float *noise);
 void noise_model_hmodist(l1str *l1rec, float *noise);
 void lt_agregat_ocis(l1str*l1rec);
 float *get_uncertainty(l1str *l1rec);
+void Kd490_unc(l2str *l2rec,int32_t ip);
 
 void get_unc_fsat(l2str *l2rec, float uflh[]);
 float get_aphstar_pderiv(float wave, int dwave, int ftype, float proxy);

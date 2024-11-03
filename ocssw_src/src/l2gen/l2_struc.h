@@ -34,6 +34,7 @@ typedef struct l2_struct {
     float *Rrs_unc;
     float *chi2; //chi square from the spectral match in mbac
     float *chl_unc;
+    float *covariance_matrix;// covariance matrix for Rrs
     float *outband_correction; //square bandpass correction for Rrs
     float *a; //absoprtion coefficient
     float *bb; //backscattering coefficient

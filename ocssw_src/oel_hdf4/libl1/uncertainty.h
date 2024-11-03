@@ -87,6 +87,7 @@ typedef struct uncertainty_struct{
     float derv_modrat_taua_l;//derivative of mwt to taua[aer_l], which is calculated from last iteration
     float derv_modrat_rhow_l;//derivative of mwt to t_sen*t_sol*rhow[aer_l]
     float dchl;           //uncertainty in chla
+    float dkd490;         //uncertainty in kd490
 
     float *derv_taua_min_rhorc_l;   //derivative of tauamin[nwave] to rhorc[aer_l]=rhot-rhor
     float *derv_taua_min_taua_l;   //derivative of tauamin[nwave] to taua[aer_l], which is calculated from last iteration
@@ -96,9 +97,13 @@ typedef struct uncertainty_struct{
     float *derv_taua_max_rhow_l;   //derivative of tauamax[nwave] to t_sen.t_sol.rhow[aer_l]
 
     float *dRrs; // just a pointer pointing to Rrs_unc[ip*nbands] in l2rec, don't need to allocate memory
-    //float *dnLw; // just a pointer pointing to nLw_unc[ip*nbands] in l2rec, don't need to allocate memory
-    float *corr_nir_s;  //correlation coefficients between uncertainty at VIS bands and at band nir_s,derived from VC
-    float *corr_nir_l;  //correlation coefficients between uncertainty at VIS bands and at band nir_l,derived from VC
+    
+    float *covaraince_matrix;//// just a pointer pointing to covariance_matrix[ip*nbands] in l2rec, don't need to allocate memory
+    float *pixel_covariance;//// used to keep the pixel error covariance when  when proc_uncertainty=1
+
+    float *corr_coef_rhot;//correlation coefficient matrix for rhot (nwave*nwave)
+
+    int *acbands_index;// index for the AC bands
 
 } uncertainty_t;
 

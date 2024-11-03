@@ -46,8 +46,11 @@ int alloc_l2(l1str *l1rec, l2str *l2rec) {
             + 7 * sizeof (float)*npix
             + 9 * sizeof (float)*npix * nbands;
 
-    if(l1rec->uncertainty)
-        len+=2 * sizeof (float)*npix * nbands;   // for nLw_unc, Rrs_unc
+    if(l1rec->uncertainty){
+        len+=sizeof (float)*npix * nbands;   // for  Rrs_unc
+        if(input->proc_uncertainty==2)
+            len+=sizeof(float)*npix*nbands*nbands;   //for covariance matrix
+    }
 
 
     if (len % 4 != 0)
@@ -97,12 +100,6 @@ int alloc_l2(l1str *l1rec, l2str *l2rec) {
     p += sizeof(float)*npix*nbands;
     l2rec->nLw = (float *) p;
     p += sizeof(float)*npix*nbands;
-    if(l1rec->uncertainty){
-        l2rec->nLw_unc = (float *) p;
-        p += sizeof (float)*npix*nbands;
-    } else {
-        l2rec->nLw_unc = NULL;
-    }
 
     l2rec->brdf = (float *) p;
     p += sizeof(float)*npix*nbands;
@@ -123,6 +120,12 @@ int alloc_l2(l1str *l1rec, l2str *l2rec) {
     l2rec->chl_unc = (float *) p;
     p += sizeof (float)*npix;
 
+    if(input->proc_uncertainty==2){
+        l2rec->covariance_matrix = (float *) p;
+        p += sizeof (float) * npix*nbands*nbands;
+    }else {
+        l2rec->covariance_matrix = NULL;
+    }
 
     if ((len - (int32_t) (p - l2rec->data)) < 0) {
         printf("%s Line %d: bad allocation on L2 record\n", __FILE__, __LINE__);

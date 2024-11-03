@@ -1349,7 +1349,10 @@ void writeProj4File(L3File* l3File, char* projectionStr, vector<OutFile*> outFil
         metaData->south = latmin;
 
         double delta = lonmax - lonmin;
+        lonmax360 = fmod(lonmax + 360.0, 360.0);
+        lonmin360 = fmod(lonmin + 360.0, 360.0);
         double delta360 = lonmax360 - lonmin360;
+
         if (delta360 < delta) {
             if (lonmin360 > 180.0)
                 metaData->west = lonmin360 - 360.0;

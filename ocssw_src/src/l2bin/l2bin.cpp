@@ -34,6 +34,7 @@
 #include "L3ShapeIsine.h"
 #include <get_geospatial.hpp>
 #include "expand3D.hpp"
+#include "find_variable.hpp"
 
 // using namespace std;
 // using namespace netCDF;
@@ -53,7 +54,7 @@ bool enableDebugPrint = true;
 #define MAXALLOCPERBIN 20
 
 
-static const int max_l3b_products = 400;
+static constexpr int max_l3b_products = MAXNUMBERPRODUCTS;
 
 /* Global variables */
 static instr input;
@@ -102,7 +103,7 @@ typedef bg::model::point<double, 2, bg::cs::geographic<bg::degree>> Point_t;
 typedef bg::model::polygon<Point_t> Polygon_t;
 typedef bg::model::box<Point_t> Box_t;
 
-#define VERSION "7.0.8"
+#define VERSION "7.1.0"
 #define PROGRAM "l2bin"
 
 int32_t get_l2prod_index(const l2_prod &l2, const char *prodname)
@@ -766,7 +767,7 @@ int main(int argc, char **argv)
     double wgt;
     float32 northmost = -90.0, southmost = 90.0, eastmost = -180.0, westmost = 180.0;
 
- 
+
     double time_rec = 0;
     time_t tnow;
     int32_t dataday0, dataday1, startdate, enddate;
@@ -826,7 +827,7 @@ int main(int argc, char **argv)
             boost::trim(l2_l3_name[0]);
             boost::trim(l2_l3_name[1]);
             output_l3_filenames[l2_l3_name[0]] = l2_l3_name[1];
-        }        
+        }
     }
 
     // check to make sure area weighting AND composite_prod are not both set
@@ -853,20 +854,17 @@ int main(int argc, char **argv)
     printf("%d input files\n", nfiles);
 
     bool flags_l2_use = set_l2_flags_use(input.flaguse);
-    int32_t l2_flags_type;
     std::string products_requested_l3_temp,products_requested_l3;
     std::string products_requested;
     for (ifile = 0; ifile < nfiles; ifile++)
     {
         std::string product_list_temp;
         std::string product_list;
-        std::string products_requested = input.l3bprod;
+        products_requested = input.l3bprod;
         if (products_requested == "ALL")
         {
-            char *prodlist;
-            getProdlist(input.files[ifile].c_str(), &prodlist, &l2_flags_type);
-            products_requested = prodlist;
-            free(prodlist);
+            products_requested = "";
+            find_variables_geo_physical(input.files[ifile],products_requested);
         }
 
         // check for quality products and composite products
@@ -904,13 +902,13 @@ int main(int argc, char **argv)
             else
                 product_list_temp += name_to_pass; //
             if(name_to_pass!=input.qual_prod)
-            {            
+            {
                 if (!product_list.empty())
                 product_list += "," + name_to_pass;
                     else
                 product_list += name_to_pass;
             }//
-            
+
             products_l2_unique.insert(name_to_pass);
         }
         products_requested_l3_temp = product_list_temp;
@@ -1171,8 +1169,8 @@ int main(int argc, char **argv)
             std::copy(geo_bounds.get_slat(),geo_bounds.get_slat() + nrec,slat);
             std::copy(geo_bounds.get_elat(),geo_bounds.get_elat() + nrec,elat);
             std::pair<int32_t,int32_t> dates_0_1 = get_datadays(nc_input,input.deltaeqcross,input.night);
-            dataday0 = dates_0_1.first;  
-            dataday1 = dates_0_1.second;  
+            dataday0 = dates_0_1.first;
+            dataday1 = dates_0_1.second;
             nc_input.close();
         }
         catch (netCDF::exceptions::NcException const &e)
@@ -1263,15 +1261,26 @@ int main(int argc, char **argv)
     }
 
     char **prodnames = (char **)malloc(l3_prodname.size() * sizeof(char *));
-    for (size_t i = 0; i < l3_prodname.size(); i++)
+    for (size_t size = 0; size < l3_prodname.size(); size++)
     {
         // look for user requested product names
-        if(output_l3_filenames.find(l3_prodname[i]) != output_l3_filenames.end())
-            prodnames[i] = strdup(output_l3_filenames[l3_prodname[i]].c_str());
+        if(output_l3_filenames.find(l3_prodname[size]) != output_l3_filenames.end())
+            prodnames[size] = strdup(output_l3_filenames[l3_prodname[size]].c_str());
         else
-            prodnames[i] = strdup(l3_prodname[i].c_str());
+            prodnames[size] = strdup(l3_prodname[size].c_str());
     }
     status = defineBinData_nc(input.deflate, out_grp, l3b_nprod, prodnames);
+    // set  wave float attribute here
+    for (size_t size = 0; size < l3_prodname.size(); size++) {
+        float wave = BAD_FLT;
+        wave = l3_attr(l3_prodname[size]);
+        if(wave !=BAD_FLT) {
+            int varid;
+            nc_inq_varid(out_grp, prodnames[size] , &varid);
+            nc_put_att_float(out_grp,varid,"wavelength",NC_FLOAT,1,&wave);
+        }
+    }
+
     if (status)
     {
         printf("-E- %s:%d Could not define binData variable in output file\n",
@@ -1684,6 +1693,30 @@ int main(int argc, char **argv)
                         continue;
                     if (l2_str[ifile].latitude[ipixl] > input.latnorth)
                         continue;
+                    if(std::abs(l2_str[ifile].latitude[ipixl]) > 90)
+                        continue;
+                    if(std::abs(l2_str[ifile].longitude[ipixl]) > 180)
+                        continue;
+                    if (input.area_weighting) {
+                        if (std::abs(l2_str[ifile].lat1[ipixl]) > 90)
+                            continue;
+                        if (std::abs(l2_str[ifile].lon1[ipixl]) > 180)
+                            continue;
+                        if (std::abs(l2_str[ifile].lat1[ipixl + 1]) > 90)
+                            continue;
+                        if (std::abs(l2_str[ifile].lon1[ipixl + 1]) > 180)
+                            continue;
+                    }
+                    if (input.area_weighting >= 2) {
+                        if (std::abs(l2_str[ifile].lat2[ipixl]) > 90)
+                            continue;
+                        if (std::abs(l2_str[ifile].lon2[ipixl]) > 180)
+                            continue;
+                        if (std::abs(l2_str[ifile].lat2[ipixl + 1]) > 90)
+                            continue;
+                        if (std::abs(l2_str[ifile].lon2[ipixl + 1]) > 180)
+                            continue;
+                    }
                     if (input.area_weighting)
                     {
                         /* Get map of bin numbers and intersection area that intersect pixel */

@@ -1,6 +1,8 @@
 #ifndef FIND_VARIABLE_HPP
 #define FIND_VARIABLE_HPP
 #include <netcdf>
+#include <unordered_set>
+
 template <typename T>
 netCDF::NcVar find_nc_variable_cpp(const std::string& var_name, T& nc_file) {
     netCDF::NcVar var = nc_file.getVar(var_name);
@@ -14,7 +16,7 @@ netCDF::NcVar find_nc_variable_cpp(const std::string& var_name, T& nc_file) {
         }
     }
     return var;
-};
+}
 
 template <typename T>
 netCDF::NcGroupAtt find_nc_grp_attribute_cpp(const std::string& att_name, T& nc_file) {
@@ -41,4 +43,22 @@ std::multimap<std::string, netCDF::NcVar> find_all_variables(T& nc_id) {
     }
     return vars;
 }
+
+template <typename T>
+std::multimap<std::string, netCDF::NcVar> find_all_variables(T& nc_id,
+                                                             const std::unordered_set<std::string>& names) {
+    auto grps = nc_id.getGroups();
+    std::multimap<std::string, netCDF::NcVar> vars = nc_id.getVars();
+    for (const auto& grp : grps) {
+        std::multimap<std::string, netCDF::NcVar> temp_var = find_all_variables(grp.second);
+        for (const auto& nc_var : temp_var) {
+            if (!names.count(nc_var.first))
+                vars.insert(nc_var);
+        }
+    }
+    return vars;
+}
+
+std::multimap<std::string, netCDF::NcVar> find_variables_geo_physical(const std::string& nc_path,
+                                                                      std::string& prod_list);
 #endif

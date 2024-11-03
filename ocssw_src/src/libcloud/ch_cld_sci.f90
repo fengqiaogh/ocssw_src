@@ -564,6 +564,8 @@ integer, parameter :: CAT_Cld_Sfc_Type = 454, CAT_Cld_Phase_2100 = 455
 integer, parameter :: CAT_Cld_Non_Abs_Band = 456, CAT_Cld_Phase_1600 = 457
 integer, parameter :: CAT_Cld_Phase_1621 = 458
 integer, parameter :: CAT_Cld_Phase_2200 = 486
+integer, parameter :: CAT_Cld_water_cloud = 440, CAT_Cld_ice_cloud = 441
+integer*1 :: iand_comp = 7
 
 !
 !  for the product type, transfer the center line
@@ -592,6 +594,17 @@ prod_sel: select case( prod_num )
   case( CAT_Cld_Phase_2200 )
     bprod = processing_information(:,lin_mid)%path_and_outcome_22
     bprod = ibclr( bprod, 3 )
+  case( CAT_Cld_water_cloud )
+    bprod = 0
+    where(iand(processing_information(:,lin_mid)%path_and_outcome,iand_comp) == 2 )
+      bprod = 1
+    elsewhere(iand(processing_information(:,lin_mid)%path_and_outcome,iand_comp) == 4 )
+      bprod = 1
+    endwhere
+  case( CAT_Cld_ice_cloud )
+    bprod = 0
+    where(iand(processing_information(:,lin_mid)%path_and_outcome,iand_comp) == 3 ) &
+      bprod = 1
   case default
     print*, "Improper product ID, case encountered, ID:", prod_num
     return

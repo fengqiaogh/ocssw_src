@@ -804,7 +804,7 @@ int l2gen_init_options(clo_optionList_t* list, const char* prog) {
     strcpy(tmpStr, "uncertainty propagation mode\n");
     strcat(tmpStr, "        0: without uncertainty propagation\n");
     strcat(tmpStr, "        1: uncertainty propagation generating error variance");
-    //strcat(tmpStr, "        2: uncertainty propagation generating full covariance matrix");
+    strcat(tmpStr, "        2: uncertainty propagation generating full covariance matrix");
     clo_addOption(list, "proc_uncertainty", CLO_TYPE_INT, "0", tmpStr);
 
     strcpy(tmpStr, "toggle SST processing\n");

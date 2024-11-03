@@ -1101,6 +1101,8 @@ VOIDP prodgen(l2prodstr *p, l2str *l2rec) {
     case CAT_Cld_Non_Abs_Band:
     case CAT_Cld_Phase_1600:
     case CAT_Cld_Phase_1621:
+    case CAT_Cld_water_cloud:
+    case CAT_Cld_ice_cloud:
         pbuf = (VOIDP)get_cmp_byt( l2rec, p->cat_ix );
         break;
 

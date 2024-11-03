@@ -34,7 +34,6 @@ void init_l2(l2str *l2rec, int32_t nbands) {
             l2rec->Lw[ipb] = BAD_FLT;
             l2rec->nLw[ipb] = BAD_FLT;
             if(l2rec->l1rec->uncertainty){
-                l2rec->nLw_unc[ipb] = BAD_FLT;
                 l2rec->Rrs_unc[ipb] =BAD_FLT;
             }
 
@@ -45,6 +44,12 @@ void init_l2(l2str *l2rec, int32_t nbands) {
             l2rec->bb[ipb] = BAD_FLT;
         }
         l2rec->chl_unc[ip]=BAD_FLT;
+
+        if(input->proc_uncertainty==2){
+            ipb=ip*nbands*nbands;
+            for(ib=0;ib<nbands*nbands;ib++)
+                l2rec->covariance_matrix[ipb+ib]=0.;
+        }
 
     }
 }

@@ -403,6 +403,8 @@
 
 
 /* Chimaera (and other algorithm?) cloud products */
+#define CAT_Cld_water_cloud         440
+#define CAT_Cld_ice_cloud           441
 #define CAT_CER_2100                445
 #define CAT_CER_1600                446
 #define CAT_COT_2100                447

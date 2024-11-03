@@ -14,6 +14,7 @@
 #include <vector>
 #include <string>
 #include <clo.h>
+#include <genutils.h>
 
 //earth radius in meters from WGS84 equatorial radius
 #define EARTH_RADIUS 6378137.0
@@ -79,8 +80,9 @@ public:
         double maxVal; //< display max physical value
         double missingValue; //< missing value from product XML (val stored in file)
         double* lineData;
+        double landPixelValue;
 
-        ProductStuff(int32_t width, const productInfo_t* productInfo);
+        ProductStuff(int32_t width, const productInfo_t* productInfo, double landPixelValue);
         ProductStuff(const OutFile::ProductStuff& pStuff);
         ~ProductStuff();
 
@@ -101,8 +103,8 @@ public:
 protected:
 
     static constexpr uint8_t qualityUnused = 255;
-    static constexpr double badPixelValue = -32767.0;
-    static constexpr double landPixelValue = -32766.0;
+    static constexpr double badPixelValue = BAD_FLT;
+    double landPixelValue;
     std::unordered_map<size_t, size_t> index_2d_3d;
     std::unordered_map<size_t, size_t> slice_2d_in_wv3d;
     std::unordered_map<std::string, size_t> product_3d_already_set, prod2d_indexes_last_index;
@@ -355,6 +357,7 @@ public:
 class OutFile_tiff_gray: public OutFile_tiff {
     float* fileData = NULL;
 public:
+    OutFile_tiff_gray();
     virtual ~OutFile_tiff_gray();
     virtual void setSize(int32_t width, int32_t height);
     virtual void writeLine();

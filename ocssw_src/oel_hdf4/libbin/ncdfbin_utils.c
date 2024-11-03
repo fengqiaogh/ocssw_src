@@ -21,7 +21,7 @@
 #include <nc4utils.h>
 #include <ncdfbin_utils.h>
 
-#define MAX_PRODS 512
+#define MAX_PRODS 2048
 #define FILE_IS_32 0
 #define FILE_IS_64 1
 

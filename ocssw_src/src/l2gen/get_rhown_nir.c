@@ -113,15 +113,17 @@ void rhown_nir(char *fqfile, float chl, float aw[], float bbw[], float Rrs[], fl
     static int32_t ib5;
     static int32_t ib6;
 
-    float *dRrs;
     uncertainty_t *uncertainty=l2rec->l1rec->uncertainty;
 
-    float *dchl=NULL,*drhown=NULL;
+    float *dchl=NULL,*drhown=NULL,*covariance;
 
     if(uncertainty){
         dchl=&uncertainty->dchl;
         drhown=uncertainty->drhown_nir;
-        dRrs=&l2rec->Rrs_unc[ip*nwave];
+        if(input->proc_uncertainty==2)
+            covariance=uncertainty->covaraince_matrix;
+        else
+            covariance=uncertainty->pixel_covariance;
     }
 
     float a6, aw6, apg6, bbp6;
@@ -203,9 +205,9 @@ void rhown_nir(char *fqfile, float chl, float aw[], float bbw[], float Rrs[], fl
     Rrs6 = above_to_below(Rrs6);
 
     if(uncertainty){
-        dRrs2 = 0.52 * pow(Rrs2 / Rrs[ib2], 2) * dRrs[ib2];
-        dRrs5 = 0.52 * pow(Rrs5 / Rrs[ib5], 2) * dRrs[ib5];
-        dRrs6 = 0.52 * pow(Rrs6 / Rrs[ib6], 2) * dRrs[ib6];
+        dRrs2 = 0.52 * pow(Rrs2 / Rrs[ib2], 2) * sqrt(covariance[ib2*nwave+ib2]);
+        dRrs5 = 0.52 * pow(Rrs5 / Rrs[ib5], 2) * sqrt(covariance[ib5*nwave+ib5]);
+        dRrs6 = 0.52 * pow(Rrs6 / Rrs[ib6], 2) * sqrt(covariance[ib6*nwave+ib6]);
     }
     //foqint_morel(wave,nwave,0.0,0.0,0.0,chl_in,foq);
     foqint_morel(fqfile, wave, nwave, solz, senz, phi, chl, foq);
@@ -221,7 +223,7 @@ void rhown_nir(char *fqfile, float chl, float aw[], float bbw[], float Rrs[], fl
             if(eta>1.|| eta<0.)
                 deta=0.0;
             else
-                deta=2.4*0.9*exp(-0.9 * (Rrs2 / Rrs5))* sqrt( pow(dRrs2/Rrs5,2)+ pow(Rrs2*dRrs5/(Rrs5*Rrs5),2));
+                deta=2.4*0.9*exp(-0.9 * (Rrs2 / Rrs5))* sqrt( pow(dRrs2/Rrs5,2)+ pow(Rrs2*dRrs5/(Rrs5*Rrs5),2)-2*Rrs2/pow(Rrs5,3)*covariance[ib2*nwave+ib5]);
         }
     }
 

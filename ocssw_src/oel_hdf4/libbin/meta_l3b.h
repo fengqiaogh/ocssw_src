@@ -5,7 +5,7 @@
 #include <hdf5.h>
 
 #define SM_ATTRSZ 1024
-#define MD_ATTRSZ 10000
+#define MD_ATTRSZ 65535
 #define LG_ATTRSZ 65535        /* MAX_ORDER is defined in HDF as 65535 */
 
 #ifdef  __cplusplus

@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include <iostream>
 #include <math.h>
-#include <genutils.h>
 #include <timeutils.h>
 #include <nc4utils.h>
 #include <string>
@@ -73,7 +72,7 @@ std::string remove_wv_from_long_name(const std::string& long_name_with_wv) {
 // OutFile::ProductStuff
 //------------------------------------------------------------------------------
 
-OutFile::ProductStuff::ProductStuff(int32_t width, const productInfo_t* productInfo) {
+OutFile::ProductStuff::ProductStuff(int32_t width, const productInfo_t* productInfo, double landPixelValue) {
     this->width = width;
     this->productInfo = allocateProductInfo();
     copyProductInfo(this->productInfo, productInfo);
@@ -87,6 +86,7 @@ OutFile::ProductStuff::ProductStuff(int32_t width, const productInfo_t* productI
     maxVal = maxOutputVal;
     missingValue = fillPix;
     lineData = (double*)allocateMemory(width * sizeof(double), "OutFile::ProductStuff::lineData");
+    this->landPixelValue = landPixelValue;
 }
 
 OutFile::ProductStuff::ProductStuff(const OutFile::ProductStuff& pStuff) {
@@ -103,6 +103,7 @@ OutFile::ProductStuff::ProductStuff(const OutFile::ProductStuff& pStuff) {
     maxVal = pStuff.maxVal;
     missingValue = pStuff.missingValue;
     lineData = (double*)allocateMemory(width * sizeof(double), "OutFile::ProductStuff::lineData");
+    landPixelValue = pStuff.landPixelValue;
 }
 
 OutFile::ProductStuff::~ProductStuff() {
@@ -289,6 +290,7 @@ void OutFile::ProductStuff::calcOutputLineVals(void* lineBuffer) const {
 //------------------------------------------------------------------------------
 
 OutFile::OutFile() {
+    landPixelValue = -32766.0;
     width = 0;
     height = 0;
     qualityData = NULL;
@@ -508,7 +510,7 @@ void OutFile::setMetaData(meta_l3bType* metaData) {
  * @return the index for the new product
  */
 int32_t OutFile::addProduct(productInfo_t* productInfo) {
-    ProductStuff* stuff = new ProductStuff(width, productInfo);
+    ProductStuff* stuff = new ProductStuff(width, productInfo, landPixelValue);
 
     // setup display scaling
     if (!strcmp(productInfo->displayScale, "linear"))
@@ -527,7 +529,7 @@ int32_t OutFile::addProduct(productInfo_t* productInfo) {
 }
 
 int32_t OutFile::addProductNonDisplay(productInfo_t* productInfo) {
-    ProductStuff* stuff = new ProductStuff(width, productInfo);
+    ProductStuff* stuff = new ProductStuff(width, productInfo, landPixelValue);
 
     if (!strcmp(productInfo->dataType, "byte")) {
         stuff->dataStorage = ByteDS;
@@ -1416,6 +1418,10 @@ void OutFile_tiff_color::setTiffColor() {
 
 //----- OutFile_tiff_gray -----
 
+OutFile_tiff_gray::OutFile_tiff_gray() {
+    this->landPixelValue = badPixelValue; // Grayscale outputs a floating point value
+}
+
 OutFile_tiff_gray::~OutFile_tiff_gray() {
     if (fileData)
         free(fileData);
@@ -1981,6 +1987,7 @@ using namespace netCDF;
 OutFile_netcdf4::OutFile_netcdf4() : OutFile() {
     ncFile = NULL;
     fileData = NULL;
+    landPixelValue = badPixelValue;
 }
 
 OutFile_netcdf4::~OutFile_netcdf4() {

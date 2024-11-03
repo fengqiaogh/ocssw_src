@@ -10,7 +10,6 @@
 #include <netcdf>
 #include "genutils.h"
 #include "readL2scan.h"
-#include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #define EXIT_LOG(...)                                                                     \
     {                                                                                     \
@@ -23,5 +22,6 @@ void set_prodname_3d_to_l2(const std::vector<std::string> &prodparam, l2_prod &l
 bool set_l2_flags_use(const std::string &flagsuse);
 void parse_wv_list(const std::string &wv_list,
                    const std::unordered_map<int, int> &wv3d_list, std::vector<int> & wv_requested_vals, 
-                  std::vector<int>  & wv_requested_indexes);
+                  std::vector<int>  & wv_requested_indexes, bool exit_on_not_found = true);
+float l3_attr(const std::string &inp3);
 #endif

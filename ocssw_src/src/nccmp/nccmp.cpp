@@ -192,7 +192,7 @@ template <typename T> int cmp_var(int ncid1, int ncid2, nccmpopts* opts, int rec
                 ToString((T) value2, value2str, opts->tprintf);
             }
             opts->diffcount++;
-            //fprintf(stderr, message.c_str(), v1->name, idxstr, value1str, value2str);
+            //fprintf(stdout, message.c_str(), v1->name, idxstr, value1str, value2str);
             printf(message.c_str(), getGroupPath(), v1->name, idxstr, value1str, value2str);
             //printf("%d nitems=%d, cmplen=%d, diff=%d do_missing=%d\n", __LINE__, nitems, cmplen, diff, opts->missing);
             if (opts->force) {
@@ -235,6 +235,9 @@ template <typename T> int cmp_vartol(int ncid1, int ncid2, nccmpopts* opts, int 
 
     do {
         /* printf("start = %d %d %d %d, count = %d %d %d %d\n", (int)start[0], (int)start[1], (int)start[2], (int)start[3], (int)count[0], (int)count[1], (int)count[2], (int)count[3]); */ \
+        if (opts->extent && opts->extentcount >= opts->extent) {
+            break;
+        }
       status = nc_get_vara(ncid1, v1->varid, start, count, P1);
         handle_error(status);
         status = nc_get_vara(ncid2, v2->varid, start, count, P2);
@@ -243,7 +246,10 @@ template <typename T> int cmp_vartol(int ncid1, int ncid2, nccmpopts* opts, int 
         /* for(i=0; i<nitems; ++i) {
             printf("nitems = %d, rec = %d, P1[%d] = %g, P2[%d] = %g\n", nitems, rec, i, P1[i], i, P2[i]); \
         } */
-        for (i = 0; i < nitems && (opts->maxdiff == 0 || opts->diffcount < opts->maxdiff); ++i) {
+        for (i = 0; i < nitems && 
+                        (opts->maxdiff == 0 || opts->diffcount < opts->maxdiff) && 
+                        (opts->extent == 0 || opts->extentcount < opts->extent); 
+                        ++i) {
             if (do_missing) {
                 if ((M1 == P1[i]) && (M2 == P2[i])) continue;
             }
@@ -276,12 +282,13 @@ template <typename T> int cmp_vartol(int ncid1, int ncid2, nccmpopts* opts, int 
                     ToString(value1, value1str, opts->tprintf);
                     ToString(value2, value2str, opts->tprintf);
                 }
-                fprintf(stderr, message.c_str(), getGroupPath(), v1->name, idxstr, value1str, value2str, (double) absdelta * 100. / (fabs((double) P1[i]) > fabs((double) P2[i]) ? fabs((double) P1[i]) : fabs((double) P2[i])));
+                fprintf(stdout, message.c_str(), getGroupPath(), v1->name, idxstr, value1str, value2str, (double) absdelta * 100. / (fabs((double) P1[i]) > fabs((double) P2[i]) ? fabs((double) P1[i]) : fabs((double) P2[i])));
                 opts->diffcount++;
                 if (!opts->force) {
                     goto break_;
                 }
             }
+            opts->extentcount++;
         }
     } while (odometer(start, odomax, (rec >= 0), v1->ndims - 2));
 break_:
@@ -360,7 +367,7 @@ template <typename T> int cmp_var_ut(int ncid1, int ncid2, nccmpopts* opts, int 
                 ToString((T) value2, value2str, opts->tprintf);
             }
             opts->diffcount++;
-            //fprintf(stderr, message.c_str(), v1->name, idxstr, value1str, value2str);
+            //fprintf(stdout, message.c_str(), v1->name, idxstr, value1str, value2str);
             printf(message.c_str(), getGroupPath(), v1->name, idxstr, value1str, value2str);
             //printf("%d nitems=%d, cmplen=%d, diff=%d do_missing=%d\n", __LINE__, nitems, cmplen, diff, opts->missing);
             if (opts->force) {
@@ -436,7 +443,7 @@ template <typename T> int cmp_vartol_ut(void *P1, void *P2, int offset1, int off
                     ToString(value1, value1str, opts->tprintf);
                     ToString(value2, value2str, opts->tprintf);
                 }
-                fprintf(stderr, message.c_str(), getGroupPath(), v1->name, name, idxstr, value1str, value2str, (double) absdelta * 100. / (fabs((double) value1) > fabs((double) value2) ? fabs((double) value1) : fabs((double) value2)));
+                fprintf(stdout, message.c_str(), getGroupPath(), v1->name, name, idxstr, value1str, value2str, (double) absdelta * 100. / (fabs((double) value1) > fabs((double) value2) ? fabs((double) value1) : fabs((double) value2)));
                 opts->diffcount++;
                 if (!opts->force) {
                     goto break_;
@@ -817,7 +824,7 @@ int cmpatt(int ncid1, int ncid2, int varid1, int varid2,
     status = EXIT_SUCCESS;
     ncstatus = nc_inq_att(ncid1, varid1, name, &type1, &lenp1);
     if (ncstatus != NC_NOERR) {
-        fprintf(stderr, "DIFFER : VARIABLE \"%s%s\" IS MISSING ATTRIBUTE WITH NAME \"%s\" IN FILE \"%s\"\n", getGroupPath(), varname, name, opts->file1);
+        fprintf(stdout, "DIFFER : VARIABLE \"%s%s\" IS MISSING ATTRIBUTE WITH NAME \"%s\" IN FILE \"%s\"\n", getGroupPath(), varname, name, opts->file1);
 
         if (!opts->warn[NCCMP_W_ALL])
             status = EXIT_DIFFER;
@@ -826,7 +833,7 @@ int cmpatt(int ncid1, int ncid2, int varid1, int varid2,
 
     ncstatus = nc_inq_att(ncid2, varid2, name, &type2, &lenp2);
     if (ncstatus != NC_NOERR) {
-        fprintf(stderr, "DIFFER : VARIABLE \"%s%s\" IS MISSING ATTRIBUTE WITH NAME \"%s\" IN FILE \"%s\"\n", getGroupPath(), varname, name, opts->file2);
+        fprintf(stdout, "DIFFER : VARIABLE \"%s%s\" IS MISSING ATTRIBUTE WITH NAME \"%s\" IN FILE \"%s\"\n", getGroupPath(), varname, name, opts->file2);
 
         if (!opts->warn[NCCMP_W_ALL])
             status = EXIT_DIFFER;
@@ -836,7 +843,7 @@ int cmpatt(int ncid1, int ncid2, int varid1, int varid2,
     if (type1 != type2) {
         type2string(type1, typestr1);
         type2string(type2, typestr2);
-        fprintf(stderr, "DIFFER : TYPES : ATTRIBUTE : %s : VARIABLE : %s%s : %s <> %s\n", name, getGroupPath(), varname, typestr1, typestr2);
+        fprintf(stdout, "DIFFER : TYPES : ATTRIBUTE : %s : VARIABLE : %s%s : %s <> %s\n", name, getGroupPath(), varname, typestr1, typestr2);
 
         if (!opts->warn[NCCMP_W_ALL])
             status = EXIT_DIFFER;
@@ -848,12 +855,12 @@ int cmpatt(int ncid1, int ncid2, int varid1, int varid2,
         prettyprintatt(ncid1, varname, varid1, name, typestr1);
         prettyprintatt(ncid2, varname, varid2, name, typestr2);
 
-        fprintf(stderr, "DIFFER : LENGTHS : ATTRIBUTE : %s : VARIABLE : %s%s : %lu <> %lu : VALUES : ", name, getGroupPath(), varname, (unsigned long) lenp1, (unsigned long) lenp2);
+        fprintf(stdout, "DIFFER : LENGTHS : ATTRIBUTE : %s : VARIABLE : %s%s : %lu <> %lu : VALUES : ", name, getGroupPath(), varname, (unsigned long) lenp1, (unsigned long) lenp2);
 
         switch (type1) {
         case NC_CHAR:
             /* Quote strings. */
-            fprintf(stderr, "\"%s\" : \"%s\"\n", typestr1, typestr2);
+            fprintf(stdout, "\"%s\" : \"%s\"\n", typestr1, typestr2);
             if (strcmp(typestr1, typestr2) == 0) {
                 /* Same text, but invisible trailing nulls because lengths differ. */
                 if (opts->warn[NCCMP_W_EOS] || opts->warn[NCCMP_W_ALL]) {
@@ -867,7 +874,7 @@ int cmpatt(int ncid1, int ncid2, int varid1, int varid2,
             break;
         default:
             /* Unquoted. */
-            fprintf(stderr, "%s : %s\n", typestr1, typestr2);
+            fprintf(stdout, "%s : %s\n", typestr1, typestr2);
             if (!opts->warn[NCCMP_W_ALL]) {
                 status = EXIT_DIFFER;
                 if (!opts->force) 
@@ -878,16 +885,16 @@ int cmpatt(int ncid1, int ncid2, int varid1, int varid2,
     } else if (cmpattval(ncid1, ncid2, varid1, varid2, name, lenp1, type1) != NC_NOERR) {
         prettyprintatt(ncid1, varname, varid1, name, typestr1);
         prettyprintatt(ncid2, varname, varid2, name, typestr2);
-        fprintf(stderr, "DIFFER : VARIABLE : %s%s : ATTRIBUTE : %s : VALUES : ", getGroupPath(), varname, name);
+        fprintf(stdout, "DIFFER : VARIABLE : %s%s : ATTRIBUTE : %s : VALUES : ", getGroupPath(), varname, name);
 
         switch (type1) {
         case NC_CHAR:
             /* Quote strings. */
-            fprintf(stderr, "\"%s\" <> \"%s\"\n", typestr1, typestr2);
+            fprintf(stdout, "\"%s\" <> \"%s\"\n", typestr1, typestr2);
             break;
         default:
             /* Unquoted. */
-            fprintf(stderr, "%s <> %s\n", typestr1, typestr2);
+            fprintf(stdout, "%s <> %s\n", typestr1, typestr2);
             break;
         }
 
@@ -1307,7 +1314,7 @@ nccmprecinfo(nccmpopts* opts, int ncid1, int ncid2) {
         return EXIT_SUCCESS;
 
     if (strcmp(name1, name2)) {
-        fprintf(stderr, "DIFFER : NAMES OF RECORDS : %s <> %s\n", name1, name2);
+        fprintf(stdout, "DIFFER : NAMES OF RECORDS : %s <> %s\n", name1, name2);
         if (!opts->warn[NCCMP_W_ALL])
             status = EXIT_DIFFER;
 
@@ -1315,7 +1322,7 @@ nccmprecinfo(nccmpopts* opts, int ncid1, int ncid2) {
     }
 
     if (nrec1 != nrec2) {
-        fprintf(stderr, "DIFFER : LENGTHS OF RECORDS : %s (%d) <> %s (%d)\n", name1, (int) nrec1, name2, (int) nrec2);
+        fprintf(stdout, "DIFFER : LENGTHS OF RECORDS : %s (%d) <> %s (%d)\n", name1, (int) nrec1, name2, (int) nrec2);
         if (!opts->warn[NCCMP_W_ALL])
             status = EXIT_DIFFER;
 
@@ -1676,7 +1683,7 @@ nccmpformats(nccmpopts* opts, int ncid1, int ncid2) {
     handle_error(status);
 
     if (fmt1 != fmt2) {
-        fprintf(stderr, "DIFFER : FILE FORMATS : %s <> %s\n", NCFORMATSTR(fmt1), NCFORMATSTR(fmt2));
+        fprintf(stdout, "DIFFER : FILE FORMATS : %s <> %s\n", NCFORMATSTR(fmt1), NCFORMATSTR(fmt2));
 
         if (!opts->warn[NCCMP_W_ALL] &&
                 !opts->warn[NCCMP_W_FORMAT])
@@ -1742,7 +1749,7 @@ nccmpglobalatts(nccmpopts* opts, int ncid1, int ncid2) {
     }
 
     if (nattsex1 != nattsex2) {
-        fprintf(stderr, "DIFFER : NUMBER OF GLOBAL ATTRIBUTES : %d <> %d\n", nattsex1, nattsex2);
+        fprintf(stdout, "DIFFER : NUMBER OF GLOBAL ATTRIBUTES : %d <> %d\n", nattsex1, nattsex2);
 
         if (!opts->warn[NCCMP_W_ALL])
             status2 = EXIT_DIFFER;
@@ -1751,7 +1758,7 @@ nccmpglobalatts(nccmpopts* opts, int ncid1, int ncid2) {
     }
 
     if (newstringlist(&processedatts, &i, NC_MAX_VARS)) {
-        fprintf(stderr, "ERROR: Failed to allocate string list for comparing  global attributes.\n");
+        fprintf(stdout, "ERROR: Failed to allocate string list for comparing  global attributes.\n");
         return EXIT_FATAL;
     }
 
@@ -1778,7 +1785,7 @@ nccmpglobalatts(nccmpopts* opts, int ncid1, int ncid2) {
 
         status = nc_inq_att(ncid2, NC_GLOBAL, name1, &type2, &len2);
         if (status != NC_NOERR) {
-            fprintf(stderr, "DIFFER : NAME OF GLOBAL ATTRIBUTE : %s : GLOBAL ATTRIBUTE DOESN'T EXIST IN \"%s\"\n", name1, opts->file2);
+            fprintf(stdout, "DIFFER : NAME OF GLOBAL ATTRIBUTE : %s : GLOBAL ATTRIBUTE DOESN'T EXIST IN \"%s\"\n", name1, opts->file2);
             if (!opts->warn[NCCMP_W_ALL])
                 status2 = EXIT_DIFFER;
 
@@ -1789,7 +1796,7 @@ nccmpglobalatts(nccmpopts* opts, int ncid1, int ncid2) {
         if (type1 != type2) {
             type2string(type1, typestr1);
             type2string(type2, typestr2);
-            fprintf(stderr, "DIFFER : GLOBAL ATTRIBUTE TYPES : %s : %s <> %s\n", name1, typestr1, typestr2);
+            fprintf(stdout, "DIFFER : GLOBAL ATTRIBUTE TYPES : %s : %s <> %s\n", name1, typestr1, typestr2);
             if (!opts->warn[NCCMP_W_ALL])
                 status2 = EXIT_DIFFER;
 
@@ -1800,7 +1807,7 @@ nccmpglobalatts(nccmpopts* opts, int ncid1, int ncid2) {
         if (len1 != len2) {
             prettyprintatt(ncid1, NULL, NC_GLOBAL, name1, typestr1);
             prettyprintatt(ncid2, NULL, NC_GLOBAL, name1, typestr2);
-            fprintf(stderr, "DIFFER : LENGTHS OF GLOBAL ATTRIBUTE : %s : %lu <> %lu : VALUES : %s <> %s\n", name1,
+            fprintf(stdout, "DIFFER : LENGTHS OF GLOBAL ATTRIBUTE : %s : %lu <> %lu : VALUES : %s <> %s\n", name1,
                     (unsigned long) len1, (unsigned long) len2, typestr1, typestr2);
             if (!opts->warn[NCCMP_W_ALL])
                 status2 = EXIT_DIFFER;
@@ -1813,7 +1820,7 @@ nccmpglobalatts(nccmpopts* opts, int ncid1, int ncid2) {
             /* Pretty print values. */
             prettyprintatt(ncid1, NULL, NC_GLOBAL, name1, typestr1);
             prettyprintatt(ncid2, NULL, NC_GLOBAL, name1, typestr2);
-            fprintf(stderr, "DIFFER : VALUES OF GLOBAL ATTRIBUTE : %s : %s <> %s\n", name1, typestr1, typestr2);
+            fprintf(stdout, "DIFFER : VALUES OF GLOBAL ATTRIBUTE : %s : %s <> %s\n", name1, typestr1, typestr2);
             if (!opts->warn[NCCMP_W_ALL])
                 status2 = EXIT_DIFFER;
 
@@ -1853,7 +1860,7 @@ nccmpglobalatts(nccmpopts* opts, int ncid1, int ncid2) {
 
         status = nc_inq_att(ncid1, NC_GLOBAL, name2, &type1, &len1);
         if (status != NC_NOERR) {
-            fprintf(stderr, "DIFFER : NAME OF GLOBAL ATTRIBUTE : %s : GLOBAL ATTRIBUTE DOESN'T EXIST IN %s\n", name2, opts->file1);
+            fprintf(stdout, "DIFFER : NAME OF GLOBAL ATTRIBUTE : %s : GLOBAL ATTRIBUTE DOESN'T EXIST IN %s\n", name2, opts->file1);
             if (!opts->warn[NCCMP_W_ALL])
                 status2 = EXIT_DIFFER;
 
@@ -1864,7 +1871,7 @@ nccmpglobalatts(nccmpopts* opts, int ncid1, int ncid2) {
         if (type1 != type2) {
             type2string(type1, typestr1);
             type2string(type2, typestr2);
-            fprintf(stderr, "DIFFER : GLOBAL ATTRIBUTE TYPE : %s : %s <> %s\n", name1, typestr1, typestr2);
+            fprintf(stdout, "DIFFER : GLOBAL ATTRIBUTE TYPE : %s : %s <> %s\n", name1, typestr1, typestr2);
             if (!opts->warn[NCCMP_W_ALL])
                 status2 = EXIT_DIFFER;
 
@@ -1876,12 +1883,12 @@ nccmpglobalatts(nccmpopts* opts, int ncid1, int ncid2) {
             prettyprintatt(ncid1, NULL, NC_GLOBAL, name1, typestr1);
             prettyprintatt(ncid2, NULL, NC_GLOBAL, name1, typestr2);
 
-            fprintf(stderr, "DIFFER : LENGTHS OF GLOBAL ATTRIBUTE : %s : %lu <> %lu : VALUES : ", name1, (unsigned long) len1, (unsigned long) len2);
+            fprintf(stdout, "DIFFER : LENGTHS OF GLOBAL ATTRIBUTE : %s : %lu <> %lu : VALUES : ", name1, (unsigned long) len1, (unsigned long) len2);
 
             switch (type1) {
             case NC_CHAR:
                 /* Quote strings. */
-                fprintf(stderr, "\"%s\" : \"%s\"\n", typestr1, typestr2);
+                fprintf(stdout, "\"%s\" : \"%s\"\n", typestr1, typestr2);
                 if (strcmp(typestr1, typestr2) == 0) {
                     /* Same text, but invisible trailing nulls because lengths differ. */
                     if (opts->warn[NCCMP_W_EOS] || opts->warn[NCCMP_W_ALL]) {
@@ -1895,7 +1902,7 @@ nccmpglobalatts(nccmpopts* opts, int ncid1, int ncid2) {
                 break;
             default:
                 /* No quotes. */
-                fprintf(stderr, "%s : %s\n", typestr1, typestr2);
+                fprintf(stdout, "%s : %s\n", typestr1, typestr2);
                 if (!opts->warn[NCCMP_W_ALL]) {
                     status2 = EXIT_DIFFER;
                     if (opts->force) continue;
@@ -1909,7 +1916,7 @@ nccmpglobalatts(nccmpopts* opts, int ncid1, int ncid2) {
             /* Pretty print values. */
             prettyprintatt(ncid1, NULL, NC_GLOBAL, name1, typestr1);
             prettyprintatt(ncid2, NULL, NC_GLOBAL, name1, typestr2);
-            fprintf(stderr, "DIFFER : VALUES OF GLOBAL ATTRIBUTE : %s : %s <> %s\n", name1, typestr1, typestr2);
+            fprintf(stdout, "DIFFER : VALUES OF GLOBAL ATTRIBUTE : %s : %s <> %s\n", name1, typestr1, typestr2);
             if (!opts->warn[NCCMP_W_ALL])
                 status2 = EXIT_DIFFER;
 
@@ -1942,7 +1949,7 @@ nccmpmetadata(nccmpopts *opts, int ncid1, int ncid2) {
         printf("INFO: Comparing number of dimensions.\n");
 
     if (ndims1 != ndims2) {
-        fprintf(stderr, "DIFFER : NUMBER OF DIMENSIONS IN FILES : %d <> %d\n", ndims1, ndims2);
+        fprintf(stdout, "DIFFER : NUMBER OF DIMENSIONS IN FILES : %d <> %d\n", ndims1, ndims2);
         if (!opts->warn[NCCMP_W_ALL])
             status = EXIT_DIFFER;
 
@@ -1983,7 +1990,7 @@ nccmpmetadata(nccmpopts *opts, int ncid1, int ncid2) {
 
         ncstatus = nc_inq_dimid(ncid2, name1, &dimid2);
         if (ncstatus != NC_NOERR) {
-            fprintf(stderr, "DIFFER : NAME : DIMENSION : %s : DIMENSION DOESN'T EXIST IN \"%s\"\n", name1, opts->file2);
+            fprintf(stdout, "DIFFER : NAME : DIMENSION : %s : DIMENSION DOESN'T EXIST IN \"%s\"\n", name1, opts->file2);
 
             if (!opts->warn[NCCMP_W_ALL])
                 status = EXIT_DIFFER;
@@ -2003,7 +2010,7 @@ nccmpmetadata(nccmpopts *opts, int ncid1, int ncid2) {
         }
 
         if (len1 != len2) {
-            fprintf(stderr, "DIFFER : LENGTHS : DIMENSION : %s : %lu <> %lu\n", name1,
+            fprintf(stdout, "DIFFER : LENGTHS : DIMENSION : %s : %lu <> %lu\n", name1,
                     (unsigned long) len1, (unsigned long) len2);
 
             if (!opts->warn[NCCMP_W_ALL])
@@ -2021,7 +2028,7 @@ nccmpmetadata(nccmpopts *opts, int ncid1, int ncid2) {
     for (i = 0; i < opts->ncmpvarlist; ++i) {
         j1 = findvar(opts->cmpvarlist[i], vars1);
         if (j1 == -1) {
-            fprintf(stderr, "DIFFER : NAME : VARIABLE : %s%s : VARIABLE DOESN'T EXIST IN \"%s\"\n", getGroupPath(), opts->cmpvarlist[i], opts->file1);
+            fprintf(stdout, "DIFFER : NAME : VARIABLE : %s%s : VARIABLE DOESN'T EXIST IN \"%s\"\n", getGroupPath(), opts->cmpvarlist[i], opts->file1);
 
             if (!opts->warn[NCCMP_W_ALL])
                 status = EXIT_DIFFER;
@@ -2032,7 +2039,7 @@ nccmpmetadata(nccmpopts *opts, int ncid1, int ncid2) {
 
         j2 = findvar(opts->cmpvarlist[i], vars2);
         if (j2 == -1) {
-            fprintf(stderr, "DIFFER : NAME : VARIABLE : %s%s : VARIABLE DOESN'T EXIST IN \"%s\"\n", getGroupPath(), opts->cmpvarlist[i], opts->file2);
+            fprintf(stdout, "DIFFER : NAME : VARIABLE : %s%s : VARIABLE DOESN'T EXIST IN \"%s\"\n", getGroupPath(), opts->cmpvarlist[i], opts->file2);
 
             if (!opts->warn[NCCMP_W_ALL])
                 status = EXIT_DIFFER;
@@ -2044,7 +2051,7 @@ nccmpmetadata(nccmpopts *opts, int ncid1, int ncid2) {
         if (vars1[j1].type != vars2[j2].type) {
             type2string(vars1[j1].type, typestr1);
             type2string(vars2[j2].type, typestr2);
-            fprintf(stderr, "DIFFER : TYPES : VARIABLE : %s%s : %s <> %s\n", getGroupPath(), opts->cmpvarlist[i], typestr1, typestr2);
+            fprintf(stdout, "DIFFER : TYPES : VARIABLE : %s%s : %s <> %s\n", getGroupPath(), opts->cmpvarlist[i], typestr1, typestr2);
 
             if (!opts->warn[NCCMP_W_ALL])
                 status = EXIT_DIFFER;
@@ -2054,7 +2061,7 @@ nccmpmetadata(nccmpopts *opts, int ncid1, int ncid2) {
         }
 
         if (vars1[j1].ndims != vars2[j2].ndims) {
-            fprintf(stderr, "DIFFER : NUMBER : DIMENSIONS : VARIABLE : %s%s : %d <> %d\n", getGroupPath(), opts->cmpvarlist[i], ndims1, ndims2);
+            fprintf(stdout, "DIFFER : NUMBER : DIMENSIONS : VARIABLE : %s%s : %d <> %d\n", getGroupPath(), opts->cmpvarlist[i], ndims1, ndims2);
 
             if (!opts->warn[NCCMP_W_ALL])
                 status = EXIT_DIFFER;
@@ -2087,7 +2094,7 @@ nccmpmetadata(nccmpopts *opts, int ncid1, int ncid2) {
             /*printf("DEBUG : %d : %s,  %s, %s\n", __LINE__, opts->cmpvarlist[i], dims1[dimid1].name, dims2[dimid2].name);*/
 
             if (strcmp(dims1[dimid1].name, dims2[dimid2].name) != 0) {
-                fprintf(stderr, "DIFFER : DIMENSION NAMES FOR VARIABLE %s%s : %s <> %s\n", getGroupPath(), opts->cmpvarlist[i], dims1[dimid1].name, dims2[dimid2].name);
+                fprintf(stdout, "DIFFER : DIMENSION NAMES FOR VARIABLE %s%s : %s <> %s\n", getGroupPath(), opts->cmpvarlist[i], dims1[dimid1].name, dims2[dimid2].name);
 
                 if (!opts->warn[NCCMP_W_ALL])
                     status = EXIT_DIFFER;
@@ -2100,7 +2107,7 @@ nccmpmetadata(nccmpopts *opts, int ncid1, int ncid2) {
             tmp2 = strcmp(dims2[dimid2].name, recname2);
 
             if ((tmp1 == 0) && (tmp2 != 0)) {
-                fprintf(stderr, "DIFFER : VARIABLE : %s%s : DIMENSION %s IS RECORD IN FILE \"%s\" BUT NOT IN \"%s\"\n", getGroupPath(), vars1[j1].name, dims1[dimid1].name, opts->file1, opts->file2);
+                fprintf(stdout, "DIFFER : VARIABLE : %s%s : DIMENSION %s IS RECORD IN FILE \"%s\" BUT NOT IN \"%s\"\n", getGroupPath(), vars1[j1].name, dims1[dimid1].name, opts->file1, opts->file2);
 
                 if (!opts->warn[NCCMP_W_ALL])
                     status = EXIT_DIFFER;
@@ -2108,7 +2115,7 @@ nccmpmetadata(nccmpopts *opts, int ncid1, int ncid2) {
                 if (opts->force) continue;
                 else goto recover;
             } else if ((tmp1 != 0) && (tmp2 == 0)) {
-                fprintf(stderr, "DIFFER : VARIABLE : %s%s : DIMENSION %s IS RECORD IN FILE \"%s\" BUT NOT IN \"%s\"\n", getGroupPath(), vars1[j1].name, dims2[dimid2].name, opts->file2, opts->file1);
+                fprintf(stdout, "DIFFER : VARIABLE : %s%s : DIMENSION %s IS RECORD IN FILE \"%s\" BUT NOT IN \"%s\"\n", getGroupPath(), vars1[j1].name, dims2[dimid2].name, opts->file2, opts->file1);
 
                 if (!opts->warn[NCCMP_W_ALL])
                     status = EXIT_DIFFER;
@@ -2204,7 +2211,7 @@ nccmpmetadata(nccmpopts *opts, int ncid1, int ncid2) {
         }
 
         if (natts1 != natts2) {
-            fprintf(stderr, "DIFFER : NUMBER OF ATTRIBUTES : VARIABLE : %s%s : %d <> %d\n", getGroupPath(), opts->cmpvarlist[i], natts1, natts2);
+            fprintf(stdout, "DIFFER : NUMBER OF ATTRIBUTES : VARIABLE : %s%s : %d <> %d\n", getGroupPath(), opts->cmpvarlist[i], natts1, natts2);
             if (!opts->warn[NCCMP_W_ALL])
                 status = EXIT_DIFFER;
 
@@ -2259,7 +2266,7 @@ int cmpvar(char* name, int rec, nccmpopts* opts, int ncid1, int ncid2, nccmp_use
     /*printf("DEBUG : %s len : %d <> %d\n", name, v1->len, v2->len); */
 
     if (v1->len != v2->len) {
-        fprintf(stderr, "DIFFER : SIZE OF VARIABLE \"%s%s\" : %d <> %d\n", getGroupPath(), name, (int) v1->len, (int) v2->len);
+        fprintf(stdout, "DIFFER : SIZE OF VARIABLE \"%s%s\" : %d <> %d\n", getGroupPath(), name, (int) v1->len, (int) v2->len);
 
         if (!opts->warn[NCCMP_W_ALL]) \
 				return EXIT_DIFFER;
@@ -2301,8 +2308,9 @@ We'll then loop over all the other outer dimensions. */
    except if only dimension is record. */
     if ((v1->ndims == 1) && (v1->hasrec)) {
         nitems = 1;
-    } else
+    } else {
         nitems = v1->dimlens[v1->ndims - 1];
+    }
 
     count[v1->ndims - 1] = nitems;
 
@@ -2559,7 +2567,7 @@ int cmpvartol(char* name, int rec, nccmpopts* opts, int ncid1, int ncid2, nccmp_
 
     if (idx1 < 0) {
         if (!opts->metadata) /* This gets reported in cmpmeta. */
-            fprintf(stderr, "DIFFER : Failed to find variable \"%s%s\" in file \"%s\".\n", getGroupPath(), name, opts->file1);
+            fprintf(stdout, "DIFFER : Failed to find variable \"%s%s\" in file \"%s\".\n", getGroupPath(), name, opts->file1);
 
         if (!opts->warn[NCCMP_W_ALL])
             return EXIT_DIFFER;
@@ -2569,7 +2577,7 @@ int cmpvartol(char* name, int rec, nccmpopts* opts, int ncid1, int ncid2, nccmp_
 
     if (idx2 < 0) {
         if (!opts->metadata) /* This gets reported in cmpmeta. */
-            fprintf(stderr, "DIFFER : Failed to find variable \"%s%s\" in file \"%s\".\n", getGroupPath(), name, opts->file2);
+            fprintf(stdout, "DIFFER : Failed to find variable \"%s%s\" in file \"%s\".\n", getGroupPath(), name, opts->file2);
 
         if (!opts->warn[NCCMP_W_ALL])
             return EXIT_DIFFER;
@@ -2581,7 +2589,7 @@ int cmpvartol(char* name, int rec, nccmpopts* opts, int ncid1, int ncid2, nccmp_
     v2 = &vars2[idx2];
 
     if (v1->len != v2->len) {
-        fprintf(stderr, "DIFFER : SIZE OF VARIABLE \"%s%s\" : %d <> %d\n", getGroupPath(), name, (int) v1->len, (int) v2->len);
+        fprintf(stdout, "DIFFER : SIZE OF VARIABLE \"%s%s\" : %d <> %d\n", getGroupPath(), name, (int) v1->len, (int) v2->len);
 
         if (!opts->warn[NCCMP_W_ALL]) \
 				return EXIT_DIFFER;
@@ -2904,6 +2912,7 @@ int nccmpdata(nccmpopts* opts, int ncid1, int ncid2, nccmp_user_type_t *user_typ
 
         // reset diff counter for each variable
         opts->diffcount = 0;
+        opts->extentcount = 0;
     
         if (instringlist(processed, opts->cmpvarlist[i], nprocessed))
             /* Skip varnames already processed. */
@@ -2919,7 +2928,7 @@ int nccmpdata(nccmpopts* opts, int ncid1, int ncid2, nccmp_user_type_t *user_typ
 
         if (idx1 < 0) {
             if (!opts->metadata) /* This gets reported in cmpmeta. */
-                fprintf(stderr, "DIFFER : Failed to find variable \"%s%s\" in file \"%s\".\n", getGroupPath(), opts->cmpvarlist[i], opts->file1);
+                fprintf(stdout, "DIFFER : Failed to find variable \"%s%s\" in file \"%s\".\n", getGroupPath(), opts->cmpvarlist[i], opts->file1);
 
             if (!opts->warn[NCCMP_W_ALL])
                 status = EXIT_DIFFER;
@@ -2931,7 +2940,7 @@ int nccmpdata(nccmpopts* opts, int ncid1, int ncid2, nccmp_user_type_t *user_typ
 
         if (idx2 < 0) {
             if (!opts->metadata) /* This gets reported in cmpmeta. */
-                fprintf(stderr, "DIFFER : Failed to find variable \"%s%s\" in file \"%s\".\n", getGroupPath(), opts->cmpvarlist[i], opts->file2);
+                fprintf(stdout, "DIFFER : Failed to find variable \"%s%s\" in file \"%s\".\n", getGroupPath(), opts->cmpvarlist[i], opts->file2);
 
             if (!opts->warn[NCCMP_W_ALL])
                 status = EXIT_DIFFER;
@@ -2942,7 +2951,7 @@ int nccmpdata(nccmpopts* opts, int ncid1, int ncid2, nccmp_user_type_t *user_typ
         }
 
         if (vars1[idx1].len != vars2[idx2].len) {
-            fprintf(stderr, "DIFFER : SIZE OF VARIABLE \"%s%s\" : %d <> %d\n", getGroupPath(), opts->cmpvarlist[i], (int) vars1[idx1].len, (int) vars2[idx2].len);
+            fprintf(stdout, "DIFFER : SIZE OF VARIABLE \"%s%s\" : %d <> %d\n", getGroupPath(), opts->cmpvarlist[i], (int) vars1[idx1].len, (int) vars2[idx2].len);
 
             if (!opts->warn[NCCMP_W_ALL])
                 status = EXIT_DIFFER;
@@ -2955,7 +2964,7 @@ int nccmpdata(nccmpopts* opts, int ncid1, int ncid2, nccmp_user_type_t *user_typ
         if (vars1[idx1].type != vars2[idx2].type) {
             type2string(vars1[idx1].type, str1);
             type2string(vars2[idx2].type, str2);
-            fprintf(stderr, "DIFFER : TYPE OF VARIABLE \"%s%s\" : %s <> %s\n", getGroupPath(), opts->cmpvarlist[i], str1, str2);
+            fprintf(stdout, "DIFFER : TYPE OF VARIABLE \"%s%s\" : %s <> %s\n", getGroupPath(), opts->cmpvarlist[i], str1, str2);
 
             if (!opts->warn[NCCMP_W_ALL])
                 status = EXIT_DIFFER;
@@ -3171,6 +3180,7 @@ int compareGroup(nccmpopts* opts, int ncid1, int ncid2) {
         getgroupinfo(ncid2, groupNames1, groups2);
 
         for (i = 0; i < numgrps1; i++) {
+            opts->extentcount = 0;
             groupPath.push_back(groupNames1[i]);
             if (opts->verbose)
                 printf("INFO: Comparing group %s:\n", getGroupPath());

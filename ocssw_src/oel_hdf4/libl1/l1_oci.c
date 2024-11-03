@@ -28,6 +28,8 @@
 static int extract_pixel_start = 0;
 static int use_rhot = 0;
 
+static int bad_num_bands = 0;
+
 static short *tmpShort;
 
 // whole file stuff
@@ -130,9 +132,9 @@ int openl1_oci(filehandle * file) {
     }
     nc_inq_dimlen(ncid_L1B, dimid, &num_blue_bands);
     if(num_blue_bands < expected_num_blue_bands) {
-        fprintf(stderr, "-E- Not enough blue bands, expecting %d, found %d.\n",
+        fprintf(stderr, "-W- Not enough blue bands, expecting %d, found %d.\n",
                 (int)expected_num_blue_bands, (int)num_blue_bands);
-        exit(EXIT_FAILURE);
+        bad_num_bands = 1;
     }
 
     // num_red_bands
@@ -143,9 +145,9 @@ int openl1_oci(filehandle * file) {
     };
     nc_inq_dimlen(ncid_L1B, dimid, &num_red_bands);
     if(num_red_bands < expected_num_red_bands) {
-        fprintf(stderr, "-E- Not enough red bands, expecting %d, found %d.\n",
+        fprintf(stderr, "-W- Not enough red bands, expecting %d, found %d.\n",
                 (int)expected_num_red_bands, (int)num_red_bands);
-        exit(EXIT_FAILURE);
+        bad_num_bands = 1;
     }
 
     // num_SWIR_bands
@@ -495,6 +497,11 @@ int readl1_oci(filehandle *file, int32_t line, l1str *l1rec, int lonlat) {
     // at this point, it should have read in: time, lon, lat, solz
     if (lonlat)
         return (LIFE_IS_GOOD);
+
+    if (bad_num_bands) {
+        fprintf(stderr, "-E- Bad number of bands\n");
+        exit(EXIT_FAILURE);
+    }
 
     status = nc_get_vara_short(geolocationGrp, senaId, start, count, tmpShort);
     check_err(status, __LINE__, __FILE__);

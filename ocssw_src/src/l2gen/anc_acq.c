@@ -3,6 +3,8 @@
 /*     Intended to initially do the MET and OZ with ECMWF data               */
 /*                                                                           */
 /* Written By: W. Robinson, SAIC, Aug, 2013                                  */
+/* W. Robinson, SAIC, 3 Oct 24  to separate the FRSNOICE to be used only     */
+/*     land pixels and FRSEAICE only over water                              */
 /*                                                                           */
 /* ========================================================================= */
 #include "l12_proto.h"
@@ -40,8 +42,8 @@ file_name, __LINE__, __FILE__); \
 exit(FATAL_ERROR); \
 }
 
-
-enum out_nam { ZW, MW, PR, WV, RH, SFCP, SFCRH, SFCT, ICEFR };
+// WDR carry ice over land, water separately
+enum out_nam { ZW, MW, PR, WV, RH, SFCP, SFCRH, SFCT, ICEFR_WTR, ICEFR_LND };
 
 enum out_prof { TPROF, RHPROF, HPROF, QPROF, O3PROF };
 
@@ -403,6 +405,8 @@ int32_t anc_acq_lin_met(l1str *l1rec)
       Programmer        Date            Description of change
       ----------        ----            ---------------------
       W. Robinson       7 May 2018      Original development
+      W. Robinson       3 Oct 2024      adapt to use ice over water only for 
+                                        water pixels and same for land
 
  *******************************************************************/
 {
@@ -415,10 +419,12 @@ int32_t anc_acq_lin_met(l1str *l1rec)
     char *files[3]; /* the 3 MET file names */
     static char file_olci_str[FILENAME_MAX];
     char *file_olci = (char *)0; /* for olci file name, 0 if not olci */
-    int32_t n_met = 9;           /* # met parms finally needed */
+    int32_t n_met = 10;           /* # met parms finally needed, with ice 
+                                     over land and water separately */
     int32_t nlvl_int = 1;        /* # levels in interpolation 1 in the 2-d case */
     int32_t ilvl = 0, nlvl = 1;  /* for met, only 1 level */
     int32_t itim, ilon, npix, iprm, t_interp, data_ix[2];
+    int32_t field_skip;   /* To skip water ice over land and land ice over water */
     float val, wt_t1, uwnd, vwnd, unc, u_unc, v_unc, ws_2;
     double l_time, anc_times[3], lat, lon, last_time;
 
@@ -509,10 +515,17 @@ int32_t anc_acq_lin_met(l1str *l1rec)
             if (lon < -180.0 || lon > 180.0 || lat < -90.0 || lat > 90.0 || isnan(lat) || isnan(lon)) {
                 continue;
             }
-            if (anc_acq_eval_pt(met_int, iprm, ilvl, lat, lon, t_interp, data_ix, wt_t1, ntim_int, nlvl,
-                                n_met, &val, &unc) != 0) {
-                fprintf(stderr, "-E- %s %d: Error interpolating to file: %s\n", __FILE__, __LINE__, files[0]);
-                return -1;
+            // only evaluate ice over land/water at land/water pixels
+            field_skip = 0;
+            if( ( (iprm == ICEFR_LND ) && (!l1rec->land[ilon]) ) ||
+                ( (iprm == ICEFR_WTR ) && (l1rec->land[ilon]) ) )
+               field_skip = 1;
+            if(field_skip == 0 ) {
+                if (anc_acq_eval_pt(met_int, iprm, ilvl, lat, lon, t_interp, data_ix, wt_t1, ntim_int, nlvl,
+                  n_met, &val, &unc) != 0) {
+                     fprintf(stderr, "-E- %s %d: Error interpolating to file: %s\n", __FILE__, __LINE__, files[0]);
+                    return -1;
+                }
             }
             /*  fill in the proper ancillary data slot */
             switch (iprm) {
@@ -585,10 +598,20 @@ int32_t anc_acq_lin_met(l1str *l1rec)
                 case SFCT:
                     l1rec->sfct[ilon] = val;
                     break;
-                case ICEFR:
-                    l1rec->icefr[ilon] = val;
-                    if (val > input->ice_threshold)
-                        l1rec->ice[ilon] = ON;
+                // for these last 2 fill icefr based on underlying sfc type
+                case ICEFR_WTR:
+                    if( !l1rec->land[ilon] ) {
+                        l1rec->icefr[ilon] = val;
+                        if (val > input->ice_threshold)
+                            l1rec->ice[ilon] = ON;
+                    }
+                    break;
+                case ICEFR_LND:
+                    if( l1rec->land[ilon] ) {      
+                        l1rec->icefr[ilon] = val;
+                        if (val > input->ice_threshold)
+                            l1rec->ice[ilon] = ON;
+                    }
                     break;
             }
         }
@@ -1389,16 +1412,17 @@ int32_t anc_acq_gmao_met_prep(char *file, gen_int_str *met_int)
       W. Robinson       7 May 2018      Original development
       W. Robinson       16 Jan 2019     adapt to read the T10M product for
                                         sfc T
+      W. Robinson       3 Oct 2024      changes to put land/water ice over land/water pixels
 
  *******************************************************************/
 {
     /* list of GMAO groups, parm names and special processing value */
     /* note that for the second RH, use the the 1st RH */
     char *ob_gmao_grp[] = {"met", "met", "met", "met", "met", "met", "met", "met", "ocn_ice"};
-    char *ob_gmao_prm_nm[] = {"U10M", "V10M", "SLP", "TQV", "PS", "PS", "PS", "T10M", "FRSEAICE"};
+    char *ob_gmao_prm_nm[] = {"U10M", "V10M", "SLP", "TQV", "PS", "PS", "PS", "T10M", "FRSEAICE", "FRSNO"};
     /* also will need for rh: met, T10M and met, QV10M */
     /* also will need for icefr: lnd_ice, FRSNO (future) */
-    int32_t n_raw_gmao = 9;
+    int32_t n_raw_gmao = 10;
     int32_t iprm, nlat, nlon, nlvl, iv, nv;
     float *data2, *data3, *data_rh, p_lcl;
     unsigned char *qual, *qual2;
@@ -1418,7 +1442,7 @@ int32_t anc_acq_gmao_met_prep(char *file, gen_int_str *met_int)
        RH sfc       sfcrh                            take above rh for now
        T surface    sfct       met     T10M           as-is
        ice fraction icefr      ocn_ice FRSEAICE      as-is
-                               lnd_ice FRSNO         Future combination with ocean
+                               lnd_ice FRSNO         as-is
      */
 
     /* loop for output parms and get the data array(s) and do any special
@@ -1532,24 +1556,17 @@ int32_t anc_acq_gmao_met_prep(char *file, gen_int_str *met_int)
                     }
                 }
                 break;
-            case ICEFR:
-                /* we may want to add the lnd_ice in with the ocn_ice  */
-
-                if (anc_acq_read_gmao(file, "lnd_ice", "FRSNO", &data2, &qual2, &time, &nlon, &nlat, &nlvl,
-                                      &lon_coord2, &lat_coord2) != 0)
-                    return 1;
-                free(lat_coord2);
-                free(lon_coord2);
-                for (iv = 0; iv < nv; iv++)
-                    *(qual + iv) = *(qual + iv) | *(qual2 + iv);
-
-                /* over land (good qual), choose the snow fraction values */
-                for (iv = 0; iv < nv; iv++) {
-                    if (*(qual2 + iv) == 0)
-                        *(data + iv) = *(data2 + iv);
+            case ICEFR_WTR:
+                /* nothing to do with the ice over water */
+                break;
+            case ICEFR_LND:
+                /* the over-water values are missing - we'll set then to 0 ice instead */
+                for( iv=0; iv < nv; iv++ ) {
+                    if( *(qual + iv) != 0 ) {
+                        *(data + iv) = 0.;
+                        *(qual + iv) = 0;
+                    }
                 }
-                free(qual2);
-                free(data2);
                 break;
             default:
                 fprintf(stderr, "-E- %s %d: Unknown output identifier: %d\n", __FILE__, __LINE__, iprm);

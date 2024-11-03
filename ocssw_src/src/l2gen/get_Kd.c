@@ -1320,6 +1320,79 @@ void get_Kd(l2str *l2rec, l2prodstr *p, float prod[]) {
     return;
 }
 
+void Kd490_unc(l2str *l2rec,int32_t ip) {
+    static int32_t *w = NULL;
+    static float *a = NULL;
+    static int ib1 = -1;
+    static int ib2 = -1;
+    float fit_unc=0.1;
+
+    int32_t ipb;
+    float R;
+
+    l1str *l1rec = l2rec->l1rec;
+
+    uncertainty_t *uncertainty=l2rec->l1rec->uncertainty;
+    float *dRrs, *dkd490, *covariance_matrix, kd_temp,tmpderiv,*Rrs;
+    static int nbands=0;
+
+    if(uncertainty){
+        dRrs=uncertainty->dRrs;
+        dkd490=&uncertainty->dkd490;
+        if(input->proc_uncertainty==2)
+            covariance_matrix=uncertainty->covaraince_matrix;
+        else
+            covariance_matrix=uncertainty->pixel_covariance;
+    }
+
+    if (w == NULL) {
+        nbands=l2rec->l1rec->l1file->nbands;
+        w = input->kd2w;
+        a = input->kd2c;
+        if (w[0] < 0 || w[1] < 0) {
+            printf("Kd490_KD2: algorithm coefficients not provided for this sensor.\n");
+            exit(1);
+        }
+        ib1 = bindex_get(w[0]);
+        ib2 = bindex_get(w[1]);
+        if (ib1 < 0 || ib2 < 0) {
+            printf("Kd490_KD2: incompatible sensor wavelengths for this algorithm\n");
+            exit(1);
+        }
+    }
+
+    ipb = l1rec->l1file->nbands*ip;
+    Rrs=&l2rec->Rrs[ipb];
+
+    if (l1rec->mask[ip] ||
+            l2rec->Rrs[ipb + ib1] <= 0.0 || l2rec->Rrs[ipb + ib2] <= 0.0) {
+        *dkd490 = 0;
+    } else {
+        R = log10(l2rec->Rrs[ipb + ib1] / l2rec->Rrs[ipb + ib2]);
+        if (isnan(R)) {
+            *dkd490 = 0;
+        } else {
+            kd_temp = a[0] + pow(10.0, a[1] + R * (a[2] + R * (a[3] + R * (a[4] + R * a[5]))));
+
+            if (kd_temp > KD_MAX) {
+                *dkd490 = 0;
+            }
+            else{
+                tmpderiv= (kd_temp-a[0])* (a[2]+2*a[3]*R+3*a[4]*R*R+4*a[5]*R*R*R)*log(10);
+                tmpderiv/=(log(10)*Rrs[ib1]/Rrs[ib2]);
+
+                *dkd490=pow(dRrs[ib1]/Rrs[ib2],2)+ pow(dRrs[ib2]*Rrs[ib1]/(Rrs[ib2]*Rrs[ib2]),2);
+
+                *dkd490-=2*Rrs[ib1]/(Rrs[ib2]*Rrs[ib2]*Rrs[ib2])*covariance_matrix[ib1*nbands+ib2];
+
+                *dkd490=fabs(tmpderiv)* sqrt(*dkd490);
+
+                *dkd490=sqrt(*dkd490**dkd490+fit_unc*fit_unc*kd_temp*kd_temp)/kd_temp;
+            }
+        }
+    }
+
+}
 
 /* =================================================================== */
 /* defunct versions                                                    */

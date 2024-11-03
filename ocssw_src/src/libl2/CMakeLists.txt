@@ -20,6 +20,7 @@ ADD_LIBRARY(l2
   expand3D.cpp
   get_geospatial.cpp
   find_variable.c
+  find_variable.cpp
 )
 
 target_link_libraries(l2 ${LIBS})

@@ -18,7 +18,12 @@
  */
 
 #include "opt.h"
+#include <stdbool.h>
 #define VERSION "2.1.1"
+
+bool anyDataSelected(nccmpopts *popts) {
+    return (popts->data || popts->metadata || popts->all);
+}
 
 static struct option const long_options[] ={
     {"Attribute", required_argument, 0, 'A'},
@@ -43,6 +48,8 @@ static struct option const long_options[] ={
     {"Tolerance", required_argument, 0, 'T'},
     {"notolerance", no_argument, 0, 'n'},
     {"variable", required_argument, 0, 'v'},
+    {"extent", required_argument, 0, 'e'},
+    {"all", no_argument, 0, 'a'},
     {"verbose", no_argument, 0, 'b'},
     {"help", no_argument, 0, 'H'},
     {"usage", no_argument, 0, 'H'},
@@ -100,6 +107,9 @@ void initnccmpopts(nccmpopts* popts) {
     popts->cmpvarlist = NULL;
     popts->ncmpvarlist = 0;
     popts->tprintf = NULL;
+    popts->all = 0;
+    popts->extent = 0;
+    popts->extentcount = 0;
 
     memset(popts->warn, 0, NCCMP_W_NUMTAGS);
 }
@@ -154,11 +164,22 @@ int getnccmpopts(int argc, char** argv, nccmpopts* popts) {
         exit(EXIT_FATAL);
     }
 
-    while ((c = getopt_long(argc, argv, "A:C:dDx:fFghmNnMp:qst:T:v:bHVG:w:", long_options, 0))
+    while ((c = getopt_long(argc, argv, "A:C:dDx:fFghmNnMp:qst:T:v:bHVG:w:ae:", long_options, 0))
             != -1
             )
 
         switch (c) {
+        case 'a':
+            popts->all = 1;
+            popts->metadata = 1;
+            popts->global = 1;
+            popts->data = 1;
+            popts->force = 1;
+            popts->maxdiff = 10;
+            break;
+        case 'e':
+            popts->extent = atoi(optarg);
+            break;
         case 'd':
             popts->data = 1;
             break;
@@ -304,8 +325,8 @@ int getnccmpopts(int argc, char** argv, nccmpopts* popts) {
         printusage();
         return EXIT_FATAL;
     }
-    if (!(popts->data || popts->metadata)) {
-        fprintf(stderr, "Error, must supply at least one of these options: -d, -m.\n\n");
+    if (!anyDataSelected(popts)) {
+        fprintf(stderr, "Error, must supply at least one of these options: -d, -m, -a.\n\n");
         printusage();
         return EXIT_FATAL;
     }

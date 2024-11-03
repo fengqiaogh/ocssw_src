@@ -904,7 +904,14 @@ float calc_par_impl_of_2023(l2str *l2rec, int ip, int nbands, float *Lt, float t
     float Func[t_step], Funcb[t_step], Funcc[t_step];
     float trise, tset;
     triseset(doy, l1rec->lon[ip], l1rec->lat[ip], &trise, &tset);
-
+    if (observed_time > trise && observed_time > tset) {
+        trise += 24;
+        tset += 24;
+    }
+    if (observed_time < trise && observed_time < tset) {
+        tset -= 24;
+        trise -= 24;
+    }
     size_t st_int = t_step;
     size_t end_int = 0;
     for (size_t it = 0; it < t_step; it++) {  // need to check

@@ -2939,7 +2939,7 @@ int32_t L1C::write_L1C_granule2(int swtd, l1c_filehandle* l1cfile, L1C_input* l1
     int16_t y_ini, mo_ini, d_ini, h_ini, mi_ini, y_end, mo_end, d_end, h_end, mi_end, y_mid, mo_mid, d_mid, h_mid, mi_mid,y_zero, mo_zero, d_zero,h_zero,mi_zero;
     double sec_ini, sec_end,sec_mid,sec_zero;
     string tswt_ini, tswt_end, tswt_ini_file;
-    int logoff = -1;
+
     int16_t syear, smon, sday, syear2, smon2, sday2;
     double secs, secs2;
     double tgran_ini, tgran_ini_sec, tgran_end, tgran_end_sec;
@@ -3249,52 +3249,6 @@ int32_t L1C::write_L1C_granule2(int swtd, l1c_filehandle* l1cfile, L1C_input* l1
            mo_zero=mo_ini;
            y_zero=y_ini;
            }
-         
-            // time coverage start----
-            secstr = std::to_string(sec_ini);
-            mistr = std::to_string(mi_ini);
-            hstr = std::to_string(h_ini);
-            daystr = std::to_string(d_ini);
-            monstr = std::to_string(mo_ini);
-            yearstr = std::to_string(y_ini);
-
-            int length = (int)floor(log10(mo_ini)) + 1;
-            if (length == 1)
-                monstr = "0" + monstr;
-            length = (int)floor(log10(d_ini)) + 1;
-            if (length == 1)
-                daystr = "0" + daystr;
-
-            if (h_ini == 0)
-                logoff = 1;
-            else
-                logoff = 0;
-            length = (int)floor(log10(h_ini + logoff)) + 1;
-            if (length == 1)
-                hstr = "0" + hstr;
-            if (mi_ini == 0)
-                logoff = 1;
-            else
-                logoff = 0;
-            length = (int)floor(log10(mi_ini + logoff)) + 1;
-            if (length == 1)
-                mistr = "0" + mistr;
-            if (sec_ini == 0)
-                logoff = 1;
-            else
-                logoff = 0;
-            length = (int)floor(log10(round(sec_ini + logoff))) + 1;
-            string str2(".0");
-            size_t found = secstr.find(str2);
-            size_t found2 = secstr.find(".");
-            if(found>1) length=1;
-            if(found2>1) length=2;
-            if (length == 1)
-                secstr = "0" + secstr;
-
-            fdatetimestr1 = yearstr + monstr + daystr + "T" + hstr + mistr + secstr.substr(0, 2);
-            datetimestr1 =
-                yearstr + "-" + monstr + "-" + daystr + "T" + hstr + ":" + mistr + ":" + secstr.substr(0, 2);
 
             daystr = std::to_string(d_zero);
             if(daystr.size() == 1)
@@ -3303,106 +3257,34 @@ int32_t L1C::write_L1C_granule2(int swtd, l1c_filehandle* l1cfile, L1C_input* l1
             if(monstr.size() == 1)
                 monstr = "0" + monstr;
             yearstr = std::to_string(y_zero);
+
             datezerotime="seconds since " + yearstr + "-" + monstr + "-" + daystr;            
-            // time coevrage end----            
-            secstr = std::to_string(sec_end);
-            mistr = std::to_string(mi_end);
-            hstr = std::to_string(h_end);
-            daystr = std::to_string(d_end);
-            monstr = std::to_string(mo_end);
-            yearstr = std::to_string(y_end);
-
-            length = (int)floor(log10(mo_end)) + 1;
-            if (length == 1)
-                monstr = "0" + monstr;
-            length = (int)floor(log10(d_end)) + 1;
-            if (length == 1)
-                daystr = "0" + daystr;
-
-            if (h_end == 0)
-                logoff = 1;
-            else
-                logoff = 0;
-            length = (int)floor(log10(h_end + logoff)) + 1;
-            if (length == 1)
-                hstr = "0" + hstr;
-            if (mi_end == 0)
-                logoff = 1;
-            else
-                logoff = 0;
-            length = (int)floor(log10(mi_end + logoff)) + 1;        
-            if (length == 1)
-                mistr = "0" + mistr;            
-            if (sec_end == 0)
-                logoff = 1;
-            else
-                logoff = 0;
-            length = (int)floor(log10(round(sec_end + logoff))) + 1;            
-            found = secstr.find(str2);
-            found2 = secstr.find(".");
-            if(found>1) length=1;
-            if(found2>1) length=2;
-            if (length == 1)
-                secstr = "0" + secstr;
-
-            datetimestr2 =
-                yearstr + "-" + monstr + "-" + daystr + "T" + hstr + ":" + mistr + ":" + secstr.substr(0, 2);
-             // time coevrage mid----            
-            secstr = std::to_string(sec_mid);
-            mistr = std::to_string(mi_mid);
-            hstr = std::to_string(h_mid);
-            daystr = std::to_string(d_mid);
-            monstr = std::to_string(mo_mid);
-            yearstr = std::to_string(y_mid);
-
-            length = (int)floor(log10(mo_mid)) + 1;
-            if (length == 1)
-                monstr = "0" + monstr;
-            length = (int)floor(log10(d_mid)) + 1;
-            if (length == 1)
-                daystr = "0" + daystr;
-
-            if (h_mid == 0)
-                logoff = 1;
-            else
-                logoff = 0;
-            length = (int)floor(log10(h_mid + logoff)) + 1;
-            if (length == 1)
-                hstr = "0" + hstr;
-            if (mi_mid == 0)
-                logoff = 1;
-            else
-                logoff = 0;
-            length = (int)floor(log10(mi_mid + logoff)) + 1;
-            if (length == 1)
-                mistr = "0" + mistr;
-            if (sec_mid == 0)
-                logoff = 1;
-            else
-                logoff = 0;
-            length = (int)floor(log10(round(sec_mid + logoff))) + 1;         
-            found = secstr.find(str2);
-            found2 = secstr.find(".");
-            if(found>1) length=1;
-            if(found2>1) length=2;
-            if (length == 1)
-                secstr = "0" + secstr;
-
-            datetimestr3 =
-                yearstr + "-" + monstr + "-" + daystr + "T" + hstr + ":" + mistr + ":" + secstr.substr(0, 2);
-            isodate2ydmsec((char *) datetimestr3.c_str(), &iyear, &iday, &msec);
+            string datemid=  unix2isodate(tg_mid, 'G');
+            isodate2ydmsec((char *) datemid.substr(0,19).c_str(), &iyear, &iday, &msec);
             double dist_es=esdist_(&iyear,&iday,&msec);
 
             if(l1cinput->verbose)cout << "sun_earth_distance -- mid gridline" <<dist_es<<endl;
-            
+          
+            // output file with list of granules
+            string dateini=  unix2isodate(tg_ini, 'G');
+            string datend=  unix2isodate(tg_end, 'G');
+
+          
+            yearstr=dateini.substr(0,4);
+            monstr=dateini.substr(5,2);
+            daystr=dateini.substr(8,2);
+            hstr=dateini.substr(11,2);
+            mistr=dateini.substr(14,2);
+            secstr=dateini.substr(17,2);
+
+            fdatetimestr1 = yearstr + monstr + daystr + "T" + hstr + mistr + secstr; 
             fname_out = pathstr + "PACE." + fdatetimestr1 + ".L1C" + extstr;
             fname_out_nopath = "PACE." + fdatetimestr1 + ".L1C" + extstr;
 
             if(l1cinput->verbose)cout << "granule filename.." << fname_out << endl;
 
-            // output file with list of granules
-            outf << fname_out_nopath << "," << datetimestr1 << "," << datetimestr2 << "," << gfull << "\n";
-            //---------------------------------------------------------------------------------
+            outf << fname_out_nopath << "," << dateini.substr(0,19) << "," << datend.substr(0,19) << "," << gfull << "\n";
+
 
             l1cfile->gridname = fname_out.c_str();
             filename_lt = fname_out.c_str();
@@ -3430,8 +3312,8 @@ int32_t L1C::write_L1C_granule2(int swtd, l1c_filehandle* l1cfile, L1C_input* l1
             }
             nc_output->putAtt("history", l1cinput->history);
             nc_output->putAtt("product_name", fname_out_nopath);
-            nc_output->putAtt("time_coverage_start", datetimestr1 + "Z");
-            nc_output->putAtt("time_coverage_end", datetimestr2 + "Z");
+            nc_output->putAtt("time_coverage_start", dateini.substr(0,19) + "Z");
+            nc_output->putAtt("time_coverage_end", datend.substr(0,19) + "Z");
             nc_output->putAtt("sun_earth_distance", ncFloat, dist_es);
 
             NY = ngridlines;
