@@ -53,7 +53,7 @@ jobs:
     - name: Install latest OCSSW version
       if: steps.compare-versions.outputs.skip_update == 'false'
       run: |
-        ./install_ocssw -t ${{ steps.get-latest-tag.outputs.tag }} -i /home/runner/work/${{ github.repository }} --src
+        ./install_ocssw -t ${{ steps.get-latest-tag.outputs.tag }} -i . --src
 
     - name: Save the latest version
       if: steps.compare-versions.outputs.skip_update == 'false'
