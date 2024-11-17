@@ -63,6 +63,38 @@ ADD_LIBRARY(swfnav
   yds2jul.f
   ydsadd.f
   ymd2day.f
+# moved from nav
+    add_elements.f
+    get_elements.f
+    put_elements.f
+    kozsak2.f
+    der.f
+    asaps.f
+    vec2mean.f
+    pout.f
+    delm.f
+    asap_rot_int.f
+    anomly.f
+    eqnox.f
+    xthird.f
+    ephem.f
+    rk78.f
+    rk78cn.f
+    fitgps.f
+    mediqr.f
+    invert.f
+    pderiv.f
+    setthd.f
+    setsun.f
+    kepler.f
+    dens76.f
+    matvec2.f
+    select.f
+    asap_rots.f
+    get_ut1.f
+    coord.f
+    legend.f
+    angles.f
 )
 
 target_link_libraries(swfnav ${LIBS})

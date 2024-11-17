@@ -33,13 +33,13 @@ void noise_model_ocis(l1str *l1rec, float *noise) {
 
 	static int firstcall=1;
 	static size_t nwave,ncoef;
-	static float *Lnoise_c;
-	static int16 *wave;
+    static float *Lnoise_c;
+    static int16 *wave;
 
 	int nbands=l1rec->l1file->nbands;
 	int npix=l1rec->npix;
 	float *wave_oci=l1rec->l1file->fwave;
-	static int *wvindx;
+    static int *wvindx;
 	int i,j;
 
 	if(firstcall){
@@ -47,57 +47,57 @@ void noise_model_ocis(l1str *l1rec, float *noise) {
 
 		wvindx=(int *)malloc(nbands*sizeof(int));
 
-		char *filedir;
-		char filename[FILENAME_MAX];
-		if ((filedir = getenv("OCDATAROOT")) == NULL) {
-			printf("-E- %s: OCDATAROOT env variable undefined.\n", __FILE__);
-			exit(EXIT_FAILURE);
-		}
-		strcpy(filename, filedir);
-		strcat(filename, "/");
-		strcat(filename, "ocis");
-		strcat(filename, "/");
-		strcat(filename, "oci_snr.h5");
-                printf("OCI SNR FILE: %s\n", filename);
+        char *filedir;
+        char filename[FILENAME_MAX];
+        if ((filedir = getenv("OCDATAROOT")) == NULL) {
+            printf("-E- %s: OCDATAROOT env variable undefined.\n", __FILE__);
+            exit(EXIT_FAILURE);
+        }
+        strcpy(filename, filedir);
+        strcat(filename, "/");
+        strcat(filename, "ocis");
+        strcat(filename, "/");
+        strcat(filename, "oci_snr.h5");
+        printf("OCI SNR FILE: %s\n", filename);
 
-		 int ncid, varid1, varid2;
-		 /* error handling. */
-		 int retval;
+        int ncid, varid1, varid2;
+        /* error handling. */
+        int retval;
 
-		 /* Open the file. NC_NOWRITE tells netCDF we want read-only access to the file.*/
-		 if (retval = nc_open(filename, NC_NOWRITE, &ncid))
-			 ERR(retval);
+        /* Open the file. NC_NOWRITE tells netCDF we want read-only access to the file.*/
+        if (retval = nc_open(filename, NC_NOWRITE, &ncid))
+            ERR(retval);
 
-		 /* Get the varid of the data variable, based on its name. */
+        /* Get the varid of the data variable, based on its name. */
 		 if ((retval = nc_inq_varid(ncid, "LNOISE_C", &varid1)) )
-			 ERR(retval);
+            ERR(retval);
 
-		 int dimids[2];
+        int dimids[2];
 		 if(retval = nc_inq_vardimid(ncid, varid1, dimids))
-			 ERR(retval);
+            ERR(retval);
 
 		 if(retval = nc_inq_dimlen(ncid, dimids[1], &nwave))
-			 ERR(retval);
+            ERR(retval);
 		 if(retval = nc_inq_dimlen(ncid, dimids[0], &ncoef))
-			 ERR(retval);
+            ERR(retval);
 
 		 Lnoise_c=(float *)malloc(ncoef*nwave*sizeof(float));
 
-		 /* Read the data. */
+        /* Read the data. */
 		 if ((retval = nc_get_var_float(ncid, varid1, Lnoise_c)) )
-			 ERR(retval);
+            ERR(retval);
 
 		 wave=(int16_t *)malloc(nwave*sizeof(int16_t));
 		 if ((retval = nc_inq_varid(ncid, "WAVE", &varid2)) )
-		 			 ERR(retval);
+            ERR(retval);
 		 if ((retval = nc_get_var_short(ncid, varid2, wave)) )
-			 ERR(retval);
+            ERR(retval);
 
-		 /* Close the file, freeing all resources. */
-		 if ((retval = nc_close(ncid)))
-			 ERR(retval);
+        /* Close the file, freeing all resources. */
+        if ((retval = nc_close(ncid)))
+            ERR(retval);
 
-		 float wavedif;
+        float wavedif;
 		 for (i=0;i<nbands;i++) {
 			 wavedif=fabs(wave_oci[i]-(float)wave[0]);
 			 wvindx[i]=0;
@@ -105,25 +105,25 @@ void noise_model_ocis(l1str *l1rec, float *noise) {
 				 if(fabs(wave_oci[i]-(float)wave[j])<wavedif){
 					 wavedif=fabs(wave_oci[i]-(float)wave[j]);
 					 wvindx[i]=j;
-				 }
-			 }
-		 }
-		 free(wave);
-	}
+                }
+            }
+        }
+        free(wave);
+    }
 
     float scaled_lt;
     for (i=0;i<npix;i++) {
     	for(j=0;j<nbands;j++){
     		scaled_lt=l1rec->Lt[i*nbands+j]*10;  //covert from mw.cm-2.sr-1.um-1 to w.m-2.sr-1.um-1.
     		noise[i*nbands+j]=sqrt(Lnoise_c[wvindx[j]]+Lnoise_c[nwave+wvindx[j]]*scaled_lt );// /snr_scale[wvindx[j]];
-    	}
+        }
     }
 }
 
 ///derive the index of OCI wavelength in MODIS wavelength domain
 int noise_index_oci(float wave)
 {
-	int i, index;
+    int i, index;
 	float wave_modis[16]={412,443,469,488,531,547,555,645,667,678,748,859,869,1240,1640,2130};
 
 	if(wave<wave_modis[0])
@@ -133,13 +133,13 @@ int noise_index_oci(float wave)
 	else{
 		for(i=0;i<16;i++){
 			if(wave<wave_modis[i])
-				break;
-			}
+                break;
+        }
 		index=i;
 		if(fabs(wave-wave_modis[i-1])< fabs(wave-wave_modis[i]))
 			index=i-1;
-	}
-	return index;
+    }
+    return index;
 }
 
 void set_error_input(l1str *l1rec, float *sensor_noise)
@@ -184,8 +184,8 @@ void set_error_input(l1str *l1rec, float *sensor_noise)
 
         if(uncertainty){
             switch(sensorID){
-            case OCI:
-            case OCIS:
+                case OCI:
+                case OCIS:
                 for(ib=0;ib<nbands;ib++){
 
                     if(wave[ib]<400)
@@ -193,29 +193,29 @@ void set_error_input(l1str *l1rec, float *sensor_noise)
                     else if(wave[ib]<=865)
                         dvc_rel[ib]=0.004;
 
-                }
+                    }
                 ib=bindex_get(820.0);
                 dvc_rel[ib]=0.0075;
 
                 //for glimr
                 for(ib=0;ib<nbands;ib++){
-                   // uncertainty->corr_nir_s[ib]=0.59;
+                        // uncertainty->corr_nir_s[ib]=0.59;
                     //uncertainty->corr_nir_l[ib]=0.53;
-                   // dvc_rel[ib]=0.005;
-                }
+                        // dvc_rel[ib]=0.005;
+                    }
                 //uncertainty->corr_nir_s[222]=0.97;
-               // uncertainty->corr_nir_l[176]=0.97;
-                break;
-            case MODISA:
+                    // uncertainty->corr_nir_l[176]=0.97;
+                    break;
+                case MODISA:
                 //float dvc_rel[16]={0.0074, 0.0078,1.0,0.0082,0.0078,0.0082,0.0084,1.0,0.0144,0.0151,0.021,1.0,0.03,1.0,1.0,1.0}; //new version 869nm=3%, Moby 5%
                 //float dvc_rel_temp[16]={0.0077, 0.0083,1.0,0.0093,0.0105,0.0116,0.0121,1.0,0.0236,0.0249,0.035,1.0,0.05,1.0,1.0,1.0};//new version 869nm=5%, Moby 5%
                 //float dvc_rel[16]={0.0056, 0.0063,1.0,0.0075,0.0101,0.0114,0.0118,1.0,0.0236,0.0249,0.035,1.0,0.05,1.0,1.0,1.0};//new version 869nm=5%, Moby 3%
                 for(ib=0;ib<nbands;ib++){
                     dvc_rel[ib]=dvc_rel_temp[ib];
-                }
-                break;
-            default:
-                break;
+                    }
+                    break;
+                default:
+                    break;
             }
         }
 
@@ -223,34 +223,34 @@ void set_error_input(l1str *l1rec, float *sensor_noise)
     }
 
     switch (sensorID) {
-    case OCI:
-    case OCIS:
+        case OCI:
+        case OCIS:
         noise_model_ocis(l1rec,noise);
-        break;
+            break;
 
-    case SEAWIFS:
-    case MERIS:
-    case OCTS:
-    case OCM1:
-    case OCM2:
-    case MOS:
-    case HICO:
-    case CZCS:
-    case OSMI:
-    case VIIRSN:
-    case VIIRSJ1:
-    case VIIRSJ2:
-    case OCRVC:
-    case GOCI:
+        case SEAWIFS:
+        case MERIS:
+        case OCTS:
+        case OCM1:
+        case OCM2:
+        case MOS:
+        case HICO:
+        case CZCS:
+        case OSMI:
+        case VIIRSN:
+        case VIIRSJ1:
+        case VIIRSJ2:
+        case OCRVC:
+        case GOCI:
         printf("%s Line %d: need a noise mode for this sensor\n",
                 __FILE__, __LINE__);
-        exit(1);
-        break;
-    default:
+            exit(1);
+            break;
+        default:
         printf("%s Line %d: need a noise mode for this sensor\n",
                 __FILE__, __LINE__);
-        exit(1);
-        break;
+            exit(1);
+            break;
     }
 
      //lt_agregat_ocis(l1rec);
@@ -261,7 +261,7 @@ void set_error_input(l1str *l1rec, float *sensor_noise)
                 ipb=ip*nbands+ib;
                 sensor_noise[ipb]=noise[ipb]/10.;
             }
-       return;
+        return;
     }
 
     for(ip=0;ip<npix; ip++){
@@ -284,9 +284,9 @@ void set_error_input(l1str *l1rec, float *sensor_noise)
             //  uncertainty->dsensor[ipb]+=0.005*l1rec->Lt[ipb];
 
             // Rayleigh systematic error based on Wang et al.(2005)
-           // uncertainty->dLr[ipb]=l1rec->Lr[ipb]*0.001;
+            // uncertainty->dLr[ipb]=l1rec->Lr[ipb]*0.001;
             //uncertainty->dLr[ipb]=0.0;
-            }
+        }
     }
 
     // error in ancillary data
@@ -354,16 +354,16 @@ float *get_uncertainty(l1str *l1rec) {
     if(firstcall){
         firstcall=0;
 
-   /* if(l1rec->l1file->sensorID==OCI ||l1rec->l1file->sensorID==OCIS  ){
-        if(firstcall){
-            firstcall=0;
+        /* if(l1rec->l1file->sensorID==OCI ||l1rec->l1file->sensorID==OCIS  ){
+             if(firstcall){
+                 firstcall=0;
 
-            if(!uncertainty)
-                noise_temp=(float *)malloc(nbands*npix*sizeof(float));
-        }
-        set_error_input(l1rec,noise_temp);
-        return noise_temp;
-    }*/
+                 if(!uncertainty)
+                     noise_temp=(float *)malloc(nbands*npix*sizeof(float));
+             }
+             set_error_input(l1rec,noise_temp);
+             return noise_temp;
+         }*/
 
 
         if(uncertainty)
@@ -381,8 +381,7 @@ float *get_uncertainty(l1str *l1rec) {
         for(iw=0;iw<nbands;iw++)
             bandindex[iw]=iw;
 
-        if(!uncertainty)
-            noise_temp=(float *)malloc(nbands*npix*sizeof(float));
+        noise_temp = (float *)malloc(nbands * npix * sizeof(float));
 
         char filename[FILENAME_MAX];
         sprintf(filename, "%s",input->uncertaintyfile);
@@ -506,7 +505,9 @@ float *get_uncertainty(l1str *l1rec) {
                 if(sensorID==OCI || sensorID==OCIS)
                     noise_temp[ipb]=sqrt(tmp_poly)/SNR_scale[iw_table]/10.;
 
-               // noise_temp[ipb]+=l1rec->Lt[ipb]*rel_unc_vc[iw];
+               noise_temp[ipb] =
+                    sqrt(l1rec->Lt[ipb] * rel_unc_vc[iw_table] * l1rec->Lt[ipb] * rel_unc_vc[iw_table] +
+                         noise_temp[ipb] * noise_temp[ipb]);
 
             }
         return noise_temp;
@@ -548,6 +549,8 @@ float *get_uncertainty(l1str *l1rec) {
 
             uncertainty->dvc[ipb]=rel_unc_vc[iw_table]*l1rec->Lt[ipb];
             uncertainty->dLr[ipb]=l1rec->Lr[ipb]*Lr_unc;
+
+            noise_temp[ipb] =sqrt(uncertainty->dvc[ipb] * uncertainty->dvc[ipb] +uncertainty->dsensor[ipb]*uncertainty->dsensor[ipb]);
         }
     }
 

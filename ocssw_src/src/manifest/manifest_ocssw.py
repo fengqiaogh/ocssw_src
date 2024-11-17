@@ -37,6 +37,7 @@ remoteRepoDir = "/data1/manifest/tags"
 # this is written to the bundle list json file when initializing a new manifest_ocssw dir
 initialBundleList = [
     {"name":"root", "dir":".", "help":"random files in the root dir", "extra":"--exclude . --include bundleList.json --include OCSSW_bash.env --include OCSSW.env", "commandLine":True},
+    {"name":"python", "dir":"python", "help":"OCSSW required python modules", "commandLine":True},
     {"name":"bin_linux_64", "dir":"bin_linux_64", "help":"executables for Linux", "commandLine":False}, 
     {"name":"bin_linux_hpc", "dir":"bin_linux_hpc", "help":"executables for Linux HPC", "commandLine":False}, 
     {"name":"bin_macosx_intel", "dir":"bin_macosx_intel", "help":"executables for Mac", "commandLine":False},

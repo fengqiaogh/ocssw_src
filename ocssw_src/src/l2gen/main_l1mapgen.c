@@ -168,7 +168,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    cdata_();
+    // cdata_();
     filehandle_init(&l1file);
     msl12_input_init();
 

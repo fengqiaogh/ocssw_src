@@ -76,6 +76,7 @@ typedef struct input_struct {
     float aer_rrs_long; /* Rrs at longest aerosol wavelength        */
     float aer_angstrom; /* angstrom for aerosol model selection     */
     int32_t gas_opt; /* 1=ozone, 2=co2, 4=no2, 8=h2o, 16=ATREM H20, 32=use gas trans tables */
+    char gas_transmittance_file[FILENAME_MAX]; /* gas transmittance input file*/
     int32_t atrem_opt; /* 1=ozone, 2=co2, 4=no2, 8=co, 16=ch4,
                                32=o2, 64=n2o                            */
     int32_t atrem_full; /* 1=do full, explicit atrem calc, 0=off    */
@@ -242,7 +243,9 @@ typedef struct input_struct {
     float kd2c[6];
 
     float flh_offset;
-
+    int flh_num_base_wavelengths;
+    float *flh_base_wavelengths;
+    float flh_height_wavelength;
     /* sst stuff */
     int32_t viirsnv7; /* =1 to use the VIIRSN V7 high satz latband equation and coeffs */
     int32_t viirsnosisaf; /* =1 to use the VIIRSN OSI-SAF equation and coeffs (sort of v5 like) */
@@ -301,6 +304,9 @@ typedef struct input_struct {
     int32_t *mbac_wave;/*wavelengths used for mbac AC*/
     int32_t nbands_ac;
     int32_t *acbands_index;
+
+    int *watervapor_bands; /*bands used to retrieve water vapor based on 3-band depth approach*/
+    int nbands_watervapor;
 } instr;
 
 #ifdef __cplusplus

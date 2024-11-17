@@ -789,7 +789,9 @@ int openl2(filehandle *l2file) {
 
         if (l2file->sensorID == AVHRR) {
             strcpy(avhrrbird, "NOAA-");
+#ifdef BUILD_HISTORICAL
             strncat(avhrrbird, xsatid2name(l2file->subsensorID) + 2, 2);
+#endif
             PTB(SetChrGA(ds_id, "platform", avhrrbird));
         } else {
             PTB(SetChrGA(ds_id, "platform", sensorId2PlatformName(l2file->sensorID)));

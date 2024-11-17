@@ -36,7 +36,9 @@
 #include "table_io_wrapper.h"
 #include <clo.h>
 #include <uncertainty.h>
+#ifdef BUILD_HISTORICAL
 #include "navigation.h"
+#endif
 #include "read_l3bin.h"
 #include "par_utils.h"
 #include "get_nitrate.h"

@@ -203,7 +203,7 @@ def print_sys_info():
     print('Python3 version: {0}'.format(get_cleaned_python_version()))
     print('Python3 Path: {0}'.format(get_python3_path()))
     env_output = get_env()
-    printenvs = ['CC','CXX','FC','OCSSW_ARCH','OCSSW_BIN','OCSSW_DEBUG','OCSSW_MODIS',
+    printenvs = ['CC','CXX','FC','OCSSW_ARCH','OCSSW_BIN','OCSSW_DEBUG',
                  'OCVARROOT','ELEMENTS','EOS_LIB_PREFIX','GCC_TUNE','HDFEOS_LIB',
                  'HRPT_STATION_IDENTIFICATION_FILE','L2GEN_ANC','LIB3_BIN','LIB3_CHECK',
                  'LIB3_DIR','LIB3_INC','LIB3_LIB','NAVCTL','NAVQC','ORBCTL','PGSINC','PGSLIB',

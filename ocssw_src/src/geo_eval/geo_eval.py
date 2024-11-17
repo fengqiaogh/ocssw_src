@@ -9,7 +9,6 @@ import pyproj
 from scipy.interpolate import RegularGridInterpolator, griddata
 from shapely.geometry import Point
 from shapely.geometry.polygon import Polygon
-# from matplotlib import pyplot as plt
 from scipy.ndimage import uniform_filter
 import time
 from copy import deepcopy
@@ -19,7 +18,7 @@ from scipy import optimize
 from typing import List, Dict
 
 PROGRAM_NAME = 'geo_eval'
-VERSION = "1.2.1"
+VERSION = "1.3.1"
 bad_float = -32767.0
 running_time = datetime.datetime.now()
 RUNNING_TIME = running_time.strftime("%Y-%m-%dT%H%M%S")
@@ -208,17 +207,22 @@ def parse_command_line():
                         chip - input chip file
                         feature_latitude - latitude of the center of the chip
                         feature_longitude - longitude of the center of the chip
-                        delta_latitude - latitude shift
-                        delta_longitude -  longitude shift.
+                        delta_latitude - latitude shift,  latitude coordinate of the peak of NCC
+                        delta_longitude -  longitude shift, longitude coordinate of the peak of NCC
                         pixel_number - pixel number between 0 and pixels_per_line-1 (or ccd_pixels-1 for OCI)
-                        confidence_level - the maximum value of the normalized cross correlation within a sliding lat/lon window
-                        tilt - tilt angle''',
+                        confidence_level - the maximum value of the normalized cross correlation (NCC) within a sliding lat/lon window
+                        tilt - tilt angle
+                        fit_delta_latitude - latitude shift from the Lorentzian fit of NCC
+                        fit_delta_longitude - longitude shift from the Lorentzian fit of NCC
+                        r_squared - R_squared of the the Lorentzian fit
+                        ''',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''\
                 Additional output info:
-                scantime is a scantime of the line where the feature pixel was found
+                scantime is a scantime of the line where the feature pixel was found.
                 delta_latitude and delta_longitude mean that a point in the chip with (lat,lon) coordinates correspond to a point in the granule with (lat + delta_latitude, lon + delta_longitude).
                 The maximum possible value of confidence_level is 1 which means 100% match. Higher value is better. Values lower 0.5 indicate poor match.
+                fit_delta_latitude, fit_delta_longitude and r_squared can be NaN if the fit does not converge.
          ''')
     parser.add_argument("-v", "--version", action="version", version=VERSION)
     parser.add_argument(
@@ -399,7 +403,7 @@ def get_lat_lon_shift(l1b_path: str, chips_list: List[str], output_file_name: st
         if position_of_the_chip is None:
             print(f"Skipping the chip {chip_path} ...")
             continue
-        i_cell, j_cell, _, _, _, _, point = position_of_the_chip
+        i_cell, j_cell, p0, p1, p2, p3, point = position_of_the_chip
         if i_cell < 2 * w or (lat.shape[0] - i_cell) < 2 * w:
             print(
                 f"The chip {chip_path} is too close to the swath edge : line_number={i_cell}. Skipping ...")
@@ -455,24 +459,23 @@ def get_lat_lon_shift(l1b_path: str, chips_list: List[str], output_file_name: st
             tilt = 0.0
         else:
             tilt = tilt_angle[i_cell]
-        if debug_mode:
-            # computing the fit parameters
-            result_out = get_lat_lon_fit_shifts(
-                ncc_array, shift_lat_array, shift_lon_array, delta_latitude, delta_longitude)
-            if result_out:
-                x0_fit, y0_fit, GammaX, GammaY, Factor, alpha, Amplitude, offset, fit, r_squared = result_out
-            else:
-                print(f"Warning: lorentzian fit for {chip_path} has not converged")
-                x0_fit = np.NAN
-                y0_fit = np.NAN
-                r_squared = np.NAN
-                fit = np.ones(ncc_array.shape) * np.NAN
-                alpha = np.NAN
-                Amplitude = np.NAN
-                offset = np.NAN
-                Factor = np.NAN
-                GammaX = np.NAN
-                GammaY = np.NAN
+        # computing the Lorentzian fit parameters
+        result_out = get_lat_lon_fit_shifts(
+            ncc_array, shift_lat_array, shift_lon_array, delta_latitude, delta_longitude)
+        if result_out:
+            x0_fit, y0_fit, GammaX, GammaY, Factor, alpha, Amplitude, offset, fit, r_squared = result_out
+        else:
+            print(f"Warning: lorentzian fit for {chip_path} has not converged")
+            x0_fit = np.NAN
+            y0_fit = np.NAN
+            r_squared = np.NAN
+            fit = np.ones(ncc_array.shape) * np.NAN
+            alpha = np.NAN
+            Amplitude = np.NAN
+            offset = np.NAN
+            Factor = np.NAN
+            GammaX = np.NAN
+            GammaY = np.NAN
         if debug_mode:
             mode = "a"
             out_ncc_filename = f"ncc_{RUNNING_TIME}_{os.path.basename(l1b_path)}.nc"
@@ -492,12 +495,23 @@ def get_lat_lon_shift(l1b_path: str, chips_list: List[str], output_file_name: st
                     out_ncc.createDimension("lon", sc_image.shape[0])
                     out_ncc.version = VERSION
                     out_ncc.runtime = RUNNING_TIME
+                    out_ncc.setncattr("l1b_file", l1b_path)
+                    out_ncc.setncattr("chips",",".join(chips_list))
+                    for key,val in kwargs.items():
+                        if val is not None:
+                            out_ncc.setncattr(key,val)
+                        else:
+                            out_ncc.setncattr(key,"")
                 grp: nc.Group = out_ncc.createGroup(
                     os.path.basename(chip_path))
                 grp.delta_latitude = delta_latitude
                 grp.delta_longitude = delta_longitude
                 grp.line = i_cell
                 grp.pixel = j_cell
+                wkt_polygon_str : str = Polygon([p0, p1, p2, p3]).wkt
+                wkt_point_str : str = point.wkt
+                grp.setncattr("Point",wkt_point_str)
+                grp.setncattr("Bounding_polygon",wkt_polygon_str)
                 grp.lat_fit = x0_fit
                 grp.lon_fit = y0_fit
                 grp.alpha = alpha
@@ -507,6 +521,9 @@ def get_lat_lon_shift(l1b_path: str, chips_list: List[str], output_file_name: st
                 grp.GammaX = GammaX
                 grp.GammaY = GammaY
                 grp.r_squared = r_squared
+                grp.tilt = tilt
+                grp.feature_latitude = point.x
+                grp.feature_longitude = point.y
                 grp.createDimension("chip_lat_len", lat_lin.size)
                 grp.createDimension("chip_lon_len", lon_lin.size)
                 var_grp_local = grp.createVariable(varname="lat_lin", dimensions='chip_lat_len',
@@ -566,9 +583,17 @@ def get_lat_lon_shift(l1b_path: str, chips_list: List[str], output_file_name: st
         data_out[-1]['pixel_number'] = f"{j_cell:12d}"
         data_out[-1]['confidence_level'] = f"{max_ncc:16.7f}"
         data_out[-1]['tilt'.rjust(10)] = f"{tilt:10.5f}"
-        # data_out[-1]['fit_delta_latitude'] = f"{x0_fit:14.7f}"
-        # data_out[-1]['fit_delta_longitude'] = f"{y0_fit:15.7f}"
-        # data_out[-1]['r_squared'] = f"{r_squared:15.7f}"
+        if abs(x0_fit) > 1.0 or abs(y0_fit) > 1.0:
+            print(f"Fit did not converge for {x0_fit} and {y0_fit}")
+            r_squared = np.NAN
+        if not np.isnan(r_squared):                
+            data_out[-1]['fit_delta_latitude'] = f"{x0_fit:18.7f}"
+            data_out[-1]['fit_delta_longitude'] = f"{y0_fit:18.7f}"
+            data_out[-1]['r_squared'.rjust(15)] = f"{r_squared:15.7f}"
+        else:
+            data_out[-1]['fit_delta_latitude'] = "NaN".rjust(18)
+            data_out[-1]['fit_delta_longitude'] = "NaN".rjust(18)
+            data_out[-1]['r_squared'.rjust(15)] = "NaN"
     if len(data_out) > 0:
         fields = []
         for key in data_out[0]:

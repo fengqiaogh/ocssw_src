@@ -15,8 +15,9 @@
 //#include        "hdfhdr.h"
 //#include        "hdfmac.h"
 //#include        "usrhdr.h"
+#ifdef BUILD_HISTORICAL
 #include        "usrmac.h"
-
+#endif
 #define VERSION "2.0"
 
 #define IOERR           -1

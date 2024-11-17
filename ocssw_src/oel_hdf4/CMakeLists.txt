@@ -5,7 +5,9 @@ project (OEL_HDF4)
 file(GLOB files "lib*")
 
 foreach(dir ${files})
+if (BUILD_HISTORICAL OR NOT((${dir} MATCHES "seawifs") OR (${dir} MATCHES "osmi") OR (${dir} MATCHES "czcs")))
   add_subdirectory(${dir})
+   endif()
 endforeach(dir)
 
 add_subdirectory(filetype)

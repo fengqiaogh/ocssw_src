@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    cdata_();
+    // cdata_();
     filehandle_init(&ifile);
     filehandle_init(&ofile);
     msl12_input_init();

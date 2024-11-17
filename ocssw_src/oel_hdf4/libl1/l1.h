@@ -243,6 +243,7 @@ typedef struct l1_struct {
     float *t_o2;
     float *tg_sol;
     float *tg_sen;
+    float *tg;
     float *t_sol;
     float *t_sen;
     float *rhof;

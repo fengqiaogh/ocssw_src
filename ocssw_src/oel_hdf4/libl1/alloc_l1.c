@@ -29,7 +29,7 @@ int32_t alloc_l1(filehandle* l1file, l1str *l1rec) {
     /* allocate data block as contiguous bytes              */
     /*                                                      */
     len = 34 * sizeof (float)*npix
-            + 22 * sizeof (float)*npix * nbands
+            + 23 * sizeof (float)*npix * nbands
             + 2 * sizeof (float)*npix * nbandsir
             + 1 * sizeof (float)*nbands
             + 4 * sizeof (int32_t) * npix
@@ -133,6 +133,8 @@ int32_t alloc_l1(filehandle* l1file, l1str *l1rec) {
     l1rec->tg_sol = (float *) p;
     p += sizeof (float)*npix*nbands;
     l1rec->tg_sen = (float *) p;
+    p += sizeof (float)*npix*nbands;
+    l1rec->tg = (float *) p;
     p += sizeof (float)*npix*nbands;
     l1rec->t_sol = (float *) p;
     p += sizeof (float)*npix*nbands;

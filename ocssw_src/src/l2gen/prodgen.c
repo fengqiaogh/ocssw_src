@@ -148,17 +148,6 @@ VOIDP prodgen(l2prodstr *p, l2str *l2rec) {
             applyMultiplier(extract_band(l2rec->nLw, p, numBands), fbuf, numPixels, 10.0);
         pbuf = fbuf;
         break;
-    case CAT_nLw_unc:
-        if(!input->proc_uncertainty) {
-            printf("-E- Can not produce product Rrs_unc without setting proc_uncertainty\n");
-            exit(EXIT_FAILURE);
-        }
-        if (p->rank == 3)
-            applyMultiplier(extract_band_3d(l2rec->nLw_unc, fbuf), fbuf, numPixels * input->nwavelengths_3d, 10.0);
-        else
-            applyMultiplier(extract_band(l2rec->nLw_unc, p, numBands), fbuf, numPixels, 10.0);
-        pbuf = fbuf;
-        break;
     case CAT_Lw:
         if (p->rank == 3)
             applyMultiplier(extract_band_3d(l2rec->Lw, fbuf), fbuf, numPixels * input->nwavelengths_3d, 10.0);
@@ -1048,7 +1037,7 @@ VOIDP prodgen(l2prodstr *p, l2str *l2rec) {
     	get_bpar(l2rec,p,fbuf);
         pbuf = (VOIDP) fbuf;
     	break;
-        
+#ifdef BUILD_CLOUD        
    /* Chimaera cloud products */
     case CAT_CER_2100:
     case CAT_CER_2200:
@@ -1105,7 +1094,7 @@ VOIDP prodgen(l2prodstr *p, l2str *l2rec) {
     case CAT_Cld_ice_cloud:
         pbuf = (VOIDP)get_cmp_byt( l2rec, p->cat_ix );
         break;
-
+#endif    
 /*  WDR cloud top height parameters, we just get the values from the record */
     case CAT_cth_alb_init:
         pbuf = (VOIDP) l1rec->cld_dat->cth_alb_init;

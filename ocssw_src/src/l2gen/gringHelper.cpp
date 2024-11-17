@@ -189,8 +189,8 @@ bool gringHelper::includeScanInGring(float *lat, float *lon, int32_t *flags, siz
         }
         // CONDITION 3: If the satellite passes over a pole, detect the change from e.g. ascending to descending (or vice versa)
         // and return scanBounds after resetting "state information". Also CONDITION 1 must have already been satisfied; i.e. last_lat
-        // has a non-default value.
-        if (first_good_scan && (last_direction == -this_direction) && (this_direction != 0)) {
+        // has a non-default value.  Only look in high latitudes.
+        if (first_good_scan && (last_direction == -this_direction) && (this_direction != 0) && (fabs(lat[good_cpix]) > 75)) {
             last_direction = this_direction;
             last_lat = lat[good_cpix];
             //printf("includeScanInGring: Scan returned due to change in direction, recnum = %d, lat[good_cpix] = %f\n", (int)recnum, lat[good_cpix]);

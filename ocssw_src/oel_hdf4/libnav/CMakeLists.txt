@@ -9,55 +9,34 @@ include_directories(${GSL_INCLUDE_DIRS})
 set(LIBS ${GSL_LIBRARIES})
   
 list(APPEND LIBS genutils m)
+# Required packages
+if(${CMAKE_SYSTEM_NAME} MATCHES "Windows" )
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWINPATH")
+endif()
+
+
+if (BUILD_HISTORICAL)
+  set(src_nav_cns cdata.f)
+endif()
 
 ADD_LIBRARY(nav
-  cdata.f
-  crossp.f
-  esdist.f
-  filenv.f
-  gha2000.f
-  l_sun.f
-  ocorient.f
-  sunangs.f
+  ${src_nav_cns}
   get_zenaz.c
   compute_alpha.c
   compute_dist.c
-  get_ut1.f
-  asap_rots.f
-  asap_rot_int.f
-  ymdhms2jul.f
-  jd.f
-  asaps.f
-  add_elements.f
-  get_elements.f
-  put_elements.f
-  pderiv.f
-  fitgps.f
-  vec2mean.f
-  jdate.f
-  matvec2.f
-  jddate.f
-  julian.f
-  kepler.f
-  kozsak2.f
-  coord.f
-  setsun.f
-  setthd.f
-  rk78.f
-  rk78cn.f
-  pout.f
-  der.f
-  mediqr.f
-  invert.f
-  eqnox.f
-  delm.f
-  dens76.f
-  legend.f
-  angles.f
-  ephem.f
-  xthird.f
-  select.f
-  anomly.f
+  nav.c
+  math_utils.c
+  crossp.c
+  sunangs.c
+  sun2000.c
+  gha2000.c
+  ephparms.c
+  nutate.c
+  l_sun.c
+  ocorient.c
+  esdist.c
+  getenv.cpp
+  ftn_interface.c
 )
 
 target_link_libraries(nav ${LIBS})

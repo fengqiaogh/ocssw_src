@@ -1416,8 +1416,8 @@ int readl1_viirs_h5(filehandle * file, int32_t dline, l1str * l1rec, int lonlat)
     int32_t nbands = (int32_t) file->nbands;
 
     l1rec->npix = file->npix;
-    if (firstcall)
-        cdata_();
+    // if (firstcall)
+    //     cdata_();
     /*
      *  get proper line in data and detector #
      */

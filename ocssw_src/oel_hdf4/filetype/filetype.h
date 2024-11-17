@@ -34,6 +34,7 @@ typedef enum {
     FT_OCML1B,
     FT_OCML1BDB,
     FT_OCTSL1A,
+    FT_OCTSL1ANC,
     FT_OCTSL1B,
     FT_OLCI,
     FT_OLCIGEO,

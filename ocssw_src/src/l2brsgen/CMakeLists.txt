@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.12)
 
 set(LIBS genutils l2 timeutils)
 
+if(BUILD_HISTORICAL)
+    set(CMAKE_C_FLAGS "-D BUILD_HISTORICAL")
+    set(CMAKE_CXX_FLAGS "-D BUILD_HISTORICAL")
+endif(BUILD_HISTORICAL)
+
 find_package(PNG REQUIRED)
 include_directories(${PNG_INCLUDE_DIRS})
 list(APPEND LIBS ${PNG_LIBRARIES})

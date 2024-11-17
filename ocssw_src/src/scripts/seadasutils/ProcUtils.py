@@ -178,10 +178,10 @@ def uncompressFile(compressed_file):
         UNIX compress
     """
 
-    compProg = {".gz": "gunzip -f ", ".Z": "gunzip -f ", ".bz2": "bunzip2 -f "}
+    compProg = {".gz": "gunzip", ".Z": "gunzip", ".bz2": "bunzip2"}
     exten = Path(compressed_file).suffix
     unzip = compProg[exten]
-    cmd = [unzip,str(compressed_file.resolve())]
+    cmd = [unzip, "-f", str(compressed_file.resolve())]
     p = subprocess.Popen(cmd, shell=False)
     status = os.waitpid(p.pid, 0)[1]
     if status:

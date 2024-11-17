@@ -138,6 +138,13 @@ void dataintp_(float* in_latlon, float* lat_list, float* lon_list,
         int32_t* intporder, float* dummy, float* dataout, float* unc,
         int32_t* int_bad, int32_t* row, int32_t* col);
 
+
+int dataintp(float in_latlon[2], float* lat_list, float* lon_list,
+               float* data_list1, double* DT1, float* data_list2, double* DT2,
+               int32_t* ipt, int32_t* nband, float rng[2], float* def,
+               int32_t* intporder, float* dummy, float* dataout, float* unc,
+               int32_t* int_bad, int32_t* row, int32_t* col);
+
 void julian_(double* dtin, double* d_jd);
 
 

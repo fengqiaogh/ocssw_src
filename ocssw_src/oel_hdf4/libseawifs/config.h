@@ -154,8 +154,10 @@ extern int pclose(FILE *);
 
 /* FILE requires the inclusion of stdio.h */
 #ifndef OSF1_V3
-#if defined(LINUX) && !(defined(__APPLE__))
+#if (defined(linux) || defined(__linux__) || defined(__linux) || defined(LINUX)) && !(defined(__APPLE__))
+
 extern void setlinebuf(FILE *stream);
+
 #else
 extern int setlinebuf(FILE *stream);
 #endif
@@ -163,6 +165,7 @@ extern int setlinebuf(FILE *stream);
 
 /* trunc.h */
 extern double trunc(double);
+
 #ifndef OSF1_V3
 /* #pragma no side effects (trunc) */
 #endif /* !OSF1_V3 */

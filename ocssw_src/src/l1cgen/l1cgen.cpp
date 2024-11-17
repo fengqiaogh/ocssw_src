@@ -221,6 +221,11 @@ int main(int argc, char** argv) {
                             "        0: disabled\n"
                             "        1: use rhow_412 aerosol index test\n"
                             "        2: GMAO ancillary aerosol test");
+            clo_addOption(optionList, "flh_base_wavelengths", CLO_TYPE_FLOAT, NULL, "flh baseline wavelengths");
+            clo_addOption(optionList, "flh_height_wavelength", CLO_TYPE_FLOAT, "-1.0", "flh height wavelength");
+            clo_addOption(optionList, "gas_transmittance_file", CLO_TYPE_IFILE, NULL, "gaseous transmittance file");
+            clo_addOption(optionList, "watervapor_bands", CLO_TYPE_INT, NULL, "bands used for calculating water vapor based on 3-band depth approach");
+
             l1_read_default_files(optionList, &l1file, ifile_char);
             l1_load_options(optionList, &l1file);
             clo_deleteList(optionList);

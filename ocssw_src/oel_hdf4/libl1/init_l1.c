@@ -81,6 +81,7 @@ void init_l1(l1str *l1rec) {
             l1rec->t_o2 [ipb] = BAD_FLT;
             l1rec->tg_sol [ipb] = BAD_FLT;
             l1rec->tg_sen [ipb] = BAD_FLT;
+            l1rec->tg [ipb] = BAD_FLT;
             l1rec->t_sol [ipb] = BAD_FLT;
             l1rec->t_sen [ipb] = BAD_FLT;
             l1rec->rhof [ipb] = BAD_FLT;

@@ -239,7 +239,7 @@ def copyGlobalAttributes(iFile: str, oFile: str):
         ncFile.setncattr("platform","Orbview-2")
         ncFile.setncattr("processing_level","L1A")
         ncFile.setncattr("processing_version","V2")
-        ncFile.setncattr("product_name","S2000011192121.L1A_HNSG.l1agen.nc")
+        ncFile.setncattr("product_name","{}".format(oFile.name))
         ncFile.setncattr("project","Ocean Biology Processing Group")
         ncFile.setncattr("publisher_email","data@oceancolor.gsfc.nasa.gov")
         ncFile.setncattr("publisher_name","NASA/GSFC/OB.DAAC")

@@ -44,10 +44,10 @@
             "tag": "V2024.1"
         },
         ".manifest_tag": {
-            "checksum": "bd73b82f76ba5e70678691ca41d6e2e760c63178490e4fe4d0dcb2c258cd6870",
+            "checksum": "9f1093603e57ae589da0a74aeb50bc4c81077725a574bfbf83d4e3eea830dded",
             "mode": 33204,
-            "size": 8,
-            "tag": "T2024.23"
+            "size": 9,
+            "tag": "T2024.24"
         },
         ".vimrc.local": {
             "checksum": "2f1fe8b5e6f3c70439247b01b139d8fc56a7579740431932e5af2b51e733bdfb",
@@ -56,10 +56,10 @@
             "tag": "initial"
         },
         "CMakeLists.txt": {
-            "checksum": "7f248861e40a3129ec7a82c7ab6d45cfe70f89f78f4e8b3576c4c39116ced6d5",
+            "checksum": "e9d38dab263ee505616290c1ae7e9ae449df59cd25be444b5a5d7f28c6489604",
             "mode": 33204,
-            "size": 6639,
-            "tag": "V2024.3"
+            "size": 6762,
+            "tag": "T2024.24"
         },
         "OCSSW.env": {
             "checksum": "259e2504b1600fea4250525ad916b32adb3d5e19039f7b0f865503eee7ae0b8b",
@@ -602,10 +602,10 @@
             "tag": "initial"
         },
         "oel_hdf4/CMakeLists.txt": {
-            "checksum": "a82b2679034def6b644190031e798adf3065bc1c8e96854a7eaa3a1837ea93d6",
+            "checksum": "96a8dd03296e626e6d52870cd0b4d97c52d4f408e2b361c1044898621cea0b89",
             "mode": 33204,
-            "size": 200,
-            "tag": "R2022.0"
+            "size": 322,
+            "tag": "T2024.24"
         },
         "oel_hdf4/README.md": {
             "checksum": "cb1627355a057a4b94ee04d9fd3624cb67bc9b4489e15ed1d2554d0ed00d1354",
@@ -662,16 +662,16 @@
             "tag": "R2022.0"
         },
         "oel_hdf4/filetype/filetype.c": {
-            "checksum": "2188b687873e916664237e406a9cf45822b8f56eb03ac135ebcbbbcf79e1bad9",
+            "checksum": "f7921285bb05a649596a2b626f9e65dd8bb35d764565801363ae4130be9f5a2f",
             "mode": 33204,
-            "size": 56142,
-            "tag": "V2024.3"
+            "size": 56610,
+            "tag": "T2024.24"
         },
         "oel_hdf4/filetype/filetype.h": {
-            "checksum": "855fde87b59de6e712a51f41b4f38e3683d100c9593a40a4d312d819034ab9d4",
+            "checksum": "a4457e4bb2ae66c9dac68dc38ca05347b23c1a61bfa43c6c7e7a1bb58b2bda8c",
             "mode": 33204,
-            "size": 1691,
-            "tag": "V2024.3"
+            "size": 1709,
+            "tag": "T2024.24"
         },
         "oel_hdf4/filetype/filetypeXml.cpp": {
             "checksum": "e11cb9b7fa09b8ac7f8fd316b8c19a41f5cef7891f264be0c02bbfbb9ce91856",
@@ -728,16 +728,16 @@
             "tag": "R2022.0"
         },
         "oel_hdf4/libbilio/read_aviris.c": {
-            "checksum": "d722be191db0ab9143ee13e81e6ec30a254200de57d33d0051860910cf55a573",
+            "checksum": "b7a1eb904668c673d3bf69435b6895a1f4bba7999a04e84ac0132083dad147a5",
             "mode": 33204,
-            "size": 30371,
-            "tag": "R2022.0"
+            "size": 30374,
+            "tag": "T2024.24"
         },
         "oel_hdf4/libbilio/read_prism.c": {
-            "checksum": "cd7072590ddb10ccb81abdebc3cf36797831ef09975bf9041af017d84cef7233",
+            "checksum": "b0ffc22bd35b89a118f55697fbb14ba2e1c736ce2541f0085b09893c960783bc",
             "mode": 33204,
-            "size": 17419,
-            "tag": "R2022.0"
+            "size": 17422,
+            "tag": "T2024.24"
         },
         "oel_hdf4/libbin/CMakeLists.txt": {
             "checksum": "e92eedb263531eb0e9e30de48cb85dff6cc6e7f9386f2b58a6f14cadc93c517b",
@@ -1064,10 +1064,10 @@
             "tag": "T2022.14"
         },
         "oel_hdf4/libl1/CMakeLists.txt": {
-            "checksum": "69e90026f77d6628f47bcfad31ca1a7a65321cc9caa45a01af37dc505e3c5786",
+            "checksum": "8cdc68f4febcca6591f43cc436259e624348a78e305d300742fba7d36ce42b02",
             "mode": 33204,
-            "size": 2354,
-            "tag": "V2024.3"
+            "size": 2565,
+            "tag": "T2024.24"
         },
         "oel_hdf4/libl1/airmass_avhrr.f": {
             "checksum": "6bbe346a4747d1d59024f5972dbc3ebe43dc00111675cdf142a62d7681cd996e",
@@ -1076,10 +1076,10 @@
             "tag": "R2022.0"
         },
         "oel_hdf4/libl1/alloc_l1.c": {
-            "checksum": "293ae3ecb4e6cf4f69b88b41cffa97b7c19d4a24bb4024a6295095cd797b2020",
+            "checksum": "fa81b4549d930006add870acc4907c6a01c9feb14798de29dd081c22515d75d2",
             "mode": 33204,
-            "size": 7567,
-            "tag": "T2023.17"
+            "size": 7633,
+            "tag": "T2024.24"
         },
         "oel_hdf4/libl1/avhrrsub5h.f": {
             "checksum": "127e902486f5d43314d7b4988923ef47eb8b889ea314cf2fce86b803aca8961a",
@@ -1153,11 +1153,17 @@
             "size": 5815,
             "tag": "R2022.0"
         },
-        "oel_hdf4/libl1/getglint.f": {
-            "checksum": "6210ebbe2cb02ef2b96c933d7daa827dccc9930bce40ad392293464b20af5b2a",
+        "oel_hdf4/libl1/getglint.c": {
+            "checksum": "5e783952bfafcd83fec0c566c73da6d122e0dc18dcfa19d451072a90dec55f4f",
             "mode": 33204,
-            "size": 7721,
-            "tag": "R2022.0"
+            "size": 4769,
+            "tag": "T2024.24"
+        },
+        "oel_hdf4/libl1/glint.h": {
+            "checksum": "aba0201e994b08b11b110697a2ffe8eb89ab3e63b1a58a8f22196b7d10f46edb",
+            "mode": 33204,
+            "size": 539,
+            "tag": "T2024.24"
         },
         "oel_hdf4/libl1/hmf8.f": {
             "checksum": "445e125e50d668219f4bc78b029bc0360e270726e2cf2d462e612ec9fe67dbe7",
@@ -1166,10 +1172,10 @@
             "tag": "R2022.0"
         },
         "oel_hdf4/libl1/init_l1.c": {
-            "checksum": "1182942055390183dbe7df1586ef1aa9211f0c5a0ab9ca3988cd325dc231cf04",
+            "checksum": "87e7b3f19f4110aceaf10a7f66a1036636ca7adaaa8a7fc85837259109ea7de9",
             "mode": 33204,
-            "size": 3713,
-            "tag": "T2022.19"
+            "size": 3752,
+            "tag": "T2024.24"
         },
         "oel_hdf4/libl1/intpos.f": {
             "checksum": "79adf418778e6ae3654adc0e25a24d85f67fb4e87407acb78acfa278ee210226",
@@ -1178,10 +1184,10 @@
             "tag": "R2022.0"
         },
         "oel_hdf4/libl1/l1.h": {
-            "checksum": "e1b0d5d76b78ad99d1528e795594041448052821b7511158fc1309ac880d6605",
+            "checksum": "db9b79c550b157a7140ba351bf9f528d6399cda55f68414be76814435535d3c5",
             "mode": 33204,
-            "size": 9681,
-            "tag": "T2023.27"
+            "size": 9696,
+            "tag": "T2024.24"
         },
         "oel_hdf4/libl1/l1_aci.c": {
             "checksum": "61f655ad9b4990a7b338745cdec9227393bff52946bbaa0d02851a29ad29d4b1",
@@ -1196,10 +1202,10 @@
             "tag": "T2022.23"
         },
         "oel_hdf4/libl1/l1_aviris.c": {
-            "checksum": "4076a3437deeb391301fb64d43b0dabc8357377373d8b7f00cad180c98839e64",
+            "checksum": "a359c375f5d7cb127636f318c26790849b28370128989966db46b65a3e2bc81c",
             "mode": 33204,
-            "size": 31580,
-            "tag": "R2022.0"
+            "size": 31583,
+            "tag": "T2024.24"
         },
         "oel_hdf4/libl1/l1_aviris.h": {
             "checksum": "e6a97afc51c5976ad496a8b897291438624109585020ef5503e788ed86d0291c",
@@ -1232,10 +1238,10 @@
             "tag": "T2022.23"
         },
         "oel_hdf4/libl1/l1_generic_write.c": {
-            "checksum": "1327ea562c819d241904b087c329ac987f81e07d9d486ac84afd85c5b93d9fee",
+            "checksum": "4f8bb486d011501bfb5cdd97178ba6bab3878e78a45464a572906d7186338831",
             "mode": 33204,
-            "size": 28640,
-            "tag": "T2022.23"
+            "size": 28671,
+            "tag": "T2024.24"
         },
         "oel_hdf4/libl1/l1_goci.c": {
             "checksum": "09447d34fbc8246f9636dae47c840b645d55670f2bd5e6b7caa3c631dc0f9867",
@@ -1298,10 +1304,10 @@
             "tag": "T2024.22"
         },
         "oel_hdf4/libl1/l1_io.c": {
-            "checksum": "0eff30ad06698fe70ca6d6db4a855225e3d69eb0c9b70efb9021afa07817c330",
+            "checksum": "321959c4c927eb311704dfa2d7f66a5edc8de585e2694fbb52f4f66ae76a394a",
             "mode": 33204,
-            "size": 20941,
-            "tag": "V2024.3"
+            "size": 21465,
+            "tag": "T2024.24"
         },
         "oel_hdf4/libl1/l1_l1c.c": {
             "checksum": "58f321b20d1c32fea2540f638aaf5cb86dadc7da27522f4c253eaed9fb8b3f08",
@@ -1442,10 +1448,10 @@
             "tag": "R2022.0"
         },
         "oel_hdf4/libl1/l1_oci.c": {
-            "checksum": "5d9807e043640b100fdb9107b6211e83055e27bf00d8af778ec2b1c75cc50386",
+            "checksum": "a794dd6eedd879a01f26ea9c30da54085f0a59606320b81eb46eae96da1373ad",
             "mode": 33204,
-            "size": 24320,
-            "tag": "T2024.23"
+            "size": 24601,
+            "tag": "T2024.24"
         },
         "oel_hdf4/libl1/l1_oci.h": {
             "checksum": "3c221765eb1de27c365cdc9c0b3ac22b214ad873e08eb49c6d50941ee8b30e90",
@@ -1514,16 +1520,28 @@
             "tag": "T2022.23"
         },
         "oel_hdf4/libl1/l1_octs.c": {
-            "checksum": "e6b39f61ad85110eca385b8e64399e2d3937dfdcbd5c28d0f5c66ac7279f0b8a",
+            "checksum": "d537dc90d7e20623cc7e501bdf1f5cc8bcf98c3f096954d9dde047735bd90d33",
             "mode": 33204,
-            "size": 42908,
-            "tag": "T2022.23"
+            "size": 42788,
+            "tag": "T2024.24"
         },
         "oel_hdf4/libl1/l1_octs.h": {
-            "checksum": "9b0d1a3789d6d17a2497e31494a4d80caed957c552a3d50ed718d9f661cb9bcb",
+            "checksum": "5ee492bedf9c9399faea0f801a39004779619c8cd63ef44efd51f7b19677a8c9",
             "mode": 33204,
-            "size": 230,
-            "tag": "T2022.23"
+            "size": 890,
+            "tag": "T2024.24"
+        },
+        "oel_hdf4/libl1/l1_octs_netcdf.cpp": {
+            "checksum": "474b27d1159da36f756d372d001220e5e4a9dff1b1999986cdcdb0a06667e42d",
+            "mode": 33204,
+            "size": 28953,
+            "tag": "T2024.24"
+        },
+        "oel_hdf4/libl1/l1_octs_netcdf.h": {
+            "checksum": "f27701ec3ba0ee7547dac0f1fd686ba083d356e726d237507a2ebeced59ec2f0",
+            "mode": 33204,
+            "size": 369,
+            "tag": "T2024.24"
         },
         "oel_hdf4/libl1/l1_oli.c": {
             "checksum": "dda6df9832cefdc53c232a34da5903f1e0e61137ef246f3e37d7765da39c9346",
@@ -1640,10 +1658,10 @@
             "tag": "T2024.0"
         },
         "oel_hdf4/libl1/l1_viirs_h5.c": {
-            "checksum": "7e5b230e8f4bc5055fad3ce0d2ec941a989b3cf728625dee8505ba52de9ae935",
+            "checksum": "06e593b1e3e0dd6ff3ceb78aacff42f6bc46cc637ae47a6272447e3dd1d3ecc6",
             "mode": 33204,
-            "size": 70405,
-            "tag": "T2023.32"
+            "size": 70411,
+            "tag": "T2024.24"
         },
         "oel_hdf4/libl1/l1_viirs_h5.h": {
             "checksum": "3a7eeb26e72e012836fbc966b4f8038e0b16d97e62add6cf999f53ac34f7289f",
@@ -2012,51 +2030,15 @@
             "tag": "R2022.0"
         },
         "oel_hdf4/libnav/CMakeLists.txt": {
-            "checksum": "520febaf3e216845c7b6d18c989079ebcff6f8e78e7830f3f21a1b4f0d835a19",
+            "checksum": "7af9358f2cfd35b0780ea5f667f115462260646ed3215984863db66b39736ba8",
             "mode": 33204,
-            "size": 968,
-            "tag": "R2022.0"
+            "size": 825,
+            "tag": "T2024.24"
         },
         "oel_hdf4/libnav/Changelog.md": {
             "checksum": "39f7f76e105659ac4aaa7dc02ce2fa7618ce248c6489d7f6bf52e6591158437c",
             "mode": 33204,
             "size": 959,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/add_elements.f": {
-            "checksum": "9dc52ab6d943648a0abad27057d868684e009f1c4b67ceed00da1022cc9ef98b",
-            "mode": 33204,
-            "size": 3580,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/angles.f": {
-            "checksum": "65e9fb50c3c6071aa3568f568efed98ac1b6168ae5bbdfb256ba19368d87414f",
-            "mode": 33204,
-            "size": 1136,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/anomly.f": {
-            "checksum": "39c892b407db7b31a8a2dcd3a1481447f9baad95cb2ffdd4d60d43b2469ca8df",
-            "mode": 33204,
-            "size": 1452,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/asap_rot_int.f": {
-            "checksum": "6dc54bdb81c33453b5effac24910b500e6a0ea28aaca9cef1fc16176bd0cda15",
-            "mode": 33204,
-            "size": 3362,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/asap_rots.f": {
-            "checksum": "da6757e599987240403fbb9a9b9edd79f4b502601c9b446c36ab7665a7652e16",
-            "mode": 33204,
-            "size": 1661,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/asaps.f": {
-            "checksum": "93b6d06c7cd62034ffa5ea11d097186770ac811d3c4fc26fe1636095d3b2a771",
-            "mode": 33204,
-            "size": 17569,
             "tag": "initial"
         },
         "oel_hdf4/libnav/cdata.f": {
@@ -2077,77 +2059,29 @@
             "size": 1021,
             "tag": "initial"
         },
-        "oel_hdf4/libnav/coord.f": {
-            "checksum": "9bee900a3e852868b9ed576eeb7047d8bab2c1283a80bd0f21698132e27d32b6",
+        "oel_hdf4/libnav/crossp.c": {
+            "checksum": "173a6585c05e48100858a105d94a6718befebd0a6268bc9124c82ad616b927ee",
             "mode": 33204,
-            "size": 1498,
-            "tag": "initial"
+            "size": 393,
+            "tag": "T2024.24"
         },
-        "oel_hdf4/libnav/crossp.f": {
-            "checksum": "d6f421914320a4bcd12c19156eb1641a9630cb7e7fcfcb03dce46dc5c3665d8b",
+        "oel_hdf4/libnav/ephparms.c": {
+            "checksum": "0352c632bf1e866809fe29629d945a2ca71f51417cee8b37297199cfb0439b16",
             "mode": 33204,
-            "size": 632,
-            "tag": "initial"
+            "size": 657,
+            "tag": "T2024.24"
         },
-        "oel_hdf4/libnav/delm.f": {
-            "checksum": "e41260284180378cc569c01ad96fc8d2baaab43b4dda5168c241faf12503ea1b",
+        "oel_hdf4/libnav/esdist.c": {
+            "checksum": "6fe7cf5ae5c8eb490b232c9af9a6a3d23fdff9d839318a0101c7440be39245cc",
             "mode": 33204,
-            "size": 2923,
-            "tag": "initial"
+            "size": 1232,
+            "tag": "T2024.24"
         },
-        "oel_hdf4/libnav/dens76.f": {
-            "checksum": "710442739a0e220d59f672a7df6223326857d5d2ecd39c8211030a73a304144f",
+        "oel_hdf4/libnav/ftn_interface.c": {
+            "checksum": "c425aeb5c4e7249356431cd53c151f9da61389ba95a52faa7dca93ad9724711b",
             "mode": 33204,
-            "size": 6234,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/der.f": {
-            "checksum": "fdc845f75354e5b5ab88bcdff8beb993321e12c3c62014c0795194d46685ab81",
-            "mode": 33204,
-            "size": 5818,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/ephem.f": {
-            "checksum": "e5f4fc73ac76c8c14ad7691dc9ac5fd407de8cd432ee2139e987e5fbc646b19b",
-            "mode": 33204,
-            "size": 3474,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/eqnox.f": {
-            "checksum": "eb1588af6e142acbc0c920a93f53ea99a554472df2c0a17c2b7e0db2db458885",
-            "mode": 33204,
-            "size": 4300,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/esdist.f": {
-            "checksum": "91776d30bdbf8494c02ee668dd5a95007c58282423f5a53d55a9fd351ac4ea03",
-            "mode": 33204,
-            "size": 1438,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/filenv.f": {
-            "checksum": "6b60f02ea8011d6e8dab3e0ae718da0d0785460e6909cacbf373c4d3b5928045",
-            "mode": 33204,
-            "size": 1480,
-            "tag": "R2022.0"
-        },
-        "oel_hdf4/libnav/fitgps.f": {
-            "checksum": "568f05fe6c96264ee9cfc632ece1b53f660b4c4e70a5e13bbecab2020da6e4e2",
-            "mode": 33204,
-            "size": 4245,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/get_elements.f": {
-            "checksum": "d8352b29e1b3585f9329ec2ee9c8692a1342fba50d4616d4785efa6b67eb72eb",
-            "mode": 33204,
-            "size": 4733,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/get_ut1.f": {
-            "checksum": "ea9054528a47e1b143f6af6ffac776f5f55ce2b8f516071c36325c12bfadf7a6",
-            "mode": 33204,
-            "size": 1719,
-            "tag": "initial"
+            "size": 621,
+            "tag": "T2024.24"
         },
         "oel_hdf4/libnav/get_zenaz.c": {
             "checksum": "1ae8253cf76dc4cc2f234d2b4ea77e6c18c53dd4fd83e2cdbfa38a631ab563ff",
@@ -2155,65 +2089,23 @@
             "size": 13124,
             "tag": "initial"
         },
-        "oel_hdf4/libnav/gha2000.f": {
-            "checksum": "f9202bcd97f75697ca181deef4b6e1716b786297a08341d8831ac7d65144a309",
+        "oel_hdf4/libnav/getenv.cpp": {
+            "checksum": "1274302257ac59ef46a7b7d9e21507a3ebb41925ccf97d97c1641a7b6f4077f1",
             "mode": 33204,
-            "size": 6239,
-            "tag": "initial"
+            "size": 840,
+            "tag": "T2024.24"
         },
-        "oel_hdf4/libnav/invert.f": {
-            "checksum": "a88a1f4d4ebd820fc40a0558796543a1aaed30f313f9cebe5d54aca8a173dcb3",
+        "oel_hdf4/libnav/gha2000.c": {
+            "checksum": "548ce8f1f8e6f87e8d1557879f09316fdb58c45d63379235f23798f596dc157d",
             "mode": 33204,
-            "size": 2961,
-            "tag": "initial"
+            "size": 928,
+            "tag": "T2024.24"
         },
-        "oel_hdf4/libnav/jd.f": {
-            "checksum": "993f02e6d7cfbf2b25a62634f7f0bf76ed74f1c7600515d8276989ebe7c0137d",
+        "oel_hdf4/libnav/l_sun.c": {
+            "checksum": "e73437bf8f2e7940d972a2f8d47cc2d971aec6d664a8cffbfdeaade1589bebf9",
             "mode": 33204,
-            "size": 957,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/jdate.f": {
-            "checksum": "ea294b98fccb9b6455e3d113e36ef4aca49a90fd4a37e61a67f4f85edaebed0e",
-            "mode": 33204,
-            "size": 949,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/jddate.f": {
-            "checksum": "3efe28ab1a8a48db3b6248843f1a0f061221ed21ad1b8dd7471c8f3d999f9977",
-            "mode": 33204,
-            "size": 887,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/julian.f": {
-            "checksum": "9e0f8ad00cad0e0d571257487d2a35df97da6b0b309340a8673c324a81358965",
-            "mode": 33204,
-            "size": 1452,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/kepler.f": {
-            "checksum": "6f8e6b5ce592a97f588c6936b353b843776c4860ca3f187ecc4b6e570235939e",
-            "mode": 33204,
-            "size": 1979,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/kozsak2.f": {
-            "checksum": "ea05df78b89699cdee8e726f8bb15be4f129e71dbb8482cd7870fae436f77f43",
-            "mode": 33204,
-            "size": 3435,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/l_sun.f": {
-            "checksum": "ea1f54ee86358b9f46bba486841701acced5dcdb9db607338a2232255381de8f",
-            "mode": 33204,
-            "size": 5389,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/legend.f": {
-            "checksum": "73494370aa62f067cf0c9dcba0c5a55412481d31de3359b22375fb0c405d18c9",
-            "mode": 33204,
-            "size": 1629,
-            "tag": "initial"
+            "size": 1484,
+            "tag": "T2024.24"
         },
         "oel_hdf4/libnav/libnav.h": {
             "checksum": "949062deb74d528e6d46c161d246a30b2e01e9620ed1065a1500284a05d56305",
@@ -2221,17 +2113,29 @@
             "size": 1402,
             "tag": "R2022.0"
         },
-        "oel_hdf4/libnav/matvec2.f": {
-            "checksum": "adce0a85c5f350e25f81e6506d2f4b3e5131b28dbf68526b0dec1987f163c99b",
+        "oel_hdf4/libnav/math_utils.c": {
+            "checksum": "a864db1d56559d7227ffcfae278bc3f8443c392176e59791123e6484b1fc1f85",
             "mode": 33204,
-            "size": 842,
-            "tag": "initial"
+            "size": 209,
+            "tag": "T2024.24"
         },
-        "oel_hdf4/libnav/mediqr.f": {
-            "checksum": "416ed0bf12df031e01fb8dbab477a9148190e2512bef870776e2d683a24dc9ad",
+        "oel_hdf4/libnav/math_utils.h": {
+            "checksum": "554e5fe5a71da8b4acb49693f5021e4a9f38ee3cb6573325bdb0e9daeb55741b",
             "mode": 33204,
-            "size": 1119,
-            "tag": "initial"
+            "size": 245,
+            "tag": "T2024.24"
+        },
+        "oel_hdf4/libnav/nav.c": {
+            "checksum": "acb755a07eb700992ddcbc59d7724b6ea12ab550bb4d03c730f0cce1650c13bd",
+            "mode": 33204,
+            "size": 3113,
+            "tag": "T2024.24"
+        },
+        "oel_hdf4/libnav/nav.h": {
+            "checksum": "9f87122a19b3f79201a67825919ec7bf660e136a8c92531c5abe8562df8170c5",
+            "mode": 33204,
+            "size": 3417,
+            "tag": "T2024.24"
         },
         "oel_hdf4/libnav/nav_cnst.fin": {
             "checksum": "e958f9cba98453b25d484ed58d0dde60388faba6ff99300fa6f5c1822f58b59b",
@@ -2239,89 +2143,41 @@
             "size": 370,
             "tag": "initial"
         },
-        "oel_hdf4/libnav/ocorient.f": {
-            "checksum": "c64b3e81e59b005fb79b04c8f246fe07b5f36084e7adb2b5dc6f036c602f6eeb",
+        "oel_hdf4/libnav/nutate.c": {
+            "checksum": "6411a27bc3b292e41b3b1ac0040aad07f86eb8babd97a66c0a00079ceed683ad",
             "mode": 33204,
-            "size": 7511,
-            "tag": "initial"
+            "size": 735,
+            "tag": "T2024.24"
         },
-        "oel_hdf4/libnav/orbit_s.fin": {
-            "checksum": "d6288547b2857653f9217fd5a6779d05d2ccb0322b9dd305f1f0d76629b1f2ce",
+        "oel_hdf4/libnav/ocorient.c": {
+            "checksum": "628180ae453e1f3da3629159586deca22c7a582905d5b04e241be474814a80b3",
             "mode": 33204,
-            "size": 881,
-            "tag": "initial"
+            "size": 7234,
+            "tag": "T2024.24"
         },
-        "oel_hdf4/libnav/pderiv.f": {
-            "checksum": "c6dc7d2430acb4ed3f1747668221f176d286ede2592e71cf61d3f1acb4ae966b",
+        "oel_hdf4/libnav/ocorient.h": {
+            "checksum": "be8923808399a5708d4503bc345340cd16239140bab1f5f5499bc12b54a756b5",
             "mode": 33204,
-            "size": 4273,
-            "tag": "initial"
+            "size": 1360,
+            "tag": "T2024.24"
         },
-        "oel_hdf4/libnav/pout.f": {
-            "checksum": "03a68475b68e4cf80ee88c3ee12a89d4897a34e8fd2bdeeebc640be4741c052f",
+        "oel_hdf4/libnav/sun2000.c": {
+            "checksum": "d4e2018420c5c9523c108ac26de2e06e51ff3b0b414aa2484b33f725d8b29700",
             "mode": 33204,
-            "size": 4168,
-            "tag": "initial"
+            "size": 2407,
+            "tag": "T2024.24"
         },
-        "oel_hdf4/libnav/put_elements.f": {
-            "checksum": "f88dc75d566deb8f2933d4aa6dfff4924184864eacf1abce547006baf7e5b728",
+        "oel_hdf4/libnav/sun2000.h": {
+            "checksum": "6ee75be47012d5b1ac81f95e43a974aeff31a21034e3841ffae26d44a475386f",
             "mode": 33204,
-            "size": 3686,
-            "tag": "initial"
+            "size": 4542,
+            "tag": "T2024.24"
         },
-        "oel_hdf4/libnav/rk78.f": {
-            "checksum": "e1d08f8a8eb80f6ea10904b18503cdcba8afea9e8d6edc67118d4986719677b3",
+        "oel_hdf4/libnav/sunangs.c": {
+            "checksum": "f8536811d0235058c22ab00773644b1437825c8de4c2428fe1dc40f88034b4df",
             "mode": 33204,
-            "size": 3964,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/rk78cn.f": {
-            "checksum": "ef036f6b0ebca824977cde5ca11b0c90ba1eea78156acf858dc57afb8e982d14",
-            "mode": 33204,
-            "size": 2884,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/select.f": {
-            "checksum": "0e0986dc0d0686a9a3d4761fed4ef144ed6b995bddde693f00f9ed5c23afb1b3",
-            "mode": 33204,
-            "size": 1236,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/setsun.f": {
-            "checksum": "c2dd0333ea5a7d8f3f449447839045346d7066857987a37dfe379118aef6b52c",
-            "mode": 33204,
-            "size": 1300,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/setthd.f": {
-            "checksum": "7982790613ad6c1e7eec29f9d87b24b8ffbb9158982c766027122b727ed2d4f6",
-            "mode": 33204,
-            "size": 1609,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/sunangs.f": {
-            "checksum": "28bd14101898c60d8e22d706a0a20942e8139fdebf65152184b65811583c4515",
-            "mode": 33204,
-            "size": 2365,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/vec2mean.f": {
-            "checksum": "7882b0e6db3457b82155bab5efd116bbc430ecc62ea05b769a175844b3897166",
-            "mode": 33204,
-            "size": 1537,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/xthird.f": {
-            "checksum": "351fe910c4f54e0124ff19f0f71d8e780d151819e44399a43f18e6d8bfd4ccae",
-            "mode": 33204,
-            "size": 1924,
-            "tag": "initial"
-        },
-        "oel_hdf4/libnav/ymdhms2jul.f": {
-            "checksum": "0008638d32728793bc68b21766beea11b5401bba862492fccc3f7800e0402c6f",
-            "mode": 33204,
-            "size": 629,
-            "tag": "initial"
+            "size": 2710,
+            "tag": "T2024.24"
         },
         "oel_hdf4/liboli/CMakeLists.txt": {
             "checksum": "11057f52835fca86e21e668e1e4f3bc927f02149054397ebd99a7d71cafdee6e",
@@ -3296,10 +3152,10 @@
             "tag": "R2022.0"
         },
         "oel_hdf4/libseawifs/config.h": {
-            "checksum": "00bda2417b4a8a25731129bd03313e2e5d6e8924c2557d594a79e186bc3cb0e3",
+            "checksum": "033515ba9951d487cb73f4e71f16f5d1a2d00d3fdb5c74b356e1ab606ca7b61b",
             "mode": 33204,
-            "size": 5336,
-            "tag": "R2022.0"
+            "size": 5401,
+            "tag": "T2024.24"
         },
         "oel_hdf4/libseawifs/datatype.h": {
             "checksum": "63d7a7316f6b4b19e8dba1b501869dd68b317b779d64f4f6962b53b0b3ec3ccf",
@@ -4280,10 +4136,10 @@
             "tag": "initial"
         },
         "oel_util/libtimeutils/timeutils.h": {
-            "checksum": "7113eb8e92c28a5b7ae490003151f3405377b4848a2ddb6f98be7f3052b7d9c3",
+            "checksum": "12208040a6ace1ca6c234095c1bbf5e528898aa3f28edffeb4fd94626f47b728",
             "mode": 33204,
-            "size": 2190,
-            "tag": "T2024.20"
+            "size": 2288,
+            "tag": "T2024.24"
         },
         "oel_util/libtimeutils/udunits2unix.cpp": {
             "checksum": "00ef1863df3d0c04c320496cd4c95455cb0d1d5be8e508d150a8a0935f6060d8",
@@ -4292,10 +4148,10 @@
             "tag": "T2024.20"
         },
         "oel_util/libtimeutils/unix2isodate.c": {
-            "checksum": "1a536b9ef4906d63dc96d68424a71bf395253661f7669bd3de013b69daaf50f7",
+            "checksum": "e6daa76e0165c2ca85f160a349a72712cbf51adea2e8bc3c5e3e5d83650b68a0",
             "mode": 33204,
-            "size": 1968,
-            "tag": "T2024.20"
+            "size": 2794,
+            "tag": "T2024.24"
         },
         "oel_util/libtimeutils/unix2ydhmsf.c": {
             "checksum": "e1f744bc1b328c0882336c8a4845fb1bd612d0ce39ef3019faef09973785b8f3",
@@ -4514,10 +4370,10 @@
             "tag": "initial"
         },
         "src/CMakeLists.txt": {
-            "checksum": "9b342133586342e2bc8408b7ae740a3402354b91d3e8abb8d72fde71a04bdc89",
+            "checksum": "e14c344d630160e46e43227bbff79fd36bc0d33ccc10f64019ea7f1c51d8d28a",
             "mode": 33204,
-            "size": 3147,
-            "tag": "T2024.5"
+            "size": 3133,
+            "tag": "T2024.24"
         },
         "src/ancgen/CMakeLists.txt": {
             "checksum": "e05034abf918a2b28310c5a695212f176a20543759271dac8f4af7762c8a0069",
@@ -5894,10 +5750,10 @@
             "tag": "T2024.5"
         },
         "src/geo_eval/geo_eval.py": {
-            "checksum": "af7d90eadea32514b1a97391dad0e97dce6a4f1bab74feb4ef3d4bccee652a90",
+            "checksum": "1453b9aca07c354adcfd2361f3df0506275605f457c8d52077a3617d1e6e132b",
             "mode": 33277,
-            "size": 27660,
-            "tag": "V2024.4"
+            "size": 29170,
+            "tag": "T2024.24"
         },
         "src/geo_eval/pex/CMakeLists.txt": {
             "checksum": "b4dc00ab50e49f864ba445938176847b9c617230198c00bc1474ecb98836673a",
@@ -6542,10 +6398,10 @@
             "tag": "T2023.31"
         },
         "src/get_dataday/version.h": {
-            "checksum": "2c9e641aaed1aeb0890c6ce584f3f8cebe29b3bf0a681a0be5d1255de8353c7e",
+            "checksum": "6c69246e493f3f3097b31b6d156a21cde315d1c9a9d834fc4b4b01583a6f105a",
             "mode": 33204,
             "size": 97,
-            "tag": "V2024.7"
+            "tag": "V2024.8"
         },
         "src/get_product_info/CMakeLists.txt": {
             "checksum": "1c494edf9ce44363870094bfda3c300e3293a6a5f7a5a3f2634c010db4455952",
@@ -9140,10 +8996,10 @@
             "tag": "V2024.1"
         },
         "src/l1bgen_oci/geolocate_oci.cpp": {
-            "checksum": "65618e3f329daabc55b42f600208ba86f18f82e82089232d7800ac6ff0ad0ec8",
+            "checksum": "f7dae7986e14f996bbcc4a46bb43cb1a124f57b4a3e94555daf3cfe03d93c405",
             "mode": 33204,
-            "size": 70475,
-            "tag": "V2024.1"
+            "size": 70477,
+            "tag": "T2024.24"
         },
         "src/l1bgen_oci/geolocate_oci.h": {
             "checksum": "9c2f9c408a3fafe9c89be9c4570e49bd086c6fd6fca0a9c6496aeb334149f998",
@@ -9212,10 +9068,10 @@
             "tag": "V2024.1"
         },
         "src/l1cgen/l1c.cpp": {
-            "checksum": "5ed1ea61e62d35c3de36c3d4c3a117dca709769856e816e5afbdbbad4dab62da",
+            "checksum": "86189277a4c16b488135caf5b834ffaf15966f4635ad91df024fd28296bde411",
             "mode": 33204,
-            "size": 145387,
-            "tag": "T2024.23"
+            "size": 145344,
+            "tag": "T2024.24"
         },
         "src/l1cgen/l1c.h": {
             "checksum": "76d5952d914a21e8926e252b09ac7554d4aa4a08bdbe7caf55eea1109ff29b58",
@@ -9284,10 +9140,10 @@
             "tag": "T2024.13"
         },
         "src/l1cgen/l1cgen.cpp": {
-            "checksum": "070e45d8974796b4863767339d2fee3b205123edde47ea1e670dd4e77de085a9",
+            "checksum": "ee1754128e1316e72200a4fd71d58e96dd76e0225de9525c050ca5d7bd57731b",
             "mode": 33204,
-            "size": 24383,
-            "tag": "V2024.3"
+            "size": 24879,
+            "tag": "T2024.24"
         },
         "src/l1cgen/l1cgen.h": {
             "checksum": "7579065d74e17bcb716c85782b8422fe207454f34749fd525de729d47016249e",
@@ -9326,10 +9182,10 @@
             "tag": "T2023.18"
         },
         "src/l2bin/CMakeLists.txt": {
-            "checksum": "171e5f09defb04cb49ed5e969c319106a5b2d1b099dfdd51ae5c3b87be8d3484",
+            "checksum": "19600094941dc367f917b6f6f9ac234229a0a5ad1e2ec9b40086f4b9b5397b22",
             "mode": 33204,
-            "size": 357,
-            "tag": "T2024.0"
+            "size": 353,
+            "tag": "T2024.24"
         },
         "src/l2bin/Changelog.md": {
             "checksum": "b1f4ed9f09327df45c155d5f1d5c26869e741476d011339f84ff1c8aee8b03bf",
@@ -9362,10 +9218,10 @@
             "tag": "T2024.17"
         },
         "src/l2brsgen/CMakeLists.txt": {
-            "checksum": "b92be52c2a250d2658870942868c1fd83d15cf8086654c879478430736b86f7c",
+            "checksum": "b07e3db6d245d6fc1153a1c7ef400c410a740a9a5828bdb9c10244555ee5739a",
             "mode": 33204,
-            "size": 337,
-            "tag": "R2022.0"
+            "size": 475,
+            "tag": "T2024.24"
         },
         "src/l2brsgen/Changelog.md": {
             "checksum": "61f07f68a049d282c2c4b66c5bd32907c08deccdca643997e1e4e2c210a7310d",
@@ -9374,10 +9230,10 @@
             "tag": "initial"
         },
         "src/l2brsgen/l2brsgen.h": {
-            "checksum": "afb8226a7db8338a158d5d43c0e9bd99fb61f6939b3b9f10cbba79634ed2c996",
+            "checksum": "f108335bfb888cd9eb9b5b0d798f6ff67071df64d13897c51251df88855f9eb7",
             "mode": 33204,
-            "size": 9094,
-            "tag": "T2023.15"
+            "size": 9124,
+            "tag": "T2024.24"
         },
         "src/l2brsgen/l2brsgen_input.c": {
             "checksum": "06fa9dab0ab2d8a7037441767f023ad481d2110cdc69715ac3193968167d58c1",
@@ -9458,10 +9314,10 @@
             "tag": "T2024.17"
         },
         "src/l2gen/CMakeLists.txt": {
-            "checksum": "fccbd6c53723423a7fc7a1d6fa14adf15df706fe1d43e2c20365ce1fb70eadb4",
+            "checksum": "bbf97fae84cd18bae46582b93463c3b76170ecdf6ebcdd734a9a47f9a0f9a047",
             "mode": 33204,
-            "size": 9830,
-            "tag": "T2024.22"
+            "size": 10222,
+            "tag": "T2024.24"
         },
         "src/l2gen/COMMONS_INC.f": {
             "checksum": "cc2cbf4be685be39f1d254d706b128f90c6dd4b4548996c78560f263ceebdd8e",
@@ -9536,10 +9392,10 @@
             "tag": "initial"
         },
         "src/l2gen/aerosol.c": {
-            "checksum": "be91f76cc9dad7214412df9d843622a475ffbc74f27a42393c393975d5225bf3",
+            "checksum": "8449154e132aeb1f14d86e5630745c5775e2a6b8e5ad755aa5773928353ddfbf",
             "mode": 33204,
-            "size": 255973,
-            "tag": "T2024.23"
+            "size": 256254,
+            "tag": "T2024.24"
         },
         "src/l2gen/airmass.c": {
             "checksum": "8d07454a5f0ec11e3fabcb877e6aa64c769798305aee6669d7e68d71c20e34fe",
@@ -9590,16 +9446,16 @@
             "tag": "T2024.3"
         },
         "src/l2gen/anc_acq.c": {
-            "checksum": "b6e60d044f03ccd47e3408182d426a0a57d2ed5adbf48482de2416df34e04d23",
+            "checksum": "6a8c971d5dffb0c2a1791f64285de530efdc281959959ae47b99f02344f20aa6",
             "mode": 33204,
-            "size": 142077,
-            "tag": "T2024.23"
+            "size": 141762,
+            "tag": "T2024.24"
         },
         "src/l2gen/anc_acq.h": {
-            "checksum": "3f1fe937b740cb71d02bc3db5ec2fda36b8e3c9dfa6ec0dfbfd7fff0f6b50efb",
+            "checksum": "6397a1853324a12bb8686b32c21e5612caca124638d8741835245d075d4cd981",
             "mode": 33204,
-            "size": 2434,
-            "tag": "T2023.17"
+            "size": 2480,
+            "tag": "T2024.24"
         },
         "src/l2gen/aph.c": {
             "checksum": "d1b48e24ec0981830a2892162fcc5cc3a8c6d810bce8b13a2fcf1dd2d21176b5",
@@ -9608,10 +9464,10 @@
             "tag": "T2024.5"
         },
         "src/l2gen/atmocor1.c": {
-            "checksum": "7f0375019b7d70173c1d1bab3deced010f801c0f02180d81afb6939f3f27d805",
+            "checksum": "8de50f0cdfb766d5a7e82c1079e96f61d5dfc24e9c1f5936f87bbb0080125cbb",
             "mode": 33204,
-            "size": 5481,
-            "tag": "T2023.33"
+            "size": 5664,
+            "tag": "T2024.24"
         },
         "src/l2gen/atmocor1_land.c": {
             "checksum": "3ae655158ae04f6216e9b11cf78fc59e47d2fa685022739b2c1132cb6a431bae",
@@ -9620,10 +9476,10 @@
             "tag": "T2023.33"
         },
         "src/l2gen/atmocor2.c": {
-            "checksum": "48c1b3e78b4f9734a0f710718c39fc80f8695e42fa6c30c516934e1ae3b432c4",
+            "checksum": "8ec4231fba9c16d56e4530eb0915b0b69eff56c3c40c1921437f53fa622d8e6e",
             "mode": 33204,
-            "size": 48275,
-            "tag": "T2024.23"
+            "size": 47982,
+            "tag": "T2024.24"
         },
         "src/l2gen/atrem_app_refl_plus_gas_removal_l2.f90": {
             "checksum": "120e80187e1c8717c6cfb57f76dee36f041f02ba93fbfd5cc94c4dcd4e78accb",
@@ -9805,6 +9661,12 @@
             "size": 19724,
             "tag": "initial"
         },
+        "src/l2gen/dtranbrdf.cpp": {
+            "checksum": "4ea5151b49ffa55532df6ff51ca2e5bce594549fa1a9c6d3292a905c0274f770",
+            "mode": 33204,
+            "size": 18839,
+            "tag": "T2024.24"
+        },
         "src/l2gen/elev.c": {
             "checksum": "65f8743253dd7d35a9e8a3e089ca08934f7cb2683dc9708080b807e6da364da6",
             "mode": 33204,
@@ -9842,10 +9704,10 @@
             "tag": "initial"
         },
         "src/l2gen/fluorescence.c": {
-            "checksum": "33cbc8f92a92d397357c25e6dbe58b742f94e761ff08dcad087603481e10f56a",
+            "checksum": "b39db4c5aecdab9d555098a7a4f274d3a51104b126e7ef68caca5f57fdf5d5fb",
             "mode": 33204,
-            "size": 13999,
-            "tag": "T2024.14"
+            "size": 12180,
+            "tag": "T2024.24"
         },
         "src/l2gen/freearray.h": {
             "checksum": "965e36c200810a76d34675b69e73e29b161c1725b958795de2dc532d7c99429e",
@@ -9866,10 +9728,10 @@
             "tag": "initial"
         },
         "src/l2gen/gas_trans.c": {
-            "checksum": "1fe243c6c2f48e5d418720eaaa3b7c6963f772db6c1d5bc7c69df305705b9391",
+            "checksum": "6d92654ac47e6b29a67c01315c9074d38ed5b4389ff77fe3d17fe5e051d0a60b",
             "mode": 33204,
-            "size": 23457,
-            "tag": "T2024.14"
+            "size": 35669,
+            "tag": "T2024.24"
         },
         "src/l2gen/gc.h": {
             "checksum": "e33db730802910bc9c7917ab35efe99c25524cc251ebbdaeca43835fe7f391e9",
@@ -9968,10 +9830,10 @@
             "tag": "V2024.2"
         },
         "src/l2gen/get_ctht.c": {
-            "checksum": "f15b0d0e634bd3ecb711dd307fcc6f6d214ca3d9eb9ddb314260f4f57ff65316",
+            "checksum": "a2a521aaf81e0b1b24718e9c5c2230ffa33a496d83b1e2a9c24e3037207cea7b",
             "mode": 33204,
-            "size": 65963,
-            "tag": "T2024.20"
+            "size": 66639,
+            "tag": "T2024.24"
         },
         "src/l2gen/get_ctht.h": {
             "checksum": "c58ebd08ef3af05dfeb7f162a8d05ec168f389d89a467f53cc5926cbeb3e02bb",
@@ -10184,10 +10046,10 @@
             "tag": "initial"
         },
         "src/l2gen/get_uncertainty.c": {
-            "checksum": "3272352e599bd4bb0802f7482168d12248b1fbb9e79add7cb192efc43c231bd1",
+            "checksum": "720e93a988c66219deb0dd72b1ad4f0a740100487a6e61023ca689f3c32a4a71",
             "mode": 33204,
-            "size": 17940,
-            "tag": "T2024.23"
+            "size": 18630,
+            "tag": "T2024.24"
         },
         "src/l2gen/get_zno3.c": {
             "checksum": "36115d31563795701f194a07f11c99ce26392d86adf63820e987b1ed946d14ec",
@@ -10232,10 +10094,10 @@
             "tag": "initial"
         },
         "src/l2gen/gringHelper.cpp": {
-            "checksum": "5a256f97089a04466abbbe70de08e027968e706eda76b4d93fa2b1424236a10e",
+            "checksum": "fe466e0f9e4a4ec09d24469ae30acc65f82d2108931589e7ab20b0cde76d85d2",
             "mode": 33204,
-            "size": 17803,
-            "tag": "R2022.0"
+            "size": 17864,
+            "tag": "T2024.24"
         },
         "src/l2gen/gringHelper.h": {
             "checksum": "0480da039ffeecb2866674af4d0bdd2a7fa5f673a85816712e3f5a5b7f917e2f",
@@ -10268,10 +10130,10 @@
             "tag": "T2024.23"
         },
         "src/l2gen/input_struc.h": {
-            "checksum": "28879126e207c6b77974584ca6362a23e79328a1defa8a2db1263c13242a844c",
+            "checksum": "dd784e15ef2c3c219735e94a3c0d6a51378f0cafef7ab121abe1b39aa2617926",
             "mode": 33204,
-            "size": 12624,
-            "tag": "T2024.17"
+            "size": 12929,
+            "tag": "T2024.24"
         },
         "src/l2gen/int_3d.c": {
             "checksum": "23c430e4c1173f982eff4d4c705a8c412fc7259a91848210c6a92180a90abe85",
@@ -10310,10 +10172,10 @@
             "tag": "T2022.15"
         },
         "src/l2gen/l12_proto.h": {
-            "checksum": "33ae460910e67244585397ac4dbb8b55af516495d5d5d605b757219aef6c17f1",
+            "checksum": "0c1b915a0263ab3f349a59f376e809455369b75019e9447541cdc82606e25d3e",
             "mode": 33204,
-            "size": 19088,
-            "tag": "T2024.23"
+            "size": 19119,
+            "tag": "T2024.24"
         },
         "src/l2gen/l1_imgscale.c": {
             "checksum": "e3769c8567a7ef92f6ed69d3356a7dd14cb80e671cd003ba762c2cdec37b82cd",
@@ -10328,10 +10190,10 @@
             "tag": "R2022.0"
         },
         "src/l2gen/l2_generic.c": {
-            "checksum": "dc33b1688c432119fdf33e974a2bfe9604aa902017934aa915690ce044b66764",
+            "checksum": "1ac7d76bb8a7df45262e80b01322683f1f67ec26f2322af70a21d92c5e591069",
             "mode": 33204,
-            "size": 66133,
-            "tag": "V2024.4"
+            "size": 66164,
+            "tag": "T2024.24"
         },
         "src/l2gen/l2_generic.h": {
             "checksum": "8a3b9fd68e6757822a5c9df72536b0cb6349ec932a146bea767de80d2d2641be",
@@ -10346,10 +10208,10 @@
             "tag": "initial"
         },
         "src/l2gen/l2_struc.h": {
-            "checksum": "2563bded6381580f0a3615284af5ddc76fd42f6447bbadda79cfe69522eb85bd",
+            "checksum": "f9b09deb51df3bb274113044f8c27a9881d951093777b6772d18e3565977a60b",
             "mode": 33204,
-            "size": 1234,
-            "tag": "T2024.23"
+            "size": 1214,
+            "tag": "T2024.24"
         },
         "src/l2gen/l2binmatch_input.cpp": {
             "checksum": "5369d7af0969125453b3666133de4068b90da88449a2b594807920204413477d",
@@ -10364,10 +10226,10 @@
             "tag": "initial"
         },
         "src/l2gen/l2prod.h": {
-            "checksum": "fbfeefc59b9b5934b4b064507d3799ce1e492339c2c16813657320904f257478",
+            "checksum": "833899bc383dcc03c79719dd0133e14437f3d16bb119587716a81e38e548f8bf",
             "mode": 33204,
-            "size": 17785,
-            "tag": "T2024.23"
+            "size": 18358,
+            "tag": "T2024.24"
         },
         "src/l2gen/las_iop.c": {
             "checksum": "934d6f371336382956c0610c9a98984fa7a042ff2bdb73a35e63ca96e98bc288",
@@ -10381,11 +10243,11 @@
             "size": 25338,
             "tag": "initial"
         },
-        "src/l2gen/lenstr.f": {
-            "checksum": "ec3ddfd222a45ebb7e63f1065679a6795ef18a3f415cf3452fbdfd0180decc03",
-            "mode": 33277,
-            "size": 823,
-            "tag": "initial"
+        "src/l2gen/lenstr.cpp": {
+            "checksum": "17c3f058e744259017d238ec1f11075c8e3756e87bf584a2bcbef19e7a61b4cd",
+            "mode": 33204,
+            "size": 336,
+            "tag": "T2024.24"
         },
         "src/l2gen/loadl1.c": {
             "checksum": "8060831803e95d6009231f586d13b20e21c232ab637c4cdc7f093e613a9388be",
@@ -10418,34 +10280,34 @@
             "tag": "initial"
         },
         "src/l2gen/main_l1bgen.c": {
-            "checksum": "abd9438f35c1f63fe6a7ce48503dd79a38ee219d604acf386b013dea63bab068",
+            "checksum": "de33a2114228171bceb548f6175900efeeaff5b06cbf34bd4db5cc793bfbed5a",
             "mode": 33204,
-            "size": 6586,
-            "tag": "T2024.17"
+            "size": 6589,
+            "tag": "T2024.24"
         },
         "src/l2gen/main_l1brsgen.c": {
-            "checksum": "efd760fec3341ca56c55203109afcd85084c57897c50ed5212b546ce9ede11be",
+            "checksum": "533c8578d95ec5e4bbba90fce37a838ce7e696e999736d0bd24902774c1d8aef",
             "mode": 33204,
-            "size": 21200,
-            "tag": "T2022.14"
+            "size": 21203,
+            "tag": "T2024.24"
         },
         "src/l2gen/main_l1det2det.c": {
-            "checksum": "110d9011d836413850c62166d001584642ce30892a48c939a964f18e856e1fe3",
+            "checksum": "d5d44f8372673d7f263ad8ddad485738a80828b266f5c86468abf6a29691ddd5",
             "mode": 33204,
-            "size": 27590,
-            "tag": "T2023.15"
+            "size": 27592,
+            "tag": "T2024.24"
         },
         "src/l2gen/main_l1info.cpp": {
-            "checksum": "dc85b07e1ab983ef8b32684a6ab7885ee17289c401e45eb3ddd2b753467d2bda",
+            "checksum": "9ee9ef980617958473e2459ecea37ec490053b6cdc0b780613104ce88a56a0e1",
             "mode": 33204,
-            "size": 48609,
-            "tag": "T2024.3"
+            "size": 48612,
+            "tag": "T2024.24"
         },
         "src/l2gen/main_l1mapgen.c": {
-            "checksum": "64939ef6b03844067945e720a824dd7a733e01eef9cafdfcf18a76459a77f243",
+            "checksum": "2016a34face39d74d1cb147213541cab2a1d9983fde6d469d8d14fc28ff37c38",
             "mode": 33204,
-            "size": 32611,
-            "tag": "T2022.14"
+            "size": 32614,
+            "tag": "T2024.24"
         },
         "src/l2gen/main_l2binmatch.cpp": {
             "checksum": "96c479232a924342e6860ee8c1982ad75ddba99dede4bd5923e32fc1bfb2ebde",
@@ -10454,28 +10316,28 @@
             "tag": "T2023.15"
         },
         "src/l2gen/main_l2gen.c": {
-            "checksum": "c4f9b2c7db9befd57b758fe468bbea46db853e0ddafcf643444d0931e7833c77",
+            "checksum": "a2ea6e9ede54b2cbd481307fccb982b33f3290fa6990a660c9315c5cfd7aaa40",
             "mode": 33204,
-            "size": 24459,
-            "tag": "V2024.1"
+            "size": 24462,
+            "tag": "T2024.24"
         },
         "src/l2gen/main_l3gen.cpp": {
-            "checksum": "0b5a59f8b12900bd0feb2c097d93824611eb5b98ed685d335daa1d4ebb4e0b2e",
+            "checksum": "013c72e4a603a21119a0c015977a4008667e305fc75c1d5026af6c288beac131",
             "mode": 33204,
-            "size": 25849,
-            "tag": "T2024.0"
+            "size": 25852,
+            "tag": "T2024.24"
         },
         "src/l2gen/main_lonlat2pixline.c": {
-            "checksum": "3d265059b4b78106f4aaed73037899ba71141fad9d9df6564e256ceaf86937bf",
+            "checksum": "f98dc2f123287981b72852d6daad7762810a9542b6c9eca585d3334a19e5aac3",
             "mode": 33204,
-            "size": 8709,
-            "tag": "R2022.0"
+            "size": 8712,
+            "tag": "T2024.24"
         },
         "src/l2gen/main_vcalmerge.c": {
-            "checksum": "f60b87098e73b32b6f042de4523da33aabcd0e5e53da5adeaeaf6dc37fcd93fc",
+            "checksum": "7c37425447a10fbe26659225e68bacff055718726256cf703b592bc9ad65d26c",
             "mode": 33204,
-            "size": 15146,
-            "tag": "T2023.15"
+            "size": 15149,
+            "tag": "T2024.24"
         },
         "src/l2gen/met_cvt.c": {
             "checksum": "9175ef69e24889d6830670b01a2acebc2c078bdd116c035564822f406b603a31",
@@ -10550,10 +10412,10 @@
             "tag": "initial"
         },
         "src/l2gen/msl12_input.c": {
-            "checksum": "89e895d744cd81d7c1f224f0f72eadb4e7efece2e4df70f43e079e4ac7add684",
+            "checksum": "c034420980e1b3fd090b0082536c6d9716175f50fcebaf6a4457713ceb39dfad",
             "mode": 33204,
-            "size": 175216,
-            "tag": "T2024.23"
+            "size": 178915,
+            "tag": "T2024.24"
         },
         "src/l2gen/mumm.c": {
             "checksum": "cbd5addbb0ea57a83055e4a07e1d3070d1aea841673e76fbbd3d6aed87c93fdd",
@@ -10730,10 +10592,10 @@
             "tag": "V2024.1"
         },
         "src/l2gen/prodgen.c": {
-            "checksum": "d0ac890061759e31aec3c4ddb71e6cb7c1ba996945d7c8c99734a7e40ca6cdbb",
+            "checksum": "4458b46f28671048413b338aadd71a19efc945d003a46221e4fc979a6d5e5be8",
             "mode": 33204,
-            "size": 35584,
-            "tag": "T2024.23"
+            "size": 35129,
+            "tag": "T2024.24"
         },
         "src/l2gen/prodlist.c": {
             "checksum": "b44f8943bea24190c88de92aaa0eee0a9b9b62de981b30dffa14bf0a62e4d392",
@@ -10976,10 +10838,10 @@
             "tag": "T2024.17"
         },
         "src/l2gen/version.h": {
-            "checksum": "e033367aded19027d6d29a554feb092188e37756cca9c438d1edb93cb14a9c6a",
+            "checksum": "333a788e06cb1fc2b7d781f6f8d27745807bb804f0dfcc2a17ecf47eb7ba1842",
             "mode": 33204,
             "size": 97,
-            "tag": "V2024.7"
+            "tag": "V2024.8"
         },
         "src/l2gen/viirs_pxcvt.c": {
             "checksum": "29b9584f2fc565a321c40f8529e4294914f523739765f45d6f64a7cdd72bf1cd",
@@ -11228,10 +11090,10 @@
             "tag": "T2020.2"
         },
         "src/l3bindump/version.h": {
-            "checksum": "28ee0d582b1bc347dca3a59fcd4d78e45dcc204046b7a54478839a07c6688272",
+            "checksum": "56397931d77fcd42f879a89717c09e80c1dfe858689b543521fdde8912ca2337",
             "mode": 33204,
             "size": 97,
-            "tag": "V2024.7"
+            "tag": "V2024.8"
         },
         "src/l3bstats/CMakeLists.txt": {
             "checksum": "a5b2f0b159db6dcf4b7435228193cfc96a4223f7124ba91b9777c61fac480ce3",
@@ -11318,10 +11180,10 @@
             "tag": "T2024.23"
         },
         "src/l3mapgen/l3mapgen.cpp": {
-            "checksum": "eb68e1a61086b62874ca2820dbb3584a203304c83be1fa9531c5e0d6d637e824",
+            "checksum": "7b2cb10d9d7337c19f1c7e20b91212b9d91540537b221d878d4ca7594f7ec4ab",
             "mode": 33204,
-            "size": 84193,
-            "tag": "T2024.23"
+            "size": 84230,
+            "tag": "T2024.24"
         },
         "src/l3mapgen/l3mapgen.h": {
             "checksum": "35df107b2aeb94b8d1eda9997966079986eccb58e415f6a104ed83c186d31817",
@@ -11342,10 +11204,10 @@
             "tag": "T2024.17"
         },
         "src/l3mapgen/version.h": {
-            "checksum": "253c869766685f27d12e2bd1ac4bffa2ed4aae740cee0ad82a0bbbc14974d566",
+            "checksum": "63f3495f3320967c3e256202a695816d1f1e939173897225dd9526986d681afb",
             "mode": 33204,
             "size": 97,
-            "tag": "V2024.7"
+            "tag": "V2024.8"
         },
         "src/landbin/CMakeLists.txt": {
             "checksum": "528d755613d2d541e0b1873e1c91f5a09e8d7849da18d58570838c13eedc06b8",
@@ -11582,10 +11444,10 @@
             "tag": "initial"
         },
         "src/libanc/CMakeLists.txt": {
-            "checksum": "7b33ea41141129cab70ace9c24d8e6341b01325b3d6c6e76f342b1389fb4e455",
+            "checksum": "a8c2b9a5b6cfca9500d34aa977b7e0d37cb3a9b9353049168f4e55ea3c77075e",
             "mode": 33204,
-            "size": 482,
-            "tag": "R2022.0"
+            "size": 475,
+            "tag": "T2024.24"
         },
         "src/libanc/Changelog.md": {
             "checksum": "b6e69bf9bcbddc44d61bc83cdc4e20414dd1d074c8bcf908d55341af4e316983",
@@ -11600,10 +11462,10 @@
             "tag": "initial"
         },
         "src/libanc/anc.h": {
-            "checksum": "3be1461e31a6e8bdea091c047520af1bc0bd1d1f20ad32e5a8da8c58246bdad7",
+            "checksum": "3963468fb1e0067bbd6588214008ea566cf4d3cbb4c151751763045593fe4927",
             "mode": 33204,
-            "size": 3134,
-            "tag": "T2023.17"
+            "size": 3492,
+            "tag": "T2024.24"
         },
         "src/libanc/ancproto.h": {
             "checksum": "0884eae186b9faa6e5330ae996a4d1df44b2e7f2616eca812cbea329cc04dcb7",
@@ -11611,29 +11473,17 @@
             "size": 3174,
             "tag": "T2023.17"
         },
-        "src/libanc/dataintp.f": {
-            "checksum": "98b6ef1cbb16d0027f7b18604f3e61d0c8513caed3a24b4fb08b81d1ca89fd3c",
+        "src/libanc/dataintp.c": {
+            "checksum": "6ea737a61892265be45340ed43257817e2f87fc43ff3f9f95a8facfefd388443",
             "mode": 33204,
-            "size": 10106,
-            "tag": "initial"
-        },
-        "src/libanc/fget_ancillary.f": {
-            "checksum": "85dbce67c44dfdaa4c647e22e3b3288d6ac95a3c18ead2b49cb99ec85a02fb78",
-            "mode": 33204,
-            "size": 1881,
-            "tag": "initial"
+            "size": 6847,
+            "tag": "T2024.24"
         },
         "src/libanc/getanc.c": {
-            "checksum": "9a4bed50a09ae1f7123a97cb56aadc8e94d9f1e76e07b521468b27cb99cf681d",
+            "checksum": "a38e0b579ebd376ca6c956bc6c8ca5a66a93ec9db6c9f6ddd9f3c622987ff30b",
             "mode": 33204,
-            "size": 70666,
-            "tag": "T2023.17"
-        },
-        "src/libanc/julian.f": {
-            "checksum": "9e0f8ad00cad0e0d571257487d2a35df97da6b0b309340a8673c324a81358965",
-            "mode": 33204,
-            "size": 1452,
-            "tag": "initial"
+            "size": 70863,
+            "tag": "T2024.24"
         },
         "src/libcloud/CMakeLists.txt": {
             "checksum": "bb3fe9c55c2cbfad8ccea7283c377902a002e48a42607192b5b62d40ae99007f",
@@ -12044,10 +11894,10 @@
             "tag": "T2024.2"
         },
         "src/libdataday/version.h": {
-            "checksum": "5dfcc5ba8b4d7444b76d799b9b636aae29cbf781f8172ed96061bdfbd73e397a",
+            "checksum": "a5266a0bff37b6bebda8b54ca8687e6872427324013542cdd3e9b26e7faede2b",
             "mode": 33204,
             "size": 97,
-            "tag": "V2024.7"
+            "tag": "V2024.8"
         },
         "src/libimageutils/CMakeLists.txt": {
             "checksum": "c0d600784574da0e77fcc4d76b99677eb5cc925645f1259380ce17b6cbf7f870",
@@ -12242,10 +12092,10 @@
             "tag": "initial"
         },
         "src/libswfnav/CMakeLists.txt": {
-            "checksum": "fce734630f2c87ac13db62b03deb86dd2d7eaac1c10792e188c2db1c413a00bb",
+            "checksum": "406c4cf9342b7860426607d3e667588ad9dec554397df8a96df4387f70383f5a",
             "mode": 33204,
-            "size": 971,
-            "tag": "R2022.0"
+            "size": 1410,
+            "tag": "T2024.24"
         },
         "src/libswfnav/Changelog.md": {
             "checksum": "e08334f87dded18a6757dbddded37a13a93443432c866a2eac34e2efc846767f",
@@ -12258,6 +12108,42 @@
             "mode": 33204,
             "size": 1035,
             "tag": "initial"
+        },
+        "src/libswfnav/add_elements.f": {
+            "checksum": "9dc52ab6d943648a0abad27057d868684e009f1c4b67ceed00da1022cc9ef98b",
+            "mode": 33204,
+            "size": 3580,
+            "tag": "T2024.24"
+        },
+        "src/libswfnav/angles.f": {
+            "checksum": "65e9fb50c3c6071aa3568f568efed98ac1b6168ae5bbdfb256ba19368d87414f",
+            "mode": 33204,
+            "size": 1136,
+            "tag": "T2024.24"
+        },
+        "src/libswfnav/anomly.f": {
+            "checksum": "39c892b407db7b31a8a2dcd3a1481447f9baad95cb2ffdd4d60d43b2469ca8df",
+            "mode": 33204,
+            "size": 1452,
+            "tag": "T2024.24"
+        },
+        "src/libswfnav/asap_rot_int.f": {
+            "checksum": "6dc54bdb81c33453b5effac24910b500e6a0ea28aaca9cef1fc16176bd0cda15",
+            "mode": 33204,
+            "size": 3362,
+            "tag": "T2024.24"
+        },
+        "src/libswfnav/asap_rots.f": {
+            "checksum": "da6757e599987240403fbb9a9b9edd79f4b502601c9b446c36ab7665a7652e16",
+            "mode": 33204,
+            "size": 1661,
+            "tag": "T2024.24"
+        },
+        "src/libswfnav/asaps.f": {
+            "checksum": "93b6d06c7cd62034ffa5ea11d097186770ac811d3c4fc26fe1636095d3b2a771",
+            "mode": 33204,
+            "size": 17569,
+            "tag": "T2024.24"
         },
         "src/libswfnav/attcmp.f": {
             "checksum": "b1a68c6ff7b7bfe2459a4f7fce30580d9c4d82538d4610ca71206d867c8007a6",
@@ -12294,6 +12180,30 @@
             "mode": 33204,
             "size": 2384,
             "tag": "initial"
+        },
+        "src/libswfnav/coord.f": {
+            "checksum": "9bee900a3e852868b9ed576eeb7047d8bab2c1283a80bd0f21698132e27d32b6",
+            "mode": 33204,
+            "size": 1498,
+            "tag": "T2024.24"
+        },
+        "src/libswfnav/delm.f": {
+            "checksum": "e41260284180378cc569c01ad96fc8d2baaab43b4dda5168c241faf12503ea1b",
+            "mode": 33204,
+            "size": 2923,
+            "tag": "T2024.24"
+        },
+        "src/libswfnav/dens76.f": {
+            "checksum": "710442739a0e220d59f672a7df6223326857d5d2ecd39c8211030a73a304144f",
+            "mode": 33204,
+            "size": 6234,
+            "tag": "T2024.24"
+        },
+        "src/libswfnav/der.f": {
+            "checksum": "fdc845f75354e5b5ab88bcdff8beb993321e12c3c62014c0795194d46685ab81",
+            "mode": 33204,
+            "size": 5818,
+            "tag": "T2024.24"
         },
         "src/libswfnav/earcnst.f": {
             "checksum": "3f225b4cb9252505bbb52912abc4fad5d0c801a79addbcb1ea97f0ea3298d8ef",
@@ -12355,6 +12265,18 @@
             "size": 3407,
             "tag": "initial"
         },
+        "src/libswfnav/ephem.f": {
+            "checksum": "e5f4fc73ac76c8c14ad7691dc9ac5fd407de8cd432ee2139e987e5fbc646b19b",
+            "mode": 33204,
+            "size": 3474,
+            "tag": "T2024.24"
+        },
+        "src/libswfnav/eqnox.f": {
+            "checksum": "eb1588af6e142acbc0c920a93f53ea99a554472df2c0a17c2b7e0db2db458885",
+            "mode": 33204,
+            "size": 4300,
+            "tag": "T2024.24"
+        },
         "src/libswfnav/euler.f": {
             "checksum": "25b755dff1814431a47db3ca552437a0a854ee423d25e793a22e037fd8674d82",
             "mode": 33204,
@@ -12366,6 +12288,12 @@
             "mode": 33204,
             "size": 6106,
             "tag": "initial"
+        },
+        "src/libswfnav/fitgps.f": {
+            "checksum": "568f05fe6c96264ee9cfc632ece1b53f660b4c4e70a5e13bbecab2020da6e4e2",
+            "mode": 33204,
+            "size": 4245,
+            "tag": "T2024.24"
         },
         "src/libswfnav/fitrng.f": {
             "checksum": "646b366bc1d8e13f5b53cd369ac93c3e54239f660deb2913ce903fe5181610db",
@@ -12379,11 +12307,23 @@
             "size": 993,
             "tag": "initial"
         },
+        "src/libswfnav/get_elements.f": {
+            "checksum": "d8352b29e1b3585f9329ec2ee9c8692a1342fba50d4616d4785efa6b67eb72eb",
+            "mode": 33204,
+            "size": 4733,
+            "tag": "T2024.24"
+        },
         "src/libswfnav/get_node.f": {
             "checksum": "c147e7cf7bde946885fe410ecaf4a6fe354005e90908977c942959ef3063aebb",
             "mode": 33204,
             "size": 3087,
             "tag": "initial"
+        },
+        "src/libswfnav/get_ut1.f": {
+            "checksum": "ea9054528a47e1b143f6af6ffac776f5f55ce2b8f516071c36325c12bfadf7a6",
+            "mode": 33204,
+            "size": 1719,
+            "tag": "T2024.24"
         },
         "src/libswfnav/getorbit.f": {
             "checksum": "2268a07fea769da58cfdf0e17e27cf6f6f5a333f8ca6b6d0d4842a0a28d32168",
@@ -12415,11 +12355,29 @@
             "size": 1059,
             "tag": "initial"
         },
+        "src/libswfnav/invert.f": {
+            "checksum": "a88a1f4d4ebd820fc40a0558796543a1aaed30f313f9cebe5d54aca8a173dcb3",
+            "mode": 33204,
+            "size": 2961,
+            "tag": "T2024.24"
+        },
         "src/libswfnav/jul2yds.f": {
             "checksum": "ad3a1349f98e854931bb54e13f40b77b4a18ad9a7d70165256601d7d8a1a0aa4",
             "mode": 33204,
             "size": 660,
             "tag": "initial"
+        },
+        "src/libswfnav/kepler.f": {
+            "checksum": "6f8e6b5ce592a97f588c6936b353b843776c4860ca3f187ecc4b6e570235939e",
+            "mode": 33204,
+            "size": 1979,
+            "tag": "T2024.24"
+        },
+        "src/libswfnav/kozsak2.f": {
+            "checksum": "66516d0333037e53b351107ca4087d4f3c2f8e82d064dc01226eff3daead48c8",
+            "mode": 33204,
+            "size": 3436,
+            "tag": "T2024.24"
         },
         "src/libswfnav/leapchk.f": {
             "checksum": "56317d36bea965dde34c2fee518523247a4c469fb416b8af9901fbabdd2c4e56",
@@ -12427,11 +12385,29 @@
             "size": 965,
             "tag": "initial"
         },
+        "src/libswfnav/legend.f": {
+            "checksum": "73494370aa62f067cf0c9dcba0c5a55412481d31de3359b22375fb0c405d18c9",
+            "mode": 33204,
+            "size": 1629,
+            "tag": "T2024.24"
+        },
         "src/libswfnav/matvec.f": {
             "checksum": "1ad1b085f2b3e873e3e1aa41f3d9e8348dea0c7e18843af71937af5f5d580a03",
             "mode": 33204,
             "size": 676,
             "tag": "initial"
+        },
+        "src/libswfnav/matvec2.f": {
+            "checksum": "adce0a85c5f350e25f81e6506d2f4b3e5131b28dbf68526b0dec1987f163c99b",
+            "mode": 33204,
+            "size": 842,
+            "tag": "T2024.24"
+        },
+        "src/libswfnav/mediqr.f": {
+            "checksum": "416ed0bf12df031e01fb8dbab477a9148190e2512bef870776e2d683a24dc9ad",
+            "mode": 33204,
+            "size": 1119,
+            "tag": "T2024.24"
         },
         "src/libswfnav/navblk_s.fin": {
             "checksum": "1a347d2d32e557899d433f1f51c900ad207b993e9e498ce419a61a7c18a3907d",
@@ -12469,11 +12445,35 @@
             "size": 11907,
             "tag": "initial"
         },
+        "src/libswfnav/orbit_s.fin": {
+            "checksum": "d6288547b2857653f9217fd5a6779d05d2ccb0322b9dd305f1f0d76629b1f2ce",
+            "mode": 33204,
+            "size": 881,
+            "tag": "T2024.24"
+        },
+        "src/libswfnav/pderiv.f": {
+            "checksum": "c6dc7d2430acb4ed3f1747668221f176d286ede2592e71cf61d3f1acb4ae966b",
+            "mode": 33204,
+            "size": 4273,
+            "tag": "T2024.24"
+        },
+        "src/libswfnav/pout.f": {
+            "checksum": "03a68475b68e4cf80ee88c3ee12a89d4897a34e8fd2bdeeebc640be4741c052f",
+            "mode": 33204,
+            "size": 4168,
+            "tag": "T2024.24"
+        },
         "src/libswfnav/proctim2.f": {
             "checksum": "bf8fc235b04ca853656e188c79a18080e38d5ee62474e373f1c055f7752e6e23",
             "mode": 33204,
             "size": 11816,
             "tag": "initial"
+        },
+        "src/libswfnav/put_elements.f": {
+            "checksum": "f88dc75d566deb8f2933d4aa6dfff4924184864eacf1abce547006baf7e5b728",
+            "mode": 33204,
+            "size": 3686,
+            "tag": "T2024.24"
         },
         "src/libswfnav/read_analog.f": {
             "checksum": "75f7de8380724b222701ce242782fed128bddbb38126db5715496e7c1f0d458d",
@@ -12529,6 +12529,18 @@
             "size": 3990,
             "tag": "initial"
         },
+        "src/libswfnav/rk78.f": {
+            "checksum": "e1d08f8a8eb80f6ea10904b18503cdcba8afea9e8d6edc67118d4986719677b3",
+            "mode": 33204,
+            "size": 3964,
+            "tag": "T2024.24"
+        },
+        "src/libswfnav/rk78cn.f": {
+            "checksum": "ef036f6b0ebca824977cde5ca11b0c90ba1eea78156acf858dc57afb8e982d14",
+            "mode": 33204,
+            "size": 2884,
+            "tag": "T2024.24"
+        },
         "src/libswfnav/runfit3t.f": {
             "checksum": "813b0ef588ee34508cf8444339d81a848be8306380576321f901bde6e1fdb41f",
             "mode": 33204,
@@ -12552,6 +12564,24 @@
             "mode": 33204,
             "size": 344,
             "tag": "initial"
+        },
+        "src/libswfnav/select.f": {
+            "checksum": "0e0986dc0d0686a9a3d4761fed4ef144ed6b995bddde693f00f9ed5c23afb1b3",
+            "mode": 33204,
+            "size": 1236,
+            "tag": "T2024.24"
+        },
+        "src/libswfnav/setsun.f": {
+            "checksum": "c2dd0333ea5a7d8f3f449447839045346d7066857987a37dfe379118aef6b52c",
+            "mode": 33204,
+            "size": 1300,
+            "tag": "T2024.24"
+        },
+        "src/libswfnav/setthd.f": {
+            "checksum": "7982790613ad6c1e7eec29f9d87b24b8ffbb9158982c766027122b727ed2d4f6",
+            "mode": 33204,
+            "size": 1609,
+            "tag": "T2024.24"
         },
         "src/libswfnav/suncnst.f": {
             "checksum": "87e2276adfb4e1851d5045284f8afbc2f084147c014a10a42ef7ea64ac3d1105",
@@ -12619,6 +12649,12 @@
             "size": 2541,
             "tag": "initial"
         },
+        "src/libswfnav/vec2mean.f": {
+            "checksum": "7882b0e6db3457b82155bab5efd116bbc430ecc62ea05b769a175844b3897166",
+            "mode": 33204,
+            "size": 1537,
+            "tag": "T2024.24"
+        },
         "src/libswfnav/vmag.f": {
             "checksum": "63dd449f05f9474db2c029a183bbab10680aced8165690ec7064202131d83568",
             "mode": 33204,
@@ -12630,6 +12666,12 @@
             "mode": 33204,
             "size": 625,
             "tag": "initial"
+        },
+        "src/libswfnav/xthird.f": {
+            "checksum": "351fe910c4f54e0124ff19f0f71d8e780d151819e44399a43f18e6d8bfd4ccae",
+            "mode": 33204,
+            "size": 1924,
+            "tag": "T2024.24"
         },
         "src/libswfnav/yd2ymd.f": {
             "checksum": "dd95307dca39f23a19b98af2c16ee49aeeb539f908534a62de0ffd2227e16203",
@@ -12692,10 +12734,10 @@
             "tag": "V2024.2"
         },
         "src/manifest/build_new_tag": {
-            "checksum": "593ee884ad799bc0637bb022cbce4e3e83665eca0887b17835649666b6c406ae",
+            "checksum": "aa4c7fa82a129fd114ea08f74cb1afba48120b5b4afaef9fcdf0b9cc7bf79c3b",
             "mode": 33277,
-            "size": 6898,
-            "tag": "T2024.22"
+            "size": 8125,
+            "tag": "T2024.24"
         },
         "src/manifest/fix_mac_rpath.py": {
             "checksum": "07db2d4288bdd840a14a5313a2dd5ced124809ce78a812cc6d6b7cfede2728b1",
@@ -12704,10 +12746,10 @@
             "tag": "T2023.9"
         },
         "src/manifest/install_ocssw.py": {
-            "checksum": "66e7fdb3b5cc5c83f8ec5313ca31cfa301ef7d5188b7eacaacf5f44a34b54438",
+            "checksum": "c35aab69248d05395b7ceec1c22215d10908fb340489c1dae1b735956a95195b",
             "mode": 33277,
-            "size": 46238,
-            "tag": "V2024.1"
+            "size": 46455,
+            "tag": "T2024.24"
         },
         "src/manifest/manifest.py": {
             "checksum": "5c2e18b1838751cbca4fd0a785a1e283c28b5f9c3e2c69714c63efa9dc102d52",
@@ -12716,10 +12758,10 @@
             "tag": "T2023.3"
         },
         "src/manifest/manifest_ocssw.py": {
-            "checksum": "1911135ab9e28329e82cf88067a48d19c23f0b0a650663376cd76647df0fa901",
+            "checksum": "64fa9ace7902689c09941bd62afc0faf09cc1c78fd6e4fa71026910419cf83c8",
             "mode": 33277,
-            "size": 32999,
-            "tag": "V2024.1"
+            "size": 33098,
+            "tag": "T2024.24"
         },
         "src/manifest/update_manifest_dirs": {
             "checksum": "ed5f806d8d1be276bb1d0b37fc1e5832e47147d2099c6da5a794782820d7af73",
@@ -13694,16 +13736,22 @@
             "tag": "T2024.20"
         },
         "src/scripts/l1aconvert_octs.py": {
-            "checksum": "f61c9a16eeaec35e78bfbd17607efbe4be48cf6e360683892e1cce2b7f3ba1d8",
+            "checksum": "758efa057275366bf0fa34827513dca6815ca179808a0a4a4e846814d62f15f2",
             "mode": 33204,
-            "size": 12049,
-            "tag": "T2024.20"
+            "size": 19577,
+            "tag": "T2024.24"
         },
         "src/scripts/l1aconvert_seawifs.py": {
-            "checksum": "8a6303fbad1b6884e5f684909557dc39655c2bc0f8220beaf538bd06e4cd49dc",
+            "checksum": "193aab31c04a8b83734164b596e3052fc807b060974a7553757a3c97ff820f0a",
             "mode": 33204,
-            "size": 21016,
-            "tag": "V2024.4"
+            "size": 21004,
+            "tag": "T2024.24"
+        },
+        "src/scripts/l1aextract_netcdf.py": {
+            "checksum": "3ce99d13dc648a3a91ff9467ca1a711e678ccc568926ecacea5cb5efeb4537f2",
+            "mode": 33277,
+            "size": 6283,
+            "tag": "T2024.24"
         },
         "src/scripts/l1bextract_oci.py": {
             "checksum": "0934d025c1224015cefcd71741a9c915b1e5832055290a4455e574179a5e004e",
@@ -13754,10 +13802,10 @@
             "tag": "T2024.21"
         },
         "src/scripts/mapgen.py": {
-            "checksum": "2c54144d679c6940821457c83b5700cc5c6e037d7dd0ba6cbce19c18ad73c571",
+            "checksum": "eb0693893e226710b36ccb9dea3ac88a7b8b3f4cab909cb60498e51a2dea4e57",
             "mode": 33277,
-            "size": 19153,
-            "tag": "T2024.17"
+            "size": 19181,
+            "tag": "T2024.24"
         },
         "src/scripts/mapgen_overlay.py": {
             "checksum": "71feda81605afa67ca967f459770b7a5433c7f6d6dbec7678e1f1f9524bf3bc4",
@@ -14540,10 +14588,10 @@
             "tag": "R2022.0"
         },
         "src/scripts/seadas_info.py": {
-            "checksum": "e623da4efdf12507ebba677b7c2838037761d2bbf83cc4034af7ddd94726742d",
+            "checksum": "3609c48fec09fcab4c0e8c078c5c54e5233acd6af71c66e7b8954f56f6dfb80e",
             "mode": 33277,
-            "size": 7932,
-            "tag": "T2023.6"
+            "size": 7918,
+            "tag": "T2024.24"
         },
         "src/scripts/seadasutils/DictUtils.py": {
             "checksum": "ba48dd683c9cde6881a2cb5330bc82a05a37953762e57e0d31877bbf52ee17e4",
@@ -14576,10 +14624,10 @@
             "tag": "initial"
         },
         "src/scripts/seadasutils/ProcUtils.py": {
-            "checksum": "db2f8e59b9e1fce533dcaa2b3c11e79f2d79a66edb011a4d49521d7c115e8e4c",
+            "checksum": "c4ef303c953bdc4945cab7e6456d861a0da5091735d8e591e01aa61c95204461",
             "mode": 33204,
-            "size": 13919,
-            "tag": "T2024.7"
+            "size": 13914,
+            "tag": "T2024.24"
         },
         "src/scripts/seadasutils/SensorUtils.py": {
             "checksum": "2c0edf5eb900f7d15b9c1243429241f73eafb0846c332d677d563243aac3319b",
@@ -15224,10 +15272,10 @@
             "tag": "T2024.20"
         },
         "test/l1agen_oci/CDataList.txt": {
-            "checksum": "74db83dda77d4beeaff7f4f7a41182264f1e7ca1e6ccaa81b91b64a7c0b7eb9e",
+            "checksum": "229a27a16bb65fd0937a00727ce0c05f97806a1f10f1eb2bd180918f491fa880",
             "mode": 33204,
             "size": 6811,
-            "tag": "V2024.1"
+            "tag": "T2024.24"
         },
         "test/l1agen_oci/CMakeLists.txt": {
             "checksum": "556559c1d01ff5c332a8074408ec919aaa3a703548d232214f5155f4ba302bfb",
@@ -15236,10 +15284,10 @@
             "tag": "T2024.21"
         },
         "test/l1agen_seawifs/CDataList.txt": {
-            "checksum": "f24ed438f322f8d63e07a578b3b2dc83e78231e59b92bd82a933661e93a24fab",
+            "checksum": "ec670066a22acf33933b09d75014f690c4b5119d5235bf1e98f68eb1149dd2ab",
             "mode": 33204,
             "size": 651,
-            "tag": "R2022.0"
+            "tag": "T2024.24"
         },
         "test/l1agen_seawifs/CMakeLists.txt": {
             "checksum": "4c78f7363f8d3208c547edeb16f27be0e666e4d7170a751e904947931dcac0fb",
@@ -15248,10 +15296,10 @@
             "tag": "T2023.15"
         },
         "test/l1bextract_meris/CDataList.txt": {
-            "checksum": "fd830035889525e266de885d7fd694c07aa4207cbc17e4a2072ad1fcbfa63e56",
+            "checksum": "190ed6bccc80810ab1751cfb7fced0e261b3bbe87ca7cac0c1585196b4bcc6bf",
             "mode": 33204,
             "size": 8289,
-            "tag": "V2024.5"
+            "tag": "T2024.24"
         },
         "test/l1bextract_meris/CMakeLists.txt": {
             "checksum": "90df998292004ce63df6b93f5c3d77c2c78a88590c316cb9979b4af7d98e85c3",
@@ -15260,10 +15308,10 @@
             "tag": "T2024.16"
         },
         "test/l1bgen_oci/CDataList.txt": {
-            "checksum": "f66783e76022fd58bd155dd89339a01b937de8cbaeb30dd2dc4131841449a64a",
+            "checksum": "c1f9c5a591e9ccd0dd4611fff742a40e673955ab28a680245a17607fbbd5e48c",
             "mode": 33204,
             "size": 1379,
-            "tag": "V2024.5"
+            "tag": "T2024.24"
         },
         "test/l1bgen_oci/CMakeLists.txt": {
             "checksum": "1ea75ff526f4a519dc0b28c84bc745946c53503425849553a10d6da41637c680",
@@ -15320,10 +15368,10 @@
             "tag": "T2024.22"
         },
         "test/l2gen/CDataList.txt": {
-            "checksum": "067c0668e854f7b7c6ed4b474b6ef33da0616f586ed46954562e82057dea744b",
+            "checksum": "f1c54813c414d52b1a886bc31c74dfc5005871865ff1e583e9a7ddef06154e45",
             "mode": 33204,
             "size": 62882,
-            "tag": "V2024.5"
+            "tag": "T2024.24"
         },
         "test/l2gen/CMakeLists.txt": {
             "checksum": "7e7835a73d7fcd7070418e2bdb5f01bece10c751a1e682f7f47218213ab13c96",
@@ -15368,10 +15416,10 @@
             "tag": "V2024.3"
         },
         "test/l3gen/CDataList.txt": {
-            "checksum": "9e84bc51b194b002cdc2578448019abe8cf9439e475a1d9900cc5d9595534255",
+            "checksum": "39182c85bbef6de7d3cddb5d56f6747fc67775934e502f9415d818f964fccd03",
             "mode": 33204,
             "size": 4666,
-            "tag": "V2024.4"
+            "tag": "T2024.24"
         },
         "test/l3gen/CMakeLists.txt": {
             "checksum": "b12c240a04ef4136419d8eb8b0890d1cb7455103a55f72b8e2259b39b7ade378",
@@ -15406,6 +15454,6 @@
     },
     "name": "ocssw_src",
     "tags": [
-        "V2024.7"
+        "V2024.8"
     ]
 }

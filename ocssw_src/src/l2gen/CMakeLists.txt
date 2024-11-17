@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.12)
 # Make a version file containing the current version from git.
 #
 set (VERSION_MAJOR 9)
-set (VERSION_MINOR 7)
+set (VERSION_MINOR 8)
 set (VERSION_PATCH 0)
 include(GetOcsswVersion)
 
@@ -63,8 +63,19 @@ set(L2GEN_COMMON_FILES
   wavelength_3d.cpp
   geo_region.cpp
 # fortran files to get rid of
-  lenstr.f
+  lenstr.cpp
 )
+
+if (BUILD_CLOUD)
+  set(cloud_src get_cmp.c)
+  set(cloud_lib cloud)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DBUILD_CLOUD")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBUILD_CLOUD")
+endif()
+if(BUILD_HISTORICAL)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DBUILD_HISTORICAL")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBUILD_HISTORICAL")
+endif(BUILD_HISTORICAL)
 
 set(L2GEN_PRODUCT_FILES
   prodgen.c
@@ -124,7 +135,7 @@ set(L2GEN_PRODUCT_FILES
   get_pft_uitz.c
   get_psd_ksm.c
   get_nitrate.c
-  get_cmp.c
+  ${cloud_src}
   get_ctht.c
   int_4d.c
   axis_interp.c
@@ -201,7 +212,7 @@ add_executable(l2gen
   aer_io.c
   alloc_aer.c
   vcal.c
-  dtran_brdf.f
+  dtranbrdf.cpp
   turbid.c
   init_l2.c
   convert_band.c
@@ -263,7 +274,7 @@ add_executable(l3gen
   aer_io.c
   alloc_aer.c
   vcal.c
-  dtran_brdf.f
+  dtranbrdf.cpp
   turbid.c
   init_l2.c
   convert_band.c
@@ -336,7 +347,7 @@ add_executable(vcalmerge
   cpl1rec.c
   convert_band.c
   flags_iop.c
-  dtran_brdf.f
+  dtranbrdf.cpp
   turbid.c
   glint.c
   get_rhown_nir.c
@@ -399,7 +410,7 @@ add_executable(l1det2det
   cpl1rec.c
   convert_band.c
   flags_iop.c
-  dtran_brdf.f
+  dtranbrdf.cpp
   turbid.c
   glint.c
   get_rhown_nir.c
@@ -492,14 +503,14 @@ add_executable(l2binmatch
 target_link_libraries(l2gen
   anc
   bin
-  cloud
+  ${cloud_lib}
   ${LIBS}
   )
 
 target_link_libraries(l3gen
   anc
   bin
-  cloud
+  ${cloud_lib}
   ${LIBS}
   )
 
@@ -529,7 +540,7 @@ target_link_libraries(lonlat2pixline
 
 target_link_libraries(vcalmerge
   anc
-  cloud
+  ${cloud_lib}
   ${LIBS}
   )
 
@@ -540,7 +551,7 @@ target_link_libraries(l2binmatch
 
 target_link_libraries(l1det2det
   anc
-  cloud
+  ${cloud_lib}
   ${LIBS}
   )
 

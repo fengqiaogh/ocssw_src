@@ -42,6 +42,7 @@ totalNumThings = 0
 bundleList = []
 initialBundleList = [
     {"name":"root", "dir":".", "help":"random files in the root dir", "extra":"--exclude . --include bundleList.json --include OCSSW_bash.env --include OCSSW.env", "commandLine":True},
+    {"name":"python", "dir":"python", "help":"OCSSW required python modules", "commandLine":True},
     {"name":"bin_linux_64", "dir":"bin_linux_64", "help":"executables for Linux", "commandLine":False}, 
     {"name":"bin_linux_hpc", "dir":"bin_linux_hpc", "help":"executables for Linux HPC", "commandLine":False}, 
     {"name":"bin_macosx_intel", "dir":"bin_macosx_intel", "help":"executables for Mac", "commandLine":False},
@@ -916,6 +917,10 @@ def run():
         options.bin = False
         options.opt = False
         options.viirs_l1_bin = False
+
+    # always install the python bundle if it exists
+    if hasattr(options, "python"):
+        options.python = True
 
     # count the things we are going to install
     totalNumThings = 0

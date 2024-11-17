@@ -109,18 +109,24 @@ int openl1_oci(filehandle * file) {
     }
     
     // num_scans
-    status = nc_inq_dimid(ncid_L1B, "number_of_scans", &dimid);
+    status = nc_inq_dimid(ncid_L1B, "scans", &dimid);
     if (status != NC_NOERR) {
-        fprintf(stderr, "-E- Error reading number_of_scans.\n");
-        exit(EXIT_FAILURE);
+        // Try to look for the old name for this dimension
+        if (nc_inq_dimid(ncid_L1B, "number_of_scans", &dimid) != NC_NOERR) {
+            fprintf(stderr, "-E- Error reading scan dimension.\n");
+            exit(EXIT_FAILURE);
+        }
     }
     nc_inq_dimlen(ncid_L1B, dimid, &num_scans);
 
     // num_pixels
-    status = nc_inq_dimid(ncid_L1B, "ccd_pixels", &dimid);
+    status = nc_inq_dimid(ncid_L1B, "pixels", &dimid);
     if (status != NC_NOERR) {
-        fprintf(stderr, "-E- Error reading num_pixels.\n");
-        exit(EXIT_FAILURE);
+        // If "pixels" doesn't exist, it's the old "ccd_pixels"
+        if (nc_inq_dimid(ncid_L1B, "ccd_pixels", &dimid)) {
+            fprintf(stderr, "-E- Error reading num_pixels.\n");
+            exit(EXIT_FAILURE);
+        }
     }
     nc_inq_dimlen(ncid_L1B, dimid, &num_pixels);
 

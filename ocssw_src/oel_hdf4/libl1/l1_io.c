@@ -31,6 +31,7 @@
 #include "l1_seawifs.h"
 #include "l1_seawifs_netcdf.h"
 #include "l1_octs.h"
+#include "l1_octs_netcdf.h"
 #include "l1_osmi.h"
 #include "l1_modis.h"
 #include "l1_czcs.h"
@@ -83,33 +84,42 @@ void closel1(filehandle *l1file) {
     case FT_MOSL1B:
         closel1_mos(l1file);
         break;
+#ifdef BUILD_HISTORICAL
     case FT_SEAWIFSL1A:
         closel1_seawifs(l1file);
         break;
     case FT_SEAWIFSL1ANC:
         closel1_seawifs_netcdf(l1file);
         break;
+#endif
+    case FT_OCTSL1A:
     case FT_OCTSL1B:
         closel1_octs(l1file);
         break;
-    case FT_OCTSL1A:
-        closel1_octs(l1file);
+    case FT_OCTSL1ANC:
+        closel1_octs_netcdf(l1file);
         break;
+#ifdef BUILD_HISTORICAL
     case FT_OSMIL1A:
         closel1_osmi(l1file);
         break;
+#endif
     case FT_L1XCAL:
         closel1_xcal(l1file);
         break;
+#ifdef BUILD_HISTORICAL
     case FT_CZCSL1A:
         closel1_czcs(l1file);
         break;
+#endif
     case FT_MODISL1B:
         closel1_modis();
         break;
+#ifdef BUILD_HISTORICAL
     case FT_CLASSAVHRR:
         closel1_aci(l1file);
         break;
+#endif
     case FT_OCML1B:
         closel1_ocm(l1file);
         break;
@@ -267,39 +277,48 @@ int openl1(filehandle *l1file) {
         case FT_MOSL1B:
             status = openl1_read_mos(l1file);
             break;
+#ifdef BUILD_HISTORICAL
         case FT_SEAWIFSL1A:
             status = openl1_seawifs(l1file);
             break;
         case FT_SEAWIFSL1ANC:
             status = openl1_seawifs_netcdf(l1file);
             break;
+#endif
         case FT_L1HDF:
             status = openl1_read_hdf_g(l1file);
             break;
         case FT_L1BNCDF:
             status = openl1_nc_generic(l1file);
             break;
+        case FT_OCTSL1A:
         case FT_OCTSL1B:
             status = openl1_octs(l1file);
             break;
-        case FT_OCTSL1A:
-            status = openl1_octs(l1file);
+        case FT_OCTSL1ANC:
+            status = openl1_octs_netcdf(l1file);
             break;
+#ifdef BUILD_HISTORICAL
         case FT_OSMIL1A:
             status = openl1_osmi(l1file);
             break;
+#endif
         case FT_L1XCAL:
             status = openl1_xcal(l1file);
             break;
+#ifdef BUILD_HISTORICAL
         case FT_CZCSL1A:
             status = openl1_czcs(l1file);
             break;
+#endif
         case FT_MODISL1B:
             status = openl1_modis(l1file);
             break;
+#ifdef BUILD_HISTORICAL
         case FT_CLASSAVHRR:
             status = openl1_aci(l1file);
             break;
+#endif
         case FT_OCML1B:
             status = openl1_ocm(l1file);
             break;
@@ -453,33 +472,42 @@ int readl1(filehandle *l1file, int32_t recnum, l1str *l1rec) {
     case FT_MOSL1B:
         status = readl1_mos(l1file, recnum, l1rec);
         break;
+#ifdef BUILD_HISTORICAL
     case FT_SEAWIFSL1A:
         status = readl1_seawifs(l1file, recnum, l1rec);
         break;
     case FT_SEAWIFSL1ANC:
         status = readl1_seawifs_netcdf(l1file, recnum, l1rec);
         break;
+#endif
+    case FT_OCTSL1A:
     case FT_OCTSL1B:
         status = readl1_octs(l1file, recnum, l1rec);
         break;
-    case FT_OCTSL1A:
-        status = readl1_octs(l1file, recnum, l1rec);
+    case FT_OCTSL1ANC:
+        status = readl1_octs_netcdf(l1file, recnum, l1rec);
         break;
+#ifdef BUILD_HISTORICAL
     case FT_OSMIL1A:
         status = readl1_osmi(l1file, recnum, l1rec);
         break;
+#endif
     case FT_L1XCAL:
         status = readl1_xcal(l1file, recnum, l1rec);
         break;
+#ifdef BUILD_HISTORICAL
     case FT_CZCSL1A:
         status = readl1_czcs(l1file, recnum, l1rec);
-        break; 
+        break;
+#endif
     case FT_MODISL1B:
         status = readl1_modis(l1file, recnum, l1rec, 0);
         break;
+#ifdef BUILD_HISTORICAL
     case FT_CLASSAVHRR:
         status = readl1_aci(l1file, recnum, l1rec);
         break;
+#endif
     case FT_OCML1B:
         status = readl1_ocm(l1file, recnum, l1rec);
         break;
@@ -619,12 +647,14 @@ int readl1_lonlat(filehandle *l1file, int32_t recnum, l1str *l1rec) {
     }
 
     switch (l1file->format) {
+#ifdef BUILD_HISTORICAL
     case FT_SEAWIFSL1A:
         status = readl1_lonlat_seawifs(l1file, recnum, l1rec);
         break;
     case FT_SEAWIFSL1ANC:
         status = readl1_lonlat_seawifs_netcdf(l1file, recnum, l1rec);
         break;
+#endif
     case FT_MODISL1B:
         status = readl1_modis(l1file, recnum, l1rec, 1);
         break;

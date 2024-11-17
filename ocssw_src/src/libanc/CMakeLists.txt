@@ -6,15 +6,14 @@ set(LIBS ${HDF4_LIBRARIES})
 
 find_package(NetCDF REQUIRED COMPONENTS C CXX)
 include_directories(${NETCDF_INCLUDE_DIRS})
-list(APPEND LIBS ${NETCDF_LIBRARIES})
+list(APPEND LIBS ${NETCDF_LIBRARIES} nav)
 
 list(APPEND LIBS genutils)
 
 ADD_LIBRARY(anc
   getanc.c
   HDFroutines.c
-  dataintp.f
-  julian.f
+  dataintp.c
 )
 
 target_link_libraries(anc ${LIBS})

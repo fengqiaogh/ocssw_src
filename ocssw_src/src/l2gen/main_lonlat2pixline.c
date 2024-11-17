@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
     extern char *optarg;
     int c;
 
-    cdata_();
+    // cdata_();
 
     // set some normal defaults
     params.want_pixbox = 0;

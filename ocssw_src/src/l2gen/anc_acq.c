@@ -1418,7 +1418,6 @@ int32_t anc_acq_gmao_met_prep(char *file, gen_int_str *met_int)
 {
     /* list of GMAO groups, parm names and special processing value */
     /* note that for the second RH, use the the 1st RH */
-    char *ob_gmao_grp[] = {"met", "met", "met", "met", "met", "met", "met", "met", "ocn_ice"};
     char *ob_gmao_prm_nm[] = {"U10M", "V10M", "SLP", "TQV", "PS", "PS", "PS", "T10M", "FRSEAICE", "FRSNO"};
     /* also will need for rh: met, T10M and met, QV10M */
     /* also will need for icefr: lnd_ice, FRSNO (future) */
@@ -1449,7 +1448,7 @@ int32_t anc_acq_gmao_met_prep(char *file, gen_int_str *met_int)
        processing to make final param in final units */
     for (iprm = 0; iprm < n_raw_gmao; iprm++) {
         /* get the GMAO array */
-        if (anc_acq_read_gmao(file, ob_gmao_grp[iprm], ob_gmao_prm_nm[iprm], &data, &qual, &time, &nlon,
+        if (anc_acq_read_gmao(file, ob_gmao_prm_nm[iprm], &data, &qual, &time, &nlon,
                               &nlat, &nlvl, &lon_coord, &lat_coord) != 0)
             return 1;
 
@@ -1475,7 +1474,7 @@ int32_t anc_acq_gmao_met_prep(char *file, gen_int_str *met_int)
                 }
                 break;
             case RH:
-                if (anc_acq_read_gmao(file, "met", "T10M", &data2, &qual2, &time, &nlon, &nlat, &nlvl,
+                if (anc_acq_read_gmao(file, "T10M", &data2, &qual2, &time, &nlon, &nlat, &nlvl,
                                       &lon_coord2, &lat_coord2) != 0)
                     return 1;
                 free(lat_coord2);
@@ -1484,7 +1483,7 @@ int32_t anc_acq_gmao_met_prep(char *file, gen_int_str *met_int)
                     *(qual + iv) = *(qual + iv) | *(qual2 + iv);
                 free(qual2);
 
-                if (anc_acq_read_gmao(file, "met", "QV10M", &data3, &qual2, &time, &nlon, &nlat, &nlvl,
+                if (anc_acq_read_gmao(file, "QV10M", &data3, &qual2, &time, &nlon, &nlat, &nlvl,
                                       &lon_coord2, &lat_coord2) != 0)
                     return 1;
                 free(lat_coord2);
@@ -1516,7 +1515,7 @@ int32_t anc_acq_gmao_met_prep(char *file, gen_int_str *met_int)
                 }
                 break;
             case SFCRH:
-                if (anc_acq_read_gmao(file, "met", "T10M", &data2, &qual2, &time, &nlon, &nlat, &nlvl,
+                if (anc_acq_read_gmao(file, "T10M", &data2, &qual2, &time, &nlon, &nlat, &nlvl,
                                       &lon_coord2, &lat_coord2) != 0)
                     return 1;
                 free(lat_coord2);
@@ -1525,7 +1524,7 @@ int32_t anc_acq_gmao_met_prep(char *file, gen_int_str *met_int)
                     *(qual + iv) = *(qual + iv) | *(qual2 + iv);
                 free(qual2);
 
-                if (anc_acq_read_gmao(file, "met", "QV10M", &data3, &qual2, &time, &nlon, &nlat, &nlvl,
+                if (anc_acq_read_gmao(file, "QV10M", &data3, &qual2, &time, &nlon, &nlat, &nlvl,
                                       &lon_coord2, &lat_coord2) != 0)
                     return 1;
                 free(lat_coord2);
@@ -1650,7 +1649,7 @@ int32_t anc_acq_gmao_prof_prep(char *file, gen_int_str *prof_int, int32_t nlvl_e
        processing to make final param in final units */
     for (iprm = 0; iprm < n_raw_gmao; iprm++) {
         /* get the GMAO array */
-        if (anc_acq_read_gmao(file, "", ob_gmao_prm_nm[iprm], &data, &qual, &time, &nlon, &nlat, &nlvl,
+        if (anc_acq_read_gmao(file, ob_gmao_prm_nm[iprm], &data, &qual, &time, &nlon, &nlat, &nlvl,
                               &lon_coord, &lat_coord) != 0)
             return 1;
 
@@ -1752,7 +1751,7 @@ int32_t anc_acq_gmao_oz_prep(char *file, gen_int_str *oz_int)
     static float *data = 0;
 
     /* read the ozone */
-    if (anc_acq_read_gmao(file, "met", "TO3", &data, &qual, &time, &nlon, &nlat, &nlvl, &lon_coord,
+    if (anc_acq_read_gmao(file, "TO3", &data, &qual, &time, &nlon, &nlat, &nlvl, &lon_coord,
                           &lat_coord) != 0)
         return 1;
 
@@ -1807,7 +1806,7 @@ int32_t anc_acq_gmao_aer_prep(char *file, gen_int_str *aer_int) {
     int32_t n_raw_gmao = 13;
     /* read the aerosol parameters */
     for (iprm = 0; iprm < n_raw_gmao; iprm++) {
-        if (anc_acq_read_gmao(file, "", ob_gmao_prm_nm[iprm], &data, &qual, &time, &nlon, &nlat, &nlvl,
+        if (anc_acq_read_gmao(file, ob_gmao_prm_nm[iprm], &data, &qual, &time, &nlon, &nlat, &nlvl,
                               &lon_coord, &lat_coord) != 0)
             return 1;
 
@@ -2195,15 +2194,14 @@ int32_t anc_acq_read_gmao_rad(char *file, const char *var_name, float **data, un
     (*lon_coord)[nlon_pre] = 180.;
     return 0;
 }
-int32_t anc_acq_read_gmao(char *file, char *group, char *ds_name,
-
+int32_t anc_acq_read_gmao(char *file, char *ds_name,
                           float **data, unsigned char **qa, double *time, int32_t *nlon, int32_t *nlat,
                           int32_t *nlvl, double **lon_coord, double **lat_coord)
 /*******************************************************************
    anc_acq_read_gmao
 
    purpose: read in the (OBPG modified or not) GMAO parameter from the
-     specified group.  Also, add a column so longitude runs -180 -> 180
+     specified file.  Also, add a column so longitude runs -180 -> 180
 
    Returns type: int32_t - status 0 is good
 
@@ -2211,8 +2209,6 @@ int32_t anc_acq_read_gmao(char *file, char *group, char *ds_name,
       Type              Name            I/O     Description
       ----              ----            ---     -----------
       char *            file             I      GMAO single-level file
-      char *            group            I      group to set, if "", the
-                                                dataset is at the top
       char *            ds_name          I      name of dataset to read
       float **          data             O      array of parameter data,
                                                 BAD_FLT for bad values

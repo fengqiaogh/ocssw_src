@@ -89,7 +89,7 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
     float *Rrs_unc;
 
     float *tg_sol = &l1rec->tg_sol[ip * l1file->nbands];
-    float *tg;  // double way absorption
+    float *tg= &l1rec->tg[ip * l1file->nbands];;  // double way absorption
 
     float *dsensor=NULL, *dLr=NULL, *dtaua=NULL, *dtg_sol=NULL;
     float *dtg_sen=NULL, *dt_sol=NULL, *dt_sen=NULL, *dvc=NULL, *last_dtaua=NULL;
@@ -378,10 +378,6 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
             printf("-E- : Error allocating memory to derv_rhorc\n");
             exit(FATAL_ERROR);
         }
-        if ((tg = (float *)calloc(nwave, sizeof(float))) == NULL) {
-            printf("-E- : Error allocating memory to tg\n");
-            exit(FATAL_ERROR);
-        }
         for (ib = 0; ib < nwave; ib++) {
             if ((derv_rhorc[ib] = (float *)calloc(nbands_ac, sizeof(float))) == NULL) {
                 printf("-E- : Error allocating memory to derv_rhorc[%d]\n", ib);
@@ -453,7 +449,6 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
             //derv_Lg_taua[ib] = 0.;
             last_dtaua[ib] = 0;
             // Rrs_unc[ib] = 0.;
-            tg[ib] = l1rec->tg_sol[ipb] * l1rec->tg_sen[ipb];
             dvc[ib] = dvc[ib] / tg[ib] / l1rec->polcor[ipb];
         }
     }
@@ -493,7 +488,6 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
             for (ib = 0; ib < nwave; ib++)
                 free(corr_nir[ib]);
             free(corr_nir);
-            free(tg);
         }
 
         status = 1;
@@ -518,7 +512,7 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
 
         /* Correct for ozone absorption.  We correct for inbound and outbound here, */
         /* then we put the inbound back when computing Lw.                          */
-        Ltemp[ib] = Ltemp[ib] / l1rec->tg_sol[ipb] / l1rec->tg_sen[ipb];
+        Ltemp[ib] = Ltemp[ib] / tg[ib];
 
         /* Do Cirrus correction - subtract off cirrus reflectance from Ltemp */
         /* Ka is the 1.375 um transmittance of water vapor above cirrus clouds */
@@ -1123,7 +1117,6 @@ NIRSWIR:
             for (ib = 0; ib < nwave; ib++)
                 free(corr_nir[ib]);
             free(corr_nir);
-            free(tg);
         }
         return (status);
 
@@ -1237,7 +1230,6 @@ NIRSWIR:
         for (ib = 0; ib < nwave; ib++)
             free(corr_nir[ib]);
         free(corr_nir);
-        free(tg);
     }
 
     return (status);

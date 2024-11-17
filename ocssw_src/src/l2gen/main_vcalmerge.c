@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
     setvbuf(stderr, NULL, _IOLBF, 0);
 
     /* Initialize file handles */
-    cdata_();
+    // cdata_();
     filehandle_init(&l2file);
     msl12_input_init();
 

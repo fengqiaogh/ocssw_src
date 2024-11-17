@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.12)
 
-set(LIBS l2 nav bin dataday)
+set(LIBS l2 bin dataday)
 
 find_package(NetCDF REQUIRED COMPONENTS C CXX)
 include_directories(${NETCDF_INCLUDE_DIRS})

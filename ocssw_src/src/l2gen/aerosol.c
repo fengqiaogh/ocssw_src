@@ -131,17 +131,18 @@ typedef struct aermod_struct {
     float *pc;                  // pc(pc)
 
 } aermodstr;
-    // sorting in ascending way elements of chi-squared --  will need clean-up
+
+// sorting in ascending way elements of chi-squared --  will need clean-up
 struct str { float value;int index;};
-// 
-static int cmp(const void *a,const void *b)
-    {
-        struct str *a1 = (struct str *)a;
-        struct str *a2 = (struct str*)b;
-        if((*a1).value<(*a2).value)return -1;
-        else if((*a1).value>(*a2).value)return 1;
-        else return 0;
-    }
+
+static int cmp(const void *a,const void *b) {
+    struct str *a1 = (struct str *)a;
+    struct str *a2 = (struct str*)b;
+    if((*a1).value<(*a2).value)return -1;
+    else if((*a1).value>(*a2).value)return 1;
+    else return 0;
+}
+
 aermodstr* alloc_aermodstr(int nbands, int nscatt, int nphi, int nsolz, int nsenz, int ntheta, int npc, int ntau_870) {
     aermodstr *model;
 
@@ -154,20 +155,20 @@ aermodstr* alloc_aermodstr(int nbands, int nscatt, int nphi, int nsolz, int nsen
         model->pc_rhoa = allocate5d_float(ntau_870, nsolz, nphi, nsenz, npc);
 
         // pc_components_rhoa(pc, wave)
-        model->pc_components_rhoa = allocate2d_float(npc, nbands); 
-        
+        model->pc_components_rhoa = allocate2d_float(npc, nbands);
+
         // pc_mean_rhoa(wave)
         model->pc_mean_rhoa = (float*) malloc(nbands * sizeof(float));
-        
+
         // pc_td(tau_870, solz, pc)
         model->pc_td = allocate3d_float(ntau_870,nsenz , npc);//nsolz
-        
+
         // pc_components_td(pc, wave)
-        model->pc_components_td = allocate2d_float(npc, nbands);   
-        
+        model->pc_components_td = allocate2d_float(npc, nbands);
+
         // pc_mean_td(wave)
         model->pc_mean_td = (float*) malloc(nbands * sizeof(float));
-        
+
         // tau_870(tau_870)
         model->tau_870 = (float*) malloc(ntau_870 * sizeof(float));             
 
@@ -490,7 +491,7 @@ int load_aermod(int32_t sensorID, float wave[], int32_t nwave, char *aermodfile,
                 read_dimension_size(file, nc_id, "dtran_nwave", &dtran_nwave);
                 read_dimension_size(file, nc_id, "dtran_ntheta", &dtran_ntheta);
             }
-         } else {
+        } else {
             read_dimension_size(file, nc_id, "nwave", &aer_nwave);
             read_dimension_size(file, nc_id, "nsolz", &nsolz);
             read_dimension_size(file, nc_id, "nsenz", &nsenz);
@@ -498,9 +499,9 @@ int load_aermod(int32_t sensorID, float wave[], int32_t nwave, char *aermodfile,
             read_dimension_size(file, nc_id, "nscatt", &nscatt);
             read_dimension_size(file, nc_id, "dtran_nwave", &dtran_nwave);
             read_dimension_size(file, nc_id, "dtran_ntheta", &dtran_ntheta);
-         }
+        }
         // if(aer_nwave != nwave) {
-        //     printf("-E- %s:%d -  Error nwave dimension = %d not equal to nwave = %d in file = %s.\n", 
+        //     printf("-E- %s:%d -  Error nwave dimension = %d not equal to nwave = %d in file = %s.\n",
         //         __FILE__, __LINE__, aer_nwave, nwave, file);
         //     exit(1);
         // }
@@ -587,10 +588,10 @@ int load_aermod(int32_t sensorID, float wave[], int32_t nwave, char *aermodfile,
             }
             else{
                 if(use_pca_lut){
-                read_lut_variable(file, nc_id, "wavelength", aertab->wave);
-                read_lut_variable(file, nc_id, "solar_zenith", aertab->solz);
-                read_lut_variable(file, nc_id, "sensor_zenith", aertab->senz);
-                read_lut_variable(file, nc_id, "relative_azimuth", aertab->phi);
+                    read_lut_variable(file, nc_id, "wavelength", aertab->wave);
+                    read_lut_variable(file, nc_id, "solar_zenith", aertab->solz);
+                    read_lut_variable(file, nc_id, "sensor_zenith", aertab->senz);
+                    read_lut_variable(file, nc_id, "relative_azimuth", aertab->phi);
                 }
                 else{
                     read_lut_variable(file, nc_id, "wave", aertab->wave);
@@ -606,7 +607,7 @@ int load_aermod(int32_t sensorID, float wave[], int32_t nwave, char *aermodfile,
         } else {
             /*  check that all the aerosol files at least have the same
                 main dimensions  */
-            if ((aertab->nsolz != first_solz) || (aertab->nsenz != first_senz) || 
+            if ((aertab->nsolz != first_solz) || (aertab->nsenz != first_senz) ||
                 (aertab->nphi != first_phi) || (aertab->nscatt != first_scatt) ||
                 (aertab->dtran_nwave != first_dtnwave) || (aertab->dtran_ntheta != first_dtntheta) ||
                 (use_pca_lut && aertab->ntau_870 != first_ntau_870) || (use_pca_lut && aertab->npc != first_npc)) {
@@ -712,7 +713,7 @@ int load_aermod(int32_t sensorID, float wave[], int32_t nwave, char *aermodfile,
             for (iw = 0; iw < aertab->nwave; iw++) {
                 if (iw != iwbase)
                     aertab->model[im]->angstrom[iw] = -log(aertab->model[im]->extc[iw] / aertab->model[im]->extc[iwbase]) /
-                    log(aertab->wave[iw] / aertab->wave[iwbase]);
+                        log(aertab->wave[iw] / aertab->wave[iwbase]);
             }
             aertab->model[im]->angstrom[iwbase] = aertab->model[im]->angstrom[iwbase - 1];
 
@@ -741,7 +742,7 @@ int load_aermod(int32_t sensorID, float wave[], int32_t nwave, char *aermodfile,
 
     /* Require number of table wavelengths to equal number of sensor wavelengths */
     if (aertab->nwave != nwave) {
-        printf("Number of aerosol LUT wavelengths (%d) is not equal to number of sensor wavelengths (%d).\n", 
+        printf("Number of aerosol LUT wavelengths (%d) is not equal to number of sensor wavelengths (%d).\n",
             aertab->nwave,nwave);
         exit(1);
     }
@@ -907,7 +908,7 @@ void ss_to_ms_coef(int modnum, geom_str *geom, float **a, float **b, float **c) 
             isolz2[iw] = MIN(i, aertab->nsolz - 1);
             if (isolz2[iw] != isolz1[iw])
                 r[iw] = (geom->solz[ig] - aertab->solz[isolz1[iw]]) /
-                (aertab->solz[isolz2[iw]] - aertab->solz[isolz1[iw]]);
+                        (aertab->solz[isolz2[iw]] - aertab->solz[isolz1[iw]]);
             else
                 r[iw] = 0.0;
 
@@ -920,7 +921,7 @@ void ss_to_ms_coef(int modnum, geom_str *geom, float **a, float **b, float **c) 
             isenz2[iw] = MIN(i, aertab->nsenz - 1);
             if (isenz2[iw] != isenz1[iw])
                 p[iw] = (geom->senz[ig] - aertab->senz[isenz1[iw]]) /
-                (aertab->senz[isenz2[iw]] - aertab->senz[isenz1[iw]]);
+                        (aertab->senz[isenz2[iw]] - aertab->senz[isenz1[iw]]);
             else
                 p[iw] = 0.0;
 
@@ -980,7 +981,7 @@ void ss_to_ms_coef(int modnum, geom_str *geom, float **a, float **b, float **c) 
                 c_coef[im][iw] = (1. - px)*(1. - rx) * ac000 + px * rx * ac101
                         + (1. - px) * rx * ac001 + px * (1. - qx)*(1. - rx) * ac100;
             } else {
-            	as000 = aertab->model[im]->acost[INDEX(iw, isolz1[ig], iphi1[ig], isenz1[ig])];
+                as000 = aertab->model[im]->acost[INDEX(iw, isolz1[ig], iphi1[ig], isenz1[ig])];
                 as100 = aertab->model[im]->acost[INDEX(iw, isolz1[ig], iphi1[ig], isenz2[ig])];
                 as010 = aertab->model[im]->acost[INDEX(iw, isolz1[ig], iphi2[ig], isenz1[ig])];
                 as110 = aertab->model[im]->acost[INDEX(iw, isolz1[ig], iphi2[ig], isenz2[ig])];
@@ -1197,7 +1198,7 @@ void ms_eps_coef(int modnum, int32_t iwnir_l, float wave[], geom_str *geom,
             isolz2[iw] = MIN(i, aertab->nsolz - 1);
             if (isolz2[iw] != isolz1[iw])
                 r[iw] = (geom->solz[ig] - aertab->solz[isolz1[iw]]) /
-                (aertab->solz[isolz2[iw]] - aertab->solz[isolz1[iw]]);
+                        (aertab->solz[isolz2[iw]] - aertab->solz[isolz1[iw]]);
             else
                 r[iw] = 0.0;
 
@@ -1210,7 +1211,7 @@ void ms_eps_coef(int modnum, int32_t iwnir_l, float wave[], geom_str *geom,
             isenz2[iw] = MIN(i, aertab->nsenz - 1);
             if (isenz2[iw] != isenz1[iw])
                 p[iw] = (geom->senz[ig] - aertab->senz[isenz1[iw]]) /
-                (aertab->senz[isenz2[iw]] - aertab->senz[isenz1[iw]]);
+                        (aertab->senz[isenz2[iw]] - aertab->senz[isenz1[iw]]);
             else
                 p[iw] = 0.0;
 
@@ -1291,76 +1292,76 @@ void ms_eps_coef(int modnum, int32_t iwnir_l, float wave[], geom_str *geom,
             } else {
                 /*       printf("coeffs: as000,ai000,ac000,ad000,ae000\n");   */
 
-            as000 = aertab->model[im]->ams_all[INDEX(iw, isolz1[ig], iphi1[ig], isenz1[ig])];
-            as100 = aertab->model[im]->ams_all[INDEX(iw, isolz2[ig], iphi1[ig], isenz1[ig])];
-            as010 = aertab->model[im]->ams_all[INDEX(iw, isolz1[ig], iphi2[ig], isenz1[ig])];
-            as110 = aertab->model[im]->ams_all[INDEX(iw, isolz2[ig], iphi2[ig], isenz1[ig])];
-            as001 = aertab->model[im]->ams_all[INDEX(iw, isolz1[ig], iphi1[ig], isenz2[ig])];
-            as011 = aertab->model[im]->ams_all[INDEX(iw, isolz1[ig], iphi2[ig], isenz2[ig])];
-            as101 = aertab->model[im]->ams_all[INDEX(iw, isolz2[ig], iphi1[ig], isenz2[ig])];
-            as111 = aertab->model[im]->ams_all[INDEX(iw, isolz2[ig], iphi2[ig], isenz2[ig])];
+                as000 = aertab->model[im]->ams_all[INDEX(iw, isolz1[ig], iphi1[ig], isenz1[ig])];
+                as100 = aertab->model[im]->ams_all[INDEX(iw, isolz2[ig], iphi1[ig], isenz1[ig])];
+                as010 = aertab->model[im]->ams_all[INDEX(iw, isolz1[ig], iphi2[ig], isenz1[ig])];
+                as110 = aertab->model[im]->ams_all[INDEX(iw, isolz2[ig], iphi2[ig], isenz1[ig])];
+                as001 = aertab->model[im]->ams_all[INDEX(iw, isolz1[ig], iphi1[ig], isenz2[ig])];
+                as011 = aertab->model[im]->ams_all[INDEX(iw, isolz1[ig], iphi2[ig], isenz2[ig])];
+                as101 = aertab->model[im]->ams_all[INDEX(iw, isolz2[ig], iphi1[ig], isenz2[ig])];
+                as111 = aertab->model[im]->ams_all[INDEX(iw, isolz2[ig], iphi2[ig], isenz2[ig])];
 
-            ai000 = aertab->model[im]->bms_all[INDEX(iw, isolz1[ig], iphi1[ig], isenz1[ig])];
-            ai100 = aertab->model[im]->bms_all[INDEX(iw, isolz2[ig], iphi1[ig], isenz1[ig])];
-            ai010 = aertab->model[im]->bms_all[INDEX(iw, isolz1[ig], iphi2[ig], isenz1[ig])];
-            ai110 = aertab->model[im]->bms_all[INDEX(iw, isolz2[ig], iphi2[ig], isenz1[ig])];
-            ai001 = aertab->model[im]->bms_all[INDEX(iw, isolz1[ig], iphi1[ig], isenz2[ig])];
-            ai011 = aertab->model[im]->bms_all[INDEX(iw, isolz1[ig], iphi2[ig], isenz2[ig])];
-            ai101 = aertab->model[im]->bms_all[INDEX(iw, isolz2[ig], iphi1[ig], isenz2[ig])];
-            ai111 = aertab->model[im]->bms_all[INDEX(iw, isolz2[ig], iphi2[ig], isenz2[ig])];
+                ai000 = aertab->model[im]->bms_all[INDEX(iw, isolz1[ig], iphi1[ig], isenz1[ig])];
+                ai100 = aertab->model[im]->bms_all[INDEX(iw, isolz2[ig], iphi1[ig], isenz1[ig])];
+                ai010 = aertab->model[im]->bms_all[INDEX(iw, isolz1[ig], iphi2[ig], isenz1[ig])];
+                ai110 = aertab->model[im]->bms_all[INDEX(iw, isolz2[ig], iphi2[ig], isenz1[ig])];
+                ai001 = aertab->model[im]->bms_all[INDEX(iw, isolz1[ig], iphi1[ig], isenz2[ig])];
+                ai011 = aertab->model[im]->bms_all[INDEX(iw, isolz1[ig], iphi2[ig], isenz2[ig])];
+                ai101 = aertab->model[im]->bms_all[INDEX(iw, isolz2[ig], iphi1[ig], isenz2[ig])];
+                ai111 = aertab->model[im]->bms_all[INDEX(iw, isolz2[ig], iphi2[ig], isenz2[ig])];
 
-            ac000 = aertab->model[im]->cms_all[INDEX(iw, isolz1[ig], iphi1[ig], isenz1[ig])];
-            ac100 = aertab->model[im]->cms_all[INDEX(iw, isolz2[ig], iphi1[ig], isenz1[ig])];
-            ac010 = aertab->model[im]->cms_all[INDEX(iw, isolz1[ig], iphi2[ig], isenz1[ig])];
-            ac110 = aertab->model[im]->cms_all[INDEX(iw, isolz2[ig], iphi2[ig], isenz1[ig])];
-            ac001 = aertab->model[im]->cms_all[INDEX(iw, isolz1[ig], iphi1[ig], isenz2[ig])];
-            ac011 = aertab->model[im]->cms_all[INDEX(iw, isolz1[ig], iphi2[ig], isenz2[ig])];
-            ac101 = aertab->model[im]->cms_all[INDEX(iw, isolz2[ig], iphi1[ig], isenz2[ig])];
-            ac111 = aertab->model[im]->cms_all[INDEX(iw, isolz2[ig], iphi2[ig], isenz2[ig])];
+                ac000 = aertab->model[im]->cms_all[INDEX(iw, isolz1[ig], iphi1[ig], isenz1[ig])];
+                ac100 = aertab->model[im]->cms_all[INDEX(iw, isolz2[ig], iphi1[ig], isenz1[ig])];
+                ac010 = aertab->model[im]->cms_all[INDEX(iw, isolz1[ig], iphi2[ig], isenz1[ig])];
+                ac110 = aertab->model[im]->cms_all[INDEX(iw, isolz2[ig], iphi2[ig], isenz1[ig])];
+                ac001 = aertab->model[im]->cms_all[INDEX(iw, isolz1[ig], iphi1[ig], isenz2[ig])];
+                ac011 = aertab->model[im]->cms_all[INDEX(iw, isolz1[ig], iphi2[ig], isenz2[ig])];
+                ac101 = aertab->model[im]->cms_all[INDEX(iw, isolz2[ig], iphi1[ig], isenz2[ig])];
+                ac111 = aertab->model[im]->cms_all[INDEX(iw, isolz2[ig], iphi2[ig], isenz2[ig])];
 
-            ad000 = aertab->model[im]->dms_all[INDEX(iw, isolz1[ig], iphi1[ig], isenz1[ig])];
-            ad100 = aertab->model[im]->dms_all[INDEX(iw, isolz2[ig], iphi1[ig], isenz1[ig])];
-            ad010 = aertab->model[im]->dms_all[INDEX(iw, isolz1[ig], iphi2[ig], isenz1[ig])];
-            ad110 = aertab->model[im]->dms_all[INDEX(iw, isolz2[ig], iphi2[ig], isenz1[ig])];
-            ad001 = aertab->model[im]->dms_all[INDEX(iw, isolz1[ig], iphi1[ig], isenz2[ig])];
-            ad011 = aertab->model[im]->dms_all[INDEX(iw, isolz1[ig], iphi2[ig], isenz2[ig])];
-            ad101 = aertab->model[im]->dms_all[INDEX(iw, isolz2[ig], iphi1[ig], isenz2[ig])];
-            ad111 = aertab->model[im]->dms_all[INDEX(iw, isolz2[ig], iphi2[ig], isenz2[ig])];
+                ad000 = aertab->model[im]->dms_all[INDEX(iw, isolz1[ig], iphi1[ig], isenz1[ig])];
+                ad100 = aertab->model[im]->dms_all[INDEX(iw, isolz2[ig], iphi1[ig], isenz1[ig])];
+                ad010 = aertab->model[im]->dms_all[INDEX(iw, isolz1[ig], iphi2[ig], isenz1[ig])];
+                ad110 = aertab->model[im]->dms_all[INDEX(iw, isolz2[ig], iphi2[ig], isenz1[ig])];
+                ad001 = aertab->model[im]->dms_all[INDEX(iw, isolz1[ig], iphi1[ig], isenz2[ig])];
+                ad011 = aertab->model[im]->dms_all[INDEX(iw, isolz1[ig], iphi2[ig], isenz2[ig])];
+                ad101 = aertab->model[im]->dms_all[INDEX(iw, isolz2[ig], iphi1[ig], isenz2[ig])];
+                ad111 = aertab->model[im]->dms_all[INDEX(iw, isolz2[ig], iphi2[ig], isenz2[ig])];
 
-            ae000 = aertab->model[im]->ems_all[INDEX(iw, isolz1[ig], iphi1[ig], isenz1[ig])];
-            ae100 = aertab->model[im]->ems_all[INDEX(iw, isolz2[ig], iphi1[ig], isenz1[ig])];
-            ae010 = aertab->model[im]->ems_all[INDEX(iw, isolz1[ig], iphi2[ig], isenz1[ig])];
-            ae110 = aertab->model[im]->ems_all[INDEX(iw, isolz2[ig], iphi2[ig], isenz1[ig])];
-            ae001 = aertab->model[im]->ems_all[INDEX(iw, isolz1[ig], iphi1[ig], isenz2[ig])];
-            ae011 = aertab->model[im]->ems_all[INDEX(iw, isolz1[ig], iphi2[ig], isenz2[ig])];
-            ae101 = aertab->model[im]->ems_all[INDEX(iw, isolz2[ig], iphi1[ig], isenz2[ig])];
-            ae111 = aertab->model[im]->ems_all[INDEX(iw, isolz2[ig], iphi2[ig], isenz2[ig])];
+                ae000 = aertab->model[im]->ems_all[INDEX(iw, isolz1[ig], iphi1[ig], isenz1[ig])];
+                ae100 = aertab->model[im]->ems_all[INDEX(iw, isolz2[ig], iphi1[ig], isenz1[ig])];
+                ae010 = aertab->model[im]->ems_all[INDEX(iw, isolz1[ig], iphi2[ig], isenz1[ig])];
+                ae110 = aertab->model[im]->ems_all[INDEX(iw, isolz2[ig], iphi2[ig], isenz1[ig])];
+                ae001 = aertab->model[im]->ems_all[INDEX(iw, isolz1[ig], iphi1[ig], isenz2[ig])];
+                ae011 = aertab->model[im]->ems_all[INDEX(iw, isolz1[ig], iphi2[ig], isenz2[ig])];
+                ae101 = aertab->model[im]->ems_all[INDEX(iw, isolz2[ig], iphi1[ig], isenz2[ig])];
+                ae111 = aertab->model[im]->ems_all[INDEX(iw, isolz2[ig], iphi2[ig], isenz2[ig])];
 
 
-           a_coef[im][iw] = (1. - rx)*(1. - qx)*(1. - px) * as000 + rx * qx * px * as111
-                            + rx * (1. - qx) * px * as101 + (1. - rx) * qx * (1. - px) * as010
-                            + rx * qx * (1. - px) * as110 + (1. - rx)*(1. - qx) * px * as001
-                            + (1. - rx) * qx * px * as011 + rx * (1. - qx)*(1. - px) * as100;
+                a_coef[im][iw] = (1. - rx)*(1. - qx)*(1. - px) * as000 + rx * qx * px * as111
+                                    + rx * (1. - qx) * px * as101 + (1. - rx) * qx * (1. - px) * as010
+                                    + rx * qx * (1. - px) * as110 + (1. - rx)*(1. - qx) * px * as001
+                                    + (1. - rx) * qx * px * as011 + rx * (1. - qx)*(1. - px) * as100;
 
-           b_coef[im][iw] = (1. - rx)*(1. - qx)*(1. - px) * ai000 + rx * qx * px * ai111
-                            + rx * (1. - qx) * px * ai101 + (1. - rx) * qx * (1. - px) * ai010
-                            + rx * qx * (1. - px) * ai110 + (1. - rx)*(1. - qx) * px * ai001
-                            + (1. - rx) * qx * px * ai011 + rx * (1. - qx)*(1. - px) * ai100;
+                b_coef[im][iw] = (1. - rx)*(1. - qx)*(1. - px) * ai000 + rx * qx * px * ai111
+                                    + rx * (1. - qx) * px * ai101 + (1. - rx) * qx * (1. - px) * ai010
+                                    + rx * qx * (1. - px) * ai110 + (1. - rx)*(1. - qx) * px * ai001
+                                    + (1. - rx) * qx * px * ai011 + rx * (1. - qx)*(1. - px) * ai100;
 
-           c_coef[im][iw] = (1. - rx)*(1. - qx)*(1. - px) * ac000 + rx * qx * px * ac111
-                            + rx * (1. - qx) * px * ac101 + (1. - rx) * qx * (1. - px) * ac010
-                            + rx * qx * (1. - px) * ac110 + (1. - rx)*(1. - qx) * px * ac001
-                            + (1. - rx) * qx * px * ac011 + rx * (1. - qx)*(1. - px) * ac100;
+                c_coef[im][iw] = (1. - rx)*(1. - qx)*(1. - px) * ac000 + rx * qx * px * ac111
+                                    + rx * (1. - qx) * px * ac101 + (1. - rx) * qx * (1. - px) * ac010
+                                    + rx * qx * (1. - px) * ac110 + (1. - rx)*(1. - qx) * px * ac001
+                                    + (1. - rx) * qx * px * ac011 + rx * (1. - qx)*(1. - px) * ac100;
 
-           d_coef[im][iw] = (1. - rx)*(1. - qx)*(1. - px) * ad000 + rx * qx * px * ad111
-                            + rx * (1. - qx) * px * ad101 + (1. - rx) * qx * (1. - px) * ad010
-                            + rx * qx * (1. - px) * ad110 + (1. - rx)*(1. - qx) * px * ad001
-                            + (1. - rx) * qx * px * ad011 + rx * (1. - qx)*(1. - px) * ad100;
+                d_coef[im][iw] = (1. - rx)*(1. - qx)*(1. - px) * ad000 + rx * qx * px * ad111
+                                    + rx * (1. - qx) * px * ad101 + (1. - rx) * qx * (1. - px) * ad010
+                                    + rx * qx * (1. - px) * ad110 + (1. - rx)*(1. - qx) * px * ad001
+                                    + (1. - rx) * qx * px * ad011 + rx * (1. - qx)*(1. - px) * ad100;
 
-           e_coef[im][iw] = (1. - rx)*(1. - qx)*(1. - px) * ae000 + rx * qx * px * ae111
-                            + rx * (1. - qx) * px * ae101 + (1. - rx) * qx * (1. - px) * ae010
-                            + rx * qx * (1. - px) * ae110 + (1. - rx)*(1. - qx) * px * ae001
-                            + (1. - rx) * qx * px * ae011 + rx * (1. - qx)*(1. - px) * ae100;
+                e_coef[im][iw] = (1. - rx)*(1. - qx)*(1. - px) * ae000 + rx * qx * px * ae111
+                                    + rx * (1. - qx) * px * ae101 + (1. - rx) * qx * (1. - px) * ae010
+                                    + rx * qx * (1. - px) * ae110 + (1. - rx)*(1. - qx) * px * ae001
+                                    + (1. - rx) * qx * px * ae011 + rx * (1. - qx)*(1. - px) * ae100;
 
             }
         }
@@ -1495,7 +1496,7 @@ void get_pc_rhoa(int modnum, geom_str *geom, float **pc_rhoa)
             isolz2[iw] = MIN(i, aertab->nsolz - 1);
             if (isolz2[iw] != isolz1[iw])
                 r[iw] = (geom->solz[ig] - aertab->solz[isolz1[iw]]) /
-                (aertab->solz[isolz2[iw]] - aertab->solz[isolz1[iw]]);
+                        (aertab->solz[isolz2[iw]] - aertab->solz[isolz1[iw]]);
             else
                 r[iw] = 0.0;
 
@@ -1508,7 +1509,7 @@ void get_pc_rhoa(int modnum, geom_str *geom, float **pc_rhoa)
             isenz2[iw] = MIN(i, aertab->nsenz - 1);
             if (isenz2[iw] != isenz1[iw])
                 p[iw] = (geom->senz[ig] - aertab->senz[isenz1[iw]]) /
-                (aertab->senz[isenz2[iw]] - aertab->senz[isenz1[iw]]);
+                        (aertab->senz[isenz2[iw]] - aertab->senz[isenz1[iw]]);
             else
                 p[iw] = 0.0;
 
@@ -1581,7 +1582,7 @@ void get_pc_rhoa(int modnum, geom_str *geom, float **pc_rhoa)
     }
 
     /* return pointers to coeffs for this geometry */
-  //  *pc_rhoa=&pc_coef[modnum][0][0];
+    //  *pc_rhoa=&pc_coef[modnum][0][0];
     for(itau=0;itau<ntau_870;itau++)
         for(ipc=0;ipc<npc;ipc++){
             pc_rhoa[itau][ipc]=pc_coef[modnum][itau][ipc];
@@ -1609,7 +1610,7 @@ int comp_epsilonT(epsilonTstr *x, epsilonTstr *y) {
 }
 
 void model_select_ahmad(int32_t nmodels, int32_t *mindx, float eps_pred[], float eps_obs, int32_t *modmin,
-        int32_t *modmax, float *modrat) {
+                        int32_t *modmax, float *modrat) {
     static epsilonTstr epsilonT[MAXAERMOD];
 
     int im, im1, im2;
@@ -1753,10 +1754,10 @@ int comp_rhoa_pca(int32_t nwave, float wave[], geom_str *geom,
             pc_rhoa[itau]=(float *)malloc(aertab->npc*sizeof(float));
     }
 
-  /*  if(tau_iwnir_l<aermod->tau_870[0]|| tau_iwnir_l>aermod->tau_870[ntau_870-1]){
-        printf("tau_870 is out of the range in LUTs\n");
-        return -1;
-    }*/
+    /*  if(tau_iwnir_l<aermod->tau_870[0]|| tau_iwnir_l>aermod->tau_870[ntau_870-1]){
+          printf("tau_870 is out of the range in LUTs\n");
+          return -1;
+      }*/
 
 
     for(itau=0;itau<ntau_870;itau++){
@@ -1959,7 +1960,7 @@ int ahmad_atm_corr_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iw
         tau_iwnir_l[im]=aermod->tau_870[itau]+(aermod->tau_870[itau]-aermod->tau_870[itau-1])*(rhoa[iwnir_l]-rhoa_modl_l[itau])/(rhoa_modl_l[itau]-rhoa_modl_l[itau-1]);
         rho_iwnir_s_pred[im]=rhoa_modl_s[itau]+(rhoa_modl_s[itau]-rhoa_modl_s[itau-1])*(tau_iwnir_l[im]-aermod->tau_870[itau])/(aermod->tau_870[itau]-aermod->tau_870[itau-1]);
 
-       // rho_iwnir_s_pred[im]=exp(rho_iwnir_s_pred[im]);
+        // rho_iwnir_s_pred[im]=exp(rho_iwnir_s_pred[im]);
         eps_pred[im] = rho_iwnir_s_pred[im] / rhoa[iwnir_l];
 
         ///!!!! TBD: should include the tlw[nir] in the future  zhang
@@ -2074,7 +2075,7 @@ int ahmad_atm_corr_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iw
                     * derv_taua_rhoa[im1]
                     - mwt * derv_rhoa_max[iw] * derv_taua_rhoa[im2]
                     + (rho_pred_max[iw] - rho_pred_min[iw]) * derv_mwt_rhow_l;
-           // uncertainty->derv_taua_s[iw] = (rho_pred_max[iw] - rho_pred_min[iw])
+            // uncertainty->derv_taua_s[iw] = (rho_pred_max[iw] - rho_pred_min[iw])
             //        * derv_mwt_taua_s;
 
             uncertainty->derv_taua_rhorc[iw][iwnir_l-iwnir_s]= (1.0 - mwt) * derv_taua_min[iw]
@@ -2095,14 +2096,14 @@ int ahmad_atm_corr_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iw
             //uncertainty->derv_taua_taua_s[iw] = (tau_pred_max[iw] - tau_pred_min[iw])
             //        * derv_mwt_taua_s;
 
-           // derv_taua[0][iw][0] = 0.;
+            // derv_taua[0][iw][0] = 0.;
             uncertainty->derv_taua_min_rhorc_l[iw] = derv_taua_min[iw] * derv_taua_rhoa[im1];
             uncertainty->derv_taua_min_taua_l[iw] = -derv_taua_min[iw] * derv_taua_rhoa[im1]
                     * derv_Lg_taua_l;
             uncertainty->derv_taua_min_rhow_l[iw] = -derv_taua_min[iw] * derv_taua_rhoa[im1];
-           // derv_taua[0][iw][4] = 0.;
+            // derv_taua[0][iw][4] = 0.;
 
-           // derv_taua[1][iw][0] = 0.;
+            // derv_taua[1][iw][0] = 0.;
             uncertainty->derv_taua_max_rhorc_l[iw]= derv_taua_max[iw] * derv_taua_rhoa[im2];
             uncertainty->derv_taua_max_taua_l [iw]= -derv_taua_max[iw] * derv_taua_rhoa[im2]
                     * derv_Lg_taua_l;
@@ -2370,7 +2371,7 @@ int ahmad_atm_corr(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
                     * derv_taua_rhoa[im1]
                     - mwt * derv_rhoa_max[iw] * derv_taua_rhoa[im2]
                     + (rho_pred_max[iw] - rho_pred_min[iw]) * derv_mwt_rhow_l;
-           // uncertainty->derv_taua_s[iw] = (rho_pred_max[iw] - rho_pred_min[iw])
+            // uncertainty->derv_taua_s[iw] = (rho_pred_max[iw] - rho_pred_min[iw])
             //        * derv_mwt_taua_s;
 
             uncertainty->derv_taua_rhorc[iw][iwnir_l-iwnir_s]= (1.0 - mwt) * derv_taua_min[iw]
@@ -2391,14 +2392,14 @@ int ahmad_atm_corr(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
             //uncertainty->derv_taua_taua_s[iw] = (tau_pred_max[iw] - tau_pred_min[iw])
             //        * derv_mwt_taua_s;
 
-           // derv_taua[0][iw][0] = 0.;
+            // derv_taua[0][iw][0] = 0.;
             uncertainty->derv_taua_min_rhorc_l[iw] = derv_taua_min[iw] * derv_taua_rhoa[im1];
             uncertainty->derv_taua_min_taua_l[iw] = -derv_taua_min[iw] * derv_taua_rhoa[im1]
                     * derv_Lg_taua_l;
             uncertainty->derv_taua_min_rhow_l[iw] = -derv_taua_min[iw] * derv_taua_rhoa[im1];
-           // derv_taua[0][iw][4] = 0.;
+            // derv_taua[0][iw][4] = 0.;
 
-           // derv_taua[1][iw][0] = 0.;
+            // derv_taua[1][iw][0] = 0.;
             uncertainty->derv_taua_max_rhorc_l[iw]= derv_taua_max[iw] * derv_taua_rhoa[im2];
             uncertainty->derv_taua_max_taua_l [iw]= -derv_taua_max[iw] * derv_taua_rhoa[im2]
                     * derv_Lg_taua_l;
@@ -2654,7 +2655,7 @@ float *model_phase(int modnum, geom_str *geom) {
             ig = gmult * iw;
             temp = sqrt((1.0 - geom->csenz[ig] * geom->csenz[ig]) *
                     (1.0 - geom->csolz[ig] * geom->csolz[ig])) *
-                    cos(geom->phi[ig] / radeg);
+                cos(geom->phi[ig] / radeg);
             scatt1[iw] = acos(
                     MAX(-geom->csenz[ig] * geom->csolz[ig] + temp, -1.0)) * radeg;
             scatt2[iw] = acos(
@@ -2682,11 +2683,11 @@ float *model_phase(int modnum, geom_str *geom) {
             splint(aertab->scatt,
                     &aertab->model[im]->lnphase[iw][0],
                     &aertab->model[im]->d2phase[iw][0],
-                    aertab->nscatt, scatt1[ig], &phase1);
+                   aertab->nscatt, scatt1[ig], &phase1);
             splint(aertab->scatt,
                     &aertab->model[im]->lnphase[iw][0],
                     &aertab->model[im]->d2phase[iw][0],
-                    aertab->nscatt, scatt2[ig], &phase2);
+                   aertab->nscatt, scatt2[ig], &phase2);
             //          incident diffuse   reflected   diff  dir
             phase[im][iw] = exp(phase1) +
                     exp(phase2)*(fres1[ig] + fres2[ig]);
@@ -3420,12 +3421,12 @@ void model_transmittance(int modnum, float wave[], int32_t nwave,
         a2 = aertab->model[modnum]->dtran_a[iwtab][i2];
         b2 = aertab->model[modnum]->dtran_b[iwtab][i2];
 
-	/* disable interpolation, BAF, 6/2022
-        if (inttst[iw]) {
-            a1 = pow(a1, intexp[iw]);
-            a2 = pow(a2, intexp[iw]);
-        }
-	*/
+        /* disable interpolation, BAF, 6/2022
+            if (inttst[iw]) {
+                a1 = pow(a1, intexp[iw]);
+                a2 = pow(a2, intexp[iw]);
+            }
+        */
 
         y1 = a1 * exp(-b1 * taua[iw]);
         y2 = a2 * exp(-b2 * taua[iw]);
@@ -3771,7 +3772,7 @@ void diff_tran(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_l,
 
     /* get AOT per band for each model, if not already computed */
     if (taua_opt == 0) {
-        // using single scattering approximation space (Gordan and Wang) 
+        // using single scattering approximation space (Gordan and Wang)
         model_taua(sensorID, modmin, wave, nwave, iwnir_l, rhoa, geom, wv, tauamin);
         model_taua(sensorID, modmax, wave, nwave, iwnir_l, rhoa, geom, wv, tauamax);
 	//printf("%d %d %d %f %f %f\n",taua_opt,modmin, iwnir_l, rhoa[iwnir_l], tauamin[0], tauamin[iwnir_l]);
@@ -3787,7 +3788,7 @@ void diff_tran(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_l,
     model_transmittance(modmax, wave, nwave, geom->solz, gmult, tauamax, tsolmax, dtmax);
 
     for (iw = 0; iw < nwave; iw++) {
-    	ig = iw * geom->gmult; /* geom used for sensor wavelengths */
+        ig = iw * geom->gmult; /* geom used for sensor wavelengths */
     	tsol[iw] = tsolmin[iw]*(1.0 - modrat) + tsolmax[iw] * modrat;
     	//uncertainty->dt_sol[ip*nwave+iw]=sqrt( pow((1.0-modrat)*dtmin[iw],2) + pow(modrat*dtmax[iw],2) + pow((tsolmax[iw]-tsolmin[iw])*dmodrat[ip],2) );
 
@@ -3797,8 +3798,8 @@ void diff_tran(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_l,
     	        if(inir==iwnir_l){
     	            uncertainty->derv_tsol_rhorc[iw][inir-iwnir_s]+=(1.0 - modrat)*dtmin[iw]*uncertainty->derv_taua_min_rhorc_l[iw];
     	            uncertainty->derv_tsol_rhorc[iw][inir-iwnir_s]+=  modrat      *dtmax[iw]*uncertainty->derv_taua_max_rhorc_l[iw];
-    	        }
-    	    }
+                }
+            }
             uncertainty->derv_tsol_taua_l[iw]=(tsolmax[iw]-tsolmin[iw])*uncertainty->derv_modrat_taua_l;
             uncertainty->derv_tsol_taua_l[iw]+=(1.0 - modrat)*dtmin[iw]*uncertainty->derv_taua_min_taua_l[iw];
             uncertainty->derv_tsol_taua_l[iw]+=  modrat      *dtmax[iw]*uncertainty->derv_taua_max_taua_l[iw];
@@ -3806,11 +3807,11 @@ void diff_tran(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_l,
             uncertainty->derv_tsol_rhow_l[iw]=(tsolmax[iw]-tsolmin[iw])*uncertainty->derv_modrat_rhow_l;
             uncertainty->derv_tsol_rhow_l[iw]+=(1.0 - modrat)*dtmin[iw]*uncertainty->derv_taua_min_rhow_l[iw];
             uncertainty->derv_tsol_rhow_l[iw]+=modrat        *dtmax[iw]*uncertainty->derv_taua_max_rhow_l[iw];
-    	}
+        }
 
-    	/* correct for pressure difference from standard pressure */
+        /* correct for pressure difference from standard pressure */
         double tmp_pressure_diff = exp(-0.5 * taur[iw] / geom->csolz[ig]*(pr / p0 - 1));
-    	tsol[iw] = tsol[iw] * tmp_pressure_diff;
+        tsol[iw] = tsol[iw] * tmp_pressure_diff;
 
     	//uncertainty->dt_sol[ip*nwave+iw]*=tmp_pressure_diff;
 
@@ -3819,16 +3820,16 @@ void diff_tran(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_l,
     	        uncertainty->derv_tsol_rhorc[iw][inir-iwnir_s]*=tmp_pressure_diff;
     	    uncertainty->derv_tsol_taua_l[iw]*=tmp_pressure_diff;
     	    uncertainty->derv_tsol_rhow_l[iw]*=tmp_pressure_diff;
-    	}
+        }
 
-    	if ((evalmask & TRANSSPHER) != 0) {
-    		/* correct for airmass difference, plane-parallel to spherical atmosphere */
+        if ((evalmask & TRANSSPHER) != 0) {
+            /* correct for airmass difference, plane-parallel to spherical atmosphere */
     		tmp=tsol[iw];
-    		tsol[iw] = pow(tsol[iw], geom->airmass_sph[ig] / geom->airmass_plp[ig]);
+            tsol[iw] = pow(tsol[iw], geom->airmass_sph[ig] / geom->airmass_plp[ig]);
 
     		if(uncertainty)
     		    uncertainty->dt_sol[ip*nwave+iw]*= ( geom->airmass_sph[ig] / geom->airmass_plp[ig] *pow(tmp,geom->airmass_sph[ig] / geom->airmass_plp[ig]-1) );
-    	}
+        }
     }
 
     /* get diff trans ground to sensor, per band for each model */
@@ -3840,7 +3841,7 @@ void diff_tran(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_l,
         ig = iw * geom->gmult; /* geom used for sensor wavelengths */
         taua[iw] = tauamin[iw]*(1.0 - modrat) + tauamax[iw] * modrat;
         tsen[iw] = tsenmin[iw]*(1.0 - modrat) + tsenmax[iw] * modrat;
-   
+
         if(uncertainty){
             for(inir=iwnir_s;inir<=iwnir_l;inir++){
                 uncertainty->derv_tsen_rhorc[iw][inir-iwnir_s]=(tsenmax[iw]-tsenmin[iw])*uncertainty->derv_modrat_rhorc[inir-iwnir_s];
@@ -3860,7 +3861,7 @@ void diff_tran(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_l,
         /* correct for pressure difference from standard pressure */
         double tmp_pressure_diff = exp(-0.5 * taur[iw] / geom->csenz[ig] *(pr / p0 - 1));
         tsen[iw] = tsen[iw] * tmp_pressure_diff;
-     
+
         if(uncertainty){
             for(inir=iwnir_s;inir<=iwnir_l;inir++)
                 uncertainty->derv_tsen_rhorc[iw][inir-iwnir_s]*=tmp_pressure_diff;
@@ -4089,10 +4090,10 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
             iw=acbands_index[ib];
             rho_all_wav_pred[iw]=rhoa_modl[itau][iw]+(rhoa_modl[itau][iw]-rhoa_modl[itau-1][iw])*(tau_iwnir_l[im]-aermod->tau_870[itau])/(aermod->tau_870[itau]-aermod->tau_870[itau-1]);
 
-          //  ext_coef = aermod->extc[iw];
+            //  ext_coef = aermod->extc[iw];
             if(uncertainty){
                 derv_rhoa_rhorc_l[im][iw]=derv_taua_rhorc_l[im]*(rhoa_modl[itau][iw]-rhoa_modl[itau-1][iw])/(aermod->tau_870[itau]-aermod->tau_870[itau-1]);
-               // derv_taua_rhorc_l[im][iw]=(ext_coef / ext_iwnir_l)*derv_temp_rhorc;
+                // derv_taua_rhorc_l[im][iw]=(ext_coef / ext_iwnir_l)*derv_temp_rhorc;
             }
         }
         if(uncertainty){
@@ -4150,8 +4151,8 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
      *modrat=1.0;    //need to flag
      *modmin=chi_struct[0].index;
      *modmax=*modmin;
-       }
-       else*/{
+       } else*/
+    {
         if(chi_obs>chi_struct[1].value){
             im=chi_struct[0].index;
             diff_1=chi_struct[0].value;
@@ -4188,14 +4189,14 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
             uncertainty->derv_modrat_rhow_l=derv_modrat_rhow_l;
             uncertainty->derv_modrat_taua_l=derv_modrat_taua_l;
         }
-       }
+    }
 
-       if(comp_rhoa_pca(nwave, wave, geom, tau_iwnir_l[*modmin], mindx[*modmin], tau_pred_min, rho_pred_min,derv_rhoa_min,derv_taua_min) !=0)
-           return -1;
-       if(comp_rhoa_pca(nwave, wave, geom, tau_iwnir_l[*modmax], mindx[*modmax], tau_pred_max, rho_pred_max,derv_rhoa_max,derv_taua_max) !=0)
-           return -1;
+    if(comp_rhoa_pca(nwave, wave, geom, tau_iwnir_l[*modmin], mindx[*modmin], tau_pred_min, rho_pred_min,derv_rhoa_min,derv_taua_min) !=0)
+        return -1;
+    if(comp_rhoa_pca(nwave, wave, geom, tau_iwnir_l[*modmax], mindx[*modmax], tau_pred_max, rho_pred_max,derv_rhoa_max,derv_taua_max) !=0)
+        return -1;
 
-       for (iw = 0; iw <nwave; iw++) {
+    for (iw = 0; iw <nwave; iw++) {
 
         rhoa[iw]=rho_pred_min[iw]*(1-*modrat)+rho_pred_max[iw]*(*modrat);
 
@@ -4443,7 +4444,7 @@ int smaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
 
             if(uncertainty){
                 derv_rhoa_rhorc_l[im][iw]*= rho_all_wav_pred[iw][im];
-               // derv_rhoa_taua_l [im][iw] =
+                // derv_rhoa_taua_l [im][iw] =
             }
         }
 
@@ -4589,12 +4590,12 @@ int smaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
     *modmax = mindx[*modmax];
     chi[0] = chi_old[0];
 
-   /* for (i = 0; i < nwave; i++) {
-        free(tau_all_wav[i]);
-        free(rho_all_wav_pred[i]);
-    }
-    free(tau_all_wav);
-    free(rho_all_wav_pred);*/
+    /* for (i = 0; i < nwave; i++) {
+         free(tau_all_wav[i]);
+         free(rho_all_wav_pred[i]);
+     }
+     free(tau_all_wav);
+     free(rho_all_wav_pred);*/
 
     if(uncertainty){
         for(im=0;im<nmodels;im++){
@@ -4665,7 +4666,7 @@ int ahmadaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int
 int wangaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
         int32_t iwnir_l, int32_t nmodels, int32_t mindx[], geom_str *geom,
         float wv, float rhoa[], int32_t *modmin, int32_t *modmax,
-        float *modrat, float *epsnir, float tauamin[], float tauamax[]) {
+            float *modrat, float *epsnir, float tauamin[], float tauamax[]) {
     int modflg;
     float *epsmin;
     float *epsmax;
@@ -4977,7 +4978,7 @@ int rhaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int32_
         }
         if (nrh * nsd != aertab->nmodel) {
             printf("-E- %s line %d: number of humidities (%d) x number of size distributions (%d) must equal number of models (%d).\n",
-                    __FILE__, __LINE__, nrh, nsd, aertab->nmodel);
+                __FILE__, __LINE__, nrh, nsd, aertab->nmodel);
             exit(1);
         } else {
             printf("%d aerosol models: %d humidities x %d size fractions\n", aertab->nmodel, nrh, nsd);
@@ -5057,13 +5058,13 @@ int rhaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int32_
     }
 
     if ((chi1 = (float *) calloc(nmodels, sizeof (float))) == NULL) {
-                printf("Unable to allocate space for chi1.\n");
-                exit(1);
-        }
+        printf("Unable to allocate space for chi1.\n");
+        exit(1);
+    }
      if ((chi2 = (float *) calloc(nmodels, sizeof (float))) == NULL) {
-                printf("Unable to allocate space for chi2.\n");
-                exit(1);
-        }
+        printf("Unable to allocate space for chi2.\n");
+        exit(1);
+    }
 
 
     for (iw = 0; iw < nwave; iw++) {
@@ -5104,7 +5105,7 @@ int rhaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int32_
         irh2 = irh1 + 1;
         wt = (rh - rhtab[irh1]) / (rhtab[irh2] - rhtab[irh1]);
         if(uncertainty)
-            derv_wt_rh = 1.0 / (rhtab[irh2] - rhtab[irh1]);     
+            derv_wt_rh = 1.0 / (rhtab[irh2] - rhtab[irh1]);
     }
 
     // set indices of active model sets
@@ -5433,7 +5434,7 @@ int fixedmodpair(int32_t sensorID, float wave[], int32_t nwave,
 
     if (modmin < 0 || modmin >= input->naermodels ||
             modmax < 0 || modmax >= input->naermodels ||
-            modrat < 0.0 || modrat > 1.0) {
+        modrat < 0.0 || modrat > 1.0) {
         printf("Bogus input for fixed model pair: %d %d %f\n", modmin + 1, modmax + 1, modrat);
         exit(1);
     }
@@ -5491,7 +5492,7 @@ int fixedmodpair(int32_t sensorID, float wave[], int32_t nwave,
 int fixedaot(int32_t sensorID, float aot[], float wave[], int32_t nwave,
         int32_t iwnir_s, int32_t iwnir_l, geom_str *geom, float wv,
         int32_t *modmin, int32_t *modmax, float *modrat, float rhoa[],
-        float *epsnir) {
+             float *epsnir) {
     static int firstCall = 1;
     static int angst_band1 = -1;
     static int angst_band2 = -1;
@@ -5689,14 +5690,9 @@ int aerosol(l2str *l2rec, int32_t aer_opt_in, aestr *aerec, int32_t ip,
         noise_global=(float *)malloc(l1rec->npix*nwave*sizeof(float));
     }
 
-    if(input->aer_opt==AERRHSM && l1rec->iscan!=last_scan){
-        if(uncertainty)
-            noise_temp=uncertainty->dsensor;
-        else
-            noise_temp=get_uncertainty(l1rec);
-
-        last_scan=l1rec->iscan;
-
+    if (input->aer_opt == AERRHSM && l1rec->iscan != last_scan) {
+        noise_temp = get_uncertainty(l1rec);
+        last_scan = l1rec->iscan;
     }
 
     int32_t sensorID = l1rec->l1file->sensorID;
@@ -5839,11 +5835,12 @@ int aerosol(l2str *l2rec, int32_t aer_opt_in, aestr *aerec, int32_t ip,
         La2 [iw] = 0.0;
         radref[iw] = pi / F0[iw] / geom.csolz[iw * geom.gmult];
 
-        if(input->aer_opt==AERRHSM){
-            if(noise_temp)
-                noise_global[ip*nwave+iw]=noise_temp[ip*nwave+iw]*radref[iw];
-            else
-                noise_global[ip*nwave+iw]=1.0;
+        if (input->aer_opt == AERRHSM) {
+            if (noise_temp) {
+                ipb = ip * nwave + iw;
+                noise_global[ipb] = noise_temp[ipb] * radref[iw];
+            } else
+                noise_global[ipb] = 1.0;
         }
     }
 

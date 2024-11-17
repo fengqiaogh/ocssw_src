@@ -28,7 +28,6 @@ typedef struct l2_struct {
     float *La; // aerosol radiance1
     float *Lw; // water-leaving radiance
     float *nLw; // normalized water-leaving radiance
-    float *nLw_unc;
     float *brdf; //bi-direction reflectance function
     float *Rrs; //Remote sensing reflectance
     float *Rrs_unc;

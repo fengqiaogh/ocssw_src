@@ -3,8 +3,20 @@ cmake_minimum_required(VERSION 3.12)
 #set_ocssw_policy()
 
 set(LIBS "")
+if (BUILD_HISTORICAL)
+    set(historical_src "l1_czcs.c" "l1_seawifs.c" "l1_osmi.c" "l1_aci.c" "l1_seawifs_netcdf.cpp"
+    avhrrsub5h.f
+    airmass_avhrr.f
+    hmf8.f
+    etbpsub.f
+    intpos.f
+    raygetpol.f
+    simpsn.f)
+    set(historical_libs czcs osmi )
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D BUILD_HISTORICAL")
+endif(BUILD_HISTORICAL)
 
-list(APPEND LIBS  piutils dfutils genutils osmi goci czcs meris oli )
+list(APPEND LIBS  piutils dfutils genutils ${historical_libs}  goci  meris oli )
 
 find_package(GeographicLib REQUIRED)
 include_directories(${GeographicLib_INCLUDE_DIRS})
@@ -60,23 +72,12 @@ add_library(l1
     setflags_l1.c
     cloud_flag.c
     scene_meta.c
-
     ll2vec.c
     ftrim.c
-    avhrrsub5h.f
-    airmass_avhrr.f
-    hmf8.f
-    etbpsub.f
-    getglint.f
-    intpos.f
-    raygetpol.f
-    simpsn.f
-
     l1_mos.c
     l1_octs.c
-    l1_czcs.c
-    l1_seawifs.c
-    l1_aci.c
+    l1_octs_netcdf.cpp
+    getglint.c
     l1_meris_N1.c
     l1_safe.cpp
     smile.c
@@ -91,7 +92,7 @@ add_library(l1
     l1_sgli.c
     l1_modis.c
     ${VIIRS_L1_SRCS}
-    l1_osmi.c
+    ${historical_src}
     l1_ocm.c
     l1_ocm2.c
     l1_ocmdb.c
@@ -108,8 +109,6 @@ add_library(l1
     l1_l1c_anc.c
     l1_spexone.c
     uncertainty.c
-
-    l1_seawifs_netcdf.cpp
 )
 
 target_link_libraries(l1 ${LIBS})

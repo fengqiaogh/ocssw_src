@@ -41,15 +41,12 @@
 #define NR 560             /* # rows */      
 #define NC 30              /* max # columns */     
 
-#define MAXOCLIN 6700      /* max # lines */
-#define MAXOCPIX 2218      /* max # pixels */
-#define MAXOCARR 10000
-#define NOCBANDS 8
 
-void reform_octs_time(char *time);
-int navigation(int32_t fileID);
-int CalcViewAngle(float lon1, float lat1, float pos[3], float usun[]);
-int LeapCheck(int yr);
+
+// void reform_octs_time(char *time);
+// int navigation(int32_t fileID);
+// int CalcViewAngle(float lon1, float lat1, float pos[3], float usun[]);
+// int LeapCheck(int yr);
 
 static int32_t msec_start;
 static int32_t msec[MAXOCLIN];

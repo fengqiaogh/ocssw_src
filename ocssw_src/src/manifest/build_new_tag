@@ -1,7 +1,8 @@
-#! /usr/bin/bash
+#! /usr/bin/bash -x
 
 # T=test, V=operational
 #export tag_type=T
+#export BASE_T_TAG="T2024.23"
 #export THETAG="T2023.26"
 #export THEMESSAGE="
 #- fixed OCI rayleigh files, no longer symlinks
@@ -23,14 +24,14 @@ source $OCSSWROOT/OCSSW_bash.env
 
 if [[ $tag_type = "V" ]]
 then
-    export BRANCH_OCSSW=R2020
-    export BRANCH_OEL_UTIL=R2020
-    export BRANCH_OEL_HDF4=R2020
-    export BRANCH_VIIRS_L1=R2020
-    export BRANCH_FOCS=R2020
-    export BRANCH_DTDB=R2020
-    export BRANCH_POLARIMETRY=R2020
-    export BRANCH_UAA=R2020
+    export BRANCH_OCSSW=$BASE_T_TAG
+    export BRANCH_OEL_UTIL=$BASE_T_TAG
+    export BRANCH_OEL_HDF4=$BASE_T_TAG
+    export BRANCH_VIIRS_L1=$BASE_T_TAG
+    export BRANCH_FOCS=$BASE_T_TAG
+    export BRANCH_DTDB=$BASE_T_TAG
+    export BRANCH_POLARIMETRY=$BASE_T_TAG
+    export BRANCH_UAA=$BASE_T_TAG
 else
     export BRANCH_OCSSW=develop
     export BRANCH_OEL_UTIL=develop
@@ -58,72 +59,67 @@ check_return () {
 #
 cd $TAGDIR/ocssw
 check_return "ocssw dir does not exist"
-git checkout $BRANCH_OCSSW
+git fetch && git checkout $BRANCH_OCSSW && if [[ $tag_type != "V" ]]; then git pull; fi
 check_return "ocssw checkout is bad"
-git pull
-cd oel_util && git checkout $BRANCH_OEL_UTIL && git pull && cd ..
-check_return "oel_util checkout is bad"
-cd oel_hdf4 && git checkout $BRANCH_OEL_HDF4 && git pull && cd ..
-check_return "oel_hdf4 checkout is bad"
+cd oel_util && git fetch && git checkout $BRANCH_OEL_UTIL && if [[ $tag_type != "V" ]]; then git pull; fi && cd ..
+check_return "ocssw/oel_util checkout is bad"
+cd oel_hdf4 && git fetch && git checkout $BRANCH_OEL_HDF4 && if [[ $tag_type != "V" ]]; then git pull; fi && cd ..
+check_return "ocssw/oel_hdf4 checkout is bad"
 
 cd $TAGDIR/viirs_l1
 check_return "viirs_l1 dir does not exist"
-git checkout $BRANCH_VIIRS_L1
+git fetch && git checkout $BRANCH_VIIRS_L1 && if [[ $tag_type != "V" ]]; then git pull; fi
 check_return "viirs_l1 checkout is bad"
-git pull
-cd oel_util; git checkout $BRANCH_OEL_UTIL; git pull; cd ..
+cd oel_util && git fetch && git checkout $BRANCH_OEL_UTIL && if [[ $tag_type != "V" ]]; then git pull; fi && cd ..
+check_return "viirs_l1/oel_util checkout is bad"
 
 cd $TAGDIR/focs
 check_return "focs dir does not exist"
-git checkout $BRANCH_FOCS
+git fetch && git checkout $BRANCH_FOCS && if [[ $tag_type != "V" ]]; then git pull; fi
 check_return "focs checkout is bad"
-git pull
-cd oel_util; git checkout $BRANCH_OEL_UTIL; git pull; cd ..
-cd oel_hdf4; git checkout $BRANCH_OEL_HDF4; git pull; cd ..
+cd oel_util && git fetch && git checkout $BRANCH_OEL_UTIL && if [[ $tag_type != "V" ]]; then git pull; fi && cd ..
+check_return "focs/oel_util checkout is bad"
+cd oel_hdf4 && git fetch && git checkout $BRANCH_OEL_HDF4 && if [[ $tag_type != "V" ]]; then git pull; fi && cd ..
+check_return "focs/oel_hdf4 checkout is bad"
 
 cd $TAGDIR/dtdb
 check_return "dtdb dir does not exist"
-git checkout $BRANCH_DTDB
+git fetch && git checkout $BRANCH_DTDB && if [[ $tag_type != "V" ]]; then git pull; fi
 check_return "dtdb checkout is bad"
-git pull
-cd oel_util; git checkout $BRANCH_OEL_UTIL; git pull; cd ..
-cd oel_hdf4; git checkout $BRANCH_OEL_HDF4; git pull; cd ..
+cd oel_util && git fetch && git checkout $BRANCH_OEL_UTIL && if [[ $tag_type != "V" ]]; then git pull; fi && cd ..
+check_return "dtdb/oel_util checkout is bad"
+cd oel_hdf4 && git fetch && git checkout $BRANCH_OEL_HDF4 && if [[ $tag_type != "V" ]]; then git pull; fi && cd ..
+check_return "dtdb/oel_hdf4 checkout is bad"
 
 cd $TAGDIR/polarimetry/harp
 check_return "harp dir does not exist"
-git checkout $BRANCH_POLARIMETRY
+git fetch && git checkout $BRANCH_POLARIMETRY && if [[ $tag_type != "V" ]]; then git pull; fi
 check_return "harp checkout is bad"
-git pull
 
 cd $TAGDIR/polarimetry/pyspex
 check_return "pyspex dir does not exist"
-git checkout $BRANCH_POLARIMETRY
+git fetch && git checkout $BRANCH_POLARIMETRY && if [[ $tag_type != "V" ]]; then git pull; fi
 check_return "pyspex checkout is bad"
-git pull
 
 cd $TAGDIR/polarimetry/spex
 check_return "spex dir does not exist"
-git checkout $BRANCH_POLARIMETRY
+git fetch && git checkout $BRANCH_POLARIMETRY && if [[ $tag_type != "V" ]]; then git pull; fi
 check_return "spex checkout is bad"
-git pull
 
 cd $TAGDIR/polarimetry/pex
 check_return "polarimetry pex dir does not exist"
-git checkout $BRANCH_POLARIMETRY
-check_return "pex checkout is bad"
-git pull
+git fetch && git checkout $BRANCH_POLARIMETRY && if [[ $tag_type != "V" ]]; then git pull; fi
+check_return "polarimetry/pex checkout is bad"
 
 cd $TAGDIR/polarimetry/fastmapol
 check_return "polarimetry fastmapol dir does not exist"
-git checkout $BRANCH_POLARIMETRY
+git fetch && git checkout $BRANCH_POLARIMETRY && if [[ $tag_type != "V" ]]; then git pull; fi
 check_return "fastmapol checkout is bad"
-git pull
 
 cd $TAGDIR/sat/unified_dtdb_aerosol
 check_return "UAA dir does not exist"
-git checkout $BRANCH_UAA
+git fetch && git checkout $BRANCH_UAA && if [[ $tag_type != "V" ]]; then git pull; fi
 check_return "UAA checkout is bad"
-git pull
 
 #
 # make sure all root repos are checked in and clean

@@ -288,7 +288,7 @@ int main(int argc, char *argv[]) {
     // make the l1 readers quiet
     want_verbose = 0;
 
-    cdata_();
+    // cdata_();
     msl12_input_init();
     l1file = (filehandle*)allocateMemory(sizeof (filehandle), "filehandle structure");
     filehandle_init(l1file);

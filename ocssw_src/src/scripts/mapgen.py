@@ -357,13 +357,13 @@ tiff:    Tagged Image File Format with georeference tags''')
         clo['prodtype'] = "regional"
 
         if args.north is not None:
-            clo['latnorth'] = ceil(args.north)
+            clo['latnorth'] = ceil(float(args.north))
         if args.south is not None:
-            clo['latsouth'] = floor(args.south)
+            clo['latsouth'] = floor(float(args.south))
         if args.west is not None:
-            clo['lonwest'] = floor(args.west)
+            clo['lonwest'] = floor(float(args.west))
         if args.east is not None:
-            clo['loneast'] = ceil(args.east)
+            clo['loneast'] = ceil(float(args.east))
         for l2bin_opt in l2bin_opts:
             if getattr(args,l2bin_opt) is not None:
                 if l2bin_opt == 'resolution':

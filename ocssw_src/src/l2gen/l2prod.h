@@ -96,8 +96,8 @@
 #define CAT_ipar              84
 #define CAT_fqy               85
 #define CAT_bbp_carder        86
-#define CAT_a                 87
-#define CAT_bb                88
+#define CAT_a                 87 /* not in product.xml? */
+#define CAT_bb                88 /* not in product.xml? */
 #define CAT_a_qaa             89
 
 #define CAT_bb_qaa            90
@@ -157,17 +157,24 @@
 
 #define CAT_chl_carder_emp   140
 #define CAT_Zphotic_lee      141
-//#define CAT_b_qaa            142
-//#define CAT_c_qaa            143
+/*
+these poc_unc entries were redefine to fix a duplication error
+previously they were 535 and 536 respectively
+142 and 142 were b_qaa and c_qaa, but the QAA code doesn't support these
+products - not sure it ever did...
+*/
+#define CAT_poc_unc_stramski_443    142
+#define CAT_poc_unc_stramski_490    143
+
 #define CAT_Kd_532           144
 #define CAT_KPAR_lee         145
 #define CAT_BT               146
 #define CAT_BT_39            147  /* phase-out */
 #define CAT_BT_40            148  /* phase-out */
 #define CAT_BT_11            149  /* phase-out */
-
 #define CAT_BT_12            150  /* phase-out */
-#define CAT_Ltir             151
+#define CAT_Ltir             151  /* phase-out */
+
 #define CAT_poc_stramski_443 152
 #define CAT_poc_stramski_490 153
 #define CAT_chl_sma          154
@@ -218,7 +225,10 @@
 #define CAT_bb_niwa          196
 #define CAT_flags_niwa       197
 #define CAT_rho_cirrus       198
-
+/*
+199 through 205, 23,214 and 222 are in product.xml...
+should they be?
+*/
 //#define CAT_ozone_unc        199
 //#define CAT_windspeed_unc    200
 //#define CAT_pressure_unc     201
@@ -249,13 +259,13 @@
 #define CAT_chl_cdomcorr_morel   224
 #define CAT_chl_hu           225
 #define CAT_Lt_unc           226
-#define CAT_nLw_unc          227
+// #define CAT_nLw_unc          227
 #define CAT_Rrs_unc          228
 #define CAT_chl_oci          229
 
 #define CAT_chl_oc3c         230
 #define CAT_chl_oci2         231
-
+/* 232 is open for use */
 #define CAT_Rrs_vc           233
 #define CAT_chl_vc           234
 #define CAT_aw               235
@@ -298,7 +308,7 @@
 #define CAT_nanoplankton_hirata     266
 #define CAT_picoeukaryotes_hirata   267
 #define CAT_prymnesiophytes_hirata  268
-
+/* 269 is open for use */
 #define CAT_microplankton_uitz      270
 #define CAT_nanoplankton_uitz       271
 #define CAT_picoplankton_uitz       272
@@ -374,6 +384,20 @@
 #define CAT_calcite_ci2             323
 #define CAT_calcite_ci748           324
 #define CAT_calcite_ci869           325
+/*
+in product.xml...but not here?
+326 - delta_La
+327 - delta_aot
+330 - delta_epsilon
+331 - delta_Rrs
+
+332 open for use
+333 open for use
+
+334 - snr
+335 - chi_min
+*/
+
 
 /* Expanded 2-d and 3-d ancillary met-mainly products */
 #define CAT_sfc_pressure            336
@@ -401,6 +425,7 @@
 #define CAT_synechococcus           354
 #define CAT_autotrophic_picoeukaryotes 355
 
+/* 356 through 444 open for use */
 
 /* Chimaera (and other algorithm?) cloud products */
 #define CAT_Cld_water_cloud         440
@@ -467,20 +492,20 @@
 
 #define CAT_cth_alb_init            500
 #define CAT_cth_alb_unc_init        501
-#define CAT_cth_cod                  502
-#define CAT_cth_alb                  503
-#define CAT_cth_phase                504
+#define CAT_cth_cod                 502
+#define CAT_cth_alb                 503
+#define CAT_cth_phase               504
 #define CAT_cth_cod_all             505
 
 #define CAT_cth_lcod_all            506
 #define CAT_cth_cth_all             507
 #define CAT_cth_ctp_all             508
-#define CAT_cth_alb_all              509
+#define CAT_cth_alb_all             509
 #define CAT_cth_cost_all            510
 
 #define CAT_cth_acost_all           511
 #define CAT_cth_iter_all            512
-#define CAT_cth_akdiag              513
+#define CAT_cth_akdiag              513 /* not in product.xml? */
 #define CAT_cth_dcod_all            514
 #define CAT_cth_dlcod_all           515
 
@@ -490,20 +515,19 @@
 #define CAT_cth_dctp_all            519
 
 //  not all in order of id
+#define CAT_cth_dctt_all            520
+#define CAT_cth_dalb_all            521
 #define CAT_cth_lcod                522
-#define CAT_cth_cost                524
-#define CAT_cth_acost               526
-#define CAT_cth_iter                525
 #define CAT_cth_cth_raw             523
+#define CAT_cth_cost                524
+#define CAT_cth_iter                525
+#define CAT_cth_acost               526
 #define CAT_ipar2                   527
 #define CAT_ipar_below_surface      528
-#define CAT_cth_dctt_all            520
 
-#define CAT_cth_dalb_all            521
 
-#define CAT_cth_dcod                535
-#define CAT_cth_dlcod               536
 #define CAT_cth_dcth                529
+
 /*  WDR still need to add the uncertainty (d...)
 #define CAT_cth_dcth_raw            530
 */
@@ -512,10 +536,9 @@
 #define CAT_cth_dctt                532
 #define CAT_cth_dalb                533
 // WDR prob not needed #define CAT_cth_dcth_raw_all        534
+#define CAT_cth_dcod                535
+#define CAT_cth_dlcod               536
 
-
-#define CAT_poc_unc_stramski_443    535
-#define CAT_poc_unc_stramski_490    536
 #define CAT_ipar_scalar             537
 #define CAT_Kd_unc_KD2              538
 #define CAT_fsat_unc                539

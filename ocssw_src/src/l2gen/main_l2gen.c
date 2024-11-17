@@ -102,7 +102,7 @@ int main(int argc, char* argv[]) {
     }
 
     /* Initialize file handles */
-    cdata_();
+    // cdata_();
     filehandle_init(&l1file);
     filehandle_init(&tgfile);
     filehandle_init(&aefile);

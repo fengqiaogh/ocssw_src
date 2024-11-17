@@ -30,8 +30,8 @@ int32_t anc_acq_read_gmao_rad(char *file, const char *var_name, float **data, un
                               double *start_time, int32_t *ntime, int32_t *nlon, int32_t *nlat, int **time,
                               double **lon_coord, double **lat_coord);
 
-int32_t anc_acq_read_gmao(char *, char *, char *, float **, unsigned char **, double *, int32_t *, int32_t *,
-                          int32_t *, double **, double **);
+int32_t anc_acq_read_gmao(char *file, char *ds_name, float **data, unsigned char **qa, double *time, 
+                            int32_t *nlon, int32_t *nlat, int32_t *nlvl, double **lon_coord, double **lat_coord);
 int32_t anc_acq_lin_rad(l1str *);
 int32_t anc_acq_lin_met(l1str *);
 int32_t anc_acq_lin_prof(l1str *);

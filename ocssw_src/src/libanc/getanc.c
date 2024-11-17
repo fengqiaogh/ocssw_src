@@ -1394,9 +1394,11 @@ void interpolate(int16_t PA_flag, int16_t parm_flag, double DT1, double DT2,
             data_list2[i] = (qc2[i] == 20) ? range[0] - 1 : WPH_p2[i];
         }
     }
-
-    dataintp_(in_latlon, lat_list, lon_list, data_list1, &DT1, data_list2,
-            &DT2, &ipt, &nband, &range, &def, &intporder, dummy,
+    // dataintp_(in_latlon, lat_list, lon_list, data_list1, &DT1, data_list2,
+    //         &DT2, &ipt, &nband, &range, &def, &intporder, dummy,
+    //         &dataout, &unc, &int_bad, &row, &col);
+    dataintp(in_latlon, lat_list, lon_list, data_list1, &DT1, data_list2,
+            &DT2, &ipt, &nband, range, &def, &intporder, dummy,
             &dataout, &unc, &int_bad, &row, &col);
 
     *intpdata = dataout;

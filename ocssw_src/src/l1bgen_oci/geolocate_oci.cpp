@@ -1220,7 +1220,7 @@ int orb_interp(size_t n_orb_rec, size_t sdim, double *torb, orb_array *p,
     for (size_t j = 0; j < 3; j++) {
       a0[j] = p[ind][j];
       a1[j] = v[ind][j] * dt;
-      if (dt >= 4) {
+      if (dt >= 3.5) {
         a2[j] = 3 * p[ind + 1][j] - 3 * p[ind][j] - 2 * v[ind][j] * dt -
           v[ind + 1][j] * dt;
         a3[j] = 2 * p[ind][j] - 2 * p[ind + 1][j] + v[ind][j] * dt +

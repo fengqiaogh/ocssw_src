@@ -1,5 +1,5 @@
 #include "l12_proto.h"
-
+#include "glint.h"
 /* ========================================================================== */
 /* module atmocor1() - computes pre-aerosol atmospheric components            */
 /*                                                                            */
@@ -75,6 +75,7 @@ void atmocor1(l1str *l1rec, int32_t ip) {
         l1rec->tLf [ipb + ib] = 0.0;
         l1rec->tg_sol[ipb + ib] = 1.0;
         l1rec->tg_sen[ipb + ib] = 1.0;
+        l1rec->tg    [ipb + ib] = 1.0;
         l1rec->t_h2o [ipb + ib] = 1.0;
         l1rec->t_o2 [ipb + ib] = 1.0;
         l1rec->t_sol [ipb + ib] = exp(-0.5 * pr / p0 * Tau_r[ib] / mu0);
@@ -135,8 +136,11 @@ void atmocor1(l1str *l1rec, int32_t ip) {
     /* for avhrr, l1_aci_hdf.c calls avhrrsub5h.f which calls getglint */
     if (sensorID != AVHRR) {
 
-        getglint_iqu_(&senz, &solz, &raz, &ws, &zero,
+        getglint_iqu(senz, solz, raz, ws, zero,
                 &l1rec->glint_coef[ip], &glint_coef_q, &glint_coef_u);
+
+        // getglint_iqu_(&senz, &solz, &raz, &ws, &zero,
+        //         &l1rec->glint_coef[ip], &glint_coef_q, &glint_coef_u);
 
         for (ib = 0; ib < nwave; ib++) {
             l1rec->TLg[ipb + ib] = l1rec->glint_coef[ip] * exp(-(Tau_r[ib] + 0.1) * airmass) * Fo[ib];

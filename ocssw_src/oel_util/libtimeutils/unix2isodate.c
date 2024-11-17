@@ -69,3 +69,36 @@ double isodate2unix(const char *isodate) {
     }
     return secSince;
 }
+
+void isodate2ymds(const char* isodate,  int16_t *year, int16_t *month, int16_t *day, double *sec) {
+    if (isodate == NULL) {
+        *year = BAD_INT;
+        *month = BAD_INT;
+        *day = BAD_INT;
+        *sec = BAD_FLT; 
+        return;
+    }
+
+    struct tm trec = {0};
+    if (strptime(isodate, "%Y-%m-%dT%H:%M:%S", &trec) == NULL) {
+        *year = BAD_INT;
+        *month = BAD_INT;
+        *day = BAD_INT;
+        *sec = BAD_FLT; 
+    }
+    else {
+        *year = trec.tm_year + 1900; 
+        *month = trec.tm_mon + 1; 
+        *day = trec.tm_mday; 
+        *sec = trec.tm_hour * 3600 + trec.tm_min * 60 + trec.tm_sec;
+
+        // check for fraction of a second
+        char* ptr = strchr(isodate, '.');
+        if (ptr) {
+            double fracsecs = atof(ptr);
+            *sec += fracsecs;
+        }
+
+    }
+
+}

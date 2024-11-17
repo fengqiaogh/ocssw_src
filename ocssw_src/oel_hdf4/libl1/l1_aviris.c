@@ -192,7 +192,7 @@ int openl1_aviris(filehandle *file) {
 
     aviris_t* data = file->private_data;
 
-    cdata_(); //  initialize global FORTRAN common block data for l_sun call
+    // cdata_(); //  initialize global FORTRAN common block data for l_sun call
 
     data->isnetcdf = 0;
     inbasename = getinbasename_av(data->hdrfile);

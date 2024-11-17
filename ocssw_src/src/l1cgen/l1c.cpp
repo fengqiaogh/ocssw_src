@@ -1568,9 +1568,7 @@ int32_t L1C::open_l1atol1c3(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
 
     float tcross1 = -999., loncross1 = -999., tcross2 = -999., loncross2 = -999.;
 
-    // call fortran blocks
-    cdata_();
-  
+
     l1cfile->num_gridlines = 4800;//3860
     num_gridlines = l1cfile->num_gridlines;
     //--------------------------------------------------------------------------------------

@@ -195,7 +195,7 @@ aviris4ocia_t *open_aviris(char *filename, char *imgfile, char *navfile, char *g
 
     char projStr[1024];
 
-    cdata_(); //  initialize global FORTRAN common block data for l_sun call
+    // cdata_(); //  initialize global FORTRAN common block data for l_sun call
 
     //    *data = createPrivateData_av(maxBands);
     *data = (aviris4ocia_t*) malloc(sizeof (aviris4ocia_t));

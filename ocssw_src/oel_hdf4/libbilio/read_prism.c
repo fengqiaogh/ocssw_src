@@ -102,7 +102,7 @@ prism4ocia_t *open_prism(char *filename, prism4ocia_t **data) {
         exit(-1);
     }
 
-    cdata_(); //  initialize global FORTRAN common block data for l_sun call
+    // cdata_(); //  initialize global FORTRAN common block data for l_sun call
 
 
     //prism4ocia_t* data = file->private_data = createPrivateData_pr(maxBands,file->nscan,file->npix);

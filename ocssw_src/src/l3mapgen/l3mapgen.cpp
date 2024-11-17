@@ -21,7 +21,7 @@
 #include <proj.h>
 #include <sensorInfo.h>
 #include <productInfo.h>
-
+#include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <unordered_map>
 #include <unordered_set>

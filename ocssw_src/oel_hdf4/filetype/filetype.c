@@ -495,6 +495,17 @@ file_format getFormat(char *filename) {
                     endDS(ds_id);
                     return ret;
                 }
+                if (strstr(titleStr, "octs level-1a gac data")) {
+                    ret.type = FT_OCTSL1ANC;
+                    ret.sensor_id = OCTS;
+                    ret.subsensor_id = -1;
+                    if (want_verbose) {
+                        printf("Input file %s is OCTS Level-1A GAC netCDF.\n", filename);
+                    }
+                    free(titleStr);
+                    endDS(ds_id);
+                    return ret;
+                }
 
                 char *platformStr = readAttrStr(ds_id, "platform");
 

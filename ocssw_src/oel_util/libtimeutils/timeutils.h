@@ -30,10 +30,11 @@ double now(void);
 void ymdhms2ydmsec(int yy, int mm, int dd, int hh, int mn, int sc,
         int32_t *year, int32_t *day, int32_t *msec);
 void date2ydmsec(char *date, int32_t *year, int32_t *day, int32_t *msec);
-void isodate2ydmsec(char *date, int32_t *year, int32_t *day, int32_t *msec);
 char * unix2isodate(double dtime, char zone);
-double zulu2unix(char *zulu);
 double isodate2unix(const char *isodate);
+void isodate2ydmsec(char *date, int32_t *year, int32_t *day, int32_t *msec);
+void isodate2ymds(const char *isodate, int16_t *year, int16_t *month, int16_t *day, double *sec);
+double zulu2unix(char *zulu);
 void addmsec(int32_t *year, int32_t *day, int32_t *msec, int32_t delta);
 
 void get_time(char *pr_time);

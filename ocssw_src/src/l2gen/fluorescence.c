@@ -9,9 +9,11 @@
 // physiology of ocean phytoplankton, Biogeosci., 6, 779-794.
 //
 // Implementation:  B. Franz, Oct 2009.                      
+//enhanced general algo with flexible wavelengths by M. Montes in Oct 2024
 //---------------------------------------------------------------------
 
 #include "l12_proto.h"
+#include <gsl/gsl_fit.h>
 
 #define PARW1 400 /**< Minimum wavelength for PAR */
 #define PARW2 700 /**< Maximum wavelength for PAR */
@@ -49,77 +51,6 @@ void get_fit_coef(float *x,float *y,int n,float *coef)
     //offset
     coef[1]=mean_y-coef[0]*mean_x;
 }
-
-void get_fsat_hyperspectral(l2str *l2rec, float flh[]) {
-
-    int32_t ib,ip, ipb,iw;
-
-    l1str *l1rec = l2rec->l1rec;
-    filehandle *l1file = l1rec->l1file;
-    float *nLw;
-    static int firstcall=1;
-    static int nwave_in,nwave_out;
-    static float *wave_in,*wave_out, *nLw_out,*fit_x,*fit_y;
-    static int ib650, ib660,ib710,ib720, nfit,ib678;
-    float fit_coef[2],baseline;
-
-
-    if(firstcall){
-        firstcall=0;
-        nwave_in=l1file->nbands;
-        wave_in=l1file->fwave;
-        nwave_out=750-400+1;
-
-        wave_out=(float *)malloc(nwave_out*sizeof(float));
-
-        for(ib=0;ib<nwave_out;ib++)
-            wave_out[ib]=400+ib;
-
-        nLw_out=(float *)malloc(nwave_out*sizeof(float));
-        ib650=windex(650.,wave_out,nwave_out);
-        ib660=windex(660.,wave_out,nwave_out);
-        ib710=windex(710.,wave_out,nwave_out);
-        ib720=windex(720.,wave_out,nwave_out);
-        ib678=windex(678.,wave_in,nwave_in);
-
-        nfit=ib660-ib650+ib720-ib710+2;
-        fit_x=(float *) malloc(nfit*sizeof(float));
-        fit_y=(float *) malloc(nfit*sizeof(float));
-
-        for(ib=0;ib<ib660-ib650+1;ib++)
-            fit_x[ib]=wave_out[ib+ib650];
-        for(ip=ib710;ip<=ib720;ip++)
-            fit_x[ib++]=wave_out[ip];
-    }
-
-    for (ip = 0; ip < l1rec->npix; ip++) {
-
-        flh[ip] = BAD_FLT;
-
-        ipb = l1file->nbands * ip;
-        nLw=&l2rec->nLw[ipb];
-
-        if(l1rec->mask[ip])
-            continue;
-
-        lspline(wave_in,nLw,nwave_in,wave_out,nLw_out,nwave_out);
-
-        for(ib=0;ib<nfit;ib++){
-            iw=windex(fit_x[ib],wave_out,nwave_out);
-            fit_y[ib]=nLw_out[iw];
-        }
-        get_fit_coef(fit_x,fit_y,nfit,fit_coef);
-
-        baseline=fit_coef[0]*678.+fit_coef[1];
-
-        flh[ip]=nLw[ib678]-baseline;
-        if(flh[ip] < flhmin) {
-            flh[ip] = BAD_FLT;
-            l1rec->flags[ip] |= PRODFAIL;
-        }
-    }
-}
-
 
 /*---------------------------------------------------------------------*/
 /* get_unc_fsat - normalized fluorescence line height uncertaintiy for */
@@ -186,9 +117,9 @@ void get_unc_fsat(l2str *l2rec, float uflh[]) {
             nLw2 = l2rec->nLw[ipb + ib680];
             nLw3 = l2rec->nLw[ipb + ib709];
             
-            unLw1 = l2rec->nLw_unc[ipb + ib665];
-            unLw2 = l2rec->nLw_unc[ipb + ib680];
-            unLw3 = l2rec->nLw_unc[ipb + ib709];
+            unLw1 = l2rec->Rrs_unc[ipb + ib665] * l2rec->l1rec->l1file->Fobar[ib665];
+            unLw2 = l2rec->Rrs_unc[ipb + ib680] * l2rec->l1rec->l1file->Fobar[ib680];
+            unLw3 = l2rec->Rrs_unc[ipb + ib709] * l2rec->l1rec->l1file->Fobar[ib709];
 
             Lf1 = l1file->fwave[ib665];
             Lf2 = l1file->fwave[ib680];
@@ -235,93 +166,80 @@ void get_unc_fsat(l2str *l2rec, float uflh[]) {
  * @param flh
  */
 void get_fsat(l2str *l2rec, float flh[]) {
-    static int32_t ib665, ib680, ib709;
-    static int firstCall = 1;
+    static int firstRun = 1;
 
-    int32_t ip, ipb;
-    float base;
-    float nLw1;
-    float nLw2;
-    float nLw3;
-    float Lf1;
-    float Lf2;
-    float Lf3;
-    float bias = input->flh_offset;
-
+    int32_t ib, ip, ipb;
     l1str *l1rec = l2rec->l1rec;
     filehandle *l1file = l1rec->l1file;
-    int32_t sensorID=l1file->sensorID;
+    double c0, c1, cov00, cov01, cov11, chi_sq;
+    float *nLw;
+    static int nfit;
+    static double *xfit = NULL;
+    static double *yfit = NULL;
+    static int *baseBands;
+    static int heightBand;
+    float baseline;
 
-    if(sensorID==OCI || sensorID==OCIS ){
+    if(firstRun) {
+        firstRun = 0;
 
-        get_fsat_hyperspectral(l2rec,flh);
-        return;
-    }
-
-    if (firstCall) {
-        firstCall = 0;
-        ib665 = windex(665., l1file->fwave, l1file->nbands);
-        ib680 = windex(680., l1file->fwave, l1file->nbands);
-        ib709 = windex(709., l1file->fwave, l1file->nbands);
-        
-        if (fabs(l1file->fwave[ib665] - 665) > 2.5){
-            printf("No fluorescence algorithm available for this sensor.\n");
+        if (input->flh_num_base_wavelengths < 2) {
+            printf("-E- Need at least 2 flh_base_wavelengths to compute FLH.  Only %d provided\n", input->flh_num_base_wavelengths);
             exit(EXIT_FAILURE);
         }
-    
-        if (fabs(l1file->fwave[ib680] - 680 ) > 2.5){
-            printf("No fluorescence algorithm available for this sensor.\n");
+        if (input->flh_height_wavelength == -1.0) {
+            printf("-E- Missing flh_height_wavelength needed to compute FLH.\n");
             exit(EXIT_FAILURE);
-
         }
-        // special handling for MODIS
-        if (fabs(l1file->fwave[ib709] - 709) > 5){
-            ib709 = windex(748., l1file->fwave, l1file->nbands);
-            if (fabs(l1file->fwave[ib709] - 748) > 5){
-                printf("No fluorescence algorithm available for this sensor.\n");
-                exit(EXIT_FAILURE);
-            }   
-        
-        }   
+
+        // default base wavelengths for Aqua 667, 748 and 678 for height
+        // default base wavelengths for OCI 650,660,710,720 and 678 for height
+        nfit = input->flh_num_base_wavelengths;
+        xfit = (double *)malloc(nfit * sizeof(double));
+        yfit = (double *)malloc(nfit * sizeof(double));
+        baseBands = (int *)malloc(nfit * sizeof(int));
+
+        heightBand = windex(input->flh_height_wavelength, l1file->fwave, l1file->nbands);
+
+        for (ib = 0; ib < nfit; ib++) {
+            baseBands[ib] = windex(input->flh_base_wavelengths[ib], l1file->fwave, l1file->nbands);
+            xfit[ib] = l1file->fwave[baseBands[ib]];
+        }
     }
 
     for (ip = 0; ip < l1rec->npix; ip++) {
-
         flh[ip] = BAD_FLT;
 
-        ipb = l1file->nbands * ip;
-        /**
-         * the nflh algorithm requires nLw values from 665, 680 and 709nm
-         */
-        nLw1 = l2rec->nLw[ipb + ib665];
-        nLw2 = l2rec->nLw[ipb + ib680];
-        nLw3 = l2rec->nLw[ipb + ib709];
-
-        Lf1 = l1file->fwave[ib665];
-        Lf2 = l1file->fwave[ib680];
-        Lf3 = l1file->fwave[ib709];
-
-        /**
-         * if the pixel is already masked, or any of the input nLw values are
-         * less than -0.01, set the PRODFAIL flag and move along
-         */
-        if (l1rec->mask[ip] || nLw1 < -0.01 || nLw2 < -0.01 || nLw3 < -0.01) {
+        if (l1rec->mask[ip]) {
             l1rec->flags[ip] |= PRODFAIL;
             continue;
+        }
 
-        } else {
+        ipb = l1file->nbands * ip;
+        nLw = &l2rec->nLw[ipb];
 
-            /**
-             * fsat (Behrenfeld et al.[2009] equation A2)
-             */
-            base = nLw3 + (nLw1 - nLw3) * ((Lf3- Lf2) / (Lf3 - Lf1));
-            flh[ip] = nLw2 - base;
+        int bad_fit = 0;
+        for (ib = 0; ib < nfit; ib++) {
+            yfit[ib] = nLw[baseBands[ib]];
+            if (yfit[ib] < -0.01) {
+                l1rec->flags[ip] |= PRODFAIL;
+                bad_fit = 1;
+                break;
+            }
+        }
+        if(bad_fit)
+            continue;
 
-            /**
-             * bias correction as per Behrenfeld et al.
-             */
-            flh[ip] -= bias;
+        gsl_fit_linear(xfit, 1, yfit, 1, nfit, &c0, &c1, &cov00, &cov01, &cov11, &chi_sq);
 
+        baseline = c0 + c1 * input->flh_height_wavelength;
+
+        flh[ip] = nLw[heightBand] - baseline - input->flh_offset;
+
+        if (flh[ip] < flhmin) {
+            flh[ip] = BAD_FLT;
+            l1rec->flags[ip] |= PRODFAIL;
+            continue;
         }
     }
 }

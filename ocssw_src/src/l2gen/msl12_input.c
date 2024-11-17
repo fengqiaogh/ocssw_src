@@ -87,6 +87,7 @@ static char *l2gen_optionKeys[] = {
     "fqfile",
     "parfile",
     "gas_opt",
+    "gas_transmittance_file",
     "atrem_opt",
     "atrem_full",
     "atrem_geom",
@@ -148,6 +149,8 @@ static char *l2gen_optionKeys[] = {
     "kd2_wave",
     "kd2_coef",
     "flh_offset",
+    "flh_base_wavelengths",
+    "flh_height_wavelength",
     "vcnnfile",
     "picfile",
     "owtfile",
@@ -293,6 +296,7 @@ static char *l2gen_optionKeys[] = {
     "dline",
     "georegion_file",
     "extreme_glint",
+    "watervapor_bands",
 
 
 
@@ -468,8 +472,8 @@ void msl12_input_nbands_init(instr *input, int32_t nbands) {
     input->taua = calloc_nbandsf(nbands, input->taua, 0.0);
     input->vcal_nLw = calloc_nbandsf(nbands, input->vcal_nLw, 0.0);
     input->vcal_Lw = calloc_nbandsf(nbands, input->vcal_Lw, 0.0);
-
 }
+
 
 /*-----------------------------------------------------------------------------
     Function:  msl12_input_init
@@ -552,7 +556,9 @@ void msl12_input_init() {
 
     input->qaa_adg_s = 0.015;
 
-    input->flh_offset = 0.0;
+ 
+
+
 
     input->seawater_opt = 0;
     input->aer_opt = 99;
@@ -656,8 +662,14 @@ void msl12_input_init() {
     input->shallow_water_depth=30.;
 
     input->mbac_wave=NULL;
+    input->watervapor_bands=NULL;
 
     strcpy(input->doi, "");
+
+
+
+
+
 
     return;
 }
@@ -955,6 +967,8 @@ int l2gen_init_options(clo_optionList_t* list, const char* prog) {
     strcat(tmpStr, "      256: N2O");
     clo_addOption(list, "gas_opt", CLO_TYPE_INT, "1", tmpStr);
 
+    clo_addOption(list, "gas_transmittance_file", CLO_TYPE_IFILE, NULL, "gaseous transmittance file");
+
     strcpy(tmpStr, "ATREM gaseous transmittance bitmask selector\n");
     strcat(tmpStr, "        0: H2O only\n");
     strcat(tmpStr, "        1: Ozone\n");
@@ -1143,6 +1157,8 @@ int l2gen_init_options(clo_optionList_t* list, const char* prog) {
     clo_addOption(list, "kd2_wave", CLO_TYPE_INT, "[-1,-1]", "sensor wavelengths for polynomial Kd(490)\n        algorithm");
     clo_addOption(list, "kd2_coef", CLO_TYPE_FLOAT, "[0.0,0.0,0.0,0.0,0.0,0.0]", "sensor wavelengths\n        for polynomial Kd(490) algorithm");
     clo_addOption(list, "flh_offset", CLO_TYPE_FLOAT, "0.0", "bias to subtract\n        from retrieved fluorescence line height");
+    clo_addOption(list, "flh_base_wavelengths", CLO_TYPE_FLOAT, NULL, "flh baseline wavelengths");
+    clo_addOption(list, "flh_height_wavelength", CLO_TYPE_FLOAT, "-1.0", "flh height wavelength");
     clo_addOption(list, "sstcoeffile", CLO_TYPE_IFILE, NULL, "IR sst algorithm coefficients file");
     clo_addOption(list, "dsdicoeffile", CLO_TYPE_IFILE, NULL, "SST dust correction algorithm coefficients file");
     clo_addOption(list, "sstssesfile", CLO_TYPE_IFILE, NULL, "IR sst algorithm error statistics file");
@@ -1336,6 +1352,8 @@ int l2gen_init_options(clo_optionList_t* list, const char* prog) {
     
     clo_addOption(list, "mbac_wave", CLO_TYPE_INT, NULL, "bands used for mbac atmospheric correction");
     clo_addOption(list, "georegion_file", CLO_TYPE_STRING, NULL, "geo region mask file with lat,lon,georegion 1=process pixel, 0=do not");
+    clo_addOption(list, "watervapor_bands", CLO_TYPE_INT, NULL, "bands used for calculating water vapor based on 3-band depth approach");
+
 
     l1_add_options(list);
 
@@ -1816,6 +1834,11 @@ int l2gen_load_input(clo_optionList_t *list, instr *input, int32_t nbands) {
 
         } else if (strcmp(keyword, "gas_opt") == 0) {
             input->gas_opt = clo_getOptionInt(option);
+
+        } else if (strcmp(keyword, "gas_transmittance_file") == 0) {
+            strVal = clo_getOptionString(option);
+            parse_file_name(strVal, tmp_file);
+            strcpy(input->gas_transmittance_file, tmp_file);
 
         } else if (strcmp(keyword, "atrem_opt") == 0) {
             input->atrem_opt = clo_getOptionInt(option);
@@ -2584,6 +2607,21 @@ int l2gen_load_input(clo_optionList_t *list, instr *input, int32_t nbands) {
         } else if (strcmp(keyword, "flh_offset") == 0) {
             input->flh_offset = clo_getOptionFloat(option);
 
+        } else if (strcmp(keyword, "flh_base_wavelengths") == 0) {
+            if (clo_isOptionSet(option)) {
+                fArray = clo_getOptionFloats(option, &count);
+                if (count < 2) {
+                    printf("-E- number of flh_base_wavelengths elements must be at least 2\n");
+                    exit(1);
+                }
+                input->flh_num_base_wavelengths = count;
+                input->flh_base_wavelengths = (float*) allocateMemory(count * sizeof(float), "flh_base_wavelengths");
+                for (i = 0; i < count; i++)
+                    input->flh_base_wavelengths[i] = fArray[i];
+            }
+        } else if (strcmp(keyword, "flh_height_wavelength") == 0) {
+            input->flh_height_wavelength = clo_getOptionFloat(option);
+
         } else if (strcmp(keyword, "aermodels") == 0) {
             strArray = clo_getOptionStrings(option, &count);
             if (count > MAXAERMOD) {
@@ -2669,7 +2707,6 @@ int l2gen_load_input(clo_optionList_t *list, instr *input, int32_t nbands) {
 
         } else if (strcmp(keyword, "mumm_epsilon") == 0) {
             input->mumm_epsilon = clo_getOptionFloat(option);
-
 
         } else if (strcmp(keyword, "viirsnv7") == 0) {
             input->viirsnv7 = clo_getOptionInt(option);
@@ -2780,15 +2817,15 @@ int l2gen_load_input(clo_optionList_t *list, instr *input, int32_t nbands) {
             strVal = clo_getOptionString(option);
             parse_file_name(strVal, tmp_file);
             strcpy(input->water_spectra_file, tmp_file);
-            
+
         } else if (strcmp(keyword, "bpar_validate_opt") == 0) {
             input->bpar_validate_opt = clo_getOptionInt(option);
-            
+
         } else if (strcmp(keyword, "bpar_elev_opt") == 0) {
             input->bpar_elev_opt = clo_getOptionInt(option);
-            
+
         } else if (strcmp(keyword, "bpar_elev_value") == 0) {
-            input->bpar_elev_value = clo_getOptionFloat(option);    
+            input->bpar_elev_value = clo_getOptionFloat(option);
 
         } else if (strcmp(keyword, "cloud_hgt_file") == 0) {
             if (clo_isOptionSet(option)) {
@@ -2820,6 +2857,18 @@ int l2gen_load_input(clo_optionList_t *list, instr *input, int32_t nbands) {
                 input->acbands_index=(int32_t *)malloc(count*sizeof(int32_t));
                 for (i = 0; i < count; i++)
                     input->mbac_wave[i] = iArray[i];
+            }
+        } else if (strcmp(keyword, "watervapor_bands") == 0) {
+            if (clo_isOptionSet(option)) {
+                iArray = clo_getOptionInts(option, &count);
+                if (count %3 !=0) {
+                    printf("-E- number of watervapor_bands elements must be time of 3\n");
+                    exit(1);
+                }
+                input->nbands_watervapor=count;
+                input->watervapor_bands=(int *)malloc(count*sizeof(int));
+                for (i = 0; i < count; i++)
+                    input->watervapor_bands[i] = iArray[i];
             }
         }else if (strcmp(keyword, "wavelength_3d") == 0) {
             if (clo_isOptionSet(option)) {
@@ -3150,6 +3199,10 @@ int msl12_option_input(int argc, char **argv, clo_optionList_t* list,
     strcat(l1_input->input_parms, "\n");
 
     sprintf(str_buf, "gas_opt = %3d", input->gas_opt);
+    strcat(l1_input->input_parms, str_buf);
+    strcat(l1_input->input_parms, "\n");
+
+    sprintf(str_buf, "gas_transmittance_file = %s", input->gas_transmittance_file);
     strcat(l1_input->input_parms, str_buf);
     strcat(l1_input->input_parms, "\n");
 
@@ -3758,6 +3811,21 @@ int msl12_option_input(int argc, char **argv, clo_optionList_t* list,
     sprintf(str_buf, "flh_offset = %8.5f", input->flh_offset);
     strcat(l1_input->input_parms, str_buf);
     strcat(l1_input->input_parms, "\n");
+    
+    sprintf(str_buf, "flh_base_wavelengths = ");
+    strcat(l1_input->input_parms, str_buf);
+    for (i = 0; i < input->flh_num_base_wavelengths; i++) {
+        if(i==0)
+            sprintf(str_buf, "%4f", input->flh_base_wavelengths[i]);
+        else
+            sprintf(str_buf, ", %4f", input->flh_base_wavelengths[i]);
+        strcat(l1_input->input_parms, str_buf);
+    }
+    strcat(l1_input->input_parms, "\n");
+ 
+    sprintf(str_buf, "flh_height_wavelength = %8.5f", input->flh_height_wavelength);
+    strcat(l1_input->input_parms, str_buf);
+    strcat(l1_input->input_parms, "\n");
 
     sprintf(str_buf, "sstcoeffile = %s", input->sstcoeffile);
     strcat(l1_input->input_parms, str_buf);
@@ -3956,6 +4024,21 @@ int msl12_option_input(int argc, char **argv, clo_optionList_t* list,
     }
     else
         strcat(l1_input->input_parms, "mbac_wave = \n");
+    
+    if(input->watervapor_bands){
+        strcat(l1_input->input_parms, "watervapor_bands = ");
+        i = 0;
+        for(i=0;i<input->nbands_watervapor;i++) {
+            if(i==0)
+                sprintf(str_buf, "%d", input->watervapor_bands[i]);
+            else
+                sprintf(str_buf, ",%d", input->watervapor_bands[i]);
+            strcat(l1_input->input_parms, str_buf);
+        }
+        strcat(l1_input->input_parms, "\n");
+    }
+    else
+        strcat(l1_input->input_parms, "watervapor_bands = \n");
 
     l1_get_input_params(l1file, l1_input->input_parms);
 
@@ -3983,6 +4066,12 @@ int msl12_option_input(int argc, char **argv, clo_optionList_t* list,
     if (strlen(input->gmpfile)) {
         tmp_str = strrchr(input->gmpfile, '/');
         tmp_str = (tmp_str == 0x0) ? input->gmpfile : tmp_str + 1;
+        sprintf(str_buf, ",%s", tmp_str);
+        strcat(l1_input->input_files, str_buf);
+    }
+    if (strlen(input->gas_transmittance_file)) {
+        tmp_str = strrchr(input->gas_transmittance_file, '/');
+        tmp_str = (tmp_str == 0x0) ? input->gas_transmittance_file : tmp_str + 1;
         sprintf(str_buf, ",%s", tmp_str);
         strcat(l1_input->input_files, str_buf);
     }

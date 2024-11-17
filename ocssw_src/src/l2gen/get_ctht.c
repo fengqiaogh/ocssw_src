@@ -314,8 +314,25 @@ int32_t comp_ctht( l2str *l2rec )
   int32_t ilin, il2, lin_in_que, scn_in_que, ntyp = 2;
   extern l1qstr l1que;
   static ctht_lin_str *ctht_sav;
-
   int32_t npix = l2rec->l1rec->npix;
+
+  if( input->proc_cloud != 1 ) {
+    printf( "E, %s, %d: For cloud processing, proc_cloud must be set to 1\n",
+      __FILE__, __LINE__ );
+    exit(1);
+  }
+
+  if( l2rec->l1rec->anc_add == NULL ) {
+    printf( "E, %s, %d: For cloud processing, anc_profile_1, _2, _3 must be specified\n", __FILE__, __LINE__ );
+    exit(1);
+  }
+
+  //  until climatology sfcp, sfct is cleared up, we can't use climatology
+  if( strstr( input->met1, "climatology" ) != NULL ) {
+    printf( "E, %s, %d: Ancillary meteorological data from a climatology file cannot be used for cloud processing\n", __FILE__, __LINE__ );
+    printf( "Use daily files in MET1, 2, 3 l2gen inputs\n" );
+    exit(1);
+  }
 
  /*  initialize the ctht line storage and lines */
   if( ctht_init == 0 )

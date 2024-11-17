@@ -57,13 +57,15 @@ endif (NOT CMAKE_BUILD_TYPE)
 
 enable_language(C)
 enable_language(CXX)
-enable_language(Fortran)
-
+if(BUILD_HISTORICAL OR BUILD_ALL OR BUILD_CLOUD)
+  enable_language(Fortran)
+endif()
 # Finer-grained control...
 OPTION(BUILD_HISTORICAL "Build the historical code (e.g. old seawifs binaries no longer needed)" OFF)
 OPTION(BUILD_MISC "Build non-essential code" OFF)
 OPTION(BUILD_ALL "Build all including  Aquarius, historical, misc and VIIRS L1 code" OFF)
 OPTION(USE_MPI "Set definition to use MPI" OFF)
+OPTION(BUILD_CLOUD "Build libcloud code")
 
 if ($ENV{OCSSW_MPI})
     set(USE_MPI ON)
@@ -72,6 +74,7 @@ endif()
 if(BUILD_ALL)
    set(BUILD_HISTORICAL ON)
    set(BUILD_MISC ON)
+   set(BUILD_CLOUD ON)
 endif(BUILD_ALL)
 
 #include(PrintAllVariables)
