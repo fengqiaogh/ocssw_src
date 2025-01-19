@@ -24,10 +24,6 @@ class l1c_str {
     virtual ~l1c_str();
 
     // Open, read, close
-    virtual int32_t openl1b_ocis_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile);
-    virtual int32_t readl1b_ocis_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile, int32_t recnum);
-    virtual int32_t closel1b_ocis_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile);
-
     virtual int32_t openl1b_oci_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile);
     virtual int32_t closel1b_oci_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile);
 
@@ -43,10 +39,6 @@ class l1c_str {
     virtual int32_t readl1b_misr_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile, filehandle *l1file,
                                      int32_t recnum);
     virtual int32_t closel1b_misr_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile, filehandle *l1file);
-
-    virtual int32_t readl1b_ocis_3lines(l1c_str *l1cstr, l1c_filehandle *l1cfile, int32_t recnum);
-    virtual int32_t writel1c_ocis(l1c_str *l1cstr, bin_str *binl1c, netCDF::NcFile *nc_output, float **Ltfrac,
-                                  float **areafrac, short **obs_view, int band_ix, int view_ix);
 
     // global attributes
     size_t npix;
@@ -122,10 +114,6 @@ class l1c_str {
 
 // prototypes------
 //  Open, read, close
-int32_t openl1b_ocis_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile);
-int32_t readl1b_ocis_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile, int32_t recnum);
-int32_t closel1b_ocis_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile);
-
 int32_t openl1b_oci_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile);
 int32_t closel1b_oci_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile);
 
@@ -140,10 +128,6 @@ int32_t closel1b_harp2_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile);
 int32_t openl1b_misr_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile, filehandle *l1file);
 int32_t readl1b_misr_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile, filehandle *l1file, int32_t recnum);
 int32_t closel1b_misr_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile, filehandle *l1file);
-
-int32_t readl1b_ocis_3lines(l1c_str *l1cstr, l1c_filehandle *l1cfile, int32_t recnum);
-int32_t writel1c_ocis(l1c_str *l1cstr, bin_str *binl1c, netCDF::NcFile *nc_output, float **Ltfrac,
-                      float **areafrac, short **obs_view, int band_ix, int view_ix);
 
 }  // namespace l1c
 

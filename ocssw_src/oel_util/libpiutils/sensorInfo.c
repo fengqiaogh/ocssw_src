@@ -7,12 +7,14 @@
 #include <genutils.h>
 
 // sensor name indexed by sensorId
+// NOTE - some of the sensors have been deleted, but we have to keep
+//        the placeholder to make the index match
 static const char* sensorName[] = {
     "SeaWiFS",  // 0
-    "MOS",      // 1
+    "MOS(Delete)",      // 1 deleted
     "OCTS",     // 2
     "AVHRR",    // 3
-    "OSMI",     // 4
+    "OSMI(Delete)",     // 4 deleted
     "CZCS",     // 5
     "MODIST",   // 6
     "MODISA",   // 7
@@ -25,7 +27,7 @@ static const char* sensorName[] = {
     "GOCI",     // 14
     "OLIL8",    // 15
     "Aquarius", // 16
-    "OCIA",     // 17
+    "OCIA(Delete)",     // 17 deleted
     "AVIRIS",   // 18
     "PRISM",    // 19
     "OLCIS3A",  // 20
@@ -39,7 +41,7 @@ static const char* sensorName[] = {
     "MISR",     // 28
     "OLCIS3B",  // 29
     "OCI",      // 30
-    "OCIS",     // 31
+    "OCIS(Delete)",     // 31 deleted
     "VIIRSJ2",  // 32
     "OLIL9",    // 33
     "SPEXONE",  // 34
@@ -50,10 +52,10 @@ static const char* sensorName[] = {
 // instrument name indexed by sensorId
 static const char *instrumentName[] = {
     "SeaWiFS",  // 0
-    "MOS",      // 1
+    "MOS(Delete)",      // 1 deleted
     "OCTS",     // 2
     "AVHRR",    // 3
-    "OSMI",     // 4
+    "OSMI(Delete)",     // 4 deleted
     "CZCS",     // 5
     "MODIS",    // 6
     "MODIS",    // 7
@@ -66,7 +68,7 @@ static const char *instrumentName[] = {
     "GOCI",     // 14
     "OLI",      // 15
     "Aquarius", // 16
-    "OCIA",     // 17
+    "OCIA(Delete)",     // 17 deleted
     "AVIRIS",   // 18
     "PRISM",    // 19
     "OLCI",     // 20
@@ -80,7 +82,7 @@ static const char *instrumentName[] = {
     "MISR",     // 28
     "OLCI",     // 29
     "OCI",      // 30
-    "OCIS",     // 31
+    "OCIS(Delete)",     // 31 deleted
     "VIIRS",    // 32
     "OLI",      // 33
     "SPEXONE",  // 34
@@ -91,10 +93,10 @@ static const char *instrumentName[] = {
 // platform name indexed by sensorId
 static const char *platformName[] = {
     "Orbview-2",    // 0
-    "IRS-P3",       // 1
+    "IRS-P3(Delete)",       // 1
     "ADEOS",        // 2
     "AVHRR",        // 3
-    "KOMPSAT",      // 4
+    "KOMPSAT(Delete)",      // 4
     "Nimbus-7",     // 5
     "Terra",        // 6
     "Aqua",         // 7
@@ -107,7 +109,7 @@ static const char *platformName[] = {
     "COMS",         // 14
     "Landsat-8",    // 15
     "SAC-D",        // 16
-    "PACE",         // 17
+    "PACE(Delete)",         // 17
     "AVIRIS",       // 18
     "PRISM",        // 19
     "Sentinel-3A",  // 20
@@ -121,7 +123,7 @@ static const char *platformName[] = {
     "Terra",        // 28
     "Sentinel-3B",  // 29
     "PACE",         // 30
-    "PACE",         // 31
+    "PACE(Delete)",         // 31
     "JPSS-2",       // 32
     "Landsat-9",    // 33
     "PACE",         // 34
@@ -132,10 +134,10 @@ static const char *platformName[] = {
 // sensor directory indexed by sensorId
 static const char *sensorDir[] = {
     "seawifs",  // 0
-    "mos",      // 1
+    "mos(Delete)",      // 1 deleted
     "octs",     // 2
     "avhrr",    // 3
-    "osmi",     // 4
+    "osmi(Delete)",     // 4 deleted
     "czcs",     // 5
     "modis",    // 6
     "modis",    // 7
@@ -148,7 +150,7 @@ static const char *sensorDir[] = {
     "goci",     // 14
     "oli",      // 15
     "aquarius", // 16
-    "ocia",     // 17
+    "ocia(Delete)",     // 17 deleted
     "aviris",   // 18
     "prism",    // 19
     "olci",     // 20
@@ -162,7 +164,7 @@ static const char *sensorDir[] = {
     "misr",     // 28
     "olci",     // 29
     "oci",      // 30
-    "ocis",     // 31
+    "ocis(Delete)",     // 31 deleted
     "viirs",    // 32
     "oli",      // 33
     "spexone",  // 34
@@ -190,10 +192,10 @@ static const char *subsensorDir[] = {
 // instrument ID indexed by sensorId
 static const int instrumentId[] = {
     INSTRUMENT_SEAWIFS, // 0
-    INSTRUMENT_MOS,     // 1
+    1,
     INSTRUMENT_OCTS,    // 2
     INSTRUMENT_AVHRR,   // 3
-    INSTRUMENT_OSMI,    // 4
+    1,
     INSTRUMENT_CZCS,    // 5
     INSTRUMENT_MODIS,   // 6
     INSTRUMENT_MODIS,   // 7
@@ -206,7 +208,7 @@ static const int instrumentId[] = {
     INSTRUMENT_GOCI,    // 14
     INSTRUMENT_OLI,     // 15
     INSTRUMENT_AQUARIUS,// 16
-    INSTRUMENT_OCIA,    // 17
+    1,
     INSTRUMENT_AVIRIS,  // 18
     INSTRUMENT_PRISM,   // 19
     INSTRUMENT_OLCI,    // 20
@@ -220,7 +222,7 @@ static const int instrumentId[] = {
     INSTRUMENT_MISR,    // 28
     INSTRUMENT_OLCI,    // 29
     INSTRUMENT_OCI,     // 30
-    INSTRUMENT_OCIS,    // 31
+    1,
     INSTRUMENT_VIIRS,   // 32
     INSTRUMENT_OLI,     // 33
     INSTRUMENT_SPEXONE, // 34
@@ -231,10 +233,10 @@ static const int instrumentId[] = {
 // instrument name indexed by instrumentId
 static const char *instrumentNameByInstrumentId[] = {
     "SeaWiFS",  // 0
-    "MOS",      // 1
+    "MOS(Delete)",      // 1 deleted
     "OCTS",     // 2
     "AVHRR",    // 3
-    "OSMI",     // 4
+    "OSMI(Delete)",     // 4 deleted
     "CZCS",     // 5
     "MODIS",    // 6
     "OCM",      // 7
@@ -246,7 +248,7 @@ static const char *instrumentNameByInstrumentId[] = {
     "GOCI",     // 13
     "OLI",      // 14
     "Aquarius", // 15
-    "OCIA",     // 16
+    "OCIA(Delete)",     // 16 deleted
     "AVIRIS",   // 17
     "PRISM",    // 18
     "OLCI",     // 19
@@ -257,7 +259,7 @@ static const char *instrumentNameByInstrumentId[] = {
     "HAWKEYE",  // 24
     "MISR",     // 25
     "OCI",      // 26
-    "OCIS",     // 27
+    "OCIS(Delete)",     // 27 deleted
     "SPEXONE",  // 28
     "HARP2",    // 29
     "HARP"      // 30

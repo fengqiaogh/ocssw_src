@@ -1,6 +1,9 @@
 #ifndef OCSSW_SUN2000_H
 #define OCSSW_SUN2000_H
 
+#ifdef  __cplusplus
+extern "C" {
+#endif
 
 /**
  * @brief
@@ -100,5 +103,9 @@ longitude and obliquity.
  * @param omega Ascending node of mean lunar orbit (degrees)
  */
 void ephparms(double t, double* xls, double* gs, double* xlm, double* omega);
+
+#ifdef  __cplusplus
+}
+#endif
 
 #endif  // OCSSW_SUN2000_H

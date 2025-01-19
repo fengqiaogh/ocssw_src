@@ -11,7 +11,7 @@ float toa_reflect(l1str *l1rec, int32_t ip, int32_t ib) {
     static float pi = 3.141592654;
     float rho;
 
-    mu0 = cos(l1rec->solz[ip] * pi / 180.);
+    mu0 = l1rec->csolz[ip];
     ipb = ip * l1rec->l1file->nbands + ib;
     rho = l1rec->Lt[ipb] * pi / l1rec->Fo[ib] / mu0;
     return (rho);

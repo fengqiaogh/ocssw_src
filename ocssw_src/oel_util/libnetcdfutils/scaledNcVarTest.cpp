@@ -1,6 +1,7 @@
 
 #include <cassert>
 #include <stdexcept>
+#include <cmath>
 
 #include "scaledNcVar.hpp"
 
@@ -84,6 +85,15 @@ int testReading() {
         if (value != TEST_VALUE)
             cerr << "-E- Vectored: " << value << " != " << TEST_VALUE << endl;
 
+    ScaledNcVar nanvar = group.getVar("nanvar");
+    vector<double> nanVec(nanvar.getDimsSize());
+    nanvar.getVar(nanVec.data());
+    for (double value : nanVec)
+        if (isnan(value)) {
+            cerr << "-E- NaN value found in nanvar" << endl;
+        }
+            
+
     return EXIT_SUCCESS;
 }
 
@@ -142,6 +152,15 @@ int testWriting() {
     badValue.assignBadValue(TEST_BADVALUE);
     badValue.putVar(dataWithBadValue.data());
 
+    ScaledNcVar defaultSNcVar;
+    netCDF::NcVar defaultNcVar = testGroup.addVar("defaultVar", ncByte, {dimY, dimX});
+    ScaledNcVar copy;
+    copy = defaultNcVar;
+
+    netCDF::NcVar fromGroup = testGroup.getVar("badValue"); // Could be any var
+    ScaledNcVar copiedFromGroup;
+    copiedFromGroup = fromGroup;
+
     // Expect an exception if a fill value that isn't representable is passed to assignFillValue
     ScaledNcVar outOfRange = testGroup.addVar("outOfRange", ncByte, {dimY, dimX});
     try {
@@ -149,6 +168,12 @@ int testWriting() {
     } catch (const out_of_range &e) {
         cout << "Caught exception - " << e.what() << endl;
     }
+
+    // What does NaN do?
+    ScaledNcVar nanVar = testGroup.addVar("nanvar", ncDouble, {dimY, dimX});
+    double zero = 1 - 1; // Quieting a warning
+    doubleData[0] = 1 / zero;
+    nanVar.putVar(doubleData.data());
 
     outFile.close();
 

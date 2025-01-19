@@ -17,6 +17,7 @@ static double bbwtab[NAWTAB];
 static int32_t ntab = NAWTAB;
 static int min_wl = MINAWTAB;
 static int del_wl = INTAWTAB;
+static int firstCall = 1;
 
 
 /* ---------------------------------------------------------------------------------------------- */
@@ -24,8 +25,6 @@ static int del_wl = INTAWTAB;
 /* ---------------------------------------------------------------------------------------------- */
 void read_water_spectra(void) {
     // TODO: Dynamically allocate awtab and bbwtab arrays
-    static int firstCall = 1;
-
     FILE *fp;
     char *line;
     int32_t i, status, netcdf_input;
@@ -103,7 +102,6 @@ void read_water_spectra(void) {
 
 /* ---------------------------------------------------------------------------------------------- */
 float aw_spectra(int32_t wl, int32_t width) {
-    static int firstCall = 1;
 
     int32_t itab = (wl - min_wl) / del_wl;
     int32_t imin = MAX(itab - width / 2 / del_wl, 0);
@@ -113,7 +111,6 @@ float aw_spectra(int32_t wl, int32_t width) {
 
     if (firstCall) {
         read_water_spectra();
-        firstCall = 0;
     }
 
     if (itab < 0) {
@@ -140,8 +137,6 @@ float aw_spectra(int32_t wl, int32_t width) {
 
 /* ---------------------------------------------------------------------------------------------- */
 float bbw_spectra(int32_t wl, int32_t width) {
-    static int firstCall = 1;
-
     int32_t itab = (wl - min_wl) / del_wl;
     int32_t imin = MAX(itab - width / 2 / del_wl, 0);
     int32_t imax = MIN(itab + width / 2 / del_wl, ntab);
@@ -150,7 +145,6 @@ float bbw_spectra(int32_t wl, int32_t width) {
 
     if (firstCall) {
         read_water_spectra();
-        firstCall = 0;
     }
 
     if (itab < 0) {

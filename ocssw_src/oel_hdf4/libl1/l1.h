@@ -155,14 +155,13 @@ typedef struct cld_rad_dat_struct_def
 cld_rad_struct;
 typedef struct l1_struct {
     int32_t length; /* number of bytes allocated to data block */
-    int32_t npix;
+    int32_t npix; // number of pixels
 
-    int32_t iscan;
-    int32_t detnum;
-    int32_t mside;
+    int32_t iscan; // number of lines
+    int32_t detnum; // detector index for multidetector sensors (ie. MODIS)
+    int32_t mside; // mirror side 0 or 1
 
-    /* scan-time-specific data */
-    double scantime;
+    double scantime; // time of scan in unix time
     double fsol;
 
     bool is_l2; /**< Lt values are actually (above water?) reflectance; skip atmocor */
@@ -182,19 +181,19 @@ typedef struct l1_struct {
     int32_t *nobs;
     float *lon;
     float *lat;
-    float *solz;
-    float *sola;
-    float *senz;
-    float *sena;
-    float *Lt;
+    float *solz; // solz[pix] is solar zenith angle in degrees
+    float *sola; // sola[pix] is solar azimuth angle in degrees
+    float *senz; // senz[pix] is sensor zenith angle in degrees
+    float *sena; // sena[pix] is sensor azimuth angle in degrees
+    float *Lt; // Lt[pix][band]
 
-    float *Ltir;
+    float *Ltir; // Ltir[pix][IRband]
     float *Bt;
 
     float *delphi;
-    float *csolz;
-    float *csenz;
-    int32_t *pixnum;
+    float *csolz; // csolz[pix] is cos(solz) in radians
+    float *csenz; // csenz[pix] is cos(senz) in radians
+    int32_t *pixnum; // pixnum[pix] is pixel index from non-extracted L1 file
     char *slot; /**< slot number                                */
     float *alpha;
     float *scattang;
@@ -241,9 +240,6 @@ typedef struct l1_struct {
 
     float *t_h2o;
     float *t_o2;
-    float *tg_sol;
-    float *tg_sen;
-    float *tg;
     float *t_sol;
     float *t_sen;
     float *rhof;
@@ -266,6 +262,10 @@ typedef struct l1_struct {
     float *sw_a_avg;
     float *sw_bb_avg;
     float *rho_cirrus;
+
+    double *tg_sol;
+    double *tg_sen;
+    double *tg;
 
     // TODO: move MERIS L1 to private_data pointer in l1rec
     /* for MERIS L1 */

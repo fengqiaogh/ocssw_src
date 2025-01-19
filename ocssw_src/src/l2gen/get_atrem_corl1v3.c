@@ -144,7 +144,7 @@ References: ********************************************************************
 #define MINDEGCHANGE 55 // Minimum change (degrees squared) in sum of zenith and azimuth angle squared
 // for both solar and sensor angles before recalculating tran_table (transmittance table)
 
-int get_atrem_cor(l1str *l1rec, int32_t ip, float *rhot, float *tg_tot, float *tg_sol, float *tg_sen) {
+int get_atrem_cor(l1str *l1rec, int32_t ip, float *rhot, float *tg_tot, double *tg_sol, double *tg_sen) {
     int32_t sensorID = l1rec->l1file->sensorID;
 
     static paramstr P;

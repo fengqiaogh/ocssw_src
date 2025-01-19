@@ -1402,7 +1402,7 @@ int openl1_viirs_h5(filehandle * file) {
 
  ------------------------------------------------------------------------*/
 int readl1_viirs_h5(filehandle * file, int32_t dline, l1str * l1rec, int lonlat) {
-    static int32_t firstcall = 1, lastframe = -1;
+    static int32_t lastframe = -1;
     static double fsol;
     int start[2], count[2];
     int32_t i, ibnd, ipix, moon_affected;
@@ -1416,8 +1416,6 @@ int readl1_viirs_h5(filehandle * file, int32_t dline, l1str * l1rec, int lonlat)
     int32_t nbands = (int32_t) file->nbands;
 
     l1rec->npix = file->npix;
-    // if (firstcall)
-    //     cdata_();
     /*
      *  get proper line in data and detector #
      */

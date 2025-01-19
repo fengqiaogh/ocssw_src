@@ -14,7 +14,7 @@ from telemetry.timestamp import *
 from telemetry.derive_orbitparams import derive_orbitparams
 from telemetry import ccsdspy
 
-__version__ = '1.5.4 (2024-05-28)'
+__version__ = '1.5.5 (2024-11-15)'
 
 ignored_apids = [
     636,  # OCI Ancillary packet
@@ -396,6 +396,7 @@ EXIT Status:
     # static
     ofile.title = "PACE HKT Data"
     ofile.instrument = "Observatory"
+    ofile.platform = "PACE"
     ofile.processing_version = "V1.0"
     ofile.institution = "NASA Goddard Space Flight Center, Ocean Biology Processing Group"
     ofile.license = "https://science.nasa.gov/earth-science/earth-science-data/data-information-policy/"

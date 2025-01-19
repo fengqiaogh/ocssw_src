@@ -10,10 +10,10 @@
 
 /* unique sensor IDs */
 #define SEAWIFS        0
-#define MOS            1
+
 #define OCTS           2
 #define AVHRR          3
-#define OSMI           4
+
 #define CZCS           5
 #define MODIST         6
 #define MODISA         7
@@ -26,7 +26,7 @@
 #define GOCI          14
 #define OLIL8         15
 #define AQUARIUS      16
-#define OCIA          17
+
 #define AVIRIS        18
 #define PRISM         19
 #define OLCIS3A       20
@@ -40,7 +40,7 @@
 #define MISR          28
 #define OLCIS3B       29
 #define OCI           30 
-#define OCIS          31 /* OCI simulated data */
+
 #define VIIRSJ2       32 /* VIIRS J2 */
 #define OLIL9         33 /* OLI LANDSAT9 */
 #define SPEXONE       34
@@ -69,10 +69,10 @@
 
 /* instrument IDs */
 #define INSTRUMENT_SEAWIFS    0
-#define INSTRUMENT_MOS        1
+
 #define INSTRUMENT_OCTS       2
 #define INSTRUMENT_AVHRR      3
-#define INSTRUMENT_OSMI       4
+
 #define INSTRUMENT_CZCS       5
 #define INSTRUMENT_MODIS      6
 #define INSTRUMENT_OCM        7
@@ -84,7 +84,7 @@
 #define INSTRUMENT_GOCI       13
 #define INSTRUMENT_OLI        14
 #define INSTRUMENT_AQUARIUS   15
-#define INSTRUMENT_OCIA       16
+
 #define INSTRUMENT_AVIRIS     17
 #define INSTRUMENT_PRISM      18
 #define INSTRUMENT_OLCI       19
@@ -95,7 +95,7 @@
 #define INSTRUMENT_HAWKEYE    24
 #define INSTRUMENT_MISR       25
 #define INSTRUMENT_OCI        26
-#define INSTRUMENT_OCIS       27
+
 #define INSTRUMENT_SPEXONE    28
 #define INSTRUMENT_HARP2      29
 #define INSTRUMENT_HARP       30

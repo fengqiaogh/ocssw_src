@@ -170,7 +170,6 @@ void get_par2(l2str *l2rec, float par[]) {
                     bindx[ib] = ib;
                 break;
             case INSTRUMENT_OCI:
-            case INSTRUMENT_OCIS:
 
                 for (ib = 0; ib < total_waves; ib++) {
                     if (l1file->fwave[ib] >= 400) {
@@ -258,7 +257,6 @@ void get_par2(l2str *l2rec, float par[]) {
             case INSTRUMENT_OCTS:
             case INSTRUMENT_OCI:
             case INSTRUMENT_MODIS:
-            case INSTRUMENT_OCIS:
                 par[ip] = calc_par_impl_of_2023(l2rec, ip, nwave, Lt, taua, angst, lambda, Fobar, kO3, Taur,
                                                 parb, parc);
                 break;

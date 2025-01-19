@@ -218,7 +218,8 @@ void l1_read_default_files(clo_optionList_t *list, filehandle *l1file, const cha
     l1file->format = format.type;
     l1file->sensorID = format.sensor_id;
     l1file->subsensorID = format.subsensor_id;
-    l1file->nbands = rdsensorinfo(l1file->sensorID, 0, "Nbands", NULL);
+    l1_input->evalmask = clo_getInt(list, "eval");
+    l1file->nbands = rdsensorinfo(l1file->sensorID, l1_input->evalmask, "Nbands", NULL);
 
 
     // load l1 defaults

@@ -18,46 +18,40 @@ void chand(float xphi, float xmuv, float xmus, float *xtau,
         float *rhoray, double *trup, double *trdown, int nbands);
 
 int atmocor1_land(l1str *l1rec, int32_t ip) {
+    static int32_t firstRun = 1;
     static float pi = 3.141592654;
-    static float radeg = 180. / 3.141592654;
     static float p0 = 1013.25;
 
     float delphi = l1rec->delphi[ip] + 180.0;
-    float mu0 = cos(l1rec->solz[ip] / radeg);
-    float mu = cos(l1rec->senz[ip] / radeg);
+    float mu0 = l1rec->csolz[ip];
+    float mu = l1rec->csenz[ip];
     float airmass = 1.0 / mu0 + 1.0 / mu;
     int nbands = l1rec->l1file->nbands;
 
-    float *Taur;
-    float *rhor;
-    double *trup;
-    double *trdown;
+    static float *Taur;
+    static float *rhor;
+    static double *trup;
+    static double *trdown;
 
     int32_t ib, ipb;
-
-    if ((Taur = (float *) calloc(nbands, sizeof (float))) == NULL) {
-        printf("-E- : Error allocating memory to Taur\n");
-        exit(FATAL_ERROR);
-    }
-    if ((rhor = (float *) calloc(nbands, sizeof (float))) == NULL) {
-        printf("-E- : Error allocating memory to rhor\n");
-        exit(FATAL_ERROR);
-    }
-    if ((trup = (double *) calloc(nbands, sizeof (double))) == NULL) {
-        printf("-E- : Error allocating memory to trup\n");
-        exit(FATAL_ERROR);
-    }
-    if ((trdown = (double *) calloc(nbands, sizeof (double))) == NULL) {
-        printf("-E- : Error allocating memory to trdown\n");
-        exit(FATAL_ERROR);
-    }
-
-    ipb = ip*nbands;
-    for (ib = 0; ib < nbands; ib++) {
-        l1rec->tg_sol[ipb + ib] = 1.0;
-        l1rec->tg_sen[ipb + ib] = 1.0;
-        l1rec->t_h2o [ipb + ib] = 1.0;
-        l1rec->t_o2 [ipb + ib] = 1.0;
+    if (firstRun) {
+        firstRun = 0;
+        if ((Taur = (float *) calloc(nbands, sizeof (float))) == NULL) {
+            printf("-E- : Error allocating memory to Taur\n");
+            exit(FATAL_ERROR);
+        }
+        if ((rhor = (float *) calloc(nbands, sizeof (float))) == NULL) {
+            printf("-E- : Error allocating memory to rhor\n");
+            exit(FATAL_ERROR);
+        }
+        if ((trup = (double *) calloc(nbands, sizeof (double))) == NULL) {
+            printf("-E- : Error allocating memory to trup\n");
+            exit(FATAL_ERROR);
+        }
+        if ((trdown = (double *) calloc(nbands, sizeof (double))) == NULL) {
+            printf("-E- : Error allocating memory to trdown\n");
+            exit(FATAL_ERROR);
+        }
     }
 
     /*                                                              */
@@ -99,11 +93,6 @@ int atmocor1_land(l1str *l1rec, int32_t ip) {
         }
 
     }
-
-    free(Taur);
-    free(rhor);
-    free(trup);
-    free(trdown);
 
     return (0);
 }

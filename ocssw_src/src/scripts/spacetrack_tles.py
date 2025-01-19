@@ -114,7 +114,7 @@ if not tleIDs:
 
 baseurl = "https://www.space-track.org"
 loginurl = '/'.join([baseurl, "ajaxauth","login"])
-tleurl = '/'.join([baseurl,"basicspacedata","query","class","tle_latest","ORDINAL","1","NORAD_CAT_ID",tleIDs,"format","tle"])
+tleurl = '/'.join([baseurl,"basicspacedata","query","class","gp","format","tle","NORAD_CAT_ID",tleIDs])
 
 #Get login cookie
 stConn = requests.Session()

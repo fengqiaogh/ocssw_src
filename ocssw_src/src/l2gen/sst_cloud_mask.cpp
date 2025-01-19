@@ -416,6 +416,51 @@ private:
     }
 
     /**
+     * @brief Get the SST using 6 regression coefficients for SST product, Celcius for All temps
+     */
+    void get_nlsst_celcius_cmc(const l1str &q_ref, float *sst_ptr, const int *mask,
+                          const float *ref) {
+        for (size_t i_p = 0; i_p < npix; i_p++) {
+            sst_ptr[i_p] = BAD_FLT;
+            if (mask[i_p]) {
+                const size_t interp_pnt =
+                        find_lat_band_interpolation_point(q_ref, i_p);
+                const float lat = q_ref.lat[i_p];
+                const float mu = q_ref.csenz[i_p];
+                const float satzen = q_ref.senz[i_p];
+                const float Bt11 =
+                        cldmsk::bt_value(q_ref, i_p, NBANDSIR, ib11);
+                const float dBT =
+                        Bt11 - cldmsk::bt_value(q_ref, i_p, NBANDSIR, ib12);
+                const float cmc = std::max(ref[i_p], 0.0f);
+                const float satzdir = 1;//
+                        // (q_ref.pixnum[i_p] < (int32_t)fullscanpix / 2) ? -1.0 : 1.0;
+                float *coeffptr =
+                        sst_regression_coefficients.data() + ncoeffs * interp_pnt;
+                const float lsst = coeffptr[0] + coeffptr[1] * Bt11 +
+                                   coeffptr[2] * dBT * cmc +
+                                   coeffptr[3] * dBT * ((1.0 / mu) - 1.0) +
+                                   coeffptr[4] * satzen * satzdir +
+                                   coeffptr[5] * satzen * satzen;
+                if (lat < bounds_search[interp_pnt + 1] - latwin ||
+                    interp_pnt == (nlatbands - 1)) {
+                    sst_ptr[i_p] = lsst;
+                } else {
+                    coeffptr += ncoeffs;  // ncoeffs must be 6 for viirs
+                    const float dBtlo = bounds_search[interp_pnt + 1] - latwin;
+                    const float hsst = coeffptr[0] + coeffptr[1] * Bt11 +
+                                       coeffptr[2] * dBT * cmc +
+                                       coeffptr[3] * dBT * ((1.0 / mu) - 1.0) +
+                                       coeffptr[4] * satzen * satzdir +
+                                       coeffptr[5] * satzen * satzen;
+                    sst_ptr[i_p] =
+                            lsst + ((lat - dBtlo) / latwin / 2.0) * (hsst - lsst);
+                }
+            }
+        }
+    }
+
+    /**
      * @brief Get the SST using 7 regression coefficients for SST product
      */
     void get_nlsst_v7_cmc(const l1str &q_ref, float *sst_ptr, const int *mask,
@@ -619,6 +664,52 @@ private:
             }
         }
     }
+
+    /**
+     * @brief Get the SST3 using 6 regression coefficients for SST product, MCSST
+     */
+    void get_mcsst_viirs3(const l1str &q_ref, float *sst_ptr, const int *mask,
+                          const float *ref) {
+        for (size_t i_p = 0; i_p < npix; i_p++) {
+            sst_ptr[i_p] = BAD_FLT;
+            if (mask[i_p]) {
+                const size_t interp_pnt =
+                        find_lat_band_interpolation_point(q_ref, i_p);
+                const float lat = q_ref.lat[i_p];
+                const float mu = q_ref.csenz[i_p];
+                const float satzen = q_ref.senz[i_p];
+                const float Bt11 =
+                        cldmsk::bt_value(q_ref, i_p, NBANDSIR, ib11);
+                const float dBT = cldmsk::bt_value(q_ref, i_p, NBANDSIR, ib37) -
+                                  Bt11;
+                const float satzdir = 1;
+                        // (q_ref.pixnum[i_p] < (int32_t)fullscanpix / 2) ? -1.0 : 1.0;
+                float *coeffptr =
+                        sst_regression_coefficients.data() + ncoeffs * interp_pnt;
+                const float lsst = coeffptr[0] + coeffptr[1] * Bt11 +
+                                   coeffptr[2] * dBT +
+                                   coeffptr[3] * ((1.0 / mu) - 1.0) +
+                                   coeffptr[4] * satzen * satzdir +
+                                   coeffptr[5] * satzen * satzen;
+                if (lat < bounds_search[interp_pnt + 1] - latwin ||
+                    interp_pnt == (nlatbands - 1)) {
+                    sst_ptr[i_p] = lsst;
+                } else {
+                    coeffptr += ncoeffs;  // ncoeffs must be 6 for viirs
+                    const float dBtlo = bounds_search[interp_pnt + 1] - latwin;
+                    const float hsst = coeffptr[0] + coeffptr[1] * Bt11 +
+                                       coeffptr[2] * dBT +
+                                       coeffptr[3] * ((1.0 / mu) - 1.0) +
+                                       coeffptr[4] * satzen * satzdir +
+                                       coeffptr[5] * satzen * satzen;
+                    sst_ptr[i_p] =
+                            lsst + ((lat - dBtlo) / latwin / 2.0) * (hsst - lsst);
+                }
+            }
+        }
+    }
+
+
 
     /**
      * @brief Process the cloud mask - set flags    *
@@ -1364,6 +1455,8 @@ private:
     std::unordered_map<std::string, nlsst_ptr> sst_calls = {
         {"SST_v6_cmc", &SeaSurfaceTemperatureCalcuations::get_nlsst_v6_cmc},
         {"SST3", &SeaSurfaceTemperatureCalcuations::get_nlsst_viirs3},
+        {"SST_celcius_cmc", &SeaSurfaceTemperatureCalcuations::get_nlsst_celcius_cmc},        
+        {"SST3_mcsst", &SeaSurfaceTemperatureCalcuations::get_mcsst_viirs3},        
         {"SST_v7_cmc", &SeaSurfaceTemperatureCalcuations::get_nlsst_v7_cmc},
         {"SST3_v7", &SeaSurfaceTemperatureCalcuations::get_mcsst3_v7},
         {"SST4",

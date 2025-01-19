@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 
 datetime.isoformat
 
-__version__ = "1.0 2024-11-01"
+__version__ = "1.0.3 2024-12-05"
 
 ## Convert an L1A OCTS HDF4 File into a L1A NetCDF File
 ## Reads the contents of the input HDF4 file and outputs it as a NetCDF
@@ -71,7 +71,11 @@ SKIP_ATTRIBUTES = (
     "Filled Scan Lines",
     "FF Missing Frames",
     "Replacement Flag",
-    "Processing Control"
+    "Processing Control",
+    "Product Name",
+    "Mission",
+    "Sensor",
+    "Software ID",
 )
 
 
@@ -90,7 +94,16 @@ GET_NC_TYPES = {
     SDC.INT32: np.int32,        # int,
     SDC.CHAR: 'S1'              # string stored as 8bit char array
 } 
-
+GET_NC_FILL = {
+    SDC.UINT8: 255,           # ubyte
+    SDC.FLOAT32: -32767.0,    # float
+    SDC.FLOAT64: -32767.0,    # double
+    SDC.INT16: -32768,        # short
+    SDC.UINT16: 65535,        # ushort
+    SDC.UINT32: 4294967295,   # uint
+    SDC.INT32: -32768,        # int,
+    SDC.CHAR: ''              # string stored as 8bit char array
+}
 # Global variables to make reading/writing easier across functions
 hdfFile = None
 ncFile = None
@@ -98,7 +111,10 @@ ncFile = None
 # Convert HDF naming to NetCDF naming
 # ie: "Data Center" to "data_center"
 def convertToNetcdfName(hdfname:str):
-    return hdfname.lower().replace(" ", "_")
+    name = hdfname.lower().replace(" ", "_")
+    if name == "obit_count":
+        name = "orbit_count"
+    return name
 
 # name of whatever dataset the program was trying to copy/do
 # if error occurs, we'll know what to look at
@@ -144,15 +160,6 @@ def copyGlobalAttributes(iFile: str, oFile: str):
         node_crossing = datetime.strptime(ncd+nct,"%Y%m%d%H:%M:%S")
         ncFile.setncattr("node_crossing_time", str(node_crossing.strftime('%Y-%m-%dT%H:%M:%S.') + fsec[:3] + 'Z'))
 
-        # convert scene center time
-        errorAt = "scene_center_time"
-        scene_center_str = globalAttr.get("Scene Center Time")
-        scd = node_crossing_str[:8]
-        sct = node_crossing_str[9:17]
-        fsec = node_crossing_str[18:21]
-        scene_center = datetime.strptime(scd+sct,"%Y%m%d%H:%M:%S")
-        ncFile.setncattr("scene_center_time", str(scene_center.strftime('%Y-%m-%dT%H:%M:%S.') + fsec[:3] + 'Z'))
-
         # make isodate for start/end time
         errorAt = "time_coverage_start"
         stime_str = globalAttr.get("Start Time")
@@ -197,7 +204,7 @@ def copyGlobalAttributes(iFile: str, oFile: str):
         ncFile.setncattr("naming_authority","gov.nasa.gsfc.oceancolor")
         ncFile.setncattr("platform","ADEOS")
         ncFile.setncattr("processing_level","L1A")
-        ncFile.setncattr("processing_version","V2")
+        ncFile.setncattr("processing_version","2")
         ncFile.setncattr("product_name","{}".format(oFile.name))
         ncFile.setncattr("project","Ocean Biology Processing Group")
         ncFile.setncattr("publisher_email","data@oceancolor.gsfc.nasa.gov")
@@ -207,7 +214,7 @@ def copyGlobalAttributes(iFile: str, oFile: str):
 
     except:
         print(f"-E- Error copying global attributes. Was processing <{errorAt}> from HDF4 when error was caught.")
-        exit()
+        exit(1)
     errorAt = "" # reset 
 
 
@@ -269,11 +276,12 @@ def getChunking(ncDims):
     global ncFile
     sizes = {
         'bbt': 5,
-        'ndatas': 6,
+        'ndatas': 8,
         'bsamp': 5,
         'sline': 7,
         'nsamp': 400,
-        'ndatas12': 72,
+        'nsampfull':400,
+        'ndatas12': 8,
         'lines': 32,
         'nrec': 1,
         'ntilt': 3,
@@ -302,9 +310,9 @@ def getChunking(ncDims):
         'pairs': 2,
         'flag': 24,
         'sdet': 2,
-        'ndatas22': 132,
+        'ndatas22': 8,
         'bands': 8,
-        'ndatas14': 84,
+        'ndatas14': 8,
         'bdatas': 2,
         'odatas': 1,
     }
@@ -344,19 +352,20 @@ def copyDatasets():
             currSet = hdfFile.select(name)
             hdfDataType = currSet.info()[3]; # index 3 gives the datasets data type
             hdfDims = currSet.dimensions().keys() # get dimension names 
+            if name == 'samp_table':
+                hdfDims = ['sets','ntilt','bands', 'sdet', 'nsampfull', 'pairs']
+
             data = currSet.get() # retrieves the data 
             hdfDatasetAttr = currSet.attributes() # variable attrs like long_name, units, etc.
 
             # netcdf writing data
-
             # get nc data type based on the hdf type
             ncDatatype = GET_NC_TYPES.get(hdfDataType)
-            # get the dimensions to be set as a tuple
-            #ncDims = tuple(map(lambda dim: hdfDims))
+            ncFillValue = GET_NC_FILL.get(hdfDataType)
 
             # create the variable and then assign the data
             chunks = getChunking(hdfDims)
-            newVariable = ncFile.createVariable(convertToNetcdfName(name), ncDatatype, hdfDims, chunksizes=chunks, zlib=True)
+            newVariable = ncFile.createVariable(convertToNetcdfName(name), ncDatatype, hdfDims, fill_value=ncFillValue, chunksizes=chunks, zlib=True)
             newVariable[:] = data # slice entire variable and assign it 
     
             # netcdf assigning attributes to the variables. NcVar is an object and can be
@@ -369,7 +378,7 @@ def copyDatasets():
     except Exception as e:
         print(f"-E- Error copying datasets/variables. Error occurred with HDF4 dataset named <{errorAt}>")
         print(f"Reason: {e}")
-        exit()
+        exit(1)
 
 def addTimeVariable():
     global ncFile
@@ -398,7 +407,7 @@ def addTimeVariable():
     except Exception as e:
         print(f"-E- Error occurred with adding time dataset...")
         print(f"Reason: {e}")
-        exit()
+        exit(1)
 
 # Runs at the end of the program, closing both files.
 def closeFiles():
@@ -426,11 +435,12 @@ def setDimensions():
     dimSet.add(("tilts", 1))
     dimSet.add(("bands", 8))
     dimSet.add(("bbt", 5))
-    dimSet.add(("ndatas", 6 ))
+    # dimSet.add(("ndatas", 6 ))
     # dimSet.add(("bsamp", 5 ))
     # dimSet.add(("sline", 22))
     # dimSet.add(("nsamp", 400))
-    dimSet.add(("ndatas12", 72))
+    dimSet.add(("nsampfull", 400))
+    # dimSet.add(("ndatas12", 72))
 	# lines = 2196
     dimSet.add(("nrec", 1))
     dimSet.add(("ntilt", 3))
@@ -446,7 +456,7 @@ def setDimensions():
     # dimSet.add(("sets", 22))
     dimSet.add(("mat", 3))
     dimSet.add(("detectors", 10))
-    dimSet.add(("odatas22", 22))
+    #dimSet.add(("odatas22", 22))
     # dimSet.add(("rec", 1098))
     dimSet.add(("tilts", 1))
     dimSet.add(("dets", 1))
@@ -459,10 +469,10 @@ def setDimensions():
     dimSet.add(("pairs", 2))
     dimSet.add(("flag", 24))
     dimSet.add(("sdet", 2))
-    dimSet.add(("ndatas22", 132))
-    dimSet.add(("ndatas14", 84))
+    #dimSet.add(("ndatas22", 132))
+    #dimSet.add(("ndatas14", 84))
     dimSet.add(("bdatas", 2))
-    dimSet.add(("odatas", 1))
+    #dimSet.add(("odatas", 1))
     try:
         errorAt = "extract dimension details from HDF file"
         # get key, value pair of all the HDF
@@ -470,8 +480,14 @@ def setDimensions():
         vars = ["l1a_data",
                 "lat",
                 "blk_data",
+                "obit_count",
                 "start_line",
-                "samp_table"]
+                "samp_table",
+                "start_time",
+                "period_count",
+                "ref_count",
+                "precision",
+                "start_date"]
         
         for var in vars:
             errorAt = f"extract {var} from HDF file"
@@ -496,7 +512,7 @@ def setDimensions():
 
     except:
         print(f"-E- Error copying dimensions. Was trying to {errorAt} when error was caught.")
-        exit()
+        exit(1)
 
 def main():
     print(f"l1aconvert_octs {__version__}")
@@ -532,7 +548,7 @@ def main():
         print(f"Opening file:\t{fileName}")
     except:
         print(f"\n-E- Error opening file named: {fileName}.\n Make sure the filetype is hdf4.\n")
-        exit()
+        exit(1)
 
     # if opened successfully, create netcdf file to be written into
     ncFile = NC(oFileName, NC_WRITE, NC_FORMAT)

@@ -104,7 +104,6 @@ void get_avw(l2str *l2rec, float avw[]){
         case HICO:
         case PRISM:
         case OCI:
-        case OCIS:
             ifhyper=1;
             break;
         }
@@ -140,9 +139,9 @@ void get_avw(l2str *l2rec, float avw[]){
                     Rrs_avw [nwave_avw]=Rrs[ib] * (l1file->Fonom[ib]*fsol/l2rec->l1rec->Fo[ib])/l2rec->outband_correction[ipb+ib];
                     wave_avw[nwave_avw]=wave[ib];
                     nwave_avw++;
+                    if(Rrs[ib]<0)
+                        negative=1;
                 }
-                else if(Rrs[ib]<0)
-                    negative=1;
             }
         }
         else{
@@ -152,9 +151,9 @@ void get_avw(l2str *l2rec, float avw[]){
                         Rrs_avw [nwave_avw]=Rrs[ib] * (l1file->Fonom[ib]*fsol/l2rec->l1rec->Fo[ib])/l2rec->outband_correction[ipb+ib];
                         wave_avw[nwave_avw]=wave[ib];
                         nwave_avw++;
+                        if(Rrs[ib]<0)
+                            negative=1;
                     }
-                    else if(Rrs[ib]<0)
-                        negative=1;
                 }
             }
         }
@@ -162,10 +161,15 @@ void get_avw(l2str *l2rec, float avw[]){
         if(negative)
             l2rec->l1rec->flags[ip] |=PRODWARN;
 
-        if(ifhyper)
-            avw[ip]=avw_cal_hypspectral(Rrs_avw,wave_avw,nwave_avw);
-        else
-            avw[ip]=avw_cal_multispectral(Rrs_avw,wave_avw,nwave_avw);
+        // ensure enough bands to run a spline
+        if(nwave_avw < 4) {
+            l2rec->l1rec->flags[ip] |=PRODFAIL;
+        } else {
+            if(ifhyper)
+                avw[ip]=avw_cal_hypspectral(Rrs_avw,wave_avw,nwave_avw);
+            else
+                avw[ip]=avw_cal_multispectral(Rrs_avw,wave_avw,nwave_avw);
+        }
 
     }
 }

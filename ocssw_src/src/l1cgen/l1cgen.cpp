@@ -33,7 +33,7 @@ using namespace netCDF;
 using namespace netCDF::exceptions;
 
 #define PROGRAM_NAME "l1cgen"
-#define VERSION "5.63 7/2/2024"
+#define VERSION "5.67 12/14/2024"
 
 
 int main(int argc, char** argv) {
@@ -167,66 +167,12 @@ int main(int argc, char** argv) {
             l1_input_init();
             clo_optionList_t* optionList = clo_createList();
             l1_add_options(optionList);
-            // add extra options from CLI and coming in msl12_defaults.par
-            clo_addOption(optionList, "suite", CLO_TYPE_STRING, "OC", "suite of OC products");
-            clo_addOption(optionList, "aermodfile", CLO_TYPE_STRING, "Unspecified",
-                          "path dir for aerosol files anc data");
-            clo_addOption(optionList, "aer_wave_short", CLO_TYPE_INT, "765",
-                          "default shortest wavelength used for aerosol correction, epsilon");
-            clo_addOption(optionList, "aer_wave_long", CLO_TYPE_INT, "865",
-                          "default longest wavelength used for aerosol correction, epsilon");
-            clo_addOption(optionList, "mumm_alpha", CLO_TYPE_FLOAT, "1.72",
-                          "mumm alpha for AC Rudick turbid waters");
-            clo_addOption(optionList, "mumm_gamma", CLO_TYPE_FLOAT, "1.0",
-                          "mumm gamma for AC Rudick turbid waters");
-            clo_addOption(optionList, "mumm_epsilon", CLO_TYPE_FLOAT, "1.0",
-                          "mumm epsilon for AC Rudick turbid waters");
-            clo_addOption(optionList, "chloc2_wave", CLO_TYPE_INT, "[-1,-1]",
-                          "sensor wavelengths for OC2 chlorophyll\n        algorithm");
-            clo_addOption(optionList, "chloc2_coef", CLO_TYPE_FLOAT, "[0.0,0.0,0.0,0.0,0.0]",
-                          "coefficients for OC2\n        chlorophyll algorithm");
-            clo_addOption(optionList, "chloc3_wave", CLO_TYPE_INT, "[-1,-1]",
-                          "sensor wavelengths for OC3 chlorophyll\n        algorithm");
-            clo_addOption(optionList, "chloc3_coef", CLO_TYPE_FLOAT, "[0.0,0.0,0.0,0.0,0.0]",
-                          "coefficients for OC3\n        chlorophyll algorithm");
-            clo_addOption(optionList, "chloc4_wave", CLO_TYPE_INT, "[-1,-1]",
-                          "sensor wavelengths for OC4 chlorophyll\n        algorithm");
-            clo_addOption(optionList, "chloc4_coef", CLO_TYPE_FLOAT, "[0.0,0.0,0.0,0.0,0.0]",
-                          "coefficients for OC4\n        chlorophyll algorithm");
-            clo_addOption(optionList, "kd2_wave", CLO_TYPE_INT, "[-1,-1]",
-                          "sensor wavelengths for polynomial Kd(490)\n        algorithm");
-            clo_addOption(optionList, "kd2_coef", CLO_TYPE_FLOAT, "[0.0,0.0,0.0,0.0,0.0,0.0]",
-                          "sensor wavelengths\n        for polynomial Kd(490) algorithm");
-            clo_addOption(optionList, "coccolith", CLO_TYPE_FLOAT, "[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]",
-                          "coefficients for coccolith  algorithm");
-            clo_addOption(optionList, "qaa_wave", CLO_TYPE_INT, NULL, "sensor wavelengths for QAA algorithm");
-            clo_addOption(optionList, "giop_wave", CLO_TYPE_FLOAT, "-1",
-                          "optimization comma-separated list, default is all visible bands (400-700nm)");
-            clo_addOption(optionList, "aer_wave_base", CLO_TYPE_INT, "865",
-                          "base sensor wavelength for aerosol \n         extrapolation");
-            clo_addOption(optionList, "aer_opt", CLO_TYPE_INT, "99", "aerosol mode option");
-            clo_addOption(optionList, "gas_opt", CLO_TYPE_INT, "1", "gaseous transmittance bitmask selector");
-            clo_addOption(optionList, "mbac_wave", CLO_TYPE_INT, NULL,
-                          "bands used for mbac atmospheric correction");
-            clo_addOption(optionList, "wavelength_3d", CLO_TYPE_STRING, NULL,
-                          "wavelength_3d input, written in ascending order\n"
-                          "        with format 'wavelength_3d=nnn,nnn,nnn' where nnn is a sensor wavelength\n"
-                          "        or a range of wavelengths as follows 'nnn:nnn'");
-            clo_addOption(optionList, "uncertaintyfile", CLO_TYPE_IFILE, NULL, "uncertainty LUT");
-            clo_addOption(optionList, "aermodels", CLO_TYPE_STRING, NULL, "aerosol models");
-            clo_addOption(optionList, "oxaband_opt", CLO_TYPE_INT, "0", "oxygen A-band correction");
-            clo_addOption(optionList, "filter_opt", CLO_TYPE_BOOL, NULL, "filtering input data option");
-            clo_addOption(optionList, "filter_file", CLO_TYPE_IFILE, "$OCDATAROOT/sensor/sensor_filter.dat", "\n        data file for input filtering");
-            clo_addOption(optionList, "absaer_opt", CLO_TYPE_INT, "0", "absorbing aerosol flagging option\n"
-                            "        0: disabled\n"
-                            "        1: use rhow_412 aerosol index test\n"
-                            "        2: GMAO ancillary aerosol test");
-            clo_addOption(optionList, "flh_base_wavelengths", CLO_TYPE_FLOAT, NULL, "flh baseline wavelengths");
-            clo_addOption(optionList, "flh_height_wavelength", CLO_TYPE_FLOAT, "-1.0", "flh height wavelength");
-            clo_addOption(optionList, "gas_transmittance_file", CLO_TYPE_IFILE, NULL, "gaseous transmittance file");
-            clo_addOption(optionList, "watervapor_bands", CLO_TYPE_INT, NULL, "bands used for calculating water vapor based on 3-band depth approach");
 
+            // ignore extra options in msl12_defaults.par files
+            clo_setEnableExtraOptions(1);
             l1_read_default_files(optionList, &l1file, ifile_char);
+            clo_setEnableExtraOptions(0);
+
             l1_load_options(optionList, &l1file);
             clo_deleteList(optionList);
 

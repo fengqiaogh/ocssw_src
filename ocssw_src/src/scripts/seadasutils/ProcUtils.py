@@ -73,7 +73,7 @@ def isRequestAuthFailure(req) :
 # See comment above
 def httpdl(server, request, localpath='.', outputfilename=None, ntries=5,
            uncompress=False, timeout=30., verbose=0, force_download=False,
-           chunk_size=DEFAULT_CHUNK_SIZE):
+           chunk_size=DEFAULT_CHUNK_SIZE,timestamp=False):
 
     status = 0
     urlStr = 'https://' + server + request
@@ -163,6 +163,17 @@ def httpdl(server, request, localpath='.', outputfilename=None, ntries=5,
 
                 if verbose:
                     print("\n...Done")
+                    
+                if timestamp:
+                    if 'Last-Modified' in req.headers:
+                        last_modified = req.headers["Last-Modified"]
+                        last_modified_time = datetime.strptime(last_modified, '%a, %d %b %Y %H:%M:%S %Z')
+                        last_modified_timestamp = time.mktime(last_modified_time.timetuple())
+                        file_path = os.path.join(localpath, os.path.basename(request))
+                        if os.path.exists(file_path):
+                            os.utime(file_path, (last_modified_timestamp, last_modified_timestamp))
+                        file_stat = os.stat(file_path)
+                        mod_time = datetime.fromtimestamp(file_stat.st_mtime)
 
     return status
 
@@ -383,6 +394,7 @@ def check_sensor(inp_file):
               'SeaWiFS': 'seawifs',
               'Coastal Zone Color Scanner (CZCS)': 'czcs',
               'Ocean Color and Temperature Scanner (OCTS)': 'octs',
+              'OCTS': 'octs',
               'Ocean Scanning Multi-Spectral Imager (OSMI)': 'osmi',
               'Ocean   Color   Monitor   OCM-2': 'ocm2', 
               'Second-generation Global Imager (SGLI)': 'sgli',

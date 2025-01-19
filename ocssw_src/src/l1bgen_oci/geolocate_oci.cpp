@@ -1,3 +1,15 @@
+/**
+ * @file geolocate_oci.cpp
+ * @brief Geolocation module for OCI instrument data
+ *
+ * This file contains functions for geolocation of OCI (Ocean Color Instrument)
+ * data, including orbit interpolation, attitude interpolation, pixel geolocation,
+ * and various coordinate transformations.
+ *
+ * @authors Joel Gales (SAIC), Jakob C Lindo (SSAI)
+ * @date Aug 2024
+ */
+
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -6,21 +18,30 @@
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_matrix_double.h>
-#include <boost/algorithm/string/trim.hpp>
-#include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/numeric/ublas/matrix.hpp>
-
-#include "geolocate_oci.h"
+#include <boost/multi_array.hpp>
 
 #include <netcdf>
 
+#include "geolocate_oci.h"
 #include "nc4utils.h"
 #include "timeutils.h"
-#include <clo.h>
 #include "global_attrs.h"
 #include <terrain.h>
+#include <libnav.h>
+#include <sun2000.h>
 #include <genutils.h>
-#define ERROR_EXIT(dim) {if(dim==0){printf("--Error--: the dimension %s is zero. Exiting. See line %d in file %s",#dim,__LINE__, __FILE__);exit(EXIT_FAILURE);} }
+#include "aggregate.hpp"
+#include <allocate2d.h>
+#include <array>
+
+#define ERROR_EXIT(dim)                                                                                    \
+    {                                                                                                      \
+        if (dim == 0) {                                                                                    \
+            printf("--Error--: the dimension %s is zero. Exiting. See line %d in file %s", #dim, __LINE__, \
+                   __FILE__);                                                                              \
+            exit(EXIT_FAILURE);                                                                            \
+        }                                                                                                  \
+    }
 
 //    Modification history:
 //  Programmer     Organization   Date     Ver   Description of change
@@ -41,2162 +62,2007 @@
 using namespace std;
 
 /**
+ * @brief Calculates the position of the Moon in geocentric *inertial* coordinates
+ * @param year The 4-digit year
+ * @param day The day of year (1-366)
+ * @param seconds Seconds of day
+ * @param moonVec (out) Moon vector in geocentric rotating coordinates (3 elements). Accurate to approximately
+ * 1 arcminute
+ * @param earthMoonDistance (out) Earth-Moon distance in kilometers
+ *
+ * @ref "Low-precision Formula for Planetary Positions", T.C. Van Flandern and K.F. Pulkkinen,
+ *       Ap. J. Supplement Series, 41:391-411, 1979.
+ */
+void moon2000(int year, int day, double seconds, orbArray moonVec, double &earthMoonDistance) {
+    int month = 1;
+    int julianDay = jday(year, month, day);  // Of the Gregorian date described by the input parameters
+    // Julian day with fraction of a day in terms of seconds
+    double currentTime = julianDay - 2451545.0 + (seconds - 43200.0) / SECONDS_IN_DAY;
+
+    double meanSolarLongitude;
+    double meanSolarAnomaly;  // In degrees
+    double meanLunarLongitude;
+    double ascNodeLuna;  // Ascending node of the Moon in degrees
+    ephparms(currentTime, &meanSolarLongitude, &meanSolarAnomaly, &meanLunarLongitude, &ascNodeLuna);
+
+    double nutation;           // Actual nutation value in degrees
+    double eclipticObliquity;  // In terms of degrees. Includes nutation
+    nutate(currentTime, meanSolarLongitude, meanSolarAnomaly, meanLunarLongitude, ascNodeLuna, &nutation,
+           &eclipticObliquity);
+
+    double meanLunarAnomaly = fmod(134.96292 + 13.06499295, 360);
+    double lunarArgLat = fmod(meanLunarLongitude - ascNodeLuna, 360);
+    double lunarMeanElon = fmod(meanLunarLongitude - meanSolarLongitude, 360);
+
+    double lunarLongitudeCorrection =
+        22640.0 * sin(meanLunarAnomaly / RADEG) -
+        4586.0 * sin((meanLunarAnomaly - 2.0 * lunarMeanElon) / RADEG) +
+        2370.0 * sin(2.0 * lunarMeanElon / RADEG) + 769.0 * sin(2.0 * meanLunarAnomaly / RADEG) -
+        668.0 * sin(meanSolarAnomaly / RADEG) - 412.0 * sin(2.0 * lunarArgLat / RADEG) -
+        212.0 * sin((2.0 * meanLunarAnomaly - 2.0 * lunarMeanElon) / RADEG) -
+        206.0 * sin((meanLunarAnomaly - 2.0 * lunarMeanElon + meanSolarAnomaly) / RADEG) +
+        192.0 * sin((meanLunarAnomaly + 2.0 * lunarMeanElon) / RADEG) +
+        165.0 * sin((2.0 * lunarMeanElon - meanSolarAnomaly) / RADEG) +
+        148.0 * sin((meanLunarAnomaly - meanSolarAnomaly) / RADEG) - 125.0 * sin(lunarMeanElon / RADEG) -
+        110.0 * sin((meanLunarAnomaly + meanSolarAnomaly) / RADEG) -
+        55.0 * sin((2.0 * lunarArgLat - 2.0 * lunarMeanElon) / RADEG) -
+        45.0 * sin((meanLunarAnomaly + 2.0 * lunarArgLat) / RADEG) +
+        40.0 * sin((meanLunarAnomaly - 2.0 * lunarArgLat) / RADEG) -
+        38.0 * sin((meanLunarAnomaly - 4.0 * lunarMeanElon) / RADEG) +
+        36.0 * sin(3.0 * meanLunarAnomaly / RADEG) -
+        31.0 * sin((2.0 * meanLunarAnomaly - 4.0 * lunarMeanElon) / RADEG) +
+        28.0 * sin((meanLunarAnomaly - 2.0 * lunarMeanElon - meanSolarAnomaly) / RADEG) -
+        24.0 * sin((2.0 * lunarMeanElon + meanSolarAnomaly) / RADEG) +
+        19.0 * sin((meanLunarAnomaly - lunarMeanElon) / RADEG) +
+        18.0 * sin((lunarMeanElon + meanSolarAnomaly) / RADEG) +
+        15.0 * sin((meanLunarAnomaly + 2.0 * lunarMeanElon - meanSolarAnomaly) / RADEG) +
+        14.0 * sin((2.0 * meanLunarAnomaly + 2.0 * lunarMeanElon) / RADEG) +
+        14.0 * sin((4.0 * lunarMeanElon) / RADEG) -
+        13.0 * sin((3.0 * meanLunarAnomaly - 2.0 * lunarMeanElon) / RADEG);
+    double lunarLongitude = meanLunarLongitude + lunarLongitudeCorrection / 3600.0 + nutation;
+
+    // Lunar ecliptic latitude
+    double angleOffEcliptic =
+        18461.0 * sin(lunarArgLat / RADEG) + 1010.0 * sin((meanLunarAnomaly + lunarArgLat) / RADEG) +
+        1000.0 * sin((meanLunarAnomaly - lunarArgLat) / RADEG) -
+        624.0 * sin((lunarArgLat - 2.0 * lunarMeanElon) / RADEG) -
+        199.0 * sin((meanLunarAnomaly - lunarArgLat - 2.0 * lunarMeanElon) / RADEG) -
+        167.0 * sin((meanLunarAnomaly + lunarArgLat - 2.0 * lunarMeanElon) / RADEG) +
+        117.0 * sin((lunarArgLat + 2.0 * lunarMeanElon) / RADEG) +
+        62.0 * sin((2.0 * meanLunarAnomaly + lunarArgLat) / RADEG) +
+        33.0 * sin((meanLunarAnomaly - lunarArgLat + 2.0 * lunarMeanElon) / RADEG) +
+        32.0 * sin((2.0 * meanLunarAnomaly - lunarArgLat) / RADEG) -
+        30.0 * sin((lunarArgLat - 2.0 * lunarMeanElon + meanSolarAnomaly) / RADEG) -
+        16.0 * sin((2.0 * meanLunarAnomaly + lunarArgLat - 2.0 * lunarMeanElon) / RADEG) +
+        15.0 * sin((meanLunarAnomaly + lunarArgLat + 2.0 * lunarMeanElon) / RADEG) +
+        12.0 * sin((lunarArgLat - 2.0 * lunarMeanElon - meanSolarAnomaly) / RADEG);
+    angleOffEcliptic /= 3600.0;
+
+    // Compute unit Moon vector in ecliptic plane
+    double angleOffEclipticDegrees = angleOffEcliptic / RADEG;
+    double cosAngleOffDegrees = cos(angleOffEclipticDegrees);
+    double moonVecEcliptic[3] = {cos(lunarLongitude / RADEG) * cosAngleOffDegrees,
+                                 sin(lunarLongitude / RADEG) * cosAngleOffDegrees,
+                                 sin(angleOffEclipticDegrees)};
+
+    // Rotate vector to equatorial plane
+    double eclipObliqDegrees = eclipticObliquity / RADEG;
+    moonVec[0] = moonVecEcliptic[0];
+    moonVec[1] = moonVecEcliptic[0] * cos(eclipObliqDegrees) - moonVecEcliptic[2] * sin(eclipObliqDegrees);
+    moonVec[2] = moonVecEcliptic[0] * sin(eclipObliqDegrees) - moonVecEcliptic[2] * cos(eclipObliqDegrees);
+
+    earthMoonDistance *= EARTH_RADIUS;
+}
+
+/**
+ * @brief Computes the unit Moon vector in geocentric rotating coordinates
+ * @param year The 4-digit year
+ * @param day The day of year (1-366)
+ * @param seconds Seconds of day
+ * @param moonVec (out) Unit Moon vector in geocentric rotating coordinates (3 elements)
+ * @param earthMoonDistance (out) Earth-Moon distance in kilometers
+ */
+
+void getMoonVector(const int year, const int day, const double seconds, orbArray moonVec,
+                   double &earthMoonDistance) {
+    moon2000(year, day, seconds, moonVec, earthMoonDistance);
+
+    // Get Greenwich mean sidereal angle
+    double greenwichHourAngleDegrees;
+    gha2000(year, day, &greenwichHourAngleDegrees);
+    double greenwichHourAngleRadians = greenwichHourAngleDegrees / RADEG;
+
+    // Transform Moon vector into geocentric rotating frame
+    double cosGhar = cos(greenwichHourAngleRadians);
+    double sinGhar = sin(greenwichHourAngleRadians);
+    double inertialX = moonVec[0];  // X component from the inertial frame
+    moonVec[0] = inertialX * cosGhar + moonVec[1] * sinGhar;
+    moonVec[1] = moonVec[1] * cosGhar - inertialX * sinGhar;
+    moonVec[2] = moonVec[2];  // Redundant, probably will be optimized out by the compiler
+}
+
+/**
  * @brief Read a predicted PACE ephemeris file and convert vectors to ECR.
- * @param ephfile Name of the ephemeris file. Expected to be non-null and not empty.
- * @param otime Out-parameter indicating time of each record.
- * @param posj In/out-parameter indicating position of each record.
- * @param velj In/out-parameter indicating velocity of each record.
+ * @param ephFile Name of the ephemeris file. Expected to be non-null and not empty.
+ * @param recordTimes Out-parameter indicating time of each record.
+ * @param positions In/out-parameter indicating position of each record.
+ * @param velocities In/out-parameter indicating velocity of each record.
  * @param l1aEpoch Unix time of the start of the L1A file's first day
-*/
-void read_def_eph(string ephfile, vector<double>& otime, 
-    vector<vector<double>>& posj, vector<vector<double>>& velj, double l1aEpoch) {
+ */
+void readDefinitiveEphemeris(string ephFile, vector<double> &recordTimes, vector<vector<double>> &positions,
+                             vector<vector<double>> &velocities, double l1aEpoch) {
+    ifstream inStream(ephFile, ios::in);
 
-  ifstream inStream(ephfile, ios::in);
-  if (!inStream.is_open()) {
-    cerr << "-E- Unable to open definitive ephemeris file\n";
-    exit(EXIT_FAILURE);
-  }
-
-  string tmpBuf;
-
-  //size_t numRecords = 1921; // Number of records per file (32 hours)
-  vector<double> posVec(3);
-  vector<double> velVec(3);
-  string ephStr;
-  vector<string> tokens; // Datetime, 3d position, 3d velocity.
-  vector<double> secondsVec(1921);
-  double oldTime = 0;
-  
-  while (inStream.peek() != EOF) {
-    getline(inStream, ephStr, '\n');
-
-    istringstream lineStream(ephStr);
-    string token; // Each individual token in this line
-
-    tokens.clear();
-    while (lineStream >> token) {
-      tokens.push_back(token);
+    if (!inStream.is_open()) {
+        cerr << "-E- Unable to open definitive ephemeris file\n";
+        exit(EXIT_FAILURE);
     }
 
-    if(tokens.size() != 7 || tokens[0].find("T") == string::npos) {
-      continue;
-    }
+    vector<double> tempPositions(3);
+    vector<double> tempVelocities(3);
+    string ephStr;
+    vector<string> tokens;  // Datetime, 3d position, 3d velocity.
+    double prevTime = 0;
 
-    // skip duplicate records
-    double theTime = isodate2unix(tokens[0].c_str());
-    if(oldTime == theTime)
-      continue;
-    oldTime = theTime;
+    while (inStream.peek() != EOF) {
+        getline(inStream, ephStr, '\n');
 
-    posVec.clear();
-    posVec.push_back(stod(tokens[1]));
-    posVec.push_back(stod(tokens[2]));
-    posVec.push_back(stod(tokens[3]));
+        istringstream lineStream(ephStr);
+        string token;  // Each individual token in this line
 
-    velVec.clear();
-    velVec.push_back(stod(tokens[4]));
-    velVec.push_back(stod(tokens[5]));
-    velVec.push_back(stod(tokens[6]));
-
-    posj.push_back(posVec);
-    velj.push_back(velVec);
-    otime.push_back(theTime - l1aEpoch);
-
-    ephStr.clear();
-    lineStream.clear();
-  }
-  inStream.close();
-
-  if (otime.size() == 0) {
-    cerr << "-E- No records found in definitive ephemeris file\n";
-    exit(EXIT_FAILURE);
-  }
-
-}
-
-int geolocate_oci( string l1a_filename, string geo_lut_filename,
-                   geo_struct& geoLUT,
-                   string l1b_filename, string dem_file, bool radiance,
-                   string doi, const string ephFile, string pversion) { // add ephemeris file
-
-  ofstream tempOut;
-
-  // Open and read data from L1Afile
-  NcFile *l1afile = new NcFile( l1a_filename, NcFile::read);
-   
-  NcGroup ncGrps[6];
-
-  ncGrps[0] = l1afile->getGroup( "scan_line_attributes");
-  ncGrps[1] = l1afile->getGroup( "spatial_spectral_modes");
-  ncGrps[2] = l1afile->getGroup( "engineering_data");
-  ncGrps[3] = l1afile->getGroup( "navigation_data");
-  ncGrps[4] = l1afile->getGroup( "onboard_calibration_data");
-  ncGrps[5] = l1afile->getGroup( "science_data");
-
-  NcGroupAtt att;
-  NcVar var;
-  
-  // Append call sequence to existing history
-  string history = get_history(l1afile);
-  //  history.append(call_sequence(argc, argv));
-
-  // Get date (change this when year and day are added to time field)
-  string tstart, tend;
-  att = l1afile->getAtt("time_coverage_start");
-  att.getValues(tstart);
-
-  att = l1afile->getAtt("time_coverage_end");
-  att.getValues(tend);
-
-  size_t pos = tstart.find("T");
-  if(pos == string::npos) {
-    cout << "-E- L1A file time_coverage_start, bad format\n";
-    exit(EXIT_FAILURE);
-  }
-  string granule_date = tstart.substr(0,pos);
-
-  // Vector of the positions of OCI for 32 hours starting at tstart with a resolution of 1 minute
-  vector<vector<double>> ephPosVec;
-  // Vector of the velocities of OCI for 32 hours starting at tstart with a resolution of 1 minute
-  vector<vector<double>> ephVelVec;
-  vector<double> ephOTime;
-
-  if (!ephFile.empty()) {
-    double l1a_start = isodate2unix(tstart.c_str());
-    double l1a_end = isodate2unix(tend.c_str());
-
-    int16_t yr,mo,dy;
-    double secs;
-    unix2ymds(l1a_start, &yr, &mo, &dy, &secs);
-    double l1a_epoch = ymds2unix(yr, mo, dy, 0.0);
-
-    read_def_eph(ephFile, ephOTime, ephPosVec, ephVelVec, l1a_epoch);
-
-    // Ensure ephem file covers L1A file time
-    if((l1a_start < (ephOTime.front() + l1a_epoch)) ||
-        (l1a_end > (ephOTime.back() + l1a_epoch))) {
-      cerr << "-E- Definitive ephemeris file does not cover L1A file time" << endl;
-      exit(EXIT_FAILURE);
-    }
-  }
-
-  // Scan time, spin ID and HAM side
-  NcDim nscan_dim = l1afile->getDim("number_of_scans");
-  uint32_t nscan = nscan_dim.getSize();
-
-  // Number of swir bands
-
-  uint32_t nswband = l1afile->getDim("SWIR_bands").getSize();
-
-  NcDim mcescan_dim = l1afile->getDim("number_of_mce_scans");
-  uint32_t nmcescan = mcescan_dim.getSize();
-
-  double *sstime = new double[nscan];
-  var = ncGrps[0].getVar( "scan_start_time");
-  var.getVar( sstime);
-
-  int32_t *spin = new int32_t[nscan];
-  var = ncGrps[0].getVar( "spin_ID");
-  var.getVar( spin);
-
-  uint8_t *hside = new uint8_t[nscan];
-  var = ncGrps[0].getVar( "HAM_side");
-  var.getVar( hside);
-  
-  uint32_t sdim=0;
-  for (size_t i=0; i<nscan; i++) {
-    if ( spin[i] > 0) {
-      sstime[sdim] = sstime[i];
-      hside[sdim] = hside[i];
-      sdim++;
-    }
-  }
-
-  // Check for and fill in missing scan times
-  short *sfl = new short[sdim]();
-  check_scan_times( sdim, sstime, sfl);
-  
-  NcDim natt_dim = l1afile->getDim("att_records");
-  uint32_t n_att_rec = natt_dim.getSize();
-  ERROR_EXIT(n_att_rec);
-
-  double *att_time = new double[n_att_rec];
-  var = ncGrps[3].getVar( "att_time");
-  var.getVar( att_time);
-
-  NcDim nquat_dim = l1afile->getDim("quaternion_elements");
-  uint32_t n_quat_elems = nquat_dim.getSize();
-  ERROR_EXIT(n_quat_elems);
-
-  float **att_quat = new float *[n_att_rec];
-  att_quat[0] = new float[n_quat_elems*n_att_rec];
-  for (size_t i=1; i<n_att_rec; i++)
-    att_quat[i] = att_quat[i-1] + n_quat_elems;
-
-  var = ncGrps[3].getVar( "att_quat");
-  var.getVar( &att_quat[0][0]);
-
-  NcDim norb_dim = l1afile->getDim("orb_records");
-  uint32_t n_orb_rec = norb_dim.getSize();
-  ERROR_EXIT(n_orb_rec);
-
-  vector<double> orb_time(n_orb_rec);
-  if (ephFile.empty()) {
-    var = ncGrps[3].getVar( "orb_time");
-    var.getVar( orb_time.data());
-  }
-
-  float **orb_pos = new float *[n_orb_rec];
-  orb_pos[0] = new float[3*n_orb_rec];
-  for (size_t i=1; i<n_orb_rec; i++) orb_pos[i] = orb_pos[i-1] + 3;
-  var = ncGrps[3].getVar( "orb_pos");
-  var.getVar( &orb_pos[0][0]);
-
-  float **orb_vel = new float *[n_orb_rec];
-  orb_vel[0] = new float[3*n_orb_rec];
-  for (size_t i=1; i<n_orb_rec; i++) orb_vel[i] = orb_vel[i-1] + 3;
-  var = ncGrps[3].getVar( "orb_vel");
-  var.getVar( &orb_vel[0][0]);
-
-  NcDim ntilt_dim = l1afile->getDim("tilt_samples");
-  uint32_t n_tilts = ntilt_dim.getSize();
-  ERROR_EXIT(n_tilts);
-
-  float *tiltin = new float[n_tilts];
-  var = ncGrps[3].getVar( "tilt");
-  var.getVar( tiltin);
-
-  double *ttime = new double[n_tilts];
-  var = ncGrps[3].getVar( "tilt_time");
-  var.getVar( ttime);
-
-
-  // **************************** //
-  // *** Read geolocation LUT *** //
-  // **************************** //
-
-  NcFile *geoLUTfile = new NcFile( geo_lut_filename, NcFile::read);
-  //  geo_struct geoLUT;
-
-  NcGroup gidTime, gidCT, gidRTA_HAM, gidPlanarity;
-  
-  gidTime = geoLUTfile->getGroup( "time_params");
-  var = gidTime.getVar( "master_clock");
-  var.getVar( &geoLUT.master_clock);
-  var = gidTime.getVar( "MCE_clock");
-  var.getVar( &geoLUT.MCE_clock);
-
-  gidCT = geoLUTfile->getGroup( "coord_trans");
-  var = gidCT.getVar( "sc_to_tilt");
-  var.getVar( &geoLUT.sc_to_tilt);
-  var = gidCT.getVar( "tilt_axis");
-  var.getVar( &geoLUT.tilt_axis);
-  var = gidCT.getVar( "tilt_angles");
-  var.getVar( &geoLUT.tilt_angles);
-  var = gidCT.getVar( "tilt_home");
-  var.getVar( &geoLUT.tilt_home);
-  var = gidCT.getVar( "tilt_to_oci_mech");
-  var.getVar( &geoLUT.tilt_to_oci_mech);
-  var = gidCT.getVar( "oci_mech_to_oci_opt");
-  var.getVar( &geoLUT.oci_mech_to_oci_opt);
-
-  gidRTA_HAM = geoLUTfile->getGroup( "RTA_HAM_params");
-  var = gidRTA_HAM.getVar( "RTA_axis");
-  var.getVar( &geoLUT.rta_axis);
-  var = gidRTA_HAM.getVar( "HAM_axis");
-  var.getVar( &geoLUT.ham_axis);
-  var = gidRTA_HAM.getVar( "HAM_AT_angles");
-  var.getVar( &geoLUT.ham_at_angles);
-  var = gidRTA_HAM.getVar( "HAM_CT_angles");
-  var.getVar( &geoLUT.ham_ct_angles);
-  var = gidRTA_HAM.getVar( "RTA_enc_scale");
-  var.getVar( &geoLUT.rta_enc_scale);
-  var = gidRTA_HAM.getVar( "HAM_enc_scale");
-  var.getVar( &geoLUT.ham_enc_scale);
-  var = gidRTA_HAM.getVar( "RTA_nadir");
-  var.getVar( geoLUT.rta_nadir);
-
-  gidPlanarity = geoLUTfile->getGroup( "planarity");
-  var = gidPlanarity.getVar( "along_scan_planarity");
-  var.getVar( &geoLUT.as_planarity);
-  var = gidPlanarity.getVar( "along_track_planarity");
-  var.getVar( &geoLUT.at_planarity);
-  
-  geoLUTfile->close();
-
-  // MCE telemetry
-  int32_t ppr_off;
-  double revpsec, secpline;
-
-  int32_t *mspin = new int32_t[nmcescan];
-  int32_t *ot_10us = new int32_t[nmcescan];
-  uint8_t *enc_count = new uint8_t[nmcescan];
-  int16_t board_id;
-  
-  NcDim nenc_dim = l1afile->getDim("encoder_samples");
-  uint32_t nenc = nenc_dim.getSize();
-
-  float **hamenc = new float *[nmcescan];
-  hamenc[0] = new float[nenc*nmcescan];
-  for (size_t i=1; i<nmcescan; i++) hamenc[i] = hamenc[i-1] + nenc;
-
-  float **rtaenc = new float *[nmcescan];
-  rtaenc[0] = new float[nenc*nmcescan];
-  for (size_t i=1; i<nmcescan; i++) rtaenc[i] = rtaenc[i-1] + nenc;
-
-  int16_t iret;
-  read_mce_tlm( l1afile, geoLUT, ncGrps[2], nmcescan, nenc, ppr_off, revpsec,
-                secpline, board_id, mspin, ot_10us, enc_count, hamenc, rtaenc,
-                iret);
-
-  int32_t iyr, iday, msec;
-  isodate2ydmsec((char *) tstart.c_str(), &iyr, &iday, &msec);
-
-  double ecmat[3][3];
-  quat_array *quatr = new quat_array[n_att_rec];
-  orb_array *posr; // Array of 1x3 vectors
-  orb_array *velr; // Array of 1x3 vectors
-
-  // Transform orbit (if needed) and attitude from J2000 to ECR
-  if (!ephFile.empty()) {
-
-    size_t ephOTimeLBIndex = -1;
-    size_t ephOTimeUBIndex = -1;
-
-    for (size_t i = 0; i < ephOTime.size(); i++) {
-      double value = ephOTime[i];
-
-      if (value <= sstime[0]) {
-        ephOTimeLBIndex = i;
-      }
-      if (value >= sstime[nscan - 1]) {
-        ephOTimeUBIndex = i;
-        break;
-      }
-    }
-
-
-    double omega_e = 7.29211585494e-5;
-    size_t num_eph_recs = ephOTimeUBIndex - ephOTimeLBIndex + 1;
-
-    n_orb_rec = num_eph_recs;
-    posr = new orb_array[n_orb_rec]; // Array of 1x3 vectors
-    velr = new orb_array[n_orb_rec]; // Array of 1x3 vectors
-
-    bzero(posr, n_orb_rec * sizeof(orb_array));
-    bzero(velr, n_orb_rec * sizeof(orb_array));
-    
-    orb_time.resize(n_orb_rec);
-
-    for (size_t idxRec = 0; idxRec < num_eph_recs; idxRec++) {
-      size_t ephIndex = idxRec + ephOTimeLBIndex;
-      orb_time[idxRec] = ephOTime[ephIndex];
-
-      j2000_to_ecr(iyr, iday, ephOTime[ephIndex], ecmat);
-      
-      for (size_t idxLine = 0; idxLine < 3; idxLine++) {
-        for (size_t idxValue = 0; idxValue < 3; idxValue++) {
-          posr[idxRec][idxLine] += ecmat[idxLine][idxValue] * ephPosVec[ephIndex][idxValue];
-          velr[idxRec][idxLine] += ecmat[idxLine][idxValue] * ephVelVec[ephIndex][idxValue];
+        tokens.clear();
+        while (lineStream >> token) {
+            tokens.push_back(token);
         }
-      }
 
-      velr[idxRec][0] = velr[idxRec][0] + posr[idxRec][1] * omega_e;
-      velr[idxRec][1] = velr[idxRec][1] - posr[idxRec][0] * omega_e;
+        if (tokens.size() != 7 || tokens[0].find("T") == string::npos) {
+            continue;
+        }
+
+        // skip duplicate records
+        double theTime = isodate2unix(tokens[0].c_str());
+        if (prevTime == theTime)
+            continue;
+        prevTime = theTime;
+
+        tempPositions[0] = stod(tokens[1]);
+        tempPositions[1] = stod(tokens[2]);
+        tempPositions[2] = stod(tokens[3]);
+
+        tempVelocities[0] = stod(tokens[4]);
+        tempVelocities[1] = stod(tokens[5]);
+        tempVelocities[2] = stod(tokens[6]);
+
+        positions.push_back(tempPositions);
+        velocities.push_back(tempVelocities);
+        recordTimes.push_back(theTime - l1aEpoch);
+
+        ephStr.clear();
+        lineStream.clear();
     }
-  } else {
-    posr = new orb_array[n_orb_rec]; // Array of 1x3 vectors
-    velr = new orb_array[n_orb_rec]; // Array of 1x3 vectors
-    // Orbit
-    for (size_t i = 0; i < n_orb_rec; i++) {
-      //  j2000_to_ecr(iyr, iday, orb_time[i], ecmat);
+    inStream.close();
 
-      for (size_t j = 0; j < 3; j++) {
-        posr[i][j] = orb_pos[i][j] / 1000;
-        velr[i][j] = orb_vel[i][j] / 1000;
-      }
+    if (recordTimes.size() == 0) {
+        cerr << "-E- No records found in definitive ephemeris file\n";
+        exit(EXIT_FAILURE);
+    }
+}
+
+void interpolateMissingScanTimes(vector<double> &scanStartTimes, vector<short> &sfl) {
+    vector<uint32_t> invalidTimeIndices, validTimeIndices;
+
+    for (size_t i = 0; i < scanStartTimes.size(); i++) {
+        if (scanStartTimes[i] == -999 || scanStartTimes[i] == -32767)
+            invalidTimeIndices.push_back(i);
+        else
+            validTimeIndices.push_back(i);
+    }
+
+    size_t numInvalidTimes = invalidTimeIndices.size();
+    if (numInvalidTimes == 0)
+        return;  // No missing scan times
+
+    if (validTimeIndices.size() < 2) {
+        printf("-E- %s:%d - need at least 2 good scan times\n", __FILE__, __LINE__);
+        exit(EXIT_FAILURE);
+    }
+
+    // Interpolate valid times to fill missing values
+    for (size_t i = 0; i < invalidTimeIndices.size(); i++) {
+        // Check for missing time before valid time
+
+        size_t currBadTimeIndex = invalidTimeIndices[i];
+
+        if (currBadTimeIndex < validTimeIndices[0]) {  // if there are no good previous times
+
+            double firstValidTimeIndex = validTimeIndices[0];
+            double secondValidTimeIndex = validTimeIndices[1];
+
+            scanStartTimes[currBadTimeIndex] =
+                scanStartTimes[firstValidTimeIndex] -
+                (scanStartTimes[secondValidTimeIndex] - scanStartTimes[firstValidTimeIndex]) /
+                    (secondValidTimeIndex - firstValidTimeIndex) * (firstValidTimeIndex - currBadTimeIndex);
+
+        } else if (currBadTimeIndex > validTimeIndices.back()) {  // if there are no good next times
+
+            size_t i = validTimeIndices.size() - 1;
+            double firstValidTimeIndex = validTimeIndices[i - 1];
+            double secondValidTimeIndex = validTimeIndices[i];
+
+            scanStartTimes[currBadTimeIndex] =
+                scanStartTimes[secondValidTimeIndex] +
+                (scanStartTimes[secondValidTimeIndex] - scanStartTimes[firstValidTimeIndex]) /
+                    (secondValidTimeIndex - firstValidTimeIndex) * (currBadTimeIndex - secondValidTimeIndex);
+
+        } else {  // Interpolation is easy
+
+            size_t beforeValidTimeIndex = 0;
+            for (int j = validTimeIndices.size() - 1; j >= 0; j--) {
+                if (validTimeIndices[j] < currBadTimeIndex) {
+                    beforeValidTimeIndex = j;
+                    break;
+                }
+            }
+
+            size_t beforeTimeIndex = validTimeIndices[beforeValidTimeIndex];
+            size_t afterTimeIndex = validTimeIndices[beforeValidTimeIndex + 1];
+            scanStartTimes[currBadTimeIndex] =
+                scanStartTimes[beforeTimeIndex] +
+                (scanStartTimes[afterTimeIndex] - scanStartTimes[beforeTimeIndex]) /
+                    (afterTimeIndex - beforeTimeIndex) * (currBadTimeIndex - beforeTimeIndex);
+        }
+        sfl[currBadTimeIndex] |= 2;  // set missing time flag for all nf(ailed)
+    }
+}
+
+void getThetaCorrections(const size_t numPix, const GeoData &geoData, const GeoLut &geoLut,
+                         const vector<double> &timeOffsets, int mceSpinId, size_t currScan,
+                         vector<double> &thetaCorrections) {
+    size_t pixelIndex = 0;
+    size_t encoderValueIndex;
+
+    while (pixelIndex < numPix) {
+        bool encoderInterpErrorFound = false;
+        double constexpr SAMPLE_DELTA_T = 0.001;  // Time between encoder samples
+        double sampleTime;                        // Encoder sample time for this pixel
+        size_t numInterpPix = 0;  // Incremented only when pix are interpolated against encoder data
+
+        for (size_t i = 0; i < geoData.mceTelem.encoderSampleCounts[mceSpinId]; i++) {
+            double encoderSampleTime = i * SAMPLE_DELTA_T;
+            double pixelTime = timeOffsets[pixelIndex];
+
+            if (encoderSampleTime <= pixelTime && pixelTime < (encoderSampleTime + SAMPLE_DELTA_T)) {
+                encoderValueIndex = i;
+                sampleTime = encoderSampleTime;
+                encoderInterpErrorFound = true;
+                break;
+            }
+        }
+
+        if (!encoderInterpErrorFound) {
+            cout << "Encoder interpolation error" << endl;
+            exit(-1);
+        }
+
+        for (size_t i = 0; i < numPix; i++) {
+            if (sampleTime + SAMPLE_DELTA_T <= timeOffsets[i] || timeOffsets[i] < sampleTime)
+                continue;
+
+            double timeFraction = (timeOffsets[i] - sampleTime) / SAMPLE_DELTA_T;
+            double rtaInterp =
+                (1 - timeFraction) * geoData.mceTelem.rtaEncData[mceSpinId][encoderValueIndex] +
+                timeFraction * geoData.mceTelem.rtaEncData[mceSpinId][encoderValueIndex + 1];
+            double hamInterp =
+                (1 - timeFraction) * geoData.mceTelem.hamEncData[mceSpinId][encoderValueIndex] +
+                timeFraction * geoData.mceTelem.hamEncData[mceSpinId][encoderValueIndex + 1] +
+                geoLut.hamCrossTrackAngles[geoData.hamSides[currScan]];
+
+            thetaCorrections[i] = rtaInterp - hamInterp * 0.236;
+            numInterpPix++;
+        }
+        pixelIndex += numInterpPix;
+    }
+}
+
+int getEarthViewVectors(const GeoData &geoData, const GeoLut &geoLut, const uint16_t numPixels,
+                        const double earthViewTimeOffset, const vector<double> &delt, size_t currScan,
+                        vector<array<float, 3>> &vectors, vector<double> &scanAngles) {
+    // TODO: Investigate using a color instead of specifying numPixels (which could be replaced with a field
+    // from GeoData)
+    size_t pixelOffset = currScan * numPixels;
+
+    const int32_t MAX_ENCODER_COUNT = 0x20000;  // 2^17
+    double constexpr RADIANS_TO_ARCSECONDS = RADEG * 3600;
+    double constexpr TAU = 2 * PI;
+    vector<double> timeOffsets(numPixels);  // Use in computing ideal scan angles for science pixels
+
+    // Compute scan angle corresponding to PPR
+    float pprAngle = TAU * (geoData.mceTelem.pprOffset - geoLut.rtaNadir[geoData.mceTelem.mceBoardId % 2]) /
+                     MAX_ENCODER_COUNT;
+    if (pprAngle > PI)
+        pprAngle -= TAU;
+
+    // Compute ideal scan angles for science pixels
+    for (size_t i = 0; i < numPixels; i++) {
+        timeOffsets[i] = delt[i] + earthViewTimeOffset;
+        scanAngles[pixelOffset + i] = pprAngle + 2 * PI * geoData.mceTelem.comRotRate * timeOffsets[i];
+    }
+
+    int mceSpinId = -1;  // The MCE spin ID for this spin number
+    for (size_t i = 0; i < geoData.mceTelem.numMceScans; i++) {
+        if (geoData.mceTelem.mceSpinIds[i] == geoData.spinIds[currScan]) {
+            mceSpinId = (int)i;
+            break;
+        }
+    }
+
+    if (mceSpinId == -1) {
+        cout << "No MCE encoder data for spin: " << geoData.spinIds[currScan] << endl;
+        return EXIT_FAILURE;
+    }
+
+    vector<double> thetaCorrections(numPixels);
+
+    getThetaCorrections(numPixels, geoData, geoLut, timeOffsets, mceSpinId, currScan, thetaCorrections);
+
+    // Calculate planarity deviations and view vectors
+    vector<double> alongScanPlanDev(numPixels);
+    vector<double> alongTrackPlanDev(numPixels);
+    for (size_t i = 0; i < numPixels; i++) {
+        scanAngles[pixelOffset + i] -= thetaCorrections[i] / RADIANS_TO_ARCSECONDS;
+
+        if (vectors.size() == 0) // Only want scan angles
+            continue;
+
+        alongScanPlanDev[i] = geoLut.alongTrackPlanarity[0];
+        alongTrackPlanDev[i] = geoLut.acrossTrackPlanarity[0];
+        for (size_t k = 1; k < 5; k++) {
+            alongScanPlanDev[i] += geoLut.alongTrackPlanarity[k] * pow(scanAngles[pixelOffset + i], k);
+            alongTrackPlanDev[i] += geoLut.acrossTrackPlanarity[k] * pow(scanAngles[pixelOffset + i], k);
+        }
+
+        vectors[i][0] = -sin(alongTrackPlanDev[i] / RADIANS_TO_ARCSECONDS);
+        vectors[i][1] = sin(scanAngles[pixelOffset + i] - alongScanPlanDev[i] / RADIANS_TO_ARCSECONDS);
+        vectors[i][2] = cos(scanAngles[pixelOffset + i] - alongScanPlanDev[i] / RADIANS_TO_ARCSECONDS);
+    }
+    return EXIT_SUCCESS;
+}
+
+int getEarthView(double comRotRate, int16_t *dataTypes, int16_t *spatialZoneLines,
+                 int16_t *spatialAggregation, uint16_t &numHyperSciPix, uint16_t &numSwirPixels,
+                 double &earthViewTimeOffset, float *scienceLines, float *swirLines,
+                 double *sciencePixeloffsets, double *swirPixelOffsets, bool isDark) {
+    const uint8_t ON = 1;
+    const uint8_t OFF = 0;
+
+    // Find end of no-data zone
+    int16_t indexZone = 0, firstDataLine = 0;
+    int returnStatus = -1;
+
+    while (dataTypes[indexZone] == NO_DATA) {
+        firstDataLine += spatialZoneLines[indexZone];
+        indexZone++;
+    }
+
+    if (indexZone == 10)
+        return 0;
+
+    // Find number of pixels in Earth views
+    numHyperSciPix = 0;
+    numSwirPixels = 0;
+    int16_t currDataLine = firstDataLine;
+
+    // Is this data type collected on orbit? See enum DataType for definitions
+    uint8_t collectOnOrbit[] = {OFF, ON, OFF, ON, ON, ON, ON, ON, ON, ON, OFF, OFF, OFF, OFF, OFF};
+
+    if (isDark)
+        collectOnOrbit[DARK_CALIBRATION] = ON;
+
+    for (size_t i = indexZone; i < 9; i++) {
+        // Check for not dark or no-data
+        if (collectOnOrbit[dataTypes[i]] != ON) {
+            continue;
+        }
+
+        uint16_t numAggregatedPix = spatialZoneLines[i] / spatialAggregation[i];
+        for (size_t j = 0; j < numAggregatedPix; j++) {
+            scienceLines[numHyperSciPix + j] =
+                currDataLine + j * spatialAggregation[i] + 0.5 * spatialAggregation[i] - 64;
+        }
+        numHyperSciPix += numAggregatedPix;
+        uint16_t ns = spatialZoneLines[i] / 8;
+        for (size_t j = 0; j < ns; j++) {
+            swirLines[numSwirPixels + j] = currDataLine + j * 8 + 4 - 64;
+        }
+        numSwirPixels += ns;
+        returnStatus = 0;
+
+        currDataLine += spatialZoneLines[i];
+    }
+
+    // Calculate times
+    for (size_t i = 0; i < (size_t)numHyperSciPix; i++)
+        sciencePixeloffsets[i] = comRotRate * scienceLines[i];
+    earthViewTimeOffset = 0.5 * (sciencePixeloffsets[0] + sciencePixeloffsets[numHyperSciPix - 1]);
+
+    for (size_t i = 0; i < (size_t)numHyperSciPix; i++)
+        sciencePixeloffsets[i] -= earthViewTimeOffset;
+
+    for (size_t i = 0; i < (size_t)numSwirPixels; i++)
+        swirPixelOffsets[i] = comRotRate * swirLines[i] - earthViewTimeOffset;
+
+    return returnStatus;
+}
+
+MceTlm readMceTelemetry(netCDF::NcFile *l1aFile, GeoLut &geoLut, netCDF::NcGroup egrData) {
+    MceTlm output;
+    output.numMceScans = l1aFile->getDim("number_of_mce_scans").getSize();
+    size_t numMceScans = output.numMceScans;
+    uint32_t numEncoderChannels = l1aFile->getDim("encoder_samples").getSize();
+    uint32_t mceBlockSize = l1aFile->getDim("MCE_block").getSize();
+    uint32_t numDdcTelemetryPackets = l1aFile->getDim("DDC_tlm").getSize();
+    uint32_t numTelemetryPackets = l1aFile->getDim("tlm_packets").getSize();
+
+    boost::multi_array<uint8_t, 2> mceTelemetry(boost::extents[numMceScans][mceBlockSize]);
+    boost::multi_array<int16_t, 2> encoderData(boost::extents[numMceScans][4 * numEncoderChannels]);
+    output.mceSpinIds = vector<int32_t>(output.numMceScans);
+    boost::multi_array<uint8_t, 2> ddcTelemetry(boost::extents[numTelemetryPackets][numDdcTelemetryPackets]);
+
+    egrData.getVar("MCE_telemetry").getVar(&mceTelemetry[0][0]);
+    egrData.getVar("MCE_encoder_data").getVar(&encoderData[0][0]);
+    egrData.getVar("MCE_spin_ID").getVar(output.mceSpinIds.data());
+    egrData.getVar("DDC_telemetry").getVar(&ddcTelemetry[0][0]);
+
+    // Check for missing MCE telemetry
+    bool noMCE = true;
+    for (size_t i = 0; i < numMceScans; i++) {
+        if (output.mceSpinIds[i] >= 0) {
+            noMCE = false;
+            break;
+        }
+    }
+
+    if (noMCE) {
+        cout << "No MCE telemetry in L1A file" << endl;
+        exit(EXIT_FAILURE);
+    }
+
+    // Get MCE board ID
+    output.mceBoardId = (int16_t)mceTelemetry[0][322] / 16;
+    int32_t maxEncoderCount = 0x20000;  // 2^17
+
+    // Get ref_pulse_divider and compute commanded rotation rate
+    uint32_t buf;
+    uint32_t refPulseDiv[2];
+    swapc_bytes2((char *)&mceTelemetry[0][0], (char *)&buf, 4, 1);
+    refPulseDiv[0] = buf % 0x1000000;  // 2^24
+    swapc_bytes2((char *)&mceTelemetry[0][4], (char *)&buf, 4, 1);
+    refPulseDiv[1] = buf % 0x1000000;  // 2^24
+
+    int32_t ref_pulse_sel = mceTelemetry[0][9] / 128;
+
+    ref_pulse_sel == 0 ? output.comRotRate = geoLut.masterClock / 2 / maxEncoderCount /
+                                             (refPulseDiv[ref_pulse_sel] / 256.0 + 1)
+                       : output.comRotRate =
+                             geoLut.mceClock / 2 / maxEncoderCount / (refPulseDiv[ref_pulse_sel] / 256.0 + 1);
+
+    // Check for static or reverse scan
+    int32_t averageStepSpeed = mceTelemetry[0][428] * 256 + mceTelemetry[0][429];
+    if (abs(averageStepSpeed) < 1000) {
+        // Static mode
+        output.comRotRate = 0.0;
+        cout << "OCI static mode" << endl;
+    } else if (averageStepSpeed < 0) {
+        // Reverse spin
+        output.comRotRate = -output.comRotRate;
+        cout << "OCI reverse scan" << endl;
+    }
+
+    // Get PPR offset
+    swapc_bytes2((char *)&mceTelemetry[0][8], (char *)&buf, 4, 1);
+    output.pprOffset = buf % maxEncoderCount;
+
+    // Get TDI time and compute time increment per line
+    int16_t tdiTime;
+    swapc_bytes2((char *)&ddcTelemetry[0][346], (char *)&tdiTime, 2, 1);
+    output.lineRate = (tdiTime + 1) / geoLut.masterClock;
+
+    // Get valid encoder count, HAM and RTA encoder data
+    output.hamEncData = new double *[numMceScans];
+    output.rtaEncData = new double *[numMceScans];
+    for (size_t i = 0; i < numMceScans; i++) {
+        output.encoderSampleCounts.push_back(mceTelemetry[i][475]);
+        output.hamEncData[i] = new double[mceBlockSize];
+        output.rtaEncData[i] = new double[mceBlockSize];
+        for (size_t j = 0; j < numEncoderChannels; j++) {
+            output.hamEncData[i][j] = encoderData[i][4 * j + 0] * geoLut.hamEncoderScale;
+            output.rtaEncData[i][j] = encoderData[i][4 * j + 1] * geoLut.rtaEncoderScale;
+        }
+    }
+
+    return output;
+}
+
+GeoData geolocateOci(NcFile *l1aFile, Level1bFile &outfile, string geoLutFilename, GeoLut &geoLut,
+                     string l1b_filename, string dem_file, bool radianceGenerationEnabled, string doi,
+                     const string ephFile, const bool disableGeolocation, string pversion) {
+    GeoData geoData;
+    NcGroup l1aScanLineAttributes = l1aFile->getGroup("scan_line_attributes");
+    NcGroup l1aSpatialSpectralModes = l1aFile->getGroup("spatial_spectral_modes");
+    NcGroup l1aEngineeringData = l1aFile->getGroup("engineering_data");
+    NcGroup l1aNavigationData = l1aFile->getGroup("navigation_data");
+    NcGroup l1aOnboardCalData = l1aFile->getGroup("onboard_calibration_data");
+    NcGroup l1aScienceData = l1aFile->getGroup("science_data");
+
+    NcGroupAtt attributeBuffer;
+    NcVar variableBuffer;
+
+    // Append call sequence to existing history
+    string history = get_history(l1aFile);
+
+    // Get date (change this when year and day are added to time field)
+    string timeCoverageStart, timeCoverageEnd;
+    attributeBuffer = l1aFile->getAtt("time_coverage_start");
+    attributeBuffer.getValues(timeCoverageStart);
+    geoData.unixTimeStart = isodate2unix(timeCoverageStart.c_str());
+    attributeBuffer = l1aFile->getAtt("time_coverage_end");
+    attributeBuffer.getValues(timeCoverageEnd);
+    geoData.unixTimeEnd = isodate2unix(timeCoverageEnd.c_str());
+
+    size_t pos = timeCoverageStart.find("T");
+    if (pos == string::npos) {
+        cout << "-E- L1A file time_coverage_start, bad format\n";
+        exit(EXIT_FAILURE);
+    }
+    string granuleDate = timeCoverageStart.substr(0, pos);
+
+    // Vector of the positions of OCI for 32 hours starting at timeCoverageStart with a resolution of 1 minute
+    vector<vector<double>> ephPosVec;
+    // Vector of the velocities of OCI for 32 hours starting at timeCoverageStart with a resolution of 1
+    // minute
+    vector<vector<double>> ephVelVec;
+    vector<double> ephOTime;
+
+    if (!ephFile.empty()) {
+        geoData.unixTimeStart = isodate2unix(timeCoverageStart.c_str());
+        geoData.unixTimeEnd = isodate2unix(timeCoverageEnd.c_str());
+
+        int16_t year, month, day;
+        double seconds;
+        unix2ymds(geoData.unixTimeStart, &year, &month, &day, &seconds);
+        double l1aEpoch = ymds2unix(year, month, day, 0.0);
+
+        readDefinitiveEphemeris(ephFile, ephOTime, ephPosVec, ephVelVec, l1aEpoch);
+
+        // Ensure ephem file covers L1A file time
+        if ((geoData.unixTimeStart < (ephOTime.front() + l1aEpoch)) ||
+            (geoData.unixTimeEnd > (ephOTime.back() + l1aEpoch))) {
+            cerr << "-E- Definitive ephemeris file does not cover L1A file time" << endl;
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    // Scan time, spin ID and HAM side
+    NcDim scansDim = l1aFile->getDim("number_of_scans");
+    uint32_t numberOfScans = scansDim.getSize();  // Number of scans collected
+
+    // Number of swir bands
+    uint32_t numSwirBands = l1aFile->getDim("SWIR_bands").getSize();
+
+    geoData.scanStartTimes = vector<double>(numberOfScans);
+    l1aScanLineAttributes.getVar("scan_start_time").getVar(geoData.scanStartTimes.data());
+    geoData.spinIds = vector<int32_t>(numberOfScans);
+    l1aScanLineAttributes.getVar("spin_ID").getVar(geoData.spinIds.data());
+    geoData.hamSides = vector<uint8_t>(numberOfScans);
+    l1aScanLineAttributes.getVar("HAM_side").getVar(geoData.hamSides.data());
+
+    uint32_t numValidScans = 0;
+    for (size_t i = 0; i < numberOfScans; i++) {
+        if (geoData.spinIds[i] > 0) {
+            geoData.scanStartTimes[numValidScans] = geoData.scanStartTimes[i];
+            geoData.hamSides[numValidScans] = geoData.hamSides[i];
+            numValidScans++;
+        }
+    }
+    geoData.numGoodScans = numValidScans;
+
+    // Check for and fill in missing scan times
+    vector<short> scanQualityFlags(numValidScans, 0);
+    interpolateMissingScanTimes(geoData.scanStartTimes, scanQualityFlags);
+
+    uint32_t numAttitudeRecords = l1aFile->getDim("att_records").getSize();
+    vector<double> attTime(numAttitudeRecords);
+    l1aNavigationData.getVar("att_time").getVar(attTime.data());
+
+    uint32_t numQuaternionElements = l1aFile->getDim("quaternion_elements").getSize();
+    ERROR_EXIT(numQuaternionElements);
+
+    float **attitudeQuaternions = allocate2d_float(numAttitudeRecords, numQuaternionElements);
+
+    l1aNavigationData.getVar("att_quat").getVar(&attitudeQuaternions[0][0]);
+
+    uint32_t numOrbitRecords = l1aFile->getDim("orb_records").getSize();
+    vector<double> orbitTimes(numOrbitRecords);
+    if (ephFile.empty()) {
+        l1aNavigationData.getVar("orb_time").getVar(orbitTimes.data());
+    }
+
+    orbArray *orbitPositions = new orbArray[numOrbitRecords];  // 3d position at each orbit record
+    l1aNavigationData.getVar("orb_pos").getVar(&orbitPositions[0][0]);
+
+    orbArray *orbitVelocities = new orbArray[numOrbitRecords];  // 3d velocity at each orbit record
+    l1aNavigationData.getVar("orb_vel").getVar(&orbitVelocities[0][0]);
+    uint32_t numTiltSamples = l1aFile->getDim("tilt_samples").getSize();
+
+    vector<float> tiltAngle(numTiltSamples);
+    l1aNavigationData.getVar("tilt").getVar(tiltAngle.data());
+
+    vector<double> tiltTimes(numTiltSamples);  // Seconds of day
+    l1aNavigationData.getVar("tilt_time").getVar(tiltTimes.data());
+
+    // **************************** //
+    // *** Read geolocation LUT *** //
+    // **************************** //
+
+    NcFile *geoLutFile = new NcFile(geoLutFilename, NcFile::read);
+    NcGroup timeParameters, coordinateTranslationParams, rtaHamParameters, planarityParams;
+
+    timeParameters = geoLutFile->getGroup("time_params");
+    timeParameters.getVar("master_clock").getVar(&geoLut.masterClock);  // Freq of OCI master clock in Hz
+    timeParameters.getVar("MCE_clock").getVar(&geoLut.mceClock);        // Freq of OCI MCE clock in Hz
+
+    coordinateTranslationParams = geoLutFile->getGroup("coord_trans");
+    coordinateTranslationParams.getVar("sc_to_tilt").getVar(&geoLut.craftToTilt);
+    coordinateTranslationParams.getVar("tilt_axis").getVar(&geoLut.tiltAxis);
+    // Tilt angles at fixed positions (aft, forward)
+    coordinateTranslationParams.getVar("tilt_angles").getVar(&geoLut.tiltAngles);
+    coordinateTranslationParams.getVar("tilt_home").getVar(&geoLut.tiltHome);
+    // Tilt platform to OCI mechanical transformation
+    coordinateTranslationParams.getVar("tilt_to_oci_mech").getVar(&geoLut.tiltToOciMech);
+    // OCI mechanical to optical transformation
+    coordinateTranslationParams.getVar("oci_mech_to_oci_opt").getVar(&geoLut.ociMechToOciOpt);
+
+    rtaHamParameters = geoLutFile->getGroup("RTA_HAM_params");
+    rtaHamParameters.getVar("RTA_axis").getVar(&geoLut.rtaAxis);  // Rotating Telescope Assembly rotation axis
+    rtaHamParameters.getVar("HAM_axis").getVar(&geoLut.hamAxis);  // Half Angle Mirror rotation axis
+    // Along-track mirror-to-axis angles
+    rtaHamParameters.getVar("HAM_AT_angles").getVar(geoLut.hamAlongTrackAngles);
+    // Cross-track mirror-to-axis angles
+    rtaHamParameters.getVar("HAM_CT_angles").getVar(geoLut.hamCrossTrackAngles);
+    // RTA encoder conversion to arcseconds
+    rtaHamParameters.getVar("RTA_enc_scale").getVar(&geoLut.rtaEncoderScale);
+    // HAM encoder conversion to arcseconds
+    rtaHamParameters.getVar("HAM_enc_scale").getVar(&geoLut.hamEncoderScale);
+    // Pulse per revolution offset from RTA nadir angle measured in encoder counts
+    rtaHamParameters.getVar("RTA_nadir").getVar(geoLut.rtaNadir);
+
+    planarityParams = geoLutFile->getGroup("planarity");
+    planarityParams.getVar("along_scan_planarity").getVar(&geoLut.alongTrackPlanarity);
+    planarityParams.getVar("along_track_planarity").getVar(&geoLut.acrossTrackPlanarity);  // PACE prograde
+
+    geoLutFile->close();
+
+    geoData.mceTelem = readMceTelemetry(l1aFile, geoLut, l1aEngineeringData);
+
+    int32_t year, day, mseconds;
+    isodate2ydmsec((char *)timeCoverageStart.c_str(), &year, &day, &mseconds);
+
+    double ecrMatrix[3][3];
+    quaternion *quaternions = new quaternion[numAttitudeRecords];
+    orbArray *positions;   // Array of 1x3 vectors
+    orbArray *velocities;  // Array of 1x3 vectors
+
+    // Transform orbit (if needed) and attitude from J2000 to ECR
+    if (!ephFile.empty()) {
+        size_t ephOTimeLBIndex = -1;
+        size_t ephOTimeUBIndex = -1;
+
+        for (size_t i = 0; i < ephOTime.size(); i++) {  // Find bracketing ephemeris records
+            double value = ephOTime[i];
+
+            if (value <= geoData.scanStartTimes[0]) {
+                ephOTimeLBIndex = i;
+            }
+            if (value >= geoData.scanStartTimes[numberOfScans - 1]) {
+                ephOTimeUBIndex = i;
+                break;
+            }
+        }
+
+        // pad the first and last record due to earth view time offset
+        // to guarantee time coverage
+        if(ephOTimeLBIndex > 0)
+            ephOTimeLBIndex--;
+        if(ephOTimeUBIndex < (ephOTime.size() - 2))
+            ephOTimeUBIndex++;
+
+        double omegaE = 7.29211585494e-5;
+        size_t numEphRecords = ephOTimeUBIndex - ephOTimeLBIndex + 1;
+
+        numOrbitRecords = numEphRecords;
+        positions = new orbArray[numOrbitRecords];   // Array of 1x3 vectors
+        velocities = new orbArray[numOrbitRecords];  // Array of 1x3 vectors
+
+        bzero(positions, numOrbitRecords * sizeof(orbArray));
+        bzero(velocities, numOrbitRecords * sizeof(orbArray));
+
+        orbitTimes.resize(numOrbitRecords);
+
+        for (size_t idxRec = 0; idxRec < numEphRecords; idxRec++) {
+            size_t ephIndex = idxRec + ephOTimeLBIndex;
+            orbitTimes[idxRec] = ephOTime[ephIndex];
+
+            j2000ToEcr(year, day, ephOTime[ephIndex], ecrMatrix);
+
+            // Matrix multiplication. positions = ecrMatrix*ephPosVec, velocities = ecrMatrix*ephVelVec
+            for (size_t idxLine = 0; idxLine < 3; idxLine++) {
+                for (size_t idxValue = 0; idxValue < 3; idxValue++) {
+                    positions[idxRec][idxLine] +=
+                        ecrMatrix[idxLine][idxValue] * ephPosVec[ephIndex][idxValue];
+                    velocities[idxRec][idxLine] +=
+                        ecrMatrix[idxLine][idxValue] * ephVelVec[ephIndex][idxValue];
+                }
+            }
+
+            // Correction for angular momentum along x and y
+            velocities[idxRec][0] = velocities[idxRec][0] + positions[idxRec][1] * omegaE;
+            velocities[idxRec][1] = velocities[idxRec][1] - positions[idxRec][0] * omegaE;
+        }
+    } else {
+        positions = new orbArray[numOrbitRecords];   // Array of 1x3 vectors
+        velocities = new orbArray[numOrbitRecords];  // Array of 1x3 vectors
+        // Orbit transformation
+        for (size_t i = 0; i < numOrbitRecords; i++) {
+            for (size_t j = 0; j < 3; j++) {
+                positions[i][j] = orbitPositions[i][j] / 1000;
+                velocities[i][j] = orbitVelocities[i][j] / 1000;
+            }
+        }  // i loop
+    }
+
+    delete[] orbitPositions;
+    delete[] orbitVelocities;
+
+    // Attitude
+    for (size_t i = 0; i < numAttitudeRecords; i++) {
+        double ecrQuaternion[4], resultQuaternion[4];
+        float attitudeQuaternion[4];
+        j2000ToEcr(year, day, attTime[i], ecrMatrix);
+        matrixToQuaternion(ecrMatrix, ecrQuaternion);
+
+        memcpy(attitudeQuaternion, &attitudeQuaternions[i][0], 3 * sizeof(float));
+        attitudeQuaternion[3] = attitudeQuaternions[i][3];
+
+        multiplyQuaternions(ecrQuaternion, attitudeQuaternion, resultQuaternion);
+        for (size_t j = 0; j < 4; j++)
+            quaternions[i][j] = resultQuaternion[j];
     }  // i loop
-  }
 
+    // ******************************************** //
+    // *** Get spatial and spectral aggregation *** //
+    // ******************************************** //
+    NcDim spatialZones = l1aFile->getDim("spatial_zones");
+    uint32_t numSpatialZones = spatialZones.getSize();
 
-  // Attitude
-  for (size_t i = 0; i < n_att_rec; i++) {
-    double ecq[4], qt2[4];
-    float qt1[4];
-    j2000_to_ecr(iyr, iday, att_time[i], ecmat);
-    mtoq(ecmat, ecq);
+    vector<int16_t> spatialZoneDataType(numSpatialZones);
+    l1aSpatialSpectralModes.getVar("spatial_zone_data_type").getVar(spatialZoneDataType.data());
 
-    memcpy(qt1, &att_quat[i][0], 3 * sizeof(float));
-    qt1[3] = att_quat[i][3];
+    vector<int16_t> spatialZoneLines(numSpatialZones);
+    l1aSpatialSpectralModes.getVar("spatial_zone_lines").getVar(spatialZoneLines.data());
 
-    qprod(ecq, qt1, qt2);
-    for (size_t j = 0; j < 4; j++) quatr[i][j] = qt2[j];
-  }  // i loop
+    vector<int16_t> spatialAggregation(numSpatialZones);
+    l1aSpatialSpectralModes.getVar("spatial_aggregation").getVar(spatialAggregation.data());
 
-  // ******************************************** //
-  // *** Get spatial and spectral aggregation *** //
-  // ******************************************** //
-  NcDim spatzn_dim = l1afile->getDim("spatial_zones");
-  uint32_t spatzn = spatzn_dim.getSize();
-
-  int16_t *dtype = new int16_t[spatzn];
-  var = ncGrps[1].getVar( "spatial_zone_data_type");
-  var.getVar( dtype);
-
-  int16_t *lines = new int16_t[spatzn];
-  var = ncGrps[1].getVar( "spatial_zone_lines");
-  var.getVar( lines);
-
-  int16_t *iagg = new int16_t[spatzn];
-  var = ncGrps[1].getVar( "spatial_aggregation");
-  var.getVar( iagg);
-
-  float clines[32400], slines[4050];
-  uint16_t pcdim, psdim;
-  double ev_toff, deltc[32400], delts[4050];
-  bool dark = false;
-  get_ev( secpline, dtype, lines, iagg, pcdim, psdim, ev_toff,
-          clines, slines, deltc, delts, dark, iret);
-  if ( iret < 0) {
-    cout << "No Earth view in file: " << l1a_filename << endl;
-    l1afile->close();
-    return 1;
-  }
-
-  double *evtime = new double[sdim];
-  for (size_t i = 0; i < sdim; i++)
-    if (sstime[i] == -32767) evtime[i] = sstime[i];
-    else
-      evtime[i] = sstime[i] + ev_toff;
-
-  // Interpolate orbit, attitude and tilt to scan times
-  orb_array *posi = new orb_array[sdim]();
-  orb_array *veli = new orb_array[sdim]();
-  orb_array *rpy = new orb_array[sdim]();
-  orb_interp(n_orb_rec, sdim, orb_time.data(), posr, velr, evtime, posi, veli);
-
-  quat_array *quati = new quat_array[sdim]();
-  q_interp(n_att_rec, sdim, att_time, quatr, evtime, quati);
-
-  float *tilt = new float[sdim];
-  tilt_interp(n_tilts, sdim, ttime, tiltin, evtime, tilt);
-  for (size_t i = 0; i < sdim; i++)
-       sfl[i] |= 1;  //  set tilt flag for all scans
-  for (size_t i = 0; i < sdim; i++) {
-      tilt[i] += geoLUT.tilt_home; // Add tilt home position to angles
-      tilt[i] = tilt[i] < geoLUT.tilt_angles[0] ? geoLUT.tilt_angles[0] : tilt[i];
-      tilt[i] = tilt[i] > geoLUT.tilt_angles[1] ? geoLUT.tilt_angles[1] : tilt[i];
-      // Fred's tilt detection 
-      // for any 2 adjecent and = tilts clear tilt flag (ie, bit AND with 110b)
-      if( ( i > 0 ) && ( tilt[i-1] == tilt[i] ) ) {
-          sfl[i-1] &= 6;
-          sfl[i] &= 6;
-      }
-  }
-  float *xlon = new float[sdim * pcdim]();
-  float *xlat = new float[sdim * pcdim]();
-  short *solz = new short[sdim * pcdim]();
-  short *sola = new short[sdim * pcdim]();
-  short *senz = new short[sdim * pcdim]();
-  short *sena = new short[sdim * pcdim]();
-  
-  uint8_t *qfl = new uint8_t[sdim * pcdim]();
-  // short *range = new short[sdim * psdim]();
-  short *height = new short[sdim * pcdim]();
-
-  // Initialize output arrays
-  for (size_t i = 0; i < sdim * pcdim; i++) {
-    xlon[i] = -32767;
-    xlat[i] = -32767;
-
-    solz[i] = -32767;
-    sola[i] = -32767;
-    senz[i] = -32767;
-    sena[i] = -32767;
-  }
-
-  // Generate pointing vector array
-  float **pview = new float *[pcdim];
-  pview[0] = new float[3*pcdim];
-  for (size_t i=1; i<pcdim; i++) pview[i] = pview[i-1] + 3;
-
-  // Get Sun vectors
-  orb_array *sunr = new orb_array[sdim]();
-  
-  double *rs = new double[sdim];
-  l_sun(sdim, iyr, iday, evtime, sunr, rs);
-  double distcorr = pow(rs[sdim/2],2);
-
-  // S/C matrices
-  gsl_matrix *sc2tiltp = gsl_matrix_alloc(3, 3);
-  gsl_matrix *sc2ocim = gsl_matrix_alloc(3, 3);
-  gsl_matrix *sc_to_oci = gsl_matrix_alloc(3, 3);
-  gsl_matrix *smat = gsl_matrix_alloc(3, 3);
-
-  double *thetap = new double[pcdim]();
-  
-  //////////////////////////////
-  // Geolocate each scan line //
-  //////////////////////////////
-  float lonwest = +180;
-  float loneast = -180;
-  float latsouth = +90;
-  float latnorth = -90;
-  for (size_t iscn = 0; iscn < sdim; iscn++) {
-    
-    if (sstime[iscn] != -999.0) {
-
-      gsl_matrix_view A;
-      gsl_matrix_view B;
-      double *ptr_C;
-      
-      // Model tilt rotation using a quaternion
-      float qt[4];
-      qt[0] = geoLUT.tilt_axis[0]*sin(tilt[iscn]/2/RADEG);
-      qt[1] = geoLUT.tilt_axis[1]*sin(tilt[iscn]/2/RADEG);
-      qt[2] = geoLUT.tilt_axis[2]*sin(tilt[iscn]/2/RADEG);
-      qt[3] = cos(tilt[iscn]/2/RADEG);
-
-      double tiltm[3][3];
-      qtom(qt, tiltm);
-
-      // Combine tilt and alignments
-
-      // sc2tiltp = tiltm#geo_lut.sc_to_tilt
-      A = gsl_matrix_view_array( (double *) geoLUT.sc_to_tilt, 3, 3);
-      B = gsl_matrix_view_array( (double *) tiltm, 3, 3);
-      gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0,
-                     &A.matrix, &B.matrix, 0.0, sc2tiltp);
-      ptr_C = gsl_matrix_ptr(sc2tiltp, 0, 0);
-
-      // sc2ocim = geo_lut.tilt_to_oci_mech#sc2tiltp
-      B = gsl_matrix_view_array( (double *)  geoLUT.tilt_to_oci_mech, 3, 3);
-      gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0,
-                     sc2tiltp, &B.matrix, 0.0, sc2ocim);
-      ptr_C = gsl_matrix_ptr(sc2ocim, 0, 0);
-
-      // sc_to_oci = geo_lut.oci_mech_to_oci_opt#sc2ocim
-      B = gsl_matrix_view_array( (double *)  geoLUT.oci_mech_to_oci_opt, 3, 3);
-      gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0,
-                     sc2ocim, &B.matrix, 0.0, sc_to_oci);
-      ptr_C = gsl_matrix_ptr(sc_to_oci, 0, 0);
-
-      
-      // Convert quaternion to matrix
-      double qmat[3][3];
-      qtom(quati[iscn], qmat);
-
-      // smat = sc_to_oci#qmat
-      B = gsl_matrix_view_array(&qmat[0][0], 3, 3);
-      gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0,
-                     sc_to_oci, &B.matrix, 0.0, smat);
-
-      // Compute attitude angles (informational only)
-      mat2rpy(posi[iscn], veli[iscn], qmat, rpy[iscn]);
-
-      // Get scan ellipse coefficients
-      ptr_C = gsl_matrix_ptr(smat, 0, 0);
-      double coef[10];
-      scan_ell(posi[iscn], (double(*)[3])ptr_C, coef);
-
-      // Generate pointing vector and relative time arrays in instrument frame
-      get_oci_vecs( nscan, pcdim, geoLUT.as_planarity, geoLUT.at_planarity,
-                    geoLUT.rta_nadir, geoLUT.ham_ct_angles,
-                    ev_toff, spin[iscn], hside[iscn], clines, deltc,
-                    revpsec, ppr_off, board_id,  nmcescan, mspin, enc_count,
-                    &hamenc[0], &rtaenc[0], pview, thetap, iret);
-
-      sfl[iscn] |= 4*iret;
-
-      // Geolocate pixels
-      size_t ip = iscn * pcdim;
-      oci_geonav(dem_file.c_str(), posi[iscn], veli[iscn], (double(*)[3])ptr_C,
-                 coef, sunr[iscn], pview, pcdim, delts, &xlat[ip], &xlon[ip],
-                 &solz[ip], &sola[ip], &senz[ip], &sena[ip], &height[ip],
-                 lonwest, loneast, latsouth, latnorth);
-    } else {
-      qfl[iscn] |= 4;
+    vector<float> scienceLines(32400), swirLines(4050);
+    uint16_t numHyperSciPix, numSwirPix;
+    double earthViewTimeOffset;
+    vector<double> sciencePixelOffset(32400), swirPixelOffset(4050);
+    bool isDark = false;
+    int earthViewStatus = getEarthView(geoData.mceTelem.lineRate, spatialZoneDataType.data(),
+                                       spatialZoneLines.data(), spatialAggregation.data(), numHyperSciPix,
+                                       numSwirPix, earthViewTimeOffset, scienceLines.data(), swirLines.data(),
+                                       sciencePixelOffset.data(), swirPixelOffset.data(), isDark);
+    if (earthViewStatus < 0) {
+        cout << "No Earth view in file: " << l1aFile->getName() << endl;
+        l1aFile->close();
+        return geoData;
     }
-  }  // scan loop
-  gsl_matrix_free(smat);
-  gsl_matrix_free(sc2tiltp);
-  gsl_matrix_free(sc2ocim);
-  gsl_matrix_free(sc_to_oci);
-
-  int geo_ncid;
-  int geo_gid[10];
-
-  // Get number of bands
-  NcDim ntaps_dim = l1afile->getDim("number_of_taps");
-  uint32_t ntaps = ntaps_dim.getSize();
-
-  int16_t *bagg = new int16_t[ntaps];
-  var = ncGrps[1].getVar( "blue_spectral_mode");
-  var.getVar( bagg);
-
-  int16_t *ragg = new int16_t[ntaps];
-  var = ncGrps[1].getVar( "red_spectral_mode");
-  var.getVar( ragg);
-
-  size_t *ia = new size_t[ntaps];
-  uint32_t ntb[16];
-  uint32_t bib, rib;
-  uint32_t bbb, rbb;
-  get_nib_nbb( ntaps, ia, ntb, bagg, bib, bbb);
-  get_nib_nbb( ntaps, ia, ntb, ragg, rib, rbb);
-  
-  static geoFile outfile;
-  
-  outfile.createFile(l1b_filename.c_str(),
-                     //  "$OCDATAROOT/oci/OCI_GEO_Data_Structure.cdl",
-                     "$OCDATAROOT/oci/OCI_GEO_Level-1B_Data_Structure.cdl",
-                     sdim, &geo_ncid, geo_gid, bbb, rbb,
-                     pcdim, psdim, nswband, geoLUT.rta_nadir, radiance);
-
-  string varname;
-
-  /*
-  char buf[32];
-  strcpy(buf, unix2isodate(now(), 'G'));
-  nc_put_att_text(geo_ncid, NC_GLOBAL, "date_created", strlen(buf), buf);
-
-  varname.assign("scan_time");
-  status = nc_inq_varid(geo_gid[scan_attr_geo], varname.c_str(), &varid);
-  status = nc_put_var_double(geo_gid[scan_attr_geo], varid, stime);
-  check_err(status, __LINE__, __FILE__);
-
-  status = nc_put_att_text(geo_ncid, NC_GLOBAL,
-                           "time_coverage_start", strlen(tstart), tstart);
-
-  status = nc_put_att_text(geo_ncid, NC_GLOBAL,
-                           "time_coverage_end", strlen(tend), tend);
-  */
-
-  
-  vector<size_t> start, count;
-  
-  start.clear();
-  start.push_back(0);
-  start.push_back(0);
-  start.push_back(0);
-
-  count.push_back(sdim);
-
-  // Need to increment ncGrps index by 1 for new geo_l1b cdl file
-  
-  var = outfile.ncGrps[1].getVar( "time");
-  var.putVar( start, count, evtime);
-  var.putAtt("units", "seconds since " + granule_date);
-
-  var = outfile.ncGrps[1].getVar( "HAM_side");
-  var.putVar( start, count, hside);
-
-  var = outfile.ncGrps[1].getVar( "scan_quality_flags");
-  var.putVar( start, count, sfl);
-
-  var = outfile.ncGrps[3].getVar( "tilt_angle");
-  var.putVar( start, count, tilt);
-  
-  count.push_back(4);
-
-  var = outfile.ncGrps[3].getVar( "att_quat");
-  var.putVar( start, count, quati);
-
-  count.pop_back();
-  count.push_back(3);
-  
-  var = outfile.ncGrps[3].getVar( "att_ang");
-  var.putVar( start, count, rpy);
-
-  var = outfile.ncGrps[3].getVar( "orb_pos");
-  var.putVar( start, count, posi);
-
-  var = outfile.ncGrps[3].getVar( "orb_vel");
-  var.putVar( start, count, veli);
-
-  var = outfile.ncGrps[3].getVar( "sun_ref");
-  var.putVar( start, count, sunr);
-
-  count.pop_back();
-  count.push_back(pcdim);
-  
-  var = outfile.ncGrps[2].getVar( "latitude");
-  var.putVar( start, count, xlat);
-
-  var = outfile.ncGrps[2].getVar( "longitude");
-  var.putVar( start, count, xlon);
-
-  var = outfile.ncGrps[2].getVar( "quality_flag");
-  var.putVar( start, count, qfl);
-
-  var = outfile.ncGrps[2].getVar( "sensor_azimuth");
-  var.putVar( start, count, sena);
-
-  var = outfile.ncGrps[2].getVar( "sensor_zenith");
-  var.putVar( start, count, senz);
-
-  var = outfile.ncGrps[2].getVar( "solar_azimuth");
-  var.putVar( start, count, sola);
-
-  var = outfile.ncGrps[2].getVar( "solar_zenith");
-  var.putVar( start, count, solz);
-
-  //  var = outfile.ncGrps[2].getVar( "range");
-  //var.putVar( start, count, range);
-
-  var = outfile.ncGrps[2].getVar( "height");
-  var.putVar( start, count, height);
-
-  // write global attributes, including history and date_created
-  set_global_attrs(outfile.geofile, history, doi, pversion);
-
-  outfile.geofile->putAtt("earth_sun_distance_correction",
-                          NC_DOUBLE, 1, &distcorr);
-
-  outfile.geofile->putAtt( "cdm_data_type", "swath");
-
-  outfile.geofile->putAtt("geospatial_lat_min", NC_FLOAT, 1, &latsouth);
-  outfile.geofile->putAtt("geospatial_lat_max", NC_FLOAT, 1, &latnorth);
-  outfile.geofile->putAtt("geospatial_lon_min", NC_FLOAT, 1, &lonwest);
-  outfile.geofile->putAtt("geospatial_lon_max", NC_FLOAT, 1, &loneast);
-
-  outfile.geofile->putAtt( "geospatial_bounds_crs", "EPSG:4326");
-  /*
-geospatial_bounds = "POLYGON ((85.129562 -78.832314,81.489693 49.646988...))"
-   */
-  outfile.close();
-
-  delete[](att_time);
-  // delete[](orb_time);
-  delete[](quatr);
-  delete[](posr);
-  delete[](velr);
-  delete[](posi);
-  delete[](veli);
-  delete[](rpy);
-  delete[](quati);
-  delete[](tilt);
-  delete[](xlon);
-  delete[](xlat);
-  delete[](solz);
-  delete[](sola);
-  delete[](senz);
-  delete[](sena);
-  //  delete[](range);
-  delete[](height);
-  delete[](tiltin);
-  delete[](ttime);
-  delete[](qfl);
-  delete[]pview[0]; delete[](pview);
-  delete[](sunr);
-
-  delete [] hamenc[0]; delete [] hamenc;
-  delete [] rtaenc[0]; delete [] rtaenc;
-   
-  delete [](sstime);
-  delete [](evtime);
-  delete [](thetap);
-  delete [](spin);
-  delete [](mspin);
-  delete [](ot_10us);
-  delete []att_quat[0]; delete [](att_quat);
-  delete []orb_vel[0]; delete [](orb_vel);
-  delete []orb_pos[0]; delete[](orb_pos);
-  delete [](sfl);
-  delete [](hside);
-  delete [](enc_count);
-  delete [](ragg);
-  delete [](bagg);
-  delete [](iagg);
-  delete [](dtype);
-  delete [](lines);
-  delete(l1afile);
-  delete(geoLUTfile);
-  //  clo_deleteList(optionList);
-  return 0;
-}
-
-int j2000_to_ecr(int32_t iyr, int32_t idy, double sec, double ecmat[3][3]) {
-  // Get J2000 to ECEF transformation matrix
-
-  // Arguments:
-
-  // Name               Type    I/O     Description
-  // --------------------------------------------------------
-  // iyr         I       I      Year, four digits
-  // idy         I       I      Day of year
-  // sec        R*8      I      Seconds of day
-  // ecmat(3,3)  R       O      J2000 to ECEF matrix
-
-  // Get transformation from J2000 to mean-of-date inertial
-  double j2mod[3][3];
-  j2000_to_mod(iyr, idy, sec, j2mod);
-
-  // Get nutation and UT1-UTC (once per run)
-  double xnut[3][3], ut1utc;
-  get_nut(iyr, idy, xnut);
-  get_ut1(iyr, idy, ut1utc);
-
-  // Compute Greenwich hour angle for time of day
-  double day = idy + (sec + ut1utc) / 86400;
-  double gha, gham[3][3];
-  gha2000(iyr, day, gha);
-
-  gham[0][0] = cos(gha / RADEG);
-  gham[1][1] = cos(gha / RADEG);
-  gham[2][2] = 1;
-  gham[0][1] = sin(gha / RADEG);
-  gham[1][0] = -sin(gha / RADEG);
-
-  gham[0][2] = 0;
-  gham[2][0] = 0;
-  gham[1][2] = 0;
-  gham[2][1] = 0;
-
-  // Combine all transformations
-  gsl_matrix_view A = gsl_matrix_view_array(&gham[0][0], 3, 3);  // gham
-  gsl_matrix_view B = gsl_matrix_view_array(&xnut[0][0], 3, 3);  // xnut
-  gsl_matrix *C = gsl_matrix_alloc(3, 3);
-
-  gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1.0, &A.matrix, &B.matrix, 0.0, C);
-
-  gsl_matrix_view D = gsl_matrix_view_array(&j2mod[0][0], 3, 3);  // j2mod
-  gsl_matrix *E = gsl_matrix_alloc(3, 3);
-  gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, C, &D.matrix, 0.0, E);
-  double *ptr_E = gsl_matrix_ptr(E, 0, 0);
-
-  memcpy(ecmat, ptr_E, 9 * sizeof(double));
-
-  gsl_matrix_free(C);
-  gsl_matrix_free(E);
-
-  return 0;
-}
-
-int j2000_to_mod(int32_t iyr, int32_t idy, double sec, double j2mod[3][3]) {
-  // Get J2000 to MOD (precession) transformation
-
-  // Arguments:
-
-  // Name               Type    I/O     Description
-  // --------------------------------------------------------
-  // iyr         I       I      Year, four digits
-  // idy         I       I      Day of year
-  // sec        R*8      I      Seconds of day
-  // j2mod(3,3)  R       O      J2000 to MOD matrix
-
-  int16_t iyear = iyr;
-  int16_t iday = idy;
-
-  double t = jday(iyear, 1, iday) - (double)2451545.5 + sec / 86400;
-  t /= 36525;
-
-  double zeta0 = t * (2306.2181 + 0.302 * t + 0.018 * t * t) / RADEG / 3600;
-  double thetap = t * (2004.3109 - 0.4266 * t - 0.04160 * t * t) / RADEG / 3600;
-  double xip = t * (2306.2181 + 1.095 * t + 0.018 * t * t) / RADEG / 3600;
-
-  j2mod[0][0] = -sin(zeta0) * sin(xip) + cos(zeta0) * cos(xip) * cos(thetap);
-  j2mod[0][1] = -cos(zeta0) * sin(xip) - sin(zeta0) * cos(xip) * cos(thetap);
-  j2mod[0][2] = -cos(xip) * sin(thetap);
-  j2mod[1][0] = sin(zeta0) * cos(xip) + cos(zeta0) * sin(xip) * cos(thetap);
-  j2mod[1][1] = cos(zeta0) * cos(xip) - sin(zeta0) * sin(xip) * cos(thetap);
-  j2mod[1][2] = -sin(xip) * sin(thetap);
-  j2mod[2][0] = cos(zeta0) * sin(thetap);
-  j2mod[2][1] = -sin(zeta0) * sin(thetap);
-  j2mod[2][2] = cos(thetap);
-
-  return 0;
-}
-
-int get_nut(int32_t iyr, int32_t idy, double xnut[3][3]) {
-  int16_t iyear = iyr;
-  int16_t iday = idy;
-
-  double t = jday(iyear, 1, iday) - (double)2451545.5;
-
-  double xls, gs, xlm, omega;
-  double dpsi, eps, epsm;
-  ephparms(t, xls, gs, xlm, omega);
-  nutate(t, xls, gs, xlm, omega, dpsi, eps, epsm);
-
-  xnut[0][0] = cos(dpsi / RADEG);
-  xnut[1][0] = -sin(dpsi / RADEG) * cos(epsm / RADEG);
-  xnut[2][0] = -sin(dpsi / RADEG) * sin(epsm / RADEG);
-  xnut[0][1] = sin(dpsi / RADEG) * cos(eps / RADEG);
-  xnut[1][1] = cos(dpsi / RADEG) * cos(eps / RADEG) * cos(epsm / RADEG) +
-               sin(eps / RADEG) * sin(epsm / RADEG);
-  xnut[2][1] = cos(dpsi / RADEG) * cos(eps / RADEG) * sin(epsm / RADEG) -
-               sin(eps / RADEG) * cos(epsm / RADEG);
-  xnut[0][2] = sin(dpsi / RADEG) * sin(eps / RADEG);
-  xnut[1][2] = cos(dpsi / RADEG) * sin(eps / RADEG) * cos(epsm / RADEG) -
-               cos(eps / RADEG) * sin(epsm / RADEG);
-  xnut[2][2] = cos(dpsi / RADEG) * sin(eps / RADEG) * sin(epsm / RADEG) +
-               cos(eps / RADEG) * cos(epsm / RADEG);
-
-  return 0;
-}
-
-int ephparms(double t, double &xls, double &gs, double &xlm, double &omega) {
-  //  This subroutine computes ephemeris parameters used by other Mission
-  //  Operations routines:  the solar mean longitude and mean anomaly, and
-  //  the lunar mean longitude and mean ascending node.  It uses the model
-  //  referenced in The Astronomical Almanac for 1984, Section S
-  //  (Supplement) and documented for the SeaWiFS Project in "Constants
-  //  and Parameters for SeaWiFS Mission Operations", in TBD.  These
-  //  parameters are used to compute the solar longitude and the nutation
-  //  in longitude and obliquity.
-
-  //  Sun Mean Longitude
-  xls = (double)280.46592 + ((double)0.9856473516) * t;
-  xls = fmod(xls, (double)360);
-
-  //  Sun Mean Anomaly
-  gs = (double)357.52772 + ((double)0.9856002831) * t;
-  gs = fmod(gs, (double)360);
-
-  //  Moon Mean Longitude
-  xlm = (double)218.31643 + ((double)13.17639648) * t;
-  xlm = fmod(xlm, (double)360);
-
-  //  Ascending Node of Moon's Mean Orbit
-  omega = (double)125.04452 - ((double)0.0529537648) * t;
-  omega = fmod(omega, (double)360);
-
-  return 0;
-}
-
-int nutate(double t, double xls, double gs, double xlm, double omega,
-           double &dpsi, double &eps, double &epsm) {
-  //  This subroutine computes the nutation in longitude and the obliquity
-  //  of the ecliptic corrected for nutation.  It uses the model referenced
-  //  in The Astronomical Almanac for 1984, Section S (Supplement) and
-  //  documented for the SeaWiFS Project in "Constants and Parameters for
-  //  SeaWiFS Mission Operations", in TBD.  These parameters are used to
-  //  compute the apparent time correction to the Greenwich Hour Angle and
-  //  for the calculation of the geocentric Sun vector.  The input
-  //  ephemeris parameters are computed using subroutine ephparms.  Terms
-  //  are included to 0.1 arcsecond.
-
-  //  Nutation in Longitude
-  dpsi = -17.1996 * sin(omega / RADEG) + 0.2062 * sin(2. * omega / RADEG) -
-         1.3187 * sin(2. * xls / RADEG) + 0.1426 * sin(gs / RADEG) -
-         0.2274 * sin(2. * xlm / RADEG);
-
-  //  Mean Obliquity of the Ecliptic
-  epsm = (double)23.439291 - ((double)3.560e-7) * t;
-
-  //  Nutation in Obliquity
-  double deps = 9.2025 * cos(omega / RADEG) + 0.5736 * cos(2. * xls / RADEG);
-
-  //  True Obliquity of the Ecliptic
-  eps = epsm + deps / 3600;
-
-  dpsi = dpsi / 3600;
-
-  return 0;
-}
-
-int get_ut1(int32_t iyr, int32_t idy, double &ut1utc) {
-  int16_t iyear = iyr;
-  int16_t iday = idy;
-
-  static int32_t ijd[25000];
-  static double ut1[25000];
-  string utcpole = "$OCVARROOT/modis/utcpole.dat";
-  static bool first = true;
-  int k = 0;
-  if (first) {
-    string line;
-    expandEnvVar(&utcpole);
-    istringstream istr;
-
-    ifstream utcpfile(utcpole.c_str());
-    if (utcpfile.is_open()) {
-      getline(utcpfile, line);
-      getline(utcpfile, line);
-      while (getline(utcpfile, line)) {
-        istr.clear();
-        istr.str(line.substr(0, 5));
-        istr >> ijd[k];
-        istr.clear();
-        istr.str(line.substr(44, 9));
-        istr >> ut1[k];
-        k++;
-      }
-      ijd[k] = 0;
-      utcpfile.close();
-      first = false;
-    } else {
-      cout << utcpole.c_str() << " not found" << endl;
-      exit(1);
-    }
-  }  // if (first)
-
-  k = 0;
-  int mjd = jday(iyear, 1, iday) - 2400000;
-  while (ijd[k] > 0) {
-    if (mjd == ijd[k]) {
-      ut1utc = ut1[k];
-      break;
-    }
-    k++;
-  }
-
-  return 0;
-}
-
-int gha2000(int32_t iyr, double day, double &gha) {
-  //  This subroutine computes the Greenwich hour angle in degrees for the
-  //  input time.  It uses the model referenced in The Astronomical Almanac
-  //  for 1984, Section S (Supplement) and documented for the SeaWiFS
-  //  Project in "Constants and Parameters for SeaWiFS Mission Operations",
-  //  in TBD.  It includes the correction to mean sidereal time for nutation
-  //  as well as precession.
-  //
-
-  //  Compute days since J2000
-  int16_t iday = day;
-  double fday = day - iday;
-  int jd = jday(iyr, 1, iday);
-  double t = jd - (double)2451545.5 + fday;
-
-  //  Compute Greenwich Mean Sidereal Time      (degrees)
-  double gmst = (double)100.4606184 + (double)0.9856473663 * t +
-                (double)2.908e-13 * t * t;
-
-  //  Check if need to compute nutation correction for this day
-  double xls, gs, xlm, omega;
-  double dpsi, eps, epsm;
-  ephparms(t, xls, gs, xlm, omega);
-  nutate(t, xls, gs, xlm, omega, dpsi, eps, epsm);
-
-  //  Include apparent time correction and time-of-day
-  gha = gmst + dpsi * cos(eps / RADEG) + fday * 360;
-  gha = fmod(gha, (double)360);
-
-  return 0;
-}
-
-int mtoq(double rm[3][3], double q[4]) {
-  //  Convert direction cosine matrix to equivalent quaternion
-
-  double e[3];
-
-  //  Compute Euler angle
-  double phi;
-  double cphi = (rm[0][0] + rm[1][1] + rm[2][2] - 1) / 2;
-  if (fabs(cphi) < 0.98) {
-    phi = acos(cphi);
-  } else {
-    double ssphi = (pow(rm[0][1] - rm[1][0], 2) +
-                    pow(rm[2][0] - rm[0][2], 2) +
-                    pow(rm[1][2] - rm[2][1], 2)) /
-                   4;
-    phi = asin(sqrt(ssphi));
-    if (cphi < 0) phi = PI - phi;
-  }
-
-  //  Compute Euler axis
-  e[0] = (rm[2][1] - rm[1][2]) / (sin(phi) * 2);
-  e[1] = (rm[0][2] - rm[2][0]) / (sin(phi) * 2);
-  e[2] = (rm[1][0] - rm[0][1]) / (sin(phi) * 2);
-  double norm = sqrt(e[0] * e[0] + e[1] * e[1] + e[2] * e[2]);
-  e[0] = e[0] / norm;
-  e[1] = e[1] / norm;
-  e[2] = e[2] / norm;
-
-  //  Compute quaternion
-  q[0] = e[0] * sin(phi / 2);
-  q[1] = e[1] * sin(phi / 2);
-  q[2] = e[2] * sin(phi / 2);
-  q[3] = cos(phi / 2);
-
-  return 0;
-}
-
-int qprod(double q1[4], float q2[4], double q3[4]) {
-  // Compute the product of two quaternions q3 = q1*q2
-
-  q3[0] = q1[0] * q2[3] + q1[1] * q2[2] - q1[2] * q2[1] + q1[3] * q2[0];
-  q3[1] = -q1[0] * q2[2] + q1[1] * q2[3] + q1[2] * q2[0] + q1[3] * q2[1];
-  q3[2] = q1[0] * q2[1] - q1[1] * q2[0] + q1[2] * q2[3] + q1[3] * q2[2];
-  q3[3] = -q1[0] * q2[0] - q1[1] * q2[1] - q1[2] * q2[2] + q1[3] * q2[3];
-
-  return 0;
-}
-
-int qprod(float q1[4], float q2[4], float q3[4]) {
-  // Compute the product of two quaternions q3 = q1*q2
-
-  q3[0] = q1[0] * q2[3] + q1[1] * q2[2] - q1[2] * q2[1] + q1[3] * q2[0];
-  q3[1] = -q1[0] * q2[2] + q1[1] * q2[3] + q1[2] * q2[0] + q1[3] * q2[1];
-  q3[2] = q1[0] * q2[1] - q1[1] * q2[0] + q1[2] * q2[3] + q1[3] * q2[2];
-  q3[3] = -q1[0] * q2[0] - q1[1] * q2[1] - q1[2] * q2[2] + q1[3] * q2[3];
-
-  return 0;
-}
-
-int orb_interp(size_t n_orb_rec, size_t sdim, double *torb, orb_array *p,
-               orb_array *v, double *time, orb_array *posi, orb_array *veli) {
-  //  Purpose: Interpolate orbit position and velocity vectors to scan line
-  //  times
-  //
-  //
-  //  Calling Arguments:
-  //
-  //  Name         Type    I/O     Description
-  //  --------     ----    ---     -----------
-  //  torb(*)     double   I      Array of orbit vector times in seconds of day
-  //  p(3,*)       float   I      Array of orbit position vectors for
-  //                                each time torb
-  //  v(3,*)       float   I      Array of orbit velocity vectors for
-  //                                each time torb
-  //  time(*)     double   I      Array of time in seconds of day
-  //                               for every scan line
-  //  pi(3,*)     float    O      Array of interpolated positions
-  //  vi(3,*)     float    O      Array of interpolated velocities
-  //
-  //
-  //  By: Frederick S. Patt, GSC, August 10, 1993
-  //
-  //  Notes:  Method uses cubic polynomial to match positions and velocities
-  //   at input data points.
-  //
-  //  Modification History:
-  //
-  //  Created IDL version from FORTRAN code.  F.S. Patt, SAIC, November 29, 2006
-  //
-
-  double a0[3], a1[3], a2[3], a3[3];
-
-  // initialize the arrays
-  for (int i=0; i<3; i++) {
-    a0[i] = 0.0;
-    a1[i] = 0.0;
-    a2[i] = 0.0;
-    a3[i] = 0.0;
-  }
-
-  /*
-  //  Make sure that first orbit vector precedes first scan line
-  k = where (time lt torb(0))
-  if (k(0) ne -1) then begin
-     posi(*,k) = 0.0
-     veli(*,k) = 0.0
-     orbfl(k) = 1
-     print, 'Scan line times before available orbit data'
-     i1 = max(k) + 1
-  endif
-  */
-
-  // orbit time
-  double startOrbTime = torb[0];
-  double endOrbTime = torb[n_orb_rec-1];
-  const double NAV_FILL = -9999999.0;
-
-  size_t ind = 0;
-  for (size_t i = 0; i < sdim; i++) {
-
-    // scantime outside valid orbit time, use fill value
-    if (time[i] < startOrbTime || time[i] > endOrbTime) {
-      for (int vector=0; vector<3; vector++) {
-        posi[i][vector] = NAV_FILL;
-        veli[i][vector] = BAD_FLT;
-      }
-      // skip calulations below
-      continue; 
-    }
-    
-    //  Find input orbit vectors bracketing scan
-    for (size_t j = ind; j < n_orb_rec; j++) {
-      if (time[i] > torb[j] && time[i] <= torb[j + 1]) {
-        ind = j;
-        break;
-      }
+    geoData.numCcdPix = numHyperSciPix;
+    geoData.numSwirPix = numSwirPix;
+    geoData.earthViewTimeOffset = earthViewTimeOffset;
+    geoData.isDark = isDark;
+    geoData.sciPixOffset = sciencePixelOffset;
+    geoData.swirPixOffset = swirPixelOffset;
+
+    vector<double> earthViewTimes(numValidScans);  // Times in which Earth was in view of the RTA
+    for (size_t i = 0; i < numValidScans; i++)
+        if (geoData.scanStartTimes[i] == BAD_FLT)
+            earthViewTimes[i] = geoData.scanStartTimes[i];
+        else
+            earthViewTimes[i] = geoData.scanStartTimes[i] + earthViewTimeOffset;
+    geoData.earthViewTimes = earthViewTimes;
+
+    // Interpolate orbit, attitude and tilt to scan times
+    orbArray *interpolatedPos = new orbArray[numValidScans];
+    orbArray *interpolatedVel = new orbArray[numValidScans];
+    orbArray *attitudeAngles = new orbArray[numValidScans];  // Roll, pitch, yaw
+    interpolateOrbitVectors(numOrbitRecords, numValidScans, orbitTimes.data(), positions, velocities,
+                            earthViewTimes.data(), interpolatedPos, interpolatedVel);
+
+    quaternion *interpolatedQuats = new quaternion[numValidScans]();
+    interpolateAttitudeForScanTimes(numAttitudeRecords, numValidScans, attTime.data(), quaternions,
+                                    earthViewTimes.data(), interpolatedQuats);
+
+    vector<float> tiltPositions(numValidScans);
+    interpolateTilt(numTiltSamples, numValidScans, tiltTimes.data(), tiltAngle.data(), earthViewTimes.data(),
+                    tiltPositions.data());
+    for (size_t i = 0; i < numValidScans; i++) {
+        tiltPositions[i] += geoLut.tiltHome;  // Add tilt home position to angles
+        tiltPositions[i] = tiltPositions[i] < geoLut.tiltAngles[0] ? geoLut.tiltAngles[0] : tiltPositions[i];
+        tiltPositions[i] = tiltPositions[i] > geoLut.tiltAngles[1] ? geoLut.tiltAngles[1] : tiltPositions[i];
+        // for any 2 adjecent and = tilts clear tilt flag (ie, bit AND with 110b)
+        if ((i > 0) && (tiltPositions[i - 1] == tiltPositions[i])) {
+            scanQualityFlags[i - 1] &= 0b110;
+            scanQualityFlags[i] &= 0b110;
+        } else
+            scanQualityFlags[i] |= 1;
     }
 
-    //  Set up cubic interpolation
-    double dt = torb[ind + 1] - torb[ind];
-    for (size_t j = 0; j < 3; j++) {
-      a0[j] = p[ind][j];
-      a1[j] = v[ind][j] * dt;
-      if (dt >= 3.5) {
-        a2[j] = 3 * p[ind + 1][j] - 3 * p[ind][j] - 2 * v[ind][j] * dt -
-          v[ind + 1][j] * dt;
-        a3[j] = 2 * p[ind][j] - 2 * p[ind + 1][j] + v[ind][j] * dt +
-          v[ind + 1][j] * dt;
-      } else {
-        a2[j] = (v[ind + 1][j] - v[ind][j]) / 2;
-        a3[j] = 0.0;
-        // a2(*) = (v(*,ind+1)-v(*,ind))*dt/2
-        //         a3(*) = 0.d0
-      }
+    geoData.solarZeniths = vector<short>(numValidScans * numHyperSciPix, BAD_FLT);
+    geoData.solarZeniths = vector<short>(numValidScans * numHyperSciPix, BAD_FLT);
+    geoData.qualityFlag = vector<uint8_t>(numValidScans * numHyperSciPix, 0);
+    geoData.pixelLongtitudes = vector<float>(numValidScans * numHyperSciPix, BAD_FLT);
+    geoData.pixelLatitudes = vector<float>(numValidScans * numHyperSciPix, BAD_FLT);
+    geoData.solarAzimuths = vector<short>(numValidScans * numHyperSciPix, BAD_FLT);
+    geoData.sensorZeniths = vector<short>(numValidScans * numHyperSciPix, BAD_FLT);
+    geoData.sensorAzimuths = vector<short>(numValidScans * numHyperSciPix, BAD_FLT);
+    geoData.height = vector<short>(numValidScans * numHyperSciPix, BAD_FLT);
+    vector<uint8_t> watermask(numValidScans * numHyperSciPix);
+    geoData.ccdScanAngles = vector<double>(numValidScans*numHyperSciPix, BAD_FLT);
+    geoData.swirScanAngles = vector<double>(numValidScans*numSwirPix, BAD_FLT);
+
+    // set flag around 10deg scan angle
+    // only set this flag if in normal scan mode
+    if(numSwirPix == numHyperSciPix) {
+        for (size_t scan = 0; scan < numValidScans; scan++) {
+            if(geoData.hamSides[scan] == 1) {
+                size_t pixelOffset = scan * numHyperSciPix;
+                for(size_t pix = 680; pix < 800; pix++) {
+                    geoData.qualityFlag[pixelOffset + pix] |= 8;
+                }
+            }
+        }
     }
 
-    //  Interpolate orbit position and velocity components to scan line time
-    double x = (time[i] - torb[ind]) / dt;
-    double x2 = x * x;
-    double x3 = x2 * x;
-    for (size_t j = 0; j < 3; j++) {
-      posi[i][j] = a0[j] + a1[j] * x + a2[j] * x2 + a3[j] * x3;
-      veli[i][j] = (a1[j] + 2 * a2[j] * x + 3 * a3[j] * x2) / dt;
-    }
-  }  // i-loop
+    NcFile *watermaskFilePointer = new NcFile(dem_file, NcFile::read);
+    const size_t WATERMASK_LAT_POINTS = watermaskFilePointer->getDim("lat").getSize();
+    const size_t WATERMASK_LON_POINTS = watermaskFilePointer->getDim("lon").getSize();
+    double constexpr DELTA_LAT = 180.0;  // Degrees of change in latitude over whole Earth
+    double constexpr DELTA_LON = 360.0;  // Degrees of change in longitude over whole Earth
 
-  return 0;
+    // Generate pointing vector array
+    vector<array<float, 3>> pointingVector(numHyperSciPix);
+
+    // Get Sun and moon vectors, check for eclipse
+    orbArray *sunVectors = new orbArray[numValidScans]();
+    orbArray *moonVectors = new orbArray[numValidScans]();
+    double earthMoonDist;
+    vector<float> earthSunDist(numValidScans, 0.0);
+    uint8_t *eclipsedScans = new uint8_t[numValidScans];
+    bool fileIsEclipsed = false;  // File has any of its scanlines eclipsed
+
+    for (size_t i = 0; i < numValidScans; i++) {
+        l_sun_(&year, &day, &earthViewTimes.data()[i], sunVectors[i], &earthSunDist[i]);
+    }
+    double earthSunDistCorrection = pow(earthSunDist[numValidScans / 2], 2);
+    geoData.auCorrection = earthSunDistCorrection;
+
+    for (size_t i = 0; i < numValidScans; i++) {  // TODO: combine with l_sun_ loop
+        // Scan start time
+        int16_t scanYear, scanDay;
+        double scanSeconds;
+        unix2yds(geoData.scanStartTimes[i], &scanYear, &scanDay, &scanSeconds);
+        getMoonVector(scanYear, scanDay, scanSeconds, moonVectors[i], earthMoonDist);
+
+        double sunDotMoon = sunVectors[i][0] * moonVectors[i][0] + sunVectors[i][1] * moonVectors[i][1] +
+                            sunVectors[i][2] * moonVectors[i][2];
+        eclipsedScans[i] = 0;
+        if (sunDotMoon > 0.9995) {
+            fileIsEclipsed = true;
+            eclipsedScans[i] = 1;
+        }
+    }
+
+    if (fileIsEclipsed)
+        cout << "Eclipse detected" << endl;
+
+    // S/C matrices
+    gsl_matrix *craftToTilt = gsl_matrix_alloc(3, 3);      // From spacecraft to tilt platform
+    gsl_matrix *craftToOciMount = gsl_matrix_alloc(3, 3);  // From spacecraft to OCI mount
+    gsl_matrix *craftToOci = gsl_matrix_alloc(3, 3);       // From spacecraft to OCI instrument
+    gsl_matrix *transformation = gsl_matrix_alloc(3, 3);
+
+    //////////////////////////////
+    // Geolocate each scan line //
+    //////////////////////////////
+    float westernmostLon = +180;
+    float easternmostLon = -180;
+    float southernmostLat = +90;
+    float northernmostLat = -90;
+    double tiltm[3][3];
+    // Model tilt rotation using a quaternion
+    float qt[4];
+    gsl_matrix_view sourceMatrix;
+    gsl_matrix_view transformMatrix;
+    double *sensorOrientationMatrix;
+    double qmat[3][3];
+    for (size_t currScan = 0; currScan < numValidScans; currScan++) {
+        if (geoData.scanStartTimes[currScan] == -999.0) {
+            scanQualityFlags[currScan] |= 2;
+            continue;
+        }
+
+        qt[0] = geoLut.tiltAxis[0] * sin(tiltPositions[currScan] / 2 / RADEG);
+        qt[1] = geoLut.tiltAxis[1] * sin(tiltPositions[currScan] / 2 / RADEG);
+        qt[2] = geoLut.tiltAxis[2] * sin(tiltPositions[currScan] / 2 / RADEG);
+        qt[3] = cos(tiltPositions[currScan] / 2 / RADEG);
+
+        quaternionToMatrix(qt, tiltm);
+
+        // Combine tilt and alignments
+
+        // sc2tiltp = tiltm#geo_lut.craftToTilt
+        sourceMatrix = gsl_matrix_view_array((double *)geoLut.craftToTilt, 3, 3);
+        transformMatrix = gsl_matrix_view_array((double *)tiltm, 3, 3);
+        gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, &sourceMatrix.matrix, &transformMatrix.matrix, 0.0,
+                       craftToTilt);
+        sensorOrientationMatrix = gsl_matrix_ptr(craftToTilt, 0, 0);
+
+        // sc2ocim = geo_lut.tilt_to_oci_mech#sc2tiltp
+        transformMatrix = gsl_matrix_view_array((double *)geoLut.tiltToOciMech, 3, 3);
+        gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, craftToTilt, &transformMatrix.matrix, 0.0,
+                       craftToOciMount);
+        sensorOrientationMatrix = gsl_matrix_ptr(craftToOciMount, 0, 0);
+
+        // sc_to_oci = geo_lut.oci_mech_to_oci_opt#sc2ocim
+        transformMatrix = gsl_matrix_view_array((double *)geoLut.ociMechToOciOpt, 3, 3);
+        gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, craftToOciMount, &transformMatrix.matrix, 0.0,
+                       craftToOci);
+        sensorOrientationMatrix = gsl_matrix_ptr(craftToOci, 0, 0);
+
+        // Convert quaternion to matrix
+        quaternionToMatrix(interpolatedQuats[currScan], qmat);
+
+        // smat = sc_to_oci#qmat
+        transformMatrix = gsl_matrix_view_array(&qmat[0][0], 3, 3);
+        gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, craftToOci, &transformMatrix.matrix, 0.0,
+                       transformation);
+
+        // Compute attitude angles (informational only)
+        getAttitudeAngles(interpolatedPos[currScan], interpolatedVel[currScan], qmat,
+                          attitudeAngles[currScan]);
+
+        // Get scan ellipse coefficients
+        sensorOrientationMatrix = gsl_matrix_ptr(transformation, 0, 0);
+        double coef[10];
+        getEarthScanTrackCoefs(interpolatedPos[currScan], (double(*)[3])sensorOrientationMatrix, coef);
+
+        // Generate pointing vector and relative time arrays in instrument frame
+        int returnStatus =
+            getEarthViewVectors(geoData, geoLut, numHyperSciPix, earthViewTimeOffset, sciencePixelOffset,
+                                currScan, pointingVector, geoData.ccdScanAngles);
+
+        scanQualityFlags[currScan] |= 4 * returnStatus;
+
+        returnStatus =
+            getEarthViewVectors(geoData, geoLut, geoData.numSwirPix, earthViewTimeOffset,
+                                sciencePixelOffset, currScan, pointingVector, geoData.swirScanAngles);
+        scanQualityFlags[currScan] |= 4 * returnStatus;
+
+        // Geolocate pixels
+        size_t pixelIndex = currScan * numHyperSciPix;  // Index of first pixel in this scan
+        GeoBox geoBox;
+        // TODO: Change signature to take in geoData
+        if (!disableGeolocation) {
+            geolocatePixelsOci(
+                dem_file.c_str(), interpolatedPos[currScan], interpolatedVel[currScan],
+                (double(*)[3])sensorOrientationMatrix, coef, sunVectors[currScan], fileIsEclipsed,
+                moonVectors[currScan], earthSunDist[currScan], pointingVector, numHyperSciPix,
+                swirPixelOffset.data(), geoData.qualityFlag, currScan,
+                geoData.pixelLatitudes.data() + pixelIndex, geoData.pixelLongtitudes.data() + pixelIndex,
+                &geoData.solarZeniths[pixelIndex], geoData.solarAzimuths.data() + pixelIndex,
+                geoData.sensorZeniths.data() + pixelIndex, geoData.sensorAzimuths.data() + pixelIndex,
+                geoData.height.data() + pixelIndex, geoBox);
+        }
+
+        westernmostLon = min(westernmostLon, geoBox.westernmostLon);
+        easternmostLon = max(easternmostLon, geoBox.easternmostLon);
+        southernmostLat = min(southernmostLat, geoBox.southernmostLat);
+        northernmostLat = max(northernmostLat, geoBox.northernmostLat);
+
+        for (size_t i = 0; i < numHyperSciPix; i++) {
+            const double lat = geoData.pixelLatitudes[pixelIndex + i];
+            const double lon = geoData.pixelLongtitudes[pixelIndex + i];
+
+            if (lat == BAD_FLT || lon == BAD_FLT) {
+                watermask[currScan * numHyperSciPix + i] = BAD_UBYTE;
+                continue;
+            }
+
+            // Putting lat and lon into a 360 degree space makes some calculations easier
+            size_t latIndex = static_cast<size_t>((lat + 90.0) / DELTA_LAT * (WATERMASK_LAT_POINTS - 1));
+            size_t lonIndex = static_cast<size_t>((lon + 180.0) / DELTA_LON * (WATERMASK_LON_POINTS - 1));
+
+            latIndex = std::min(latIndex, WATERMASK_LAT_POINTS - 1);
+            lonIndex = std::min(lonIndex, WATERMASK_LON_POINTS - 1);
+
+            // Only grabbing one point because the watermask probably has a different interval
+            watermaskFilePointer->getVar("watermask")
+                .getVar({latIndex, lonIndex}, {1, 1}, &watermask[pixelIndex + i]);
+        }
+
+    }  // scan loop
+    gsl_matrix_free(transformation);
+    gsl_matrix_free(craftToTilt);
+    gsl_matrix_free(craftToOciMount);
+    gsl_matrix_free(craftToOci);
+
+    // Get number of bands
+    NcDim numTapsDim = l1aFile->getDim("number_of_taps");
+    const size_t numTaps = numTapsDim.getSize();
+
+    vector<int16_t> blueBands(numTaps);
+    l1aSpatialSpectralModes.getVar("blue_spectral_mode").getVar(blueBands.data());
+
+    vector<int16_t> redBands(numTaps);
+    l1aSpatialSpectralModes.getVar("red_spectral_mode").getVar(redBands.data());
+
+    vector<size_t> tapAggFactors(numTaps);
+    array<size_t, 16> binCounts;
+    size_t numBlueInsBands, numRedInsBands;
+    size_t numBlueBands, numRedBands;
+    aggregateBands(numTaps, tapAggFactors.data(), binCounts.data(), blueBands.data(), numBlueInsBands,
+                   numBlueBands);
+    aggregateBands(numTaps, tapAggFactors.data(), binCounts.data(), redBands.data(), numRedInsBands,
+                   numRedBands);
+
+    vector<size_t> start(3, 0);
+    vector<size_t> count(1, numValidScans);
+
+    outfile.createFile(l1aFile->getName().c_str(), numValidScans, numBlueBands, numRedBands, numHyperSciPix,
+                       numSwirPix, numSwirBands, geoLut.rtaNadir, radianceGenerationEnabled);
+
+    variableBuffer = outfile.scanLineAttributes.getVar("time");
+    variableBuffer.putVar(start, count, earthViewTimes.data());
+    variableBuffer.putAtt("units", "seconds since " + granuleDate);
+
+    outfile.scanLineAttributes.getVar("HAM_side").putVar(start, count, geoData.hamSides.data());
+    outfile.scanLineAttributes.getVar("scan_quality_flags").putVar(start, count, scanQualityFlags.data());
+    outfile.navigationData.getVar("tilt_angle").putVar(start, count, tiltPositions.data());
+    count.push_back(4);
+    outfile.navigationData.getVar("att_quat").putVar(start, count, interpolatedQuats);
+
+    count.pop_back();
+    count.push_back(3);
+
+    outfile.navigationData.getVar("att_ang").putVar(start, count, attitudeAngles);
+    outfile.navigationData.getVar("orb_pos").putVar(start, count, interpolatedPos);
+    outfile.navigationData.getVar("orb_vel").putVar(start, count, interpolatedVel);
+    outfile.navigationData.getVar("sun_ref").putVar(start, count, sunVectors);
+
+    count.pop_back();
+    count.push_back(numHyperSciPix);
+
+    outfile.geolocationData.getVar("latitude").putVar(start, count, geoData.pixelLatitudes.data());
+    outfile.geolocationData.getVar("longitude").putVar(start, count, geoData.pixelLongtitudes.data());
+    outfile.geolocationData.getVar("quality_flag").putVar(start, count, geoData.qualityFlag.data());
+    outfile.geolocationData.getVar("sensor_azimuth").putVar(start, count, geoData.sensorAzimuths.data());
+    outfile.geolocationData.getVar("sensor_zenith").putVar(start, count, geoData.sensorZeniths.data());
+    outfile.geolocationData.getVar("solar_azimuth").putVar(start, count, geoData.solarAzimuths.data());
+    outfile.geolocationData.getVar("solar_zenith").putVar(start, count, geoData.solarZeniths.data());
+    outfile.geolocationData.getVar("height").putVar(start, count, geoData.height.data());
+    outfile.geolocationData.getVar("watermask").putVar(start, count, watermask.data());
+
+    // write global attributes, including history and date_created
+    set_global_attrs(outfile.l1bFile, history, doi, pversion);
+
+    outfile.l1bFile->putAtt("earth_sun_distance_correction", NC_DOUBLE, 1, &earthSunDistCorrection);
+
+    outfile.l1bFile->putAtt("cdm_data_type", "swath");
+
+    outfile.l1bFile->putAtt("geospatial_lat_min", NC_FLOAT, 1, &southernmostLat);
+    outfile.l1bFile->putAtt("geospatial_lat_max", NC_FLOAT, 1, &northernmostLat);
+    outfile.l1bFile->putAtt("geospatial_lon_min", NC_FLOAT, 1, &westernmostLon);
+    outfile.l1bFile->putAtt("geospatial_lon_max", NC_FLOAT, 1, &easternmostLon);
+
+    outfile.l1bFile->putAtt("geospatial_bounds_crs", "EPSG:4326");
+
+    delete[] (quaternions);
+    delete[] (positions);
+    delete[] (velocities);
+    delete[] (interpolatedPos);
+    delete[] (interpolatedVel);
+    delete[] (attitudeAngles);
+    delete[] (sunVectors);
+
+    free2d_float(attitudeQuaternions);
+    geoLutFile->close();
+    delete (geoLutFile);
+    return geoData;
 }
 
-int q_interp(size_t n_att_rec, size_t sdim, double *tq, quat_array *q,
-             double *time, quat_array *qi) {
-  //  Purpose: Interpolate quaternions to scan line times
-  //
-  //
+int j2000ToEcr(int32_t year, int32_t dayOfYear, double secondOfDay, double ecrMatrix[3][3]) {
+    double j2000ToMeanOfDateMatrix[3][3];
+    double nutationMatrix[3][3], ut1MinusUtc;
 
-  // Attitude
-  double startAttTime = tq[0];
-  double endAttTime = tq[n_att_rec-1];
-  const double NAV_FILL = -32767.0;
-  size_t ind = 0;
-  for (size_t i = 0; i < sdim; i++) {
+    // Get transformation from J2000 to mean-of-date inertial
+    j2000ToMod(year, dayOfYear, secondOfDay, j2000ToMeanOfDateMatrix);
+    // Get nutation and UT1-UTC (once per run)
+    getNutation(year, dayOfYear, nutationMatrix);
+    getUt1ToUtc(year, dayOfYear, ut1MinusUtc);
 
-    // if scan time is outside the valid att time, use fill value
-    if (time[i] < startAttTime || time[i] > endAttTime) {
-      for (int element=0; element<4; element++) {
-        qi[i][element] = NAV_FILL;
+    // Compute Greenwich hour angle for time of day
+    double fractionalDay = dayOfYear + (secondOfDay + ut1MinusUtc) / 86400;
+    double greenwichHourAngle, greenwichHourAngleMatrix[3][3];
+    gha2000(year, fractionalDay, &greenwichHourAngle);
 
-      }
-      continue;
-    }
+    double cosGHA = cos(greenwichHourAngle / RADEG);
+    double sinGHA = sin(greenwichHourAngle / RADEG);
 
-    //  Find input attitude vectors bracketing scan
-    for (size_t j = ind; j < n_att_rec; j++) {
-      if (time[i] > tq[j] && time[i] <= tq[j + 1]) {
-        ind = j;
-        break;
-      }
-    }
+    greenwichHourAngleMatrix[0][0] = cosGHA;
+    greenwichHourAngleMatrix[1][1] = cosGHA;
+    greenwichHourAngleMatrix[2][2] = 1;
+    greenwichHourAngleMatrix[0][1] = sinGHA;
+    greenwichHourAngleMatrix[1][0] = -sinGHA;
 
-    //  Set up quaternion interpolation
-    double dt = tq[ind + 1] - tq[ind];
-    double qin[4];
-    qin[0] = -q[ind][0];
-    qin[1] = -q[ind][1];
-    qin[2] = -q[ind][2];
-    qin[3] = q[ind][3];
+    greenwichHourAngleMatrix[0][2] = 0;
+    greenwichHourAngleMatrix[2][0] = 0;
+    greenwichHourAngleMatrix[1][2] = 0;
+    greenwichHourAngleMatrix[2][1] = 0;
+    // Combine all transformations
+    gsl_matrix_view ghaMatrixView = gsl_matrix_view_array(&greenwichHourAngleMatrix[0][0], 3, 3);
+    gsl_matrix_view nutationMatrixView = gsl_matrix_view_array(&nutationMatrix[0][0], 3, 3);
+    gsl_matrix *tempMatrix1 = gsl_matrix_alloc(3, 3);
 
-    double e[3], qr[4];
-    qprod(qin, q[ind + 1], qr);
-    memcpy(e, qr, 3 * sizeof(double));
-    double sto2 = sqrt(e[0] * e[0] + e[1] * e[1] + e[2] * e[2]);
-    for (size_t j = 0; j < 3; j++) e[j] /= sto2;
+    gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1.0, &ghaMatrixView.matrix, &nutationMatrixView.matrix, 0.0,
+                   tempMatrix1);
 
-    // Interpolate quaternion to scan times
-    double x = (time[i] - tq[ind]) / dt;
-    float qri[4], qp[4];
-    for (size_t j = 0; j < 3; j++) qri[j] = e[j] * sto2 * x;
-    qri[3] = 1.0;
-    qprod(q[ind], qri, qp);
-    memcpy(qi[i], qp, 4 * sizeof(float));
-  }
+    gsl_matrix_view j2000ToMeanOfDateMatrixView = gsl_matrix_view_array(&j2000ToMeanOfDateMatrix[0][0], 3, 3);
+    gsl_matrix *tempMatrix2 = gsl_matrix_alloc(3, 3);
+    gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, tempMatrix1, &j2000ToMeanOfDateMatrixView.matrix, 0.0,
+                   tempMatrix2);
+    double *finalMatrixPtr = gsl_matrix_ptr(tempMatrix2, 0, 0);
 
-  return 0;
+    memcpy(ecrMatrix, finalMatrixPtr, 9 * sizeof(double));
+
+    gsl_matrix_free(tempMatrix1);
+    gsl_matrix_free(tempMatrix2);
+
+    return 0;
 }
 
+int j2000ToMod(int32_t year, int32_t idy, double sec, double j2mod[3][3]) {
+    int16_t iyear = year;
+    int16_t day = idy;
 
-int tilt_interp(size_t n_tilts, size_t sdim, double *ttilt, float *tiltin,
-                double *time, float *tilt) {
+    double t = jday(iyear, 1, day) - (double)2451545.5 + sec / 86400;
+    t /= 36525;
 
-  double startTiltTime = ttilt[0];
-  double endTiltTime = ttilt[n_tilts-1];
-  const double NAV_FILL = -32767.0;
+    double zeta0 = t * (2306.2181 + 0.302 * t + 0.018 * t * t) / RADEG / 3600;
+    double thetap = t * (2004.3109 - 0.4266 * t - 0.04160 * t * t) / RADEG / 3600;
+    double xip = t * (2306.2181 + 1.095 * t + 0.018 * t * t) / RADEG / 3600;
 
-  size_t ind = 0;
-  for (size_t i = 0; i < sdim; i++) {
+    double sinZeta0 = sin(zeta0);
+    double cosZeta0 = cos(zeta0);
+    double sinXip = sin(xip);
+    double cosXip = cos(xip);
+    double sinThetaP = sin(thetap);
+    double cosThetaP = cos(thetap);
 
-    if (time[i] < startTiltTime || time[i] > endTiltTime) {
-      tilt[i] = NAV_FILL;
-      continue;
-    }
+    j2mod[0][0] = -sinZeta0 * sinXip + cosZeta0 * cosXip * cosThetaP;
+    j2mod[0][1] = -cosZeta0 * sinXip - sinZeta0 * cosXip * cosThetaP;
+    j2mod[0][2] = -cosXip * sinThetaP;
+    j2mod[1][0] = sinZeta0 * cosXip + cosZeta0 * sinXip * cosThetaP;
+    j2mod[1][1] = cosZeta0 * cosXip - sinZeta0 * sinXip * cosThetaP;
+    j2mod[1][2] = -sinXip * sinThetaP;
+    j2mod[2][0] = cosZeta0 * sinThetaP;
+    j2mod[2][1] = -sinZeta0 * sinThetaP;
+    j2mod[2][2] = cosThetaP;
 
-    //  Find input tilt vectors bracketing scan
-    for (size_t j = ind; j < n_tilts; j++) {
-      if (time[i] > ttilt[j] && time[i] <= ttilt[j + 1]) {
-        ind = j;
-        break;
-      }
-    }
-
-    double x = (time[i] - ttilt[ind])/(ttilt[ind+1] - ttilt[ind]);
-    tilt[i] = (1-x)*tiltin[ind] + x*tiltin[ind+1];
-  }
-  
-  return 0;
+    return 0;
 }
 
+int getNutation(int32_t year, int32_t idy, double xnut[3][3]) {
+    int16_t iyear = year;
+    int16_t day = idy;
 
-int l_sun(size_t sdim, int32_t iyr, int32_t iday, double *sec,
-          orb_array *sunr, double *rs) {
-  //  Computes unit Sun vector in geocentric rotating coordinates, using
-  //  subprograms to compute inertial Sun vector and Greenwich hour angle
-
-  //  Get unit Sun vector in geocentric inertial coordinates
-  sun2000(sdim, iyr, iday, sec, sunr, rs);
-
-  //  Get Greenwich mean sidereal angle
-  for (size_t i = 0; i < sdim; i++) {
-    double day = iday + sec[i] / 86400;
-    double gha;
-    gha2000(iyr, day, gha);
-    double ghar = gha / RADEG;
-
-    //  Transform Sun vector into geocentric rotating frame
-    float temp0 = sunr[i][0] * cos(ghar) + sunr[i][1] * sin(ghar);
-    float temp1 = sunr[i][1] * cos(ghar) - sunr[i][0] * sin(ghar);
-    sunr[i][0] = temp0;
-    sunr[i][1] = temp1;
-  }
-
-  return 0;
-}
-
-int sun2000(size_t sdim, int32_t iyr, int32_t idy, double *sec,
-            orb_array *sun, double *rs) {
-  //  This subroutine computes the Sun vector in geocentric inertial
-  //  (equatorial) coordinates.  It uses the model referenced in The
-  //  Astronomical Almanac for 1984, Section S (Supplement) and documented
-  //  for the SeaWiFS Project in "Constants and Parameters for SeaWiFS
-  //  Mission Operations", in TBD.  The accuracy of the Sun vector is
-  //  approximately 0.1 arcminute.
-
-  float xk = 0.0056932;  // Constant of aberration
-
-  //   Compute floating point days since Jan 1.5, 2000
-  //    Note that the Julian day starts at noon on the specified date
-  int16_t iyear = iyr;
-  int16_t iday = idy;
-
-  for (size_t i = 0; i < sdim; i++) {
-    double t =
-        jday(iyear, 1, iday) - (double)2451545.0 + (sec[i] - 43200) / 86400;
+    double t = jday(iyear, 1, day) - (double)2451545.5;
 
     double xls, gs, xlm, omega;
     double dpsi, eps, epsm;
-    //  Compute solar ephemeris parameters
-    ephparms(t, xls, gs, xlm, omega);
+    ephparms(t, &xls, &gs, &xlm, &omega);
+    nutate(t, xls, gs, xlm, omega, &dpsi, &eps);
+    epsm = (double)23.439291 - ((double)3.560e-7) * t;
 
-    // Compute nutation corrections for this day
-    nutate(t, xls, gs, xlm, omega, dpsi, eps, epsm);
+    double cos_dpsi_over_radeg = cos(dpsi / RADEG);
+    double sin_dpsm_over_radeg = sin(dpsi / RADEG);
+    double cos_epsm_over_radeg = cos(epsm / RADEG);
+    double sin_epsm_over_radeg = sin(epsm / RADEG);
+    double cos_eps_over_radeg = cos(eps / RADEG);
+    double sin_eps_over_radeg = sin(eps / RADEG);
 
-    //  Compute planet mean anomalies
-    //   Venus Mean Anomaly
-    double g2 = 50.40828 + 1.60213022 * t;
-    g2 = fmod(g2, (double)360);
+    xnut[0][0] = cos_dpsi_over_radeg;
+    xnut[1][0] = -sin_dpsm_over_radeg * cos_epsm_over_radeg;
+    xnut[2][0] = -sin_dpsm_over_radeg * sin_epsm_over_radeg;
+    xnut[0][1] = sin_dpsm_over_radeg * cos_eps_over_radeg;
+    xnut[1][1] = cos_dpsi_over_radeg * cos_eps_over_radeg * cos_epsm_over_radeg +
+                 sin_eps_over_radeg * sin_epsm_over_radeg;
+    xnut[2][1] = cos_dpsi_over_radeg * cos_eps_over_radeg * sin_epsm_over_radeg -
+                 sin_eps_over_radeg * cos_epsm_over_radeg;
+    xnut[0][2] = sin_dpsm_over_radeg * sin_eps_over_radeg;
+    xnut[1][2] = cos_dpsi_over_radeg * sin_eps_over_radeg * cos_epsm_over_radeg -
+                 cos_eps_over_radeg * sin_epsm_over_radeg;
+    xnut[2][2] = cos_dpsi_over_radeg * sin_eps_over_radeg * sin_epsm_over_radeg +
+                 cos_eps_over_radeg * cos_epsm_over_radeg;
 
-    //   Mars Mean Anomaly
-    double g4 = 19.38816 + 0.52402078 * t;
-    g4 = fmod(g4, (double)360);
-
-    //  Jupiter Mean Anomaly
-    double g5 = 20.35116 + 0.08309121 * t;
-    g5 = fmod(g5, (double)360);
-
-    //  Compute solar distance (AU)
-    rs[i]
-      = 1.00014 - 0.01671 * cos(gs / RADEG) - 0.00014 * cos(2. * gs / RADEG);
-
-    //  Compute Geometric Solar Longitude
-    double dls = (6893. - 4.6543463e-4 * t) * sin(gs / RADEG) +
-                 72. * sin(2. * gs / RADEG) - 7. * cos((gs - g5) / RADEG) +
-                 6. * sin((xlm - xls) / RADEG) +
-                 5. * sin((4. * gs - 8. * g4 + 3. * g5) / RADEG) -
-                 5. * cos((2. * gs - 2. * g2) / RADEG) -
-                 4. * sin((gs - g2) / RADEG) +
-                 4. * cos((4. * gs - 8. * g4 + 3. * g5) / RADEG) +
-                 3. * sin((2. * gs - 2. * g2) / RADEG) - 3. * sin(g5 / RADEG) -
-                 3. * sin((2. * gs - 2. * g5) / RADEG);
-
-    double xlsg = xls + dls / 3600;
-
-    //  Compute Apparent Solar Longitude// includes corrections for nutation
-    //  in longitude and velocity aberration
-    double xlsa = xlsg + dpsi - xk / rs[i];
-
-    //   Compute unit Sun vector
-    sun[i][0] = cos(xlsa / RADEG);
-    sun[i][1] = sin(xlsa / RADEG) * cos(eps / RADEG);
-    sun[i][2] = sin(xlsa / RADEG) * sin(eps / RADEG);
-  }  // i-loop
-
-  return 0;
+    return 0;
 }
 
-int qtom(float q[4], double rm[3][3]) {
-  // Convert quaternion to equivalent direction cosine matrix
+int getUt1ToUtc(int32_t year, int32_t dayOfYear, double &ut1ToUtc) {
+    int16_t iyear = year;
+    int16_t day = dayOfYear;
+    static int32_t julianDay[25000];
+    static double ut1[25000];
+    string utcDataFile = "$OCVARROOT/modis/utcpole.dat";
+    static bool firstCall = true;
+    int k = 0;
 
-  rm[0][0] = q[0] * q[0] - q[1] * q[1] - q[2] * q[2] + q[3] * q[3];
-  rm[0][1] = 2 * (q[0] * q[1] + q[2] * q[3]);
-  rm[0][2] = 2 * (q[0] * q[2] - q[1] * q[3]);
-  rm[1][0] = 2 * (q[0] * q[1] - q[2] * q[3]);
-  rm[1][1] = -q[0] * q[0] + q[1] * q[1] - q[2] * q[2] + q[3] * q[3];
-  rm[1][2] = 2 * (q[1] * q[2] + q[0] * q[3]);
-  rm[2][0] = 2 * (q[0] * q[2] + q[1] * q[3]);
-  rm[2][1] = 2 * (q[1] * q[2] - q[0] * q[3]);
-  rm[2][2] = -q[0] * q[0] - q[1] * q[1] + q[2] * q[2] + q[3] * q[3];
+    if (firstCall) {
+        expandEnvVar(&utcDataFile);
 
-  return 0;
-}
-
-int scan_ell(float p[3], double sm[3][3], double coef[10]) {
-  //  This program calculates the coefficients which
-  //  represent the Earth scan track in the sensor frame.
-
-  //  The reference ellipsoid uses an equatorial radius of 6378.137 km and
-  //  a flattening factor of 1/298.257 (WGS 1984).
-
-  //  Calling Arguments
-  //
-  //  Name              Type    I/O     Description
-  //
-  //  pos(3)    R*4      I      ECR Orbit Position Vector (km)
-  //  smat(3,3) R*4      I      Sensor Orientation Matrix
-  //  coef(10)  R*4      O      Scan path coefficients
-
-  double re = 6378.137;
-  double f = 1 / 298.257;
-  double omf2 = (1 - f) * (1 - f);
-
-  //  Compute constants for navigation model using Earth radius values
-  double rd = 1 / omf2;
-
-  //  Compute coefficients of intersection ellipse in scan plane
-  coef[0] = 1 + (rd - 1) * sm[0][2] * sm[0][2];
-  coef[1] = 1 + (rd - 1) * sm[1][2] * sm[1][2];
-  coef[2] = 1 + (rd - 1) * sm[2][2] * sm[2][2];
-  coef[3] = (rd - 1) * sm[0][2] * sm[1][2] * 2;
-  coef[4] = (rd - 1) * sm[0][2] * sm[2][2] * 2;
-  coef[5] = (rd - 1) * sm[1][2] * sm[2][2] * 2;
-  coef[6] = (sm[0][0] * p[0] + sm[0][1] * p[1] + sm[0][2] * p[2] * rd) * 2;
-  coef[7] = (sm[1][0] * p[0] + sm[1][1] * p[1] + sm[1][2] * p[2] * rd) * 2;
-  coef[8] = (sm[2][0] * p[0] + sm[2][1] * p[1] + sm[2][2] * p[2] * rd) * 2;
-  coef[9] = p[0] * p[0] + p[1] * p[1] + p[2] * p[2] * rd - re * re;
-
-  return 0;
-}
-
-int oci_geonav(const char* dem_file, float pos[3], float vel[3],
-               double smat[3][3], double coef[10], float sunr[3],
-               float **pview, size_t npix, double *delt, float *xlat,
-               float *xlon, short *solz, short *sola,
-               short *senz, short *sena, short *height,
-               float& lonwest, float& loneast, float& latsouth, float& latnorth)
-               {
-  //  This subroutine performs navigation of a scanning sensor on the
-  //  surface of an ellipsoid based on an input orbit position vector and
-  //  spacecraft orientation matrix.  It uses a closed-form algorithm for
-  //  determining points on the ellipsoidal surface which involves
-  //  determining the intersection of the scan plan with the ellipsoid.
-  //  The sensor view vectors in the sensor frame are passed in as a 3xN array.
-
-  //  The reference ellipsoid is set according to the scan
-  //  intersection coefficients in the calling sequence// an equatorial
-  //  radius of 6378.137 km. and a flattening factor of 1/298.257 are
-  //  used by both the Geodetic Reference System (GRS) 1980 and the
-  //  World Geodetic System (WGS) 1984.
-
-  //  It then computes geometric parameters using the pixel locations on
-  //  the Earth, the spacecraft position vector and the unit Sun vector in
-  //  the geocentric rotating reference frame.  The outputs are arrays of
-  //  geodetic latitude and longitude, solar zenith and azimuth and sensor
-  //  zenith and azimuth.  The azimuth angles are measured from local
-  //  North toward East.  Flag values of 999. are returned for any pixels
-  //  whose scan angle is past the Earth's horizon.
-
-  //  Reference: "Exact closed-form geolocation geolocation algorithm for
-  //  Earth survey sensors", F. S. Patt and W. W. Gregg, IJRS, Vol. 15
-  //  No. 18, 1994.
-
-  //  Calling Arguments
-
-  //  Name      Type    I/O     Description
-  //  dem_file  char*   I       Digital elevation map file
-  //  pos(3)    R*4      I      ECR Orbit Position Vector (km) at scan
-  //                                 mid-time
-  //  vel(3)      R*4      I      ECR Orbit Velocity Vector (km/sec)
-  //  smat(3,3) R*4      I      Sensor Orientation Matrix
-  //  coef(10)  R*4      I      Scan path coefficients
-  //  sunr(3)   R*4      I      Sun unit vector in geocentric rotating
-  //                             reference frame
-  //  pview(3,*)  R*4      I      Array of sensor view vectors
-  //  npix        R*4      I      Number of pixels to geolocate
-  //  xlat(*)   R*4      O      Pixel geodetic latitudes
-  //  xlon(*)   R*4      O      Pixel geodetic longitudes
-  //  solz(*)   I*2      O      Pixel solar zenith angles
-  //  sola(*)   I*2      O      Pixel solar azimuth angles
-  //  senz(*)   I*2      O      Pixel sensor zenith angles
-  //  sena(*)   I*2      O      Pixel sensor azimuth angles
-  //  height(*) I*2      O      Pixel terrain height
-  //
-
-  //    Program written by:     Frederick S. Patt
-  //                            General Sciences Corporation
-  //                            October 20, 1992
-  //
-  //    Modification History:
-
-  //       Created universal version of the SeaWiFS geolocation algorithm
-  //       by specifying view vectors as an input.  F. S. Patt, SAIC, 11/17/09
-
-  // Earth ellipsoid parameters
-  float f = 1 / 298.257;
-  float omf2 = (1 - f) * (1 - f);
-  gsl_vector *C = gsl_vector_alloc(3);
-
-  for (size_t i = 0; i < npix; i++) {
-    // Compute sensor-to-surface vectors for all scan angles
-    // Compute terms for quadratic equation
-    double o =
-      coef[0] * pview[i][0] * pview[i][0] +
-      coef[1] * pview[i][1] * pview[i][1] +
-      coef[2] * pview[i][2] * pview[i][2] +
-      coef[3] * pview[i][0] * pview[i][1] +
-      coef[4] * pview[i][0] * pview[i][2] +
-      coef[5] * pview[i][1] * pview[i][2];
-
-    double p =
-      coef[6] * pview[i][0] + coef[7] * pview[i][1] + coef[8] * pview[i][2];
-
-    double q = coef[9];
-
-    double r = p * p - 4 * q * o;
-
-    xlat[i] = -32767;
-    xlon[i] = -32767;
-
-    solz[i] = -32767;
-    sola[i] = -32767;
-    senz[i] = -32767;
-    sena[i] = -32767;
-    height[i] = -32767;
-    //  Check for scan past edge of Earth
-    if (r >= 0) {
-
-      //  Solve for magnitude of sensor-to-pixel vector and compute components
-      double d = (-p - sqrt(r)) / (2 * o);
-      double x1[3];
-      for (size_t j = 0; j < 3; j++) x1[j] = d * pview[i][j];
-
-      //  Convert velocity vector to ground speed
-      float re = 6378.137;
-      //      double omegae = 7.29211585494e-05;
-      double pm = sqrt(pos[0]*pos[0] + pos[1]*pos[1] + pos[2]*pos[2]);
-      double clatg = sqrt(pos[0]*pos[0] + pos[1]*pos[1]) / pm;
-      double rg = re*(1.-f)/sqrt(1.-(2.-f)*f*clatg*clatg);
-      double v[3];
-      //      v[0] = (vel[0] - pos[1]*omegae) * rg / pm;
-      //v[1] = (vel[1] - pos[0]*omegae) * rg / pm;
-      v[0] = vel[0] * rg / pm;
-      v[1] = vel[1] * rg / pm;
-      v[2] = vel[2] * rg / pm;
-      
-      //  Transform vector from sensor to geocentric frame
-      gsl_matrix_view A = gsl_matrix_view_array((double *)smat, 3, 3);
-      gsl_vector_view B = gsl_vector_view_array(x1, 3);
-
-      gsl_blas_dgemv(CblasTrans, 1.0, &A.matrix, &B.vector, 0.0, C);
-
-      float rh[3], geovec[3];
-      double *ptr_C = gsl_vector_ptr(C, 0);
-      for (size_t j = 0; j < 3; j++) {
-        rh[j] = ptr_C[j];
-        geovec[j] = pos[j] + rh[j] + v[j]*delt[i];
-      }
-
-      // Compute the local vertical, East and North unit vectors
-      float uxy = geovec[0] * geovec[0] + geovec[1] * geovec[1];
-      float temp = sqrt(geovec[2] * geovec[2] + omf2 * omf2 * uxy);
-
-      float up[3];
-      up[0] = omf2 * geovec[0] / temp;
-      up[1] = omf2 * geovec[1] / temp;
-      up[2] = geovec[2] / temp;
-      float upxy = sqrt(up[0] * up[0] + up[1] * up[1]);
-
-      float ea[3];
-      ea[0] = -up[1] / upxy;
-      ea[1] = up[0] / upxy;
-      ea[2] = 0.0;
-
-      // no = crossp(up,ea)
-      float no[3];
-      no[0] = -up[2] * ea[1];
-      no[1] = up[2] * ea[0];
-      no[2] = up[0] * ea[1] - up[1] * ea[0];
-
-      //  Compute geodetic latitude and longitude
-      float xlat_ = RADEG * asin(up[2]);
-      float xlon_ = RADEG * atan2(up[1], up[0]);
-      //check if it is in the range
-      if( std::abs(xlat_) > 90.0e0 || std::abs(xlon_) > 180.0e0){
-          continue;
+        ifstream utcpfile(utcDataFile.c_str());
+        if (!utcpfile.is_open()) {
+            cout << utcDataFile.c_str() << " not found" << endl;
+            exit(1);
         }
-      xlat[i] = xlat_;
-      xlon[i] = xlon_;
-      // Transform the pixel-to-spacecraft and Sun vectors into local frame
-      float rl[3], sl[3];
-      rl[0] = -ea[0] * rh[0] - ea[1] * rh[1] - ea[2] * rh[2];
-      rl[1] = -no[0] * rh[0] - no[1] * rh[1] - no[2] * rh[2];
-      rl[2] = -up[0] * rh[0] - up[1] * rh[1] - up[2] * rh[2];
 
-      sl[0] = sunr[0] * ea[0] + sunr[1] * ea[1] + sunr[2] * ea[2];
-      sl[1] = sunr[0] * no[0] + sunr[1] * no[1] + sunr[2] * no[2];
-      sl[2] = sunr[0] * up[0] + sunr[1] * up[1] + sunr[2] * up[2];
-
-      //  Compute the solar zenith and azimuth
-      solz[i] = (short)(100 * RADEG *
-                        atan2(sqrt(sl[0] * sl[0] + sl[1] * sl[1]), sl[2]));
-
-      // Check for zenith close to zero
-      if (solz[i] > 0.01) sola[i] = (short)(100 * RADEG * atan2(sl[0], sl[1]));
-
-      // Compute the sensor zenith and azimuth
-      senz[i] = (short)(100 * RADEG *
-                        atan2(sqrt(rl[0] * rl[0] + rl[1] * rl[1]), rl[2]));
-
-      // Check for zenith close to zero
-      if (senz[i] > 0.01) sena[i] = (short)(100 * RADEG * atan2(rl[0], rl[1]));
-
-      // terrain correct the pixel
-      float tmp_sena = sena[i] / 100.0;
-      float tmp_senz = senz[i] / 100.0;
-      float tmp_height = 0;
-      get_nc_height(dem_file, &xlon[i], &xlat[i],
-                    &tmp_senz, &tmp_sena, &tmp_height);
-      // there is also a bug in terraing correction
-      if( std::abs(xlat[i]) > 90.0e0 || std::abs(xlon[i]) > 180.0e0){
-        xlat[i] = -32767;
-        xlon[i] = -32767;
-        solz[i] = -32767;
-        sola[i] = -32767;
-        senz[i] = -32767;
-        sena[i] = -32767;
-        continue;
-      }
-
-      if (xlon[i] > loneast) loneast = xlon[i];
-      if (xlon[i] < lonwest) lonwest = xlon[i];
-      if (xlat[i] < latsouth) latsouth = xlat[i];
-      if (xlat[i] > latnorth) latnorth = xlat[i];
-
-      sena[i] = (short)(tmp_sena * 100.0);
-      senz[i] = (short)(tmp_senz * 100.0);
-      height[i] = (short)tmp_height;
-    }  // if on-earth
-  }    // pixel loop
-
-  gsl_vector_free(C);
-
-  return 0;
-}
-
-int mat2rpy(float pos[3], float vel[3], double smat[3][3], float rpy[3]) {
-  //  This program calculates the attitude angles from the ECEF orbit vector and
-  //  attitude matrix.  The rotation order is (1,2,3).
-
-  //  The reference ellipsoid uses an equatorial radius of 6378.137 km and
-  //  a flattening factor of 1/298.257 (WGS 1984).
-
-  //  Calling Arguments
-
-  //  Name                Type    I/O     Description
-  //
-  //  pos(3)      R*4      I      Orbit position vector (ECEF)
-  //  vel(3)      R*4      I      Orbit velocity vector (ECEF)
-  //  smat(3,3)   R*8      I      Sensor attitude matrix (ECEF to sensor)
-  //  rpy(3)      R*4      O      Attitude angles (roll, pitch, yaw)
-
-  double rem = 6371;
-  double f = 1 / (double)298.257;
-  double omegae = 7.29211585494e-5;
-  double omf2 = (1 - f) * (1 - f);
-
-  // Determine local vertical reference axes
-  double p[3], v[3];
-  for (size_t j = 0; j < 3; j++) {
-    p[j] = (double)pos[j];
-    v[j] = (double)vel[j];
-  }
-  v[0] -= p[1] * omegae;
-  v[1] += p[0] * omegae;
-
-  //  Compute Z axis as local nadir vector
-  double pm = sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]);
-  double omf2p = (omf2 * rem + pm - rem) / pm;
-  double pxy = p[0] * p[0] + p[1] * p[1];
-  double temp = sqrt(p[2] * p[2] + omf2p * omf2p * pxy);
-
-  double z[3];
-  z[0] = -omf2p * p[0] / temp;
-  z[1] = -omf2p * p[1] / temp;
-  z[2] = -p[2] / temp;
-
-  // Compute Y axis along negative orbit normal
-  double on[3];
-  on[0] = v[1] * z[2] - v[2] * z[1];
-  on[1] = v[2] * z[0] - v[0] * z[2];
-  on[2] = v[0] * z[1] - v[1] * z[0];
-
-  double onm = sqrt(on[0] * on[0] + on[1] * on[1] + on[2] * on[2]);
-
-  double y[3];
-  for (size_t j = 0; j < 3; j++) y[j] = -on[j] / onm;
-
-  // Compute X axis to complete orthonormal triad (velocity direction)
-  double x[3];
-  x[0] = y[1] * z[2] - y[2] * z[1];
-  x[1] = y[2] * z[0] - y[0] * z[2];
-  x[2] = y[0] * z[1] - y[1] * z[0];
-
-  // Store local vertical reference vectors in matrix
-  double om[3][3];
-  memcpy(&om[0][0], &x, 3 * sizeof(double));
-  memcpy(&om[1][0], &y, 3 * sizeof(double));
-  memcpy(&om[2][0], &z, 3 * sizeof(double));
-
-  // Compute orbital-to-spacecraft matrix
-  double rm[3][3];
-  gsl_matrix_view rm_mat = gsl_matrix_view_array(&rm[0][0], 3, 3);
-
-  int s;
-
-  gsl_permutation *perm = gsl_permutation_alloc(3);
-
-  // Compute the LU decomposition of this matrix
-  gsl_matrix_view B = gsl_matrix_view_array(&om[0][0], 3, 3);
-  gsl_linalg_LU_decomp(&B.matrix, perm, &s);
-
-  // Compute the  inverse of the LU decomposition
-  double inv[3][3];
-  gsl_matrix_view inv_mat = gsl_matrix_view_array(&inv[0][0], 3, 3);
-
-  gsl_linalg_LU_invert(&B.matrix, perm, &inv_mat.matrix);
-
-  gsl_matrix_view A = gsl_matrix_view_array(&smat[0][0], 3, 3);
-
-  gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, &A.matrix, &inv_mat.matrix,
-                 0.0, &rm_mat.matrix);
-
-  gsl_permutation_free(perm);
-
-  // Compute attitude angles
-  rpy[0] = RADEG * atan(-rm[2][1] / rm[2][2]);
-  double cosp = sqrt(rm[2][1] * rm[2][1] + rm[2][2] * rm[2][2]);
-  if (rm[2][2] < 0) cosp *= -1;
-  rpy[1] = RADEG * atan2(rm[2][0], cosp);
-  rpy[2] = RADEG * atan(-rm[1][0] / rm[0][0]);
-
-  return 0;
-}
-
-
-/*----------------------------------------------------------------- */
-/* Create a Generic NETCDF4 file                                   */
-/* ---------------------------------------------------------------- */
-int geoFile::createFile( const char* filename, const char* cdlfile,
-                         size_t sdim, int *ncid, int *gid,
-                         uint32_t bbb, uint32_t rbb,
-                         int16_t pcdim, int16_t psdim, size_t nswband, int32_t *rta_nadir,
-                         bool radiance) {
-
-   try {
-     geofile = new NcFile( filename, NcFile::replace);
-   }
-   catch ( NcException& e) {
-     e.what();
-     cerr << "Failure creating OCI GEO file: " << filename << endl;
-     exit(1);
-   }
-
-   ifstream output_data_structure;
-   string line;
-   string dataStructureFile;
-
-   dataStructureFile.assign( cdlfile);
-   expandEnvVar( &dataStructureFile);
-
-   output_data_structure.open( dataStructureFile.c_str(), ifstream::in);
-   if ( output_data_structure.fail() == true) {
-     cout << "\"" << dataStructureFile.c_str() << "\" not found" << endl;
-     exit(1);
-   }
-
-   // Find "dimensions" section of CDL file
-   while(1) {
-     getline( output_data_structure, line);
-     size_t pos = line.find("dimensions:");
-     if ( pos == 0) break;
-   }
-
-   // Define dimensions from "dimensions" section of CDL file
-   ndims = 0;
-   //   int dimid[1000];
-   while(1) {
-     getline( output_data_structure, line);
-     boost::trim(line);
-     if (line.substr(0,2) == "//") continue;
-
-     size_t pos = line.find(" = ");
-     if ( pos == string::npos) break;
-
-     uint32_t dimSize;
-     istringstream iss(line.substr(pos+2, string::npos));
-     iss >> dimSize;
-
-     iss.clear(); 
-     iss.str( line);
-     iss >> skipws >> line;
-
-     if (line.compare("number_of_scans") == 0) {
-       dimSize = sdim;
-     }
-
-     if (line.compare("blue_bands") == 0) {
-       dimSize = bbb;
-     }
-          
-     if (line.compare("red_bands") == 0) {
-       dimSize = rbb;
-     }
-
-     if (line.compare("ccd_pixels") == 0) {
-       dimSize = pcdim;
-     }
-
-     if (line.compare("SWIR_pixels") == 0) {
-       dimSize = psdim;
-     }
-     
-     if (line.compare("SWIR_bands") == 0) {
-     dimSize = nswband;
-     }
-     try {
-       ncDims[ndims++] = geofile->addDim( line, dimSize);
-     }
-     catch ( NcException& e) {
-       e.what();
-       cerr << "Failure creating dimension: " << line.c_str() << endl;
-       exit(1);
-     }
-
-   } // while loop
-
-   // Read global attributes (string attributes only) 
-   while(1) {
-     getline( output_data_structure, line);
-     boost::trim(line);
-     size_t pos = line.find("// global attributes");
-     if ( pos == 0) break;
-   }
-
-   while(1) {
-     getline( output_data_structure, line);
-     size_t pos = line.find(" = ");
-     if ( pos == string::npos) break;
-
-     string attValue = line.substr(pos+3);
-
-     // Remove any leading and trailing quotes
-     attValue.erase(attValue.length()-2); // skip final " ;"
-     size_t begQuote = attValue.find('"');
-     size_t endQuote = attValue.find_last_of('"');
-     if (begQuote == string::npos) continue; // Skip non-string global attributes
-     attValue = attValue.substr(begQuote+1, endQuote-begQuote-1);
-
-     istringstream iss(line.substr(pos+2));
-     iss.clear(); 
-     iss.str( line);
-     iss >> skipws >> line;
-
-     // Skip commented out attributes
-     if (line.compare("//") == 0) continue;
-
-     string attName;
-     attName.assign(line.substr(1).c_str());
-
-     try {
-       geofile->putAtt(attName, attValue);
-     }
-     catch ( NcException& e) {
-       e.what();
-       cerr << "Failure creating attribute: " + attName << endl;
-       exit(1);
-     }
-     
-   } // while(1)
-
-   geofile->putAtt("rta_nadir", NC_LONG, 2, rta_nadir);
-
-   ngrps = 0;
-   // Loop through groups
-   while(1) {
-     getline( output_data_structure, line);
-
-     // Check if end of CDL file
-     // If so then close CDL file and return
-     if (line.substr(0,1).compare("}") == 0) {
-       output_data_structure.close();
-       return 0;
-     }
-
-     // Check for beginning of new group
-     size_t pos = line.find("group:");
-
-     // If found then create new group and variables
-     if ( pos == 0) {
-
-       // Parse group name
-       istringstream iss(line.substr(6, string::npos));
-       iss >> skipws >> line;
-
-       // Create NCDF4 group
-       ncGrps[ngrps++] = geofile->addGroup(line);
-
-       int numDims=0;
-       //       int varDims[NC_MAX_DIMS];
-       //size_t dimSize[NC_MAX_DIMS];
-       //char dimName[NC_MAX_NAME+1];
-       string sname;
-       string lname;
-       string standard_name;
-       string units;
-       string description;
-       string flag_masks;
-       string flag_meanings;
-       double valid_min=0.0;
-       double valid_max=0.0;
-       double scale=1.0;
-       double offset=0.0;
-       double fill_value=0.0;
-       string coordinates;
-
-       vector<NcDim> varVec;
-
-       int ntype=0;
-       NcType ncType;
-
-       // Loop through datasets in group
-       getline( output_data_structure, line); // skip "variables:"
-       while(1) {
-         getline( output_data_structure, line);
-         boost::trim(line);
-
-         if (line.substr(0,2) == "//") continue;
-         if (line.length() == 0) continue;
-         if (line.substr(0,1).compare("\r") == 0) continue;
-         if (line.substr(0,1).compare("\n") == 0) continue;
-
-         if (radiance) {
-           if (line.find("rhot_") != std::string::npos) continue;
-         } else {
-           if (line.find("Lt_") != std::string::npos) continue;
-         }
-         
-         size_t pos = line.find(":");
-
-         // No ":" found, new dataset or empty line or end-of-group
-         if ( pos == string::npos) {
-
-           if ( numDims > 0) {
-             // Create previous dataset
-             createField( ncGrps[ngrps-1], sname.c_str(), lname.c_str(),
-                          standard_name.c_str(), units.c_str(),
-                          description.c_str(),
-                          (void *) &fill_value, 
-                          flag_masks.c_str(), flag_meanings.c_str(),
-                          valid_min, valid_max, 
-                          scale, offset,
-                          ntype, varVec, coordinates);
-
-             flag_masks.clear();
-             flag_meanings.clear();
-             units.clear();
-             description.clear();
-             varVec.clear();
-             coordinates.clear();
-           }
-
-           valid_min=0.0;
-           valid_max=0.0;
-           scale=1.0;
-           offset=0.0;
-           fill_value=0.0;
-
-           if (line.substr(0,10).compare("} // group") == 0) break;
-
-           // Parse variable type
-           string varType;
-           istringstream iss(line);
-           iss >> skipws >> varType;
-
-           // Get corresponding NC variable type
-           if ( varType.compare("char") == 0) ntype = NC_CHAR;
-           else if ( varType.compare("byte") == 0) ntype = NC_BYTE;
-           else if ( varType.compare("short") == 0) ntype = NC_SHORT;
-           else if ( varType.compare("int") == 0) ntype = NC_INT;
-           else if ( varType.compare("long") == 0) ntype = NC_INT;
-           else if ( varType.compare("float") == 0) ntype = NC_FLOAT;
-           else if ( varType.compare("real") == 0) ntype = NC_FLOAT;
-           else if ( varType.compare("double") == 0) ntype = NC_DOUBLE;
-           else if ( varType.compare("ubyte") == 0) ntype = NC_UBYTE;
-           else if ( varType.compare("ushort") == 0) ntype = NC_USHORT;
-           else if ( varType.compare("uint") == 0) ntype = NC_UINT;
-           else if ( varType.compare("ulong") == 0) ntype = NC_UINT;
-           else if ( varType.compare("int64") == 0) ntype = NC_INT64;
-           else if ( varType.compare("uint64") == 0) ntype = NC_UINT64;
-
-           // Parse short name (sname)
-           pos = line.find("(");
-           size_t posSname = line.substr(0, pos).rfind(" ");
-           sname.assign(line.substr(posSname+1, pos-posSname-1));
-
-           // Parse variable dimension info
-           this->parseDims( line.substr(pos+1, string::npos), varVec);
-           numDims = varVec.size();
-
-         } else {
-           // Parse variable attributes
-           size_t posEql = line.find("=");
-           size_t pos1qte = line.find("\"");
-           size_t pos2qte = line.substr(pos1qte+1, string::npos).find("\"");
-
-           string attrName = line.substr(pos+1, posEql-pos-2);
-
-           // Get long_name
-           if ( attrName.compare("long_name") == 0) {
-             lname.assign(line.substr(pos1qte+1, pos2qte));
-           }
-
-           // Get units
-           else if ( attrName.compare("units") == 0) {
-             units.assign(line.substr(pos1qte+1, pos2qte));
-           }
-
-           // Get description
-           else if ( attrName.compare("description") == 0) {
-             description.assign(line.substr(pos1qte+1, pos2qte));
-           }
-
-           // Get _FillValue
-           else if ( attrName.compare("_FillValue") == 0) {
-             iss.clear(); 
-             iss.str( line.substr(posEql+1, string::npos));
-             iss >> fill_value;
-           }
-
-           // Get flag_masks
-           else if ( attrName.compare("flag_masks") == 0) {
-             flag_masks.assign(line.substr(pos1qte+1, pos2qte));
-           }
-           else if ( attrName.compare("flag_masks") == 0) {
-             flag_masks.assign(line.substr(pos1qte+1, pos2qte));
-           }
-
-           // Get flag_meanings
-           else if ( attrName.compare("flag_meanings") == 0) {
-             flag_meanings.assign(line.substr(pos1qte+1, pos2qte));
-           }
-
-           // Get valid_min
-           else if ( attrName.compare("valid_min") == 0) {
-             iss.clear(); 
-             iss.str( line.substr(posEql+1, string::npos));
-             iss >> valid_min;
-           }
-
-           // Get valid_max
-           else if ( attrName.compare("valid_max") == 0) {
-             iss.clear(); 
-             iss.str( line.substr(posEql+1, string::npos));
-             iss >> valid_max;
-           }
-
-           // Get scale
-           else if ( attrName.compare("scale_factor") == 0) {
-             iss.clear(); 
-             iss.str( line.substr(posEql+1, string::npos));
-             iss >> scale;
-           }
-
-           // Get offset
-           else if ( attrName.compare("add_offset") == 0) {
-             iss.clear(); 
-             iss.str( line.substr(posEql+1, string::npos));
-             iss >> offset;
-           }
-
-           // Get coordinates
-           else if ( attrName.compare("coordinates") == 0) {
-             coordinates.assign(line.substr(pos1qte+1, pos2qte));
-           }
-
-         } // if ( pos == string::npos)
-       } // datasets in group loop
-     } // New Group loop
-   } // Main Group loop
-
-   return 0;
-}
-
-
-int geoFile::parseDims( string dimString, vector<NcDim>& varDims) {
-
-  size_t curPos=0;
-  //  char dimName[NC_MAX_NAME+1];
-  string dimName;
-
-  while(1) {
-    size_t pos = dimString.find(",", curPos);
-    if ( pos == string::npos) 
-      pos = dimString.find(")");
-
-    string varDimName;
-    istringstream iss(dimString.substr(curPos, pos-curPos));
-    iss >> skipws >> varDimName;
-
-    for (int i=0; i<ndims; i++) {
-      
-      try {      
-        dimName = ncDims[i].getName();
-      }
-      catch ( NcException& e) {
-        e.what();
-        cerr << "Failure accessing dimension: " + dimName << endl;
-        exit(1);
-      }
-      
-      if ( varDimName.compare(dimName) == 0) {
-        varDims.push_back(ncDims[i]);
-        break;
-      }
+        istringstream istr;
+        string line;
+
+        getline(utcpfile, line);
+        getline(utcpfile, line);
+        while (getline(utcpfile, line)) {
+            istr.clear();
+            istr.str(line.substr(0, 5));
+            istr >> julianDay[k];
+            istr.clear();
+            istr.str(line.substr(44, 9));
+            istr >> ut1[k];
+            k++;
+        }
+        julianDay[k] = 0;
+        utcpfile.close();
+        firstCall = false;
+
+    }  // if (first)
+
+    k = 0;
+    int daysSinceEpoch = jday(iyear, 1, day) - 2400000;
+    while (julianDay[k] > 0) {
+        if (daysSinceEpoch == julianDay[k]) {
+            ut1ToUtc = ut1[k];
+            break;
+        }
+        k++;
     }
-    if ( dimString.substr(pos, 1).compare(")") == 0) break;
 
-    curPos = pos + 1;
-  }
-
-  return 0;
+    return 0;
 }
 
-int geoFile::close() {
+int matrixToQuaternion(double rotationMatrix[3][3], double quaternion[4]) {
+    //  Convert direction cosine matrix to equivalent quaternion
 
-  try { 
-    geofile->close();
-  }
-  catch ( NcException& e) {
-    cout << e.what() << endl;
-    cerr << "Failure closing: " + fileName << endl;
-    exit(1);
-  }
-  
-  return 0;
+    double eulerAxis[3];
+
+    //  Compute Euler angle
+    double phi;  // Euler angle
+    double cphi = (rotationMatrix[0][0] + rotationMatrix[1][1] + rotationMatrix[2][2] - 1) / 2;
+    if (fabs(cphi) < 0.98) {
+        phi = acos(cphi);
+    } else {
+        // Squared sine of Euler angle (called phi)
+        double ssphi = (pow(rotationMatrix[0][1] - rotationMatrix[1][0], 2) +
+                        pow(rotationMatrix[2][0] - rotationMatrix[0][2], 2) +
+                        pow(rotationMatrix[1][2] - rotationMatrix[2][1], 2)) /
+                       4;
+
+        phi = cphi < 0 ? PI - asin(sqrt(ssphi)) : asin(sqrt(ssphi));
+    }
+
+    //  Compute Euler axis
+    double sinPhi2x = sin(phi) * 2;
+    eulerAxis[0] = (rotationMatrix[2][1] - rotationMatrix[1][2]) / sinPhi2x;
+    eulerAxis[1] = (rotationMatrix[0][2] - rotationMatrix[2][0]) / sinPhi2x;
+    eulerAxis[2] = (rotationMatrix[1][0] - rotationMatrix[0][1]) / sinPhi2x;
+
+    double norm =
+        sqrt(eulerAxis[0] * eulerAxis[0] + eulerAxis[1] * eulerAxis[1] + eulerAxis[2] * eulerAxis[2]);
+
+    eulerAxis[0] /= norm;
+    eulerAxis[1] /= norm;
+    eulerAxis[2] /= norm;
+
+    //  Compute quaternion
+    double sinPhiOver2 = sin(phi / 2);
+    quaternion[0] = eulerAxis[0] * sinPhiOver2;
+    quaternion[1] = eulerAxis[1] * sinPhiOver2;
+    quaternion[2] = eulerAxis[2] * sinPhiOver2;
+    quaternion[3] = cos(phi / 2);
+
+    return 0;
 }
 
+int multiplyQuaternions(double q1[4], float q2[4], double q3[4]) {
+    // Compute the product of two quaternions q3 = q1*q2
+
+    q3[0] = q1[0] * q2[3] + q1[1] * q2[2] - q1[2] * q2[1] + q1[3] * q2[0];
+    q3[1] = -q1[0] * q2[2] + q1[1] * q2[3] + q1[2] * q2[0] + q1[3] * q2[1];
+    q3[2] = q1[0] * q2[1] - q1[1] * q2[0] + q1[2] * q2[3] + q1[3] * q2[2];
+    q3[3] = -q1[0] * q2[0] - q1[1] * q2[1] - q1[2] * q2[2] + q1[3] * q2[3];
+
+    return 0;
+}
+
+int multiplyQuaternions(float q1[4], float q2[4], float q3[4]) {
+    // Compute the product of two quaternions q3 = q1*q2
+
+    q3[0] = q1[0] * q2[3] + q1[1] * q2[2] - q1[2] * q2[1] + q1[3] * q2[0];
+    q3[1] = -q1[0] * q2[2] + q1[1] * q2[3] + q1[2] * q2[0] + q1[3] * q2[1];
+    q3[2] = q1[0] * q2[1] - q1[1] * q2[0] + q1[2] * q2[3] + q1[3] * q2[2];
+    q3[3] = -q1[0] * q2[0] - q1[1] * q2[1] - q1[2] * q2[2] + q1[3] * q2[3];
+
+    return 0;
+}
+
+int interpolateOrbitVectors(size_t numOrbRec, size_t numScans, double *orbitTimes, orbArray *positions,
+                            orbArray *velocities, double *scanTimes, orbArray *posI, orbArray *velI) {
+    double constantTerm[3], linearTerm[3], quadraticTerm[3], cubicTerm[3];
+
+    // initialize the arrays
+    for (int i = 0; i < 3; i++) {
+        constantTerm[i] = 0.0;
+        linearTerm[i] = 0.0;
+        quadraticTerm[i] = 0.0;
+        cubicTerm[i] = 0.0;
+    }
+
+    // orbit time
+    double startOrbTime = orbitTimes[0];
+    double endOrbTime = orbitTimes[numOrbRec - 1];
+    const double NAV_FILL = -9999999.0;
+
+    size_t ind = 0;
+    for (size_t i = 0; i < numScans; i++) {
+        // scantime outside valid orbit time, use fill value
+        if (scanTimes[i] < startOrbTime || scanTimes[i] > endOrbTime) {
+            for (int vector = 0; vector < 3; vector++) {
+                posI[i][vector] = NAV_FILL;
+                velI[i][vector] = BAD_FLT;
+            }
+            // skip calulations below
+            continue;
+        }
+
+        //  Find input orbit vectors bracketing scan
+        for (size_t j = ind; j < numOrbRec; j++) {
+            if (scanTimes[i] > orbitTimes[j] && scanTimes[i] <= orbitTimes[j + 1]) {
+                ind = j;
+                break;
+            }
+        }
+
+        //  Set up cubic interpolation
+        double dt = orbitTimes[ind + 1] - orbitTimes[ind];
+        for (size_t j = 0; j < 3; j++) {
+            constantTerm[j] = positions[ind][j];
+            linearTerm[j] = velocities[ind][j] * dt;
+            if (dt >= 3.5) {
+                quadraticTerm[j] = 3 * positions[ind + 1][j] - 3 * positions[ind][j] -
+                                   2 * velocities[ind][j] * dt - velocities[ind + 1][j] * dt;
+                cubicTerm[j] = 2 * positions[ind][j] - 2 * positions[ind + 1][j] + velocities[ind][j] * dt +
+                               velocities[ind + 1][j] * dt;
+            } else {
+                quadraticTerm[j] = (velocities[ind + 1][j] - velocities[ind][j]) / 2;
+                cubicTerm[j] = 0.0;
+            }
+        }
+
+        //  Interpolate orbit position and velocity components to scan line time
+        double x = (scanTimes[i] - orbitTimes[ind]) / dt;
+        double x2 = x * x;
+        double x3 = x2 * x;
+        for (size_t j = 0; j < 3; j++) {
+            posI[i][j] = constantTerm[j] + linearTerm[j] * x + quadraticTerm[j] * x2 + cubicTerm[j] * x3;
+            velI[i][j] = (linearTerm[j] + 2 * quadraticTerm[j] * x + 3 * cubicTerm[j] * x2) / dt;
+        }
+    }  // i-loop
+
+    return 0;
+}
+
+int interpolateAttitudeForScanTimes(size_t numAttRec, size_t numScans, double *quatTimes, quaternion *quats,
+                                    double *scanTimes, quaternion *quatsInterpolated) {
+    // Attitude
+    double startAttTime = quatTimes[0];
+    double endAttTime = quatTimes[numAttRec - 1];
+    size_t ind = 0;
+    for (size_t i = 0; i < numScans; i++) {
+        // if scan time is outside the valid att time, use fill value
+        if (scanTimes[i] < startAttTime || scanTimes[i] > endAttTime) {
+            for (int element = 0; element < 4; element++) {
+                quatsInterpolated[i][element] = BAD_FLT;
+            }
+            continue;
+        }
+
+        //  Find input attitude vectors bracketing scan
+        for (size_t j = ind; j < numAttRec; j++) {
+            if (scanTimes[i] > quatTimes[j] && scanTimes[i] <= quatTimes[j + 1]) {
+                ind = j;
+                break;
+            }
+        }
+
+        //  Set up quaternion interpolation
+        double deltaT = quatTimes[ind + 1] - quatTimes[ind];
+        double quatToInterpolate[4];
+        quatToInterpolate[0] = -quats[ind][0];
+        quatToInterpolate[1] = -quats[ind][1];
+        quatToInterpolate[2] = -quats[ind][2];
+        quatToInterpolate[3] = quats[ind][3];
+
+        double relativeRotationAxis[3], resultQuat[4];
+        multiplyQuaternions(quatToInterpolate, quats[ind + 1], resultQuat);
+        memcpy(relativeRotationAxis, resultQuat, 3 * sizeof(double));
+        double rotationMagnitude = sqrt(relativeRotationAxis[0] * relativeRotationAxis[0] +
+                                        relativeRotationAxis[1] * relativeRotationAxis[1] +
+                                        relativeRotationAxis[2] * relativeRotationAxis[2]);
+        for (size_t j = 0; j < 3; j++)
+            relativeRotationAxis[j] /= rotationMagnitude;
+
+        // Interpolate quaternion to scan times
+        double interpolationFactor = (scanTimes[i] - quatTimes[ind]) / deltaT;
+        float relativeRotationQuat[4], interpolatedQuat[4];
+        for (size_t j = 0; j < 3; j++)
+            relativeRotationQuat[j] = relativeRotationAxis[j] * rotationMagnitude * interpolationFactor;
+        relativeRotationQuat[3] = 1.0;
+        multiplyQuaternions(quats[ind], relativeRotationQuat, interpolatedQuat);
+        memcpy(quatsInterpolated[i], interpolatedQuat, 4 * sizeof(float));
+    }
+
+    return 0;
+}
+
+int interpolateTilt(size_t numTilts, size_t numScans, double *tiltTimes, float *tiltin, double *scanTimes,
+                    float *tiltInterpolated) {
+    double startTiltTime = tiltTimes[0];
+    double endTiltTime = tiltTimes[numTilts - 1];
+
+    size_t ind = 0;
+    for (size_t i = 0; i < numScans; i++) {
+        if (scanTimes[i] < startTiltTime || scanTimes[i] > endTiltTime) {
+            tiltInterpolated[i] = BAD_FLT;
+            continue;
+        }
+
+        //  Find input tilt vectors bracketing scan
+        for (size_t j = ind; j < numTilts; j++) {
+            if (scanTimes[i] > tiltTimes[j] && scanTimes[i] <= tiltTimes[j + 1]) {
+                ind = j;
+                break;
+            }
+        }
+
+        double interpolationFactor = (scanTimes[i] - tiltTimes[ind]) / (tiltTimes[ind + 1] - tiltTimes[ind]);
+        tiltInterpolated[i] = (1 - interpolationFactor) * tiltin[ind] + interpolationFactor * tiltin[ind + 1];
+    }
+
+    return 0;
+}
+
+double calculateGreenwichHourAngle(int32_t year, int32_t day, double seconds) {
+    double timeOfDay = day + seconds / SECONDS_IN_DAY;
+    double greenwichHourAngle;
+    gha2000(year, timeOfDay, &greenwichHourAngle);
+    return greenwichHourAngle * RADEG;
+}
+
+int getEcrSunVector(size_t numScans, int32_t year, int32_t day, double *sec, orbArray *sunr, double *rs) {
+    //  Get unit Sun vector in geocentric inertial coordinates
+    getInertialSunVector(numScans, year, day, sec, sunr, rs);
+
+    //  Get Greenwich mean sidereal angle
+    for (size_t i = 0; i < numScans; i++) {
+        double greenwichHourAngleDegrees = calculateGreenwichHourAngle(year, day, sec[i]);
+
+        //  Transform Sun vector into geocentric rotating frame
+        sunr[i][0] =
+            sunr[i][0] * cos(greenwichHourAngleDegrees) + sunr[i][1] * sin(greenwichHourAngleDegrees);
+        sunr[i][1] =
+            sunr[i][1] * cos(greenwichHourAngleDegrees) - sunr[i][0] * sin(greenwichHourAngleDegrees);
+    }
+
+    return EXIT_SUCCESS;
+}
+
+int getInertialSunVector(size_t numScans, int32_t year, int32_t dayOfYear, double *secondsOfDay,
+                         orbArray *sunVector, double *sunEarthDistance) {
+    float constexpr aberrationConstant = 0.0056932;  // Constant of aberration
+    // todo: constexpr/global for J2000
+
+    for (size_t i = 0; i < numScans; i++) {
+        //   Compute floating point days since Jan 1.5, 2000
+        //    Note that the Julian day starts at noon on the specified date
+        double daysSinceJ2000 = jday((int16_t)year, 1, (int16_t)dayOfYear) - (double)2451545.0 +
+                                (secondsOfDay[i] - (SECONDS_IN_DAY / 2)) / SECONDS_IN_DAY;
+        double meanSolarLon, meanAnomalySun, meanLunarLon, ascendingNodeLon;
+        double nutationInLongitude, obliquityOfEcliptic;
+
+        //  Compute solar ephemeris parameters
+        ephparms(daysSinceJ2000, &meanSolarLon, &meanAnomalySun, &meanLunarLon, &ascendingNodeLon);
+
+        // Compute nutation corrections for this day
+        nutate(daysSinceJ2000, meanSolarLon, meanAnomalySun, meanLunarLon, ascendingNodeLon,
+               &nutationInLongitude, &obliquityOfEcliptic);
+
+        //  Compute planet mean anomalies. These are the points at which the planets find themselves relative
+        //  to their respective perihelions.
+        //   Venus Mean Anomaly
+        double venusMeanAnomaly = 50.40828 + 1.60213022 * daysSinceJ2000;
+        venusMeanAnomaly = fmod(venusMeanAnomaly, (double)360);
+
+        //   Mars Mean Anomaly
+        double marsMeanAnomaly = 19.38816 + 0.52402078 * daysSinceJ2000;
+        marsMeanAnomaly = fmod(marsMeanAnomaly, (double)360);
+
+        //  Jupiter Mean Anomaly
+        double jupiterMeanAnomaly = 20.35116 + 0.08309121 * daysSinceJ2000;
+        jupiterMeanAnomaly = fmod(jupiterMeanAnomaly, (double)360);
+
+        //  Compute solar distance (AU)
+        sunEarthDistance[i] =
+            1.00014 - 0.01671 * cos(meanAnomalySun / RADEG) - 0.00014 * cos(2. * meanAnomalySun / RADEG);
+
+        //  Compute Geometric Solar Longitude
+        double geometricSolarLonCorrection =
+            (6893. - 4.6543463e-4 * daysSinceJ2000) * sin(meanAnomalySun / RADEG) +
+            72. * sin(2. * meanAnomalySun / RADEG) - 7. * cos((meanAnomalySun - jupiterMeanAnomaly) / RADEG) +
+            6. * sin((meanLunarLon - meanSolarLon) / RADEG) +
+            5. * sin((4. * meanAnomalySun - 8. * marsMeanAnomaly + 3. * jupiterMeanAnomaly) / RADEG) -
+            5. * cos((2. * meanAnomalySun - 2. * venusMeanAnomaly) / RADEG) -
+            4. * sin((meanAnomalySun - venusMeanAnomaly) / RADEG) +
+            4. * cos((4. * meanAnomalySun - 8. * marsMeanAnomaly + 3. * jupiterMeanAnomaly) / RADEG) +
+            3. * sin((2. * meanAnomalySun - 2. * venusMeanAnomaly) / RADEG) -
+            3. * sin(jupiterMeanAnomaly / RADEG) -
+            3. * sin((2. * meanAnomalySun - 2. * jupiterMeanAnomaly) / RADEG);
+
+        double geometricSolarLon = meanSolarLon + geometricSolarLonCorrection / 3600;
+
+        //  Compute Apparent Solar Longitude// includes corrections for nutation
+        //  in longitude and velocity aberration
+        double apparentSolarLon =
+            geometricSolarLon + nutationInLongitude - aberrationConstant / sunEarthDistance[i];
+
+        //   Compute unit Sun vector
+        sunVector[i][0] = cos(apparentSolarLon / RADEG);
+        sunVector[i][1] = sin(apparentSolarLon / RADEG) * cos(obliquityOfEcliptic / RADEG);
+        sunVector[i][2] = sin(apparentSolarLon / RADEG) * sin(obliquityOfEcliptic / RADEG);
+    }  // i-loop
+
+    return 0;
+}
+
+int quaternionToMatrix(float quaternion[4], double rotationMatrix[3][3]) {
+    // Convert quaternion to equivalent direction cosine matrix
+
+    rotationMatrix[0][0] = quaternion[0] * quaternion[0] - quaternion[1] * quaternion[1] -
+                           quaternion[2] * quaternion[2] + quaternion[3] * quaternion[3];
+    rotationMatrix[0][1] = 2 * (quaternion[0] * quaternion[1] + quaternion[2] * quaternion[3]);
+    rotationMatrix[0][2] = 2 * (quaternion[0] * quaternion[2] - quaternion[1] * quaternion[3]);
+
+    rotationMatrix[1][0] = 2 * (quaternion[0] * quaternion[1] - quaternion[2] * quaternion[3]);
+    rotationMatrix[1][1] = -quaternion[0] * quaternion[0] + quaternion[1] * quaternion[1] -
+                           quaternion[2] * quaternion[2] + quaternion[3] * quaternion[3];
+    rotationMatrix[1][2] = 2 * (quaternion[1] * quaternion[2] + quaternion[0] * quaternion[3]);
+
+    rotationMatrix[2][0] = 2 * (quaternion[0] * quaternion[2] + quaternion[1] * quaternion[3]);
+    rotationMatrix[2][1] = 2 * (quaternion[1] * quaternion[2] - quaternion[0] * quaternion[3]);
+    rotationMatrix[2][2] = -quaternion[0] * quaternion[0] - quaternion[1] * quaternion[1] +
+                           quaternion[2] * quaternion[2] + quaternion[3] * quaternion[3];
+
+    return EXIT_SUCCESS;
+}
+
+int getEarthScanTrackCoefs(float craftPos[3], double sensorOrientMatrix[3][3], double scanTrackCoefs[10]) {
+    //  Compute constants for navigation model using Earth radius values
+    double reciprocalFlatDiff = 1 / ECCENTRICITY_SQUARED;
+
+    //  Compute coefficients of intersection ellipse in scan plane
+    scanTrackCoefs[0] = 1 + (reciprocalFlatDiff - 1) * sensorOrientMatrix[0][2] * sensorOrientMatrix[0][2];
+    scanTrackCoefs[1] = 1 + (reciprocalFlatDiff - 1) * sensorOrientMatrix[1][2] * sensorOrientMatrix[1][2];
+    scanTrackCoefs[2] = 1 + (reciprocalFlatDiff - 1) * sensorOrientMatrix[2][2] * sensorOrientMatrix[2][2];
+    scanTrackCoefs[3] = (reciprocalFlatDiff - 1) * sensorOrientMatrix[0][2] * sensorOrientMatrix[1][2] * 2;
+    scanTrackCoefs[4] = (reciprocalFlatDiff - 1) * sensorOrientMatrix[0][2] * sensorOrientMatrix[2][2] * 2;
+    scanTrackCoefs[5] = (reciprocalFlatDiff - 1) * sensorOrientMatrix[1][2] * sensorOrientMatrix[2][2] * 2;
+    scanTrackCoefs[6] = (sensorOrientMatrix[0][0] * craftPos[0] + sensorOrientMatrix[0][1] * craftPos[1] +
+                         sensorOrientMatrix[0][2] * craftPos[2] * reciprocalFlatDiff) *
+                        2;
+    scanTrackCoefs[7] = (sensorOrientMatrix[1][0] * craftPos[0] + sensorOrientMatrix[1][1] * craftPos[1] +
+                         sensorOrientMatrix[1][2] * craftPos[2] * reciprocalFlatDiff) *
+                        2;
+    scanTrackCoefs[8] = (sensorOrientMatrix[2][0] * craftPos[0] + sensorOrientMatrix[2][1] * craftPos[1] +
+                         sensorOrientMatrix[2][2] * craftPos[2] * reciprocalFlatDiff) *
+                        2;
+    scanTrackCoefs[9] = craftPos[0] * craftPos[0] + craftPos[1] * craftPos[1] +
+                        craftPos[2] * craftPos[2] * reciprocalFlatDiff - EARTH_RADIUS * EARTH_RADIUS;
+
+    return 0;
+}
+
+void convertVelVecToGroundSpeed(float position[3], float velocity[3], double sensorOrientationMatrix[3][3],
+                                double pixelVector[3], double *deltaT, float geoPosition[3],
+                                float sensorToPixelVector[3], gsl_vector *C, size_t pixel) {
+    double positionMagnitude =
+        sqrt(position[0] * position[0] + position[1] * position[1] + position[2] * position[2]);
+    double geocentricLatitudeCosine =
+        sqrt(position[0] * position[0] + position[1] * position[1]) / positionMagnitude;
+    double localEarthRadius = EARTH_RADIUS * (1. - ECCENTRICITY_SQUARED) /
+                              sqrt(1. - (2. - ECCENTRICITY_SQUARED) * ECCENTRICITY_SQUARED *
+                                            geocentricLatitudeCosine * geocentricLatitudeCosine);
+
+    double groundVelocity[3];
+    groundVelocity[0] = velocity[0] * localEarthRadius / positionMagnitude;
+    groundVelocity[1] = velocity[1] * localEarthRadius / positionMagnitude;
+    groundVelocity[2] = velocity[2] * localEarthRadius / positionMagnitude;
+    //  Transform vector from sensor to geocentric frame
+    gsl_matrix_view transformMatrix = gsl_matrix_view_array((double *)sensorOrientationMatrix, 3, 3);
+    gsl_vector_view pixelVectorView = gsl_vector_view_array(pixelVector, 3);
+
+    gsl_blas_dgemv(CblasTrans, 1.0, &transformMatrix.matrix, &pixelVectorView.vector, 0.0, C);
+
+    double *transformedVector = gsl_vector_ptr(C, 0);
+    for (size_t j = 0; j < 3; j++) {
+        sensorToPixelVector[j] = transformedVector[j];
+        geoPosition[j] = position[j] + sensorToPixelVector[j] + groundVelocity[j] * deltaT[pixel];
+    }
+}
+
+void calculateLocalCoordinateSystem(const float geoPosition[3], float localVerticalVector[3],
+                                    float eastVector[3], float northVector[3], float &horizontalDistance) {
+    horizontalDistance = geoPosition[0] * geoPosition[0] + geoPosition[1] * geoPosition[1];
+    float verticalDistance = sqrt(geoPosition[2] * geoPosition[2] +
+                                  ECCENTRICITY_SQUARED * ECCENTRICITY_SQUARED * horizontalDistance);
+
+    localVerticalVector[0] = ECCENTRICITY_SQUARED * geoPosition[0] / verticalDistance;
+    localVerticalVector[1] = ECCENTRICITY_SQUARED * geoPosition[1] / verticalDistance;
+    localVerticalVector[2] = geoPosition[2] / verticalDistance;
+    float horizontalProjectionLength = sqrt(localVerticalVector[0] * localVerticalVector[0] +
+                                            localVerticalVector[1] * localVerticalVector[1]);
+
+    eastVector[0] = -localVerticalVector[1] / horizontalProjectionLength;
+    eastVector[1] = localVerticalVector[0] / horizontalProjectionLength;
+    eastVector[2] = 0.0;
+
+    // no = crossp(up,ea)
+
+    northVector[0] = -localVerticalVector[2] * eastVector[1];
+    northVector[1] = localVerticalVector[2] * eastVector[0];
+    northVector[2] = localVerticalVector[0] * eastVector[1] - localVerticalVector[1] * eastVector[0];
+}
+
+void computeSolarZeniths(float eastVector[3], float northVector[3], float localVerticalVector[3],
+                         float sensorToPixelVector[3], float sunUnitVector[3], float pixelToSpacecraftVec[3],
+                         float sunToEarthVector[3], short *solarZeniths, int i) {
+    // Transform the pixel-to-spacecraft and Sun vectors into local frame
+    pixelToSpacecraftVec[0] = -eastVector[0] * sensorToPixelVector[0] -
+                              eastVector[1] * sensorToPixelVector[1] - eastVector[2] * sensorToPixelVector[2];
+    pixelToSpacecraftVec[1] = -northVector[0] * sensorToPixelVector[0] -
+                              northVector[1] * sensorToPixelVector[1] -
+                              northVector[2] * sensorToPixelVector[2];
+    pixelToSpacecraftVec[2] = -localVerticalVector[0] * sensorToPixelVector[0] -
+                              localVerticalVector[1] * sensorToPixelVector[1] -
+                              localVerticalVector[2] * sensorToPixelVector[2];
+
+    sunToEarthVector[0] = sunUnitVector[0] * eastVector[0] + sunUnitVector[1] * eastVector[1] +
+                          sunUnitVector[2] * eastVector[2];
+    sunToEarthVector[1] = sunUnitVector[0] * northVector[0] + sunUnitVector[1] * northVector[1] +
+                          sunUnitVector[2] * northVector[2];
+    sunToEarthVector[2] = sunUnitVector[0] * localVerticalVector[0] +
+                          sunUnitVector[1] * localVerticalVector[1] +
+                          sunUnitVector[2] * localVerticalVector[2];
+
+    //  Compute the solar zenith and azimuth
+    solarZeniths[i] = (short)(100 * RADEG *
+                              atan2(sqrt(sunToEarthVector[0] * sunToEarthVector[0] +
+                                         sunToEarthVector[1] * sunToEarthVector[1]),
+                                    sunToEarthVector[2]));
+}
+
+int geolocatePixelsOci(const char *demFile, float pos[3], float vel[3], double smat[3][3],
+                       double scanPathCoefs[10], float sunUnitVector[3], bool fileIsEclipsed,
+                       orbArray moonVector, double earthSunDist, vector<array<float, 3>> &sensorViews, size_t numPix,
+                       double *delT, vector<uint8_t> &qualityFlags, size_t currScan, float *latitudes,
+                       float *longitudes, short *solZeniths, short *solAzimuths, short *senZeniths,
+                       short *senAzimuths, short *terrainHeights, GeoBox& geoBox) {
+    // Earth ellipsoid parameters
+    float FLAT = 1 / 298.257;  // How squished the Earth is
+    float ECCENTRICITY = (1 - FLAT) * (1 - FLAT);
+    gsl_vector *C = gsl_vector_alloc(3);
+    bool fileCrossesIdl = false;  // Crossing the International Date Line requires some more math
+    float previousLon = -180.1;   // Helps determine if the file crosses the date line
+
+    for (size_t i = 0; i < numPix; i++) {
+        // Compute sensor-to-surface vectors for all scan angles
+        // Compute terms for quadratic equation
+        double o = scanPathCoefs[0] * sensorViews[i][0] * sensorViews[i][0] +
+                   scanPathCoefs[1] * sensorViews[i][1] * sensorViews[i][1] +
+                   scanPathCoefs[2] * sensorViews[i][2] * sensorViews[i][2] +
+                   scanPathCoefs[3] * sensorViews[i][0] * sensorViews[i][1] +
+                   scanPathCoefs[4] * sensorViews[i][0] * sensorViews[i][2] +
+                   scanPathCoefs[5] * sensorViews[i][1] * sensorViews[i][2];
+        double p = scanPathCoefs[6] * sensorViews[i][0] + scanPathCoefs[7] * sensorViews[i][1] +
+                   scanPathCoefs[8] * sensorViews[i][2];
+        double q = scanPathCoefs[9];
+        double discriminant = p * p - 4 * q * o;  // Line from sensor to pixel
+
+        // If discriminant < 0, this pixel views above the horizon.
+        if (discriminant < 0 || o == 0) {
+            latitudes[i] = -32767;
+            longitudes[i] = -32767;
+            solZeniths[i] = -32767;
+            solAzimuths[i] = -32767;
+            senZeniths[i] = -32767;
+            senAzimuths[i] = -32767;
+            terrainHeights[i] = -32767;
+            continue;
+        }
+
+        //  Solve for magnitude of sensor-to-pixel vector and compute components
+        double d = (-p - sqrt(discriminant)) / (2 * o);
+        double x1[3];
+        for (size_t j = 0; j < 3; j++)
+            x1[j] = d * sensorViews[i][j];
+
+        //  Convert velocity vector to ground speed
+        float re = 6378.137;
+        double pm = sqrt(pos[0] * pos[0] + pos[1] * pos[1] + pos[2] * pos[2]);
+        double clatg = sqrt(pos[0] * pos[0] + pos[1] * pos[1]) / pm;
+        double rg = re * (1. - FLAT) / sqrt(1. - (2. - FLAT) * FLAT * clatg * clatg);
+        double v[3];
+        v[0] = vel[0] * rg / pm;
+        v[1] = vel[1] * rg / pm;
+        v[2] = vel[2] * rg / pm;
+
+        //  Transform vector from sensor to geocentric frame
+        gsl_matrix_view A = gsl_matrix_view_array((double *)smat, 3, 3);
+        gsl_vector_view B = gsl_vector_view_array(x1, 3);
+
+        gsl_blas_dgemv(CblasTrans, 1.0, &A.matrix, &B.vector, 0.0, C);
+
+        float rh[3], geovec[3];
+        double *ptr_C = gsl_vector_ptr(C, 0);
+        for (size_t j = 0; j < 3; j++) {
+            rh[j] = ptr_C[j];
+            geovec[j] = pos[j] + rh[j] + v[j] * delT[i];
+        }
+
+        // Compute the local vertical, East and North unit vectors
+        float uxy = geovec[0] * geovec[0] + geovec[1] * geovec[1];
+        float temp = sqrt(geovec[2] * geovec[2] + ECCENTRICITY * ECCENTRICITY * uxy);
+
+        float up[3];
+        up[0] = ECCENTRICITY * geovec[0] / temp;
+        up[1] = ECCENTRICITY * geovec[1] / temp;
+        up[2] = geovec[2] / temp;
+        float upxy = sqrt(up[0] * up[0] + up[1] * up[1]);
+
+        float ea[3];
+        ea[0] = -up[1] / upxy;
+        ea[1] = up[0] / upxy;
+        ea[2] = 0.0;
+
+        // no = crossp(up,ea)
+        float no[3];
+        no[0] = -up[2] * ea[1];
+        no[1] = up[2] * ea[0];
+        no[2] = up[0] * ea[1] - up[1] * ea[0];
+
+        //  Compute geodetic latitude and longitude
+        float xlat_ = RADEG * asin(up[2]);
+        float xlon_ = RADEG * atan2(up[1], up[0]);
+        // check if it is in the range
+        if (std::abs(xlat_) > 90.0e0 || std::abs(xlon_) > 180.0e0) {
+            continue;
+        }
+
+        if (i >= 1 && abs(xlon_ - previousLon) > 180) {
+            fileCrossesIdl = true;
+        }
+
+        latitudes[i] = xlat_;
+        longitudes[i] = xlon_;
+
+        // Transform the pixel-to-spacecraft and Sun vectors into local frame
+        float rl[3], sl[3];
+        rl[0] = -ea[0] * rh[0] - ea[1] * rh[1] - ea[2] * rh[2];
+        rl[1] = -no[0] * rh[0] - no[1] * rh[1] - no[2] * rh[2];
+        rl[2] = -up[0] * rh[0] - up[1] * rh[1] - up[2] * rh[2];
+
+        sl[0] = sunUnitVector[0] * ea[0] + sunUnitVector[1] * ea[1] + sunUnitVector[2] * ea[2];
+        sl[1] = sunUnitVector[0] * no[0] + sunUnitVector[1] * no[1] + sunUnitVector[2] * no[2];
+        sl[2] = sunUnitVector[0] * up[0] + sunUnitVector[1] * up[1] + sunUnitVector[2] * up[2];
+
+        //  Compute the solar zenith and azimuth
+        solZeniths[i] = (short)(100 * RADEG * atan2(sqrt(sl[0] * sl[0] + sl[1] * sl[1]), sl[2]));
+
+        // Check for zenith close to zero
+        if (solZeniths[i] > 0.01)
+            solAzimuths[i] = (short)(100 * RADEG * atan2(sl[0], sl[1]));
+
+        // Compute the sensor zenith and azimuth
+        senZeniths[i] = (short)(100 * RADEG * atan2(sqrt(rl[0] * rl[0] + rl[1] * rl[1]), rl[2]));
+
+        // Check for zenith close to zero
+        if (senZeniths[i] > 0.01)
+            senAzimuths[i] = (short)(100 * RADEG * atan2(rl[0], rl[1]));
+
+        if (fileIsEclipsed) {
+            // Reference Wertz, App. l, Table L-4
+            double sunAngularRadius = 0.53313 / earthSunDist / RADEG / 2;
+            double moonDist;
+
+            orbArray earthToMoon;
+            for (size_t j = 0; j < 2; j++) {
+                earthToMoon[j] = moonVector[j] - geovec[j];
+            }
+            moonDist = sqrt(pow(earthToMoon[0], 2.0) + pow(earthToMoon[1], 2.0) + pow(earthToMoon[2], 2.0));
+
+            orbArray sunMoonDiff;
+            for (size_t j = 0; j < 2; j++) {
+                sunMoonDiff[j] = earthToMoon[j] / moonDist - sunUnitVector[j];
+            }
+            // The angle described between the Sun and the Moon with Earth as the apex
+            double sunEarthMoon =
+                sqrt(pow(sunMoonDiff[0], 2.0) + pow(sunMoonDiff[1], 2.0) + pow(sunMoonDiff[2], 2.0));
+
+            double moonAngularRadius = 1738.2 / moonDist;
+
+            // Set eclipse flag where angle is less than combined Sun and Moon radii
+            if (sunEarthMoon < (sunAngularRadius + moonAngularRadius)) {
+                qualityFlags[currScan*numPix + i] |= 2;
+            }
+        }
+
+        float tempSenAzimuth = senAzimuths[i] / 100.0;
+        float tempSenZenith = senZeniths[i] / 100.0;
+        float tempHeight = 0;
+
+        get_nc_height(demFile, &longitudes[i], &latitudes[i], &tempSenZenith, &tempSenAzimuth, &tempHeight);
+
+        // there is also a bug in terrain correction
+        bool badLatLons = std::abs(latitudes[i]) > 90.0e0 || std::abs(longitudes[i]) > 180.0e0;
+        if (badLatLons) {
+            latitudes[i] = -32767;
+            longitudes[i] = -32767;
+            solZeniths[i] = -32767;
+            solAzimuths[i] = -32767;
+            senZeniths[i] = -32767;
+            senAzimuths[i] = -32767;
+            continue;
+        }
+
+        senAzimuths[i] = (short)(tempSenAzimuth * 100.0);
+        senZeniths[i] = (short)(tempSenZenith * 100.0);
+        terrainHeights[i] = (short)tempHeight;
+
+        if (longitudes[i] > geoBox.easternmostLon || (fileCrossesIdl && longitudes[i] > previousLon))
+            geoBox.easternmostLon = longitudes[i];
+        if (longitudes[i] < geoBox.westernmostLon && !fileCrossesIdl)
+            geoBox.westernmostLon = longitudes[i];
+        if (latitudes[i] < geoBox.southernmostLat)
+            geoBox.southernmostLat = latitudes[i];
+        if (latitudes[i] > geoBox.northernmostLat)
+            geoBox.northernmostLat = latitudes[i];
+
+        previousLon = longitudes[i];
+    }  // pixel loop
+
+    gsl_vector_free(C);
+
+    return EXIT_SUCCESS;
+}
+
+int getAttitudeAngles(float pos[3], float vel[3], double smat[3][3], float attitudeAngles[3]) {
+    double omegae = 7.29211585494e-5;
+    double rem = 6371;
+    double f = 1 / (double)298.257;
+    double omf2 = (1 - f) * (1 - f);
+
+    // Determine local vertical reference axes
+    double p[3], v[3];
+    for (size_t j = 0; j < 3; j++) {
+        p[j] = (double)pos[j];
+        v[j] = (double)vel[j];
+    }
+    v[0] -= p[1] * omegae;
+    v[1] += p[0] * omegae;
+
+    //  Compute Z axis as local nadir vector
+    double pm = sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]);
+    double omf2p = (omf2 * rem + pm - rem) / pm;
+    double pxy = p[0] * p[0] + p[1] * p[1];
+    double temp = sqrt(p[2] * p[2] + omf2p * omf2p * pxy);
+
+    double z[3];
+    z[0] = -omf2p * p[0] / temp;
+    z[1] = -omf2p * p[1] / temp;
+    z[2] = -p[2] / temp;
+
+    // Compute Y axis along negative orbit normal
+    double on[3];
+    on[0] = v[1] * z[2] - v[2] * z[1];
+    on[1] = v[2] * z[0] - v[0] * z[2];
+    on[2] = v[0] * z[1] - v[1] * z[0];
+
+    double onm = sqrt(on[0] * on[0] + on[1] * on[1] + on[2] * on[2]);
+
+    double y[3];
+    for (size_t j = 0; j < 3; j++)
+        y[j] = -on[j] / onm;
+
+    // Compute X axis to complete orthonormal triad (velocity direction)
+    double x[3];
+    x[0] = y[1] * z[2] - y[2] * z[1];
+    x[1] = y[2] * z[0] - y[0] * z[2];
+    x[2] = y[0] * z[1] - y[1] * z[0];
+
+    // Store local vertical reference vectors in matrix
+    double om[3][3];
+    memcpy(&om[0][0], &x, 3 * sizeof(double));
+    memcpy(&om[1][0], &y, 3 * sizeof(double));
+    memcpy(&om[2][0], &z, 3 * sizeof(double));
+
+    // Compute orbital-to-spacecraft matrix
+    double rm[3][3];
+    gsl_matrix_view rm_mat = gsl_matrix_view_array(&rm[0][0], 3, 3);
+
+    int s;  // Only used to fill a parameter
+
+    gsl_permutation *perm = gsl_permutation_alloc(3);
+
+    // Compute the LU decomposition of this matrix
+    gsl_matrix_view B = gsl_matrix_view_array(&om[0][0], 3, 3);
+    gsl_linalg_LU_decomp(&B.matrix, perm, &s);
+
+    // Compute the  inverse of the LU decomposition
+    double inv[3][3];
+    gsl_matrix_view inv_mat = gsl_matrix_view_array(&inv[0][0], 3, 3);
+
+    gsl_linalg_LU_invert(&B.matrix, perm, &inv_mat.matrix);
+
+    gsl_matrix_view A = gsl_matrix_view_array(&smat[0][0], 3, 3);
+
+    gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, &A.matrix, &inv_mat.matrix, 0.0, &rm_mat.matrix);
+
+    gsl_permutation_free(perm);
+
+    // Compute attitude angles
+    attitudeAngles[0] = RADEG * atan(-rm[2][1] / rm[2][2]);
+    double cosp = sqrt(rm[2][1] * rm[2][1] + rm[2][2] * rm[2][2]);
+    if (rm[2][2] < 0)
+        cosp *= -1;
+    attitudeAngles[1] = RADEG * atan2(rm[2][0], cosp);
+    attitudeAngles[2] = RADEG * atan(-rm[1][0] / rm[0][0]);
+
+    return 0;
+}

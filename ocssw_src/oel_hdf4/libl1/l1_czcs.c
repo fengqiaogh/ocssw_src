@@ -8,14 +8,6 @@
 #include <math.h>
 #include <libnav.h>
 
-#define   NREC_IN_BUF             1
-#define   NBND_CZCS               5
-#define   POS_ERR_THRESH          2000.  /* orbit position error tolerence */
-
-int cz_posll_2_satang(float *, int, float *, float *, float *, float *);
-void matrix_mult(double[3], double[3][3], double[3]);
-void cross_prod(double *, double *, double *);
-
 static int syear, sday; /* data start date                  */
 static int32 smsec; /* data start time                  */
 static int16 eyear, eday; /* data end date                    */

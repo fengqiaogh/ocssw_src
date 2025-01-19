@@ -659,12 +659,9 @@ extern "C" l2prodstr *get_l2prod_index(const char *prod_name, /* Input SDS name 
         case SEAWIFS:
         case OCM1:
         case OCM2:
-        case MOS:
         case MERIS:
         case HICO:
-        case OCIA:
         case OCI:
-        case OCIS:
         case HAWKEYE:
         case AVIRIS:
         case PRISM:
@@ -675,7 +672,6 @@ extern "C" l2prodstr *get_l2prod_index(const char *prod_name, /* Input SDS name 
         case MODIST:
         case MODISA:
         case CZCS:
-        case OSMI:
         case VIIRSN:
         case VIIRSJ1:
         case VIIRSJ2:

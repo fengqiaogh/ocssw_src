@@ -92,7 +92,7 @@ typedef struct param_table {
 } paramstr;
 
 float get_atrem(float *tg_tot, float *rhot, paramstr *P);
-int get_atrem_cor(l1str *l1rec, int32_t ip, float *rhot, float *tg_tot, float *tg_sol, float *tg_sen);
+int get_atrem_cor(l1str *l1rec, int32_t ip, float *rhot, float *tg_tot, double *tg_sol, double *tg_sen);
 int init_atrem(int32_t sensorID, paramstr *P, l1str *l2rec, int32_t nbands);
 int32_t rdatreminfo(int32_t sensorID, int32_t evalmask, const char *pname, void **pval);
 int get_angle_limits(float **angle_limit, float **senz, float **solz, int *n_senz, int *n_solz);

@@ -1041,6 +1041,10 @@ int32_t comp_ctht_lin( l1str *l1rec, ctht_lin_str *ctht_lin )
           // ret_iter[npix,nlin,nphase]
           ctht_lin->nitr[ ityp + ntyp * ipix ] = oe_info.nitr;
 
+          if (oe_info.nitr == 1 && oe_info.cost > 30){
+            l1rec->flags[ipix] |= CHLFAIL;
+          }
+
           // Avg kernel - HOLD outputting this, need yet another 3rd dim size
           // oe_akdiag[npix,nlin,nphase,3]
           int nxx = 3;

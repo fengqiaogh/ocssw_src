@@ -33,7 +33,7 @@ aqua.L3B.ODPS.multiplegranule.POC.nc testdata/l2bin/aqua.L3B.ODPS.multiplegranul
 aqua.L3B.ODPS.multiplegranule.POC.nc.par testdata/l2bin/aqua.L3B.ODPS.multiplegranule.POC.nc.par 105e4d8d18e5adf858724cd4c336f0254b8b3db1 3abebafb40c098ee054c089fc6676c9ba484f403
 aqua.L3B.ODPS.multiplegranule.RRS.nc testdata/l2bin/aqua.L3B.ODPS.multiplegranule.RRS.nc 0052dae8406ecf3ac42c806d75d8462ab194a0ef 2495beef25aca5e79cd756fbcd1e582232c49593
 aqua.L3B.ODPS.multiplegranule.RRS.nc.par testdata/l2bin/aqua.L3B.ODPS.multiplegranule.RRS.nc.par 105e4d8d18e5adf858724cd4c336f0254b8b3db1 f83b2ef71f495c7a1c93c3429b2e4dfeea59b875
-aqua.L3B.ODPS.multiplegranule.SST.nc testdata/l2bin/aqua.L3B.ODPS.multiplegranule.SST.nc 0052dae8406ecf3ac42c806d75d8462ab194a0ef 1516144deba11e92dcf9e6cb562b313138f554dc
+aqua.L3B.ODPS.multiplegranule.SST.nc testdata/l2bin/aqua.L3B.ODPS.multiplegranule.SST.nc b1d90b68a4b7f56c686e7f0920cdd919f848c753 7f44c80fc9b152908436c58f018504ccfccc98e5
 aqua.L3B.ODPS.multiplegranule.SST.nc.par testdata/l2bin/aqua.L3B.ODPS.multiplegranule.SST.nc.par 1f9c26e8bfd5f3215bea3fbe708dae1aedf9f58c 4729ec87b7ff1aedcac4b4163b20e25ed183ef51
 aqua.L3B.ODPS.multiplegranule.SST4.nc testdata/l2bin/aqua.L3B.ODPS.multiplegranule.SST4.nc 0052dae8406ecf3ac42c806d75d8462ab194a0ef c4fcde3c08d7b1cce6a809da56add790e404e0bd
 aqua.L3B.ODPS.multiplegranule.SST4.nc.par testdata/l2bin/aqua.L3B.ODPS.multiplegranule.SST4.nc.par 1f9c26e8bfd5f3215bea3fbe708dae1aedf9f58c 06b20160e535df9adf4c746a2d5c2a5b5a9fff3d
@@ -55,7 +55,7 @@ aqua.L3B.ODPS.singlegranule.POC.nc testdata/l2bin/aqua.L3B.ODPS.singlegranule.PO
 aqua.L3B.ODPS.singlegranule.POC.nc.par testdata/l2bin/aqua.L3B.ODPS.singlegranule.POC.nc.par 105e4d8d18e5adf858724cd4c336f0254b8b3db1 e3d6fe6fbc95ff57ace9703907fb7ac5b78eb1fe
 aqua.L3B.ODPS.singlegranule.RRS.nc testdata/l2bin/aqua.L3B.ODPS.singlegranule.RRS.nc 0052dae8406ecf3ac42c806d75d8462ab194a0ef f7b93d9a25b70af30e1a5361bfa169b961013061
 aqua.L3B.ODPS.singlegranule.RRS.nc.par testdata/l2bin/aqua.L3B.ODPS.singlegranule.RRS.nc.par 105e4d8d18e5adf858724cd4c336f0254b8b3db1 e083bf848bc6dc93e3e2238bc12de3b18c260cc6
-aqua.L3B.ODPS.singlegranule.SST.nc testdata/l2bin/aqua.L3B.ODPS.singlegranule.SST.nc 0052dae8406ecf3ac42c806d75d8462ab194a0ef fcaa38b9f0ec27201772e3468a7164a66b088105
+aqua.L3B.ODPS.singlegranule.SST.nc testdata/l2bin/aqua.L3B.ODPS.singlegranule.SST.nc b1d90b68a4b7f56c686e7f0920cdd919f848c753 a64c8191ed96ffa773a24a27b66e9abcc2a6cc32
 aqua.L3B.ODPS.singlegranule.SST.nc.par testdata/l2bin/aqua.L3B.ODPS.singlegranule.SST.nc.par 1f9c26e8bfd5f3215bea3fbe708dae1aedf9f58c 2d1e0f99f88784f59f8ddebf0e4ad911510db569
 aqua.L3B.ODPS.singlegranule.SST4.nc testdata/l2bin/aqua.L3B.ODPS.singlegranule.SST4.nc 0052dae8406ecf3ac42c806d75d8462ab194a0ef 7e8044894b375031ea6757e391c5a7b7ce0c102f
 aqua.L3B.ODPS.singlegranule.SST4.nc.par testdata/l2bin/aqua.L3B.ODPS.singlegranule.SST4.nc.par 1f9c26e8bfd5f3215bea3fbe708dae1aedf9f58c e67e43bdbe2dffcd289c450875e445ddc3189991

@@ -15,7 +15,7 @@ import sys
 from seadasutils.setupenv import env
 from seadasutils.netcdf_utils import ncsubset_vars
 
-versionStr = "1.0_2024-11-06"
+versionStr = "1.0.2_2024-12-09"
 
 class extract:
 
@@ -101,10 +101,33 @@ class extract:
                   'scans':   [self.sline, self.eline]}
         infile = netCDF4.Dataset(self.ifile, 'r')
         dims = list(infile.dimensions.keys())
-        infile.close()
+        # OCTS is weird...
+        # it has 2 lines per scan (rec) and lines must be 2 * rec
+        # ...and blines must be 10 * rec
         if 'nsamp' in dims:
+            # make sure we're starting on an even line, so the start of a rec
+            if self.sline % 2 != 0:
+                if (self.sline - 1) < 0:
+                    self.sline += 1
+                else:
+                    self.sline -= 1
+            rec_start = int(self.sline / 2)
+            rec_end = int((self.eline +1)/2)
+            if rec_end >=  len(infile.dimensions['rec']):
+                rec_end = len(infile.dimensions['rec']) - 1
+            nrec = rec_end - rec_start + 1
+
+            self.sline = int(2 * rec_start)
+            self.eline = self.sline + int(2 * (nrec)) - 1
+            bline_start = int(10 * rec_start)
+            bline_end = bline_start + int(10 * (nrec)) - 1
+
             subset = {'nsamp':[self.spixl, self.epixl],
-                      'lines':[self.sline, self.eline]}
+                      'lines':[self.sline, self.eline],
+                      'rec':[rec_start, rec_end],
+                      'blines':[bline_start, bline_end]}
+
+        infile.close()
 
         self.runextract(subset)
 
@@ -120,11 +143,11 @@ if __name__ == "__main__":
 
     # parse command line
     parser = argparse.ArgumentParser(
-        description='Extract specified area from an L1A netCDF file')
+        description='Extract specified area from an L1A netCDF file for CZCS, SeaWiFS or OCTS')
     parser.add_argument('-v', '--verbose', help='print status messages',
                         action='store_true')
     parser.add_argument('ifile',
-                        help='SeaWiFS Level 1A input file')
+                        help='netCDF Level 1A input file')
     parser.add_argument('ofile',
                         help='output file')
 

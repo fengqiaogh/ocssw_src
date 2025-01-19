@@ -98,9 +98,34 @@ void initializePolCorOci(NcFile &ncFile) {
         numRedBands = ncFile.getDim("red_bands").getSize();
         numSwirBands = ncFile.getDim("SWIR_bands").getSize();
         numPolCoef = ncFile.getDim("polarization_coefficients").getSize();
-        numCcdPixels = ncFile.getDim("ccd_pixels").getSize();
-        numScans = ncFile.getDim("number_of_scans").getSize();
-        numSwirPixels = ncFile.getDim("SWIR_pixels").getSize();
+
+        NcDim dim = ncFile.getDim("pixels");
+        if(dim.isNull()) {
+            dim = ncFile.getDim("ccd_pixels");
+            if(dim.isNull()) {
+                printf("-E- could not read dimension for number of CCD pixels\n");
+                exit(EXIT_FAILURE);
+            }
+            numCcdPixels = dim.getSize();
+            dim = ncFile.getDim("SWIR_pixels");
+            if(dim.isNull()) {
+                printf("-E- could not read dimension for number of SWIR pixels\n");
+                exit(EXIT_FAILURE);
+            }
+            numSwirPixels = dim.getSize();
+        } else {
+            numCcdPixels = numSwirPixels = dim.getSize();
+        }
+
+        dim = ncFile.getDim("scans");
+        if(dim.isNull()) {
+            dim = ncFile.getDim("number_of_scans");
+            if(dim.isNull()) {
+                printf("-E- could not read dimension for number of scans\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+        numScans = dim.getSize();
 
         // OCI has 3 coefficients. Bad file if it doesn't. 
         if (numPolCoef != 3 || numCcdPixels != numSwirPixels) {
@@ -116,8 +141,6 @@ void initializePolCorOci(NcFile &ncFile) {
         }
 
         /*----READING HAM SIDES----*/ 
-
-        numScans = ncFile.getDim("number_of_scans").getSize();
         hamSide = vector<unsigned char>(numScans, 255);
 
         // read in HAM side
@@ -150,7 +173,7 @@ void initializePolCorOci(NcFile &ncFile) {
 
             // -- SWIR -- read all, but 2 will be dropped during calculation
             getPolarizationCoefs(swirM12Var, m12[ham], 0, numSwirBands, numPolCoef, ham); 
-            getPolarizationCoefs(swirM12Var, m13[ham], 0, numSwirBands, numPolCoef, ham);   
+            getPolarizationCoefs(swirM13Var, m13[ham], 0, numSwirBands, numPolCoef, ham);   
             
         }
         
@@ -313,7 +336,7 @@ void calculateAndSetPolCor(l1str* &l1rec, int currPix, int index, vector<float> 
  */
 extern "C" void polcor_oci(l1str *l1rec, int32_t currPix) {
 
-    // happens when ccd pixel != swir pixels. leave polcof as 1.000
+    // happens when ccd pixel != swir pixels. leave polcor as 1.000
     if (skipPolarization) {
         return;
     }

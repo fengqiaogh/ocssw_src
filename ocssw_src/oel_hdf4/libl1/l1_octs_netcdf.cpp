@@ -14,6 +14,7 @@ extern "C" {
 #include <netcdf>
 #include <iostream>
 
+
 #include <hdf.h>
 #include <mfhdf.h>
 
@@ -43,7 +44,7 @@ static float *lon, *lat, *senz, *sena, *solz, *sola;
 static int32_t ncol;
 static int32_t scansPerScene;
 static int32_t linesPerScan;
-static int16_t *tilt_flag;
+static uint16_t *tilt_flag;
 static int16_t *gain;
 static float *inst_temp;
 static int16_t *miss_qual;
@@ -604,7 +605,7 @@ extern "C" int32_t openl1_octs_netcdf(filehandle *l1file) {
         maxday = 365 + abs(LeapCheck(year));
 
         /* Get tilt flag, instrument temperature, and gain index */
-        tilt_flag = (int16_t *) calloc(scansPerScene, sizeof (int16_t));
+        tilt_flag = (uint16_t *) calloc(scansPerScene, sizeof (uint16_t));
         tempVar = dataFile.getVar("tilt_flag");
         tempVar.getVar(tilt_flag);
         inst_temp = (float *) calloc(4 * scansPerScene, sizeof (float));
@@ -776,6 +777,9 @@ extern "C" int32_t readl1_octs_netcdf(filehandle *l1file, int32_t recnum, l1str 
 
         if (scan >= start_scan[last_table + 1]) {
             last_table++;
+            // This is to keep this version bug compatible with the HDF4 reader
+            if (last_table >= num_tab)
+                last_table = num_tab - 1;
             samp_start[0] = last_table;
 
             samp_tableVar.getVar(samp_start, samp_edges, &sample_table);
@@ -827,6 +831,58 @@ extern "C" int32_t readl1_octs_netcdf(filehandle *l1file, int32_t recnum, l1str 
     return (0);
 }
 
+extern "C" int32_t readl1_lonlat_octs_netcdf(filehandle *l1file, int32_t recnum, l1str *l1rec) {
+    int32_t ip;
+
+    /* load scan times */
+    /* if the day changed between the start of the scene
+    and the start of the subscene, adjust the day/year
+    accordingly */
+    static int32_t dayIncrimented = 0;
+    if (msec[recnum] < msec_start) {
+        if(!dayIncrimented) {
+            dayIncrimented = 1;
+            day = day + 1;
+            if (day > maxday) {
+                year = year + 1;
+                day = day - maxday;
+            }
+        }
+    }
+    if (msec[recnum] >= 86400000L) {
+        msec[recnum] = msec[recnum] - 86400000L;
+        if(!dayIncrimented) {
+            dayIncrimented = 1;
+            day = day + 1;
+            if (day > maxday) {
+                year = year + 1;
+                day = day - maxday;
+            }
+        }
+    }
+    l1rec->scantime = yds2unix(year, day, (double) (msec[recnum] / 1.e3));
+
+    /* load standard navigation */
+    memcpy(l1rec->lon, &lon [recnum * npix], sizeof (float)*npix);
+    memcpy(l1rec->lat, &lat [recnum * npix], sizeof (float)*npix);
+    memcpy(l1rec->solz, &solz[recnum * npix], sizeof (float)*npix);
+    memcpy(l1rec->sola, &sola[recnum * npix], sizeof (float)*npix);
+    memcpy(l1rec->senz, &senz[recnum * npix], sizeof (float)*npix);
+    memcpy(l1rec->sena, &sena[recnum * npix], sizeof (float)*npix);
+
+    /* copy the scan array over all bands, and npix pixels */
+    for (ip = 0; ip < npix; ip++) {
+
+        // if solz NaN set navfail
+        if (isnan(l1rec->solz[ip]))
+            l1rec->navfail[ip] = 1;
+
+    }
+
+    l1rec->npix = l1file->npix;
+
+    return (0);
+}
 
 /* ------------------------------------------------------ */
 /* closel1_octs() - closes the level 1 OCTS HDF file  */

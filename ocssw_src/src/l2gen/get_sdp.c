@@ -836,8 +836,6 @@ int run_sdp(l2str *l2rec) {
         switch (l1rec->l1file->sensorID) {
         case OCI:
             break;
-        case OCIS:
-            break;
         case HICO:
             break;
         case PRISM:

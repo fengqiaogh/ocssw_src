@@ -298,8 +298,6 @@ static char *l2gen_optionKeys[] = {
     "extreme_glint",
     "watervapor_bands",
 
-
-
     NULL
 };
 
@@ -556,10 +554,6 @@ void msl12_input_init() {
 
     input->qaa_adg_s = 0.015;
 
- 
-
-
-
     input->seawater_opt = 0;
     input->aer_opt = 99;
     input->oxaband_opt = 99;
@@ -663,13 +657,9 @@ void msl12_input_init() {
 
     input->mbac_wave=NULL;
     input->watervapor_bands=NULL;
+    input->nbands_watervapor = 0;
 
     strcpy(input->doi, "");
-
-
-
-
-
 
     return;
 }
@@ -2861,14 +2851,16 @@ int l2gen_load_input(clo_optionList_t *list, instr *input, int32_t nbands) {
         } else if (strcmp(keyword, "watervapor_bands") == 0) {
             if (clo_isOptionSet(option)) {
                 iArray = clo_getOptionInts(option, &count);
-                if (count %3 !=0) {
-                    printf("-E- number of watervapor_bands elements must be time of 3\n");
-                    exit(1);
+                if (count > 1) {
+                    if (count % 3 != 0) {
+                        printf("-E- number of watervapor_bands elements must be multiple of 3\n");
+                        exit(1);
+                    }
+                    input->nbands_watervapor = count;
+                    input->watervapor_bands = (int *)malloc(count * sizeof(int));
+                    for (i = 0; i < count; i++)
+                        input->watervapor_bands[i] = iArray[i];
                 }
-                input->nbands_watervapor=count;
-                input->watervapor_bands=(int *)malloc(count*sizeof(int));
-                for (i = 0; i < count; i++)
-                    input->watervapor_bands[i] = iArray[i];
             }
         }else if (strcmp(keyword, "wavelength_3d") == 0) {
             if (clo_isOptionSet(option)) {
@@ -2960,7 +2952,7 @@ int msl12_option_input(int argc, char **argv, clo_optionList_t* list,
 
 
     /* Make sure band-dependent inputs have values for all bands */
-    numBands = rdsensorinfo(l1file->sensorID, 0, "Nbands", NULL);
+    numBands = rdsensorinfo(l1file->sensorID, l1_input->evalmask, "Nbands", NULL);
 
     if (l2gen_load_input(list, input, numBands) != 0) {
         printf("-E- %s: Error loading options into input structure.\n", __FILE__);
@@ -4028,8 +4020,8 @@ int msl12_option_input(int argc, char **argv, clo_optionList_t* list,
     if(input->watervapor_bands){
         strcat(l1_input->input_parms, "watervapor_bands = ");
         i = 0;
-        for(i=0;i<input->nbands_watervapor;i++) {
-            if(i==0)
+        for(i=0; i<input->nbands_watervapor; i++) {
+            if(i == 0)
                 sprintf(str_buf, "%d", input->watervapor_bands[i]);
             else
                 sprintf(str_buf, ",%d", input->watervapor_bands[i]);

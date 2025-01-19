@@ -293,19 +293,20 @@ int loadl1(filehandle *l1file, l1str *l1rec) {
                 /* ------------------------------------------------ */
                 /* General Processing                               */
                 /* ------------------------------------------------ */
-            else {
-                for (ib = 0; ib < nbands; ib++) {
-                    ipb = ip * nbands + ib;
-                    l1rec->Lr [ipb] = 0.0;
-                    l1rec->t_sol [ipb] = 1.0;
-                    l1rec->t_sen [ipb] = 1.0;
-                    l1rec->tg_sol[ipb] = 1.0;
-                    l1rec->tg_sen[ipb] = 1.0;
-                    l1rec->t_o2 [ipb] = 1.0;
-                    l1rec->t_h2o [ipb] = 1.0;
-                    l1rec->polcor [ipb] = 1.0;
-                }
-            }
+            // else {
+            //     for (ib = 0; ib < nbands; ib++) {
+            //         ipb = ip * nbands + ib;
+            //         l1rec->Lr [ipb] = 0.0;
+            //         l1rec->tg [ipb] = 1.0;
+            //         l1rec->t_sol [ipb] = 1.0;
+            //         l1rec->t_sen [ipb] = 1.0;
+            //         l1rec->tg_sol[ipb] = 1.0;
+            //         l1rec->tg_sen[ipb] = 1.0;
+            //         l1rec->t_o2 [ipb] = 1.0;
+            //         l1rec->t_h2o [ipb] = 1.0;
+            //         l1rec->polcor [ipb] = 1.0;
+            //     }
+            // }
         }
 
     }

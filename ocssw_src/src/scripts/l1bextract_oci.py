@@ -17,7 +17,9 @@ from seadasutils.setupenv import env
 from seadasutils.netcdf_utils import ncsubset_vars
 #import seadasutils.ProcUtils as ProcUtils
 
-versionStr = "1.1 (2024-03-15)"
+versionStr = "1.2 (2025-01-13)"
+global pixDim
+global scanDim
 
 class extract:
 
@@ -50,7 +52,6 @@ class extract:
         env(self)  # run setupenv
 
     def runextract(self, subset):
-
         srcfile = self.ifile
         if srcfile.exists():
             dstfile = self.ofile
@@ -76,10 +77,10 @@ class extract:
          
             # Number of seconds at infile time_coverage_start/end
             infile_start_sec: float = infile.groups['scan_line_attributes'].variables['time'][0]
-            infile_end_sec = infile.groups['scan_line_attributes'].variables['time'][infile.dimensions['number_of_scans'].size - 1]
+            infile_end_sec = infile.groups['scan_line_attributes'].variables['time'][infile.dimensions[scanDim].size - 1]
             # Number of seconds at outfile time_coverage_start/end
             outfile_start_sec = outfile.groups['scan_line_attributes'].variables['time'][0]
-            outfile_end_sec = outfile.groups['scan_line_attributes'].variables['time'][outfile.dimensions['number_of_scans'].size - 1] 
+            outfile_end_sec = outfile.groups['scan_line_attributes'].variables['time'][outfile.dimensions[scanDim].size - 1]
 
             # Take infile time_coverage_start/end
             infile_start_time = infile.time_coverage_start
@@ -137,16 +138,17 @@ class extract:
             #_________________________________________________________________________________|
             
             outfile.set_auto_mask(False)
-            number_of_scans = outfile.dimensions['number_of_scans'].size - 1
-            SWIR_pixels = outfile.dimensions['SWIR_pixels'].size - 1
+
+            scans = outfile.dimensions[scanDim].size - 1
+            pixels = outfile.dimensions[pixDim].size - 1
             
             latitude = outfile.groups['geolocation_data'].variables['latitude']
             longitude = outfile.groups['geolocation_data'].variables['longitude']
             
             lon_min = longitude[0, 0]
-            lon_max = longitude[number_of_scans, SWIR_pixels]
+            lon_max = longitude[scans, pixels]
             lat_min = latitude[0, 0]
-            lat_max = latitude[number_of_scans, SWIR_pixels]
+            lat_max = latitude[scans, pixels]
             
             # Degrees to separate latitude points, here it is 20
             lat_add = float((lat_max - lat_min) / 20)
@@ -158,26 +160,26 @@ class extract:
             lon_r = []
 
             # add latitude right values
-            if lat_add > 0 and int(number_of_scans/lat_add) != 0:
-                for i in range(0, number_of_scans - 1, int(number_of_scans/lat_add)):
+            if lat_add > 0 and int(scans/lat_add) != 0:
+                for i in range(0, scans - 1, int(scans/lat_add)):
                     lat_r.append(i)
                     # add longitude left/right values
                     lon_l.append(0)
-                    lon_r.append(SWIR_pixels) 
+                    lon_r.append(pixels)
             else:
-                 for i in range(0, number_of_scans - 1, 1):
+                 for i in range(0, scans - 1, 1):
                     lat_r.append(i)
                     # add longitude left/right values
                     lon_l.append(0)
-                    lon_r.append(SWIR_pixels) 
+                    lon_r.append(pixels)
 
             # add latitude left values
             lat_l = list(reversed(lat_r))
             
             # add longitude up values
-            lon_u = [SWIR_pixels, (SWIR_pixels/2), 0] 
+            lon_u = [pixels, (pixels/2), 0]
             # add latitude up values
-            lat_u = [number_of_scans, number_of_scans, number_of_scans]
+            lat_u = [scans, scans, scans]
             # add longitude down values
             lon_d = list(reversed(lon_u)) 
             # add longitude up values
@@ -238,8 +240,8 @@ class extract:
             def minmax(arr):
                 return arr.min(), arr.max()
 
-            lat_min, lat_max = latitude[0, 0], latitude[number_of_scans, SWIR_pixels]
-            lon_min, lon_max = longitude[0, 0], longitude[number_of_scans, SWIR_pixels]
+            lat_min, lat_max = latitude[0, 0], latitude[scans, pixels]
+            lon_min, lon_max = longitude[0, 0], longitude[scans, pixels]
 
             outfile.setncattr('geospatial_lat_min', lat_min)
             outfile.setncattr('geospatial_lat_max', lat_max)
@@ -264,30 +266,43 @@ class extract:
         return pl.status
 
     def run(self):
+        global scanDim
         # convert to zero-based index
         self.spixl, self.epixl, self.sline, self.eline = \
         (v-1 for v in (self.spixl, self.epixl, self.sline, self.eline))
 
+        dims = list(infile.dimensions.keys())
+
         # extract file
-        subset = {'SWIR_pixels':[self.spixl, self.epixl],
-                  'ccd_pixels': [self.spixl, self.epixl],
-                  'number_of_scans': [self.sline, self.eline]}
+        subset = {'pixels':[self.spixl, self.epixl],
+            'scans': [self.sline, self.eline]}
+        if scanDim == 'number_of_scans':
+            # prior to V3 dimension change
+            subset = {'SWIR_pixels':[self.spixl, self.epixl],
+                    'ccd_pixels': [self.spixl, self.epixl],
+                    'number_of_scans': [self.sline, self.eline]}
+        elif 'SWIR_pixels' in dims and 'scans' in dims:
+            # V3 non-baseline configuration
+            subset = {'SWIR_pixels':[self.spixl, self.epixl],
+                    'pixels': [self.spixl, self.epixl],
+                    'scans': [self.sline, self.eline]}
         self.runextract(subset)
 
         #return status
         return 0
 
 def chk_pixl(args, infile):
+    global pixDim
+    global scanDim
     if args.epixl == -1:
-        args.epixl = infile.dimensions['SWIR_pixels'].size
+        args.epixl = infile.dimensions[pixDim].size
     if args.eline == -1:
-        args.eline = infile.dimensions['number_of_scans'].size
+        args.eline = infile.dimensions[scanDim].size
     return args.spixl, args.epixl, args.sline, args.eline
    
 if __name__ == "__main__":
     print("l1bextract_oci", versionStr)
     status = 0
-
     # parse command line
     parser = argparse.ArgumentParser(
         description='Extract specified area from OCI Level 1B files.',
@@ -321,6 +336,12 @@ if __name__ == "__main__":
     
     # Read infile as netCDF dataset
     infile = netCDF4.Dataset(args.ifile, 'r')
+    dims = list(infile.dimensions.keys())
+    pixDim = 'pixels'
+    scanDim = 'scans'
+    if 'number_of_scans' in dims:
+        pixDim = 'SWIR_pixels'
+        scanDim = 'number_of_scans'
 
     args.spixl, args.epixl, args.sline, args.in_eline = chk_pixl(args, infile)
              

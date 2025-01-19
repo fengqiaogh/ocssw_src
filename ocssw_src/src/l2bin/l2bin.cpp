@@ -103,7 +103,7 @@ typedef bg::model::point<double, 2, bg::cs::geographic<bg::degree>> Point_t;
 typedef bg::model::polygon<Point_t> Polygon_t;
 typedef bg::model::box<Point_t> Box_t;
 
-#define VERSION "7.1.0"
+#define VERSION "7.1.1"
 #define PROGRAM "l2bin"
 
 int32_t get_l2prod_index(const l2_prod &l2, const char *prodname)
@@ -703,6 +703,30 @@ bool skip_DL(float lon, int side, int night_flag, time_t end_day, time_t beg_day
     }
     return false;
 }
+
+
+/**
+ * @brief check if value is valid latitude
+ * @tparam T type (float, double, etc)
+ * @param lat val
+ * @return true, if it's a valid latitude value
+ */
+template <typename T>
+bool check_lat(const T &lat) {
+    return std::abs(lat) <= 90.0  &&  std::isfinite(lat);
+}
+
+/**
+ * @brief check if value is valid longitude
+ * @tparam T type (float, double, etc)
+ * @param lon val
+ * @return true, if it's a valid longitude value
+ */
+template <typename T>
+bool check_lon(const T &lon) {
+    return std::abs(lon) <= 180.0 && std::isfinite(lon);
+}
+
 
 int main(int argc, char **argv)
 {
@@ -1693,28 +1717,28 @@ int main(int argc, char **argv)
                         continue;
                     if (l2_str[ifile].latitude[ipixl] > input.latnorth)
                         continue;
-                    if(std::abs(l2_str[ifile].latitude[ipixl]) > 90)
+                    if (!check_lat(l2_str[ifile].latitude[ipixl]))
                         continue;
-                    if(std::abs(l2_str[ifile].longitude[ipixl]) > 180)
+                    if (!check_lon(l2_str[ifile].longitude[ipixl]))
                         continue;
                     if (input.area_weighting) {
-                        if (std::abs(l2_str[ifile].lat1[ipixl]) > 90)
+                        if (!check_lat(l2_str[ifile].lat1[ipixl]))
                             continue;
-                        if (std::abs(l2_str[ifile].lon1[ipixl]) > 180)
-                            continue;
-                        if (std::abs(l2_str[ifile].lat1[ipixl + 1]) > 90)
-                            continue;
-                        if (std::abs(l2_str[ifile].lon1[ipixl + 1]) > 180)
+                        if (!check_lon(l2_str[ifile].lon1[ipixl]))
                             continue;
                     }
                     if (input.area_weighting >= 2) {
-                        if (std::abs(l2_str[ifile].lat2[ipixl]) > 90)
+                        if (!check_lat(l2_str[ifile].lat1[ipixl + 1]))
                             continue;
-                        if (std::abs(l2_str[ifile].lon2[ipixl]) > 180)
+                        if (!check_lon(l2_str[ifile].lon1[ipixl + 1]))
                             continue;
-                        if (std::abs(l2_str[ifile].lat2[ipixl + 1]) > 90)
+                        if (!check_lat(l2_str[ifile].lat2[ipixl]))
                             continue;
-                        if (std::abs(l2_str[ifile].lon2[ipixl + 1]) > 180)
+                        if (!check_lon(l2_str[ifile].lon2[ipixl]))
+                            continue;
+                        if (!check_lat(l2_str[ifile].lat2[ipixl + 1]))
+                            continue;
+                        if (!check_lon(l2_str[ifile].lon2[ipixl + 1]))
                             continue;
                     }
                     if (input.area_weighting)

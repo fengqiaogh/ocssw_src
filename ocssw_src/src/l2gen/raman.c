@@ -263,11 +263,9 @@ void get_raman_coeffs(l2str *l2rec) {
     }
     strcat(filename, "/raman.nc");
    
-    if(l1file->sensorID == OCIS) {
+    if(l1file->sensorID == OCI) {
         limitVisFlag = 1;
-    } else if(l1file->sensorID == OCI) {
-        limitVisFlag = 1;
-    } else {
+    }  else {
         limitVisFlag = 0;
     }
     
@@ -840,7 +838,6 @@ void run_raman_cor(l2str *l2rec, int ip) {
         case OLCIS3A:
         case OLCIS3B:
         case SGLI:
-        case OCIS:
         case OCI:
             sensorSupported = 1;
             break;

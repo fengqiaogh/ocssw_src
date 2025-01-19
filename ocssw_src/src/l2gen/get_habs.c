@@ -85,7 +85,7 @@ void habs_meris_ci_corr(float rhos443, float rhos490, float rhos560,
 void get_habs_ci(l2str *l2rec, l2prodstr *p, float ci[]) {
 
     int ib0, ib1, ib2, ib3, ib4, ib5, ib6, ib7, ib8;
-    float wav0, wav1, wav2, wav3, wav4, wav5, wav6, wav7, wav8, fac, w681_fac;
+    float wav0, wav1, wav2, wav3, wav4, wav5, wav6, wav7, wav8, fac;
     int nonci;
 
     int ip, ipb;
@@ -95,16 +95,14 @@ void get_habs_ci(l2str *l2rec, l2prodstr *p, float ci[]) {
     case MODISA:
     case MODIST:
         fac = 1.3;
-        w681_fac = 1.0;
         break;
     case OLCIS3A:
     case OLCIS3B:        
-        fac = 1.052;
-        w681_fac = 0.99;
+        // fac = 1.052;
+        fac = 1.0;
         break;
     default:
         fac = 1.0;
-        w681_fac = 1.0;        
     }
     switch (p->cat_ix) {
 
@@ -191,15 +189,16 @@ void get_habs_ci(l2str *l2rec, l2prodstr *p, float ci[]) {
             case CAT_CI_cyano:
             case CAT_CI_noncyano:
                 ci[ip] = fac * ((l2rec->l1rec->rhos[ipb + ib3] - l2rec->l1rec->rhos[ipb + ib1])*(wav2 - wav1) / (wav3 - wav1)
-                        - (l2rec->l1rec->rhos[ipb + ib2]*w681_fac - l2rec->l1rec->rhos[ipb + ib1]));
+                        - (l2rec->l1rec->rhos[ipb + ib2] - l2rec->l1rec->rhos[ipb + ib1]));
            
                 //following corrections currently only applicable for MERIS/OLCI
                 if (l2rec->l1rec->l1file->sensorID == MERIS || l2rec->l1rec->l1file->sensorID == OLCIS3A 
                         || l2rec->l1rec->l1file->sensorID == OLCIS3B) {
 
-                    //turbidity correction based on ss620
-                    if (l2rec->l1rec->rhos[ipb + ib0] - l2rec->l1rec->rhos[ipb + ib6]
-                        + (l2rec->l1rec->rhos[ipb + ib6] - l2rec->l1rec->rhos[ipb + ib1]) * (wav0 - wav6) / (wav1 - wav6) > 0) {
+                    //turbidity correction based on ss620 and rhos560<rhos620 test
+                    if ((l2rec->l1rec->rhos[ipb + ib0] - l2rec->l1rec->rhos[ipb + ib6]
+                        + (l2rec->l1rec->rhos[ipb + ib6] - l2rec->l1rec->rhos[ipb + ib1]) * (wav0 - wav6) / (wav1 - wav6) > 0) 
+                        || l2rec->l1rec->rhos[ipb + ib6] < l2rec->l1rec->rhos[ipb + ib0]) {
                             ci[ip] = 0;
                     }
 
@@ -212,19 +211,21 @@ void get_habs_ci(l2str *l2rec, l2prodstr *p, float ci[]) {
                         if (l2rec->l1rec->rhos[ipb + ib1]
                                 - l2rec->l1rec->rhos[ipb + ib0]
                                 + (l2rec->l1rec->rhos[ipb + ib0]
-                                - l2rec->l1rec->rhos[ipb + ib2]*w681_fac)
+                                - l2rec->l1rec->rhos[ipb + ib2])
                                 *(wav1 - wav0) / (wav2 - wav0) >= 0) {
                             nonci = 0;
                         } else {
                             nonci = 1;
+                            // set HABS_NONCYANO - we may decide to set a CI threshold for tripping NONCYANO
+                            flags_habs[ip] |= HABS_NONCYANO;
                         }
 
                         if (l2rec->l1rec->rhos[ipb + ib0] <= 0 && p->cat_ix == CAT_CI_noncyano) {
                             ci[ip] = BAD_FLT;
                             l2rec->l1rec->flags[ip] |= PRODFAIL;
                         } else {
+                            // we may decide to NOT set CI to zero and just use flagging
                             if (p->cat_ix == CAT_CI_noncyano) {
-
                                 if (nonci == 0) ci[ip] = 0;
                             } else {
                                 if (nonci == 1) ci[ip] = 0;
@@ -234,8 +235,8 @@ void get_habs_ci(l2str *l2rec, l2prodstr *p, float ci[]) {
                 }
                 break;
             case CAT_MCI_stumpf:
-                ci[ip] = fac * (l2rec->l1rec->rhos[ipb + ib2] - l2rec->l1rec->rhos[ipb + ib1]*w681_fac
-                        - (l2rec->l1rec->rhos[ipb + ib3] - l2rec->l1rec->rhos[ipb + ib1]*w681_fac)*(wav2 - wav1) / (wav3 - wav1));
+                ci[ip] = fac * (l2rec->l1rec->rhos[ipb + ib2] - l2rec->l1rec->rhos[ipb + ib1]
+                        - (l2rec->l1rec->rhos[ipb + ib3] - l2rec->l1rec->rhos[ipb + ib1])*(wav2 - wav1) / (wav3 - wav1));
                 break;
             default:
                 ci[ip] = BAD_FLT;
@@ -487,7 +488,7 @@ uint8_t* get_flags_habs_meris(l2str *l2rec) {
     int ib443, ib490, ib510, ib560, ib620, ib665, ib681, ib709, ib754, ib865, ib885;
     int ip, ipb;
     float *rhos = l2rec->l1rec->rhos;
-    float mdsi, cv, mean, sum, sdev, w681_fac;
+    float mdsi, cv, mean, sum, sdev;
     int i, n=7;
 
     allocateFlagsHABS(l2rec->l1rec->npix);
@@ -517,13 +518,6 @@ uint8_t* get_flags_habs_meris(l2str *l2rec) {
         exit(EXIT_FAILURE);
     }
     
-    if (l2rec->l1rec->l1file->sensorID == OLCIS3A ||
-        l2rec->l1rec->l1file->sensorID == OLCIS3B) {
-        w681_fac = 0.99;
-    } else {
-        w681_fac = 1.0;
-    }
-
     for (ip = 0; ip < l2rec->l1rec->npix; ip++) {
         flags_habs[ip] = 0;
         ipb = l2rec->l1rec->l1file->nbands*ip;
@@ -584,10 +578,10 @@ uint8_t* get_flags_habs_meris(l2str *l2rec) {
                 flags_habs[ip] |= HABS_SNOWICE;
             }
             //adjacency flagging
-            float mci = 1.0 * (rhos[ipb + ib709] - rhos[ipb + ib681]*w681_fac
-                + (rhos[ipb + ib681]*w681_fac - rhos[ipb + ib754])*(709 - 681) / (754 - 681));
+            float mci = 1.0 * (rhos[ipb + ib709] - rhos[ipb + ib681]
+                + (rhos[ipb + ib681] - rhos[ipb + ib754])*(709 - 681) / (754 - 681));
             float ci = 1.0 * ((rhos[ipb + ib709] - rhos[ipb + ib665])*(681 - 665) / (709 - 665)
-                - (rhos[ipb + ib681]*w681_fac - rhos[ipb + ib665]));
+                - (rhos[ipb + ib681] - rhos[ipb + ib665]));
 
             habs_meris_ci_corr(rhos[ipb + ib443], rhos[ipb + ib490],
                     rhos[ipb + ib560], rhos[ipb + ib620],

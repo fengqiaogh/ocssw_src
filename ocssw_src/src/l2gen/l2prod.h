@@ -578,4 +578,10 @@ in product.xml...but not here?
 #define CAT_mRrs_diff_sdp           567
 #define CAT_d2Rrs_diff_sdp          568
 
+#define CAT_tchl_gpig               569
+#define CAT_chlc12_gpig             570
+#define CAT_tchlb_gpig              571
+#define CAT_ppc_gpig                572
+#define CAT_flags_gpig              573
+
 #endif

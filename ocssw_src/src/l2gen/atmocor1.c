@@ -67,33 +67,21 @@ void atmocor1(l1str *l1rec, int32_t ip) {
     ipb = ip*nwave;
 
     /* Initialize output values */
-    for (ib = 0; ib < nwave; ib++) {
+    if (sensorID == SEAWIFS || sensorID == OCTS) {
+        for (ib = 0; ib < nwave; ib++) {
+            // Explicitly only doing the Ding and Gordon correction if the sensor has a band AT 765nm
+            // So, you know, SeaWiFS, OCTS, OSMI, and any others to be named later...
+            if (input->oxaband_opt == 1 && l1rec->l1file->iwave[ib] == 765) {
+                ib765 = ib;
+                l1rec->t_o2[ipb + ib765] = 1.0 / oxygen_aer(airmass);
+            }
 
-        l1rec->Lr [ipb + ib] = 0.0;
-        l1rec->L_q [ipb + ib] = 0.0;
-        l1rec->L_u [ipb + ib] = 0.0;
-        l1rec->tLf [ipb + ib] = 0.0;
-        l1rec->tg_sol[ipb + ib] = 1.0;
-        l1rec->tg_sen[ipb + ib] = 1.0;
-        l1rec->tg    [ipb + ib] = 1.0;
-        l1rec->t_h2o [ipb + ib] = 1.0;
-        l1rec->t_o2 [ipb + ib] = 1.0;
-        l1rec->t_sol [ipb + ib] = exp(-0.5 * pr / p0 * Tau_r[ib] / mu0);
-        l1rec->t_sen [ipb + ib] = exp(-0.5 * pr / p0 * Tau_r[ib] / mu);
-
-        // Explicitly only doing the Ding and Gordon correction if the sensor has a band AT 765nm
-        // So, you know, SeaWiFS, OCTS, OSMI, and any others to be named later...
-        if (input->oxaband_opt == 1 && l1rec->l1file->iwave[ib] == 765) {
-            ib765 = ib;
-            l1rec->t_o2[ipb + ib765] = 1.0 / oxygen_aer(airmass);
+            if (sensorID == SEAWIFS && ((input->gas_opt & GAS_TRANS_TBL_BIT) == 0)) {
+                /* this is for rhos only, but effects seawifs land products and cloud   */
+                /* will modify get_rhos() to use gaseous transmittance in future update */
+                l1rec->t_h2o[ipb + ib] = water_vapor(ib, wv, airmass);
+            }
         }
-
-        if (sensorID == SEAWIFS && ((input->gas_opt & GAS_TRANS_TBL_BIT) == 0)) {
-            /* this is for rhos only, but effects seawifs land products and cloud   */
-            /* will modify get_rhos() to use gaseous transmittance in future update */
-            l1rec->t_h2o[ipb + ib] = water_vapor(ib, wv, airmass);
-        }
-
     }
 
     /* apply gaseous transmittance */
@@ -101,7 +89,10 @@ void atmocor1(l1str *l1rec, int32_t ip) {
 
     /* white-cap radiances at TOA */
     whitecaps(sensorID, l1_input->evalmask, nwave, ws, input->wsmax, &l1rec->rhof[ipb]);
+
     for (ib = 0; ib < nwave; ib++) {
+        l1rec->t_sol [ipb + ib] = exp(-0.5 * pr / p0 * Tau_r[ib] / mu0);
+        l1rec->t_sen [ipb + ib] = exp(-0.5 * pr / p0 * Tau_r[ib] / mu);
         l1rec->tLf[ipb + ib] = l1rec->rhof[ipb + ib] * l1rec->t_sen[ipb + ib] * l1rec->t_sol[ipb + ib] * Fo[ib] * mu0 / M_PI;
     }
 

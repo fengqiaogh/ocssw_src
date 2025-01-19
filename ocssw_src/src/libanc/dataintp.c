@@ -192,4 +192,5 @@ int dataintp(float in_latlon[2], float *lat, float *lon,
         default:
             return 1;
     }
+    return ret_;
 }

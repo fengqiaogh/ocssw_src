@@ -88,8 +88,8 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
 
     float *Rrs_unc;
 
-    float *tg_sol = &l1rec->tg_sol[ip * l1file->nbands];
-    float *tg= &l1rec->tg[ip * l1file->nbands];;  // double way absorption
+    double *tg_sol = &l1rec->tg_sol[ip * l1file->nbands];
+    double *tg= &l1rec->tg[ip * l1file->nbands];;  // double way absorption
 
     float *dsensor=NULL, *dLr=NULL, *dtaua=NULL, *dtg_sol=NULL;
     float *dtg_sen=NULL, *dt_sol=NULL, *dt_sen=NULL, *dvc=NULL, *last_dtaua=NULL;

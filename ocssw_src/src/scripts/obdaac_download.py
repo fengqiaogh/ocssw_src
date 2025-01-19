@@ -9,8 +9,10 @@ import textwrap
 from seadasutils.ProcUtils import httpdl, compare_checksum
 from urllib.parse import urlparse
 from pathlib import Path, PurePath
+from datetime import datetime
+import time
 
-def retrieveURL(request,localpath='.', uncompress=False, verbose=0,force_download=False, appkey=False, checksum=False):
+def retrieveURL(request,localpath='.', uncompress=False, verbose=0,force_download=False, appkey=False, checksum=False,timestamp=False):
     if args.verbose:
         print("Retrieving %s" % request.rstrip())
 
@@ -32,7 +34,7 @@ def retrieveURL(request,localpath='.', uncompress=False, verbose=0,force_downloa
     if parsedRequest.query:
         netpath = netpath + joiner + parsedRequest.query
 
-    status = httpdl(server, netpath, localpath=localpath, uncompress=uncompress, verbose=verbose,force_download=force_download)
+    status = httpdl(server, netpath, localpath=localpath, uncompress=uncompress, verbose=verbose,force_download=force_download,timestamp=timestamp)
     
     if checksum and not uncompress:
         cksumURL = 'https://'+server + '/checkdata/' + parsedRequest.path
@@ -76,6 +78,9 @@ NOTE: For authentication, a valid .netrc file in the user home ($HOME) directory
                         default=False)
     parser.add_argument('--checksum',action="store_true",
                         help='compare retrieved file checksum; cannot be used with --uncompress',
+                        default=False)
+    parser.add_argument('--timestamp',action="store_true",
+                        help='change timestamp of retrieved file to time of creation',
                         default=False)
     parser.add_argument('--failed',help='filename to contain list of files that failed to be retrieved')
     parser.add_argument('--appkey',help='value of the users application key')
@@ -122,7 +127,7 @@ NOTE: For authentication, a valid .netrc file in the user home ($HOME) directory
     for request in filelist:
         status = retrieveURL(request,localpath=outpath, uncompress=args.uncompress,
                              verbose=args.verbose,force_download=args.force,
-                             appkey=args.appkey,checksum=args.checksum)
+                             appkey=args.appkey,checksum=args.checksum,timestamp=args.timestamp)
         if status:
             if status == 304: 
                 if args.verbose:

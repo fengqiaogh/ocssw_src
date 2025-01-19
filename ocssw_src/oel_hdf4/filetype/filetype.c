@@ -290,17 +290,6 @@ file_format getFormat(char *filename) {
                     endDS(ds_id);
                     return ret;
                 }
-                if (strstr(titleStr, "ocia level-1b")) {
-                    ret.type = FT_OCIA;
-                    ret.sensor_id = OCIA;
-                    ret.subsensor_id = -1;
-                    if (want_verbose) {
-                        printf("Input file %s is OCIA L1B file.\n", filename);
-                    }
-                    free(titleStr);
-                    endDS(ds_id);
-                    return ret;
-                }
                 if (strstr(titleStr, "aviris level-1b")) {
                     ret.type = FT_AVIRIS;
                     ret.sensor_id = AVIRIS;
@@ -367,22 +356,10 @@ file_format getFormat(char *filename) {
                     endDS(ds_id);
                     return ret;
                 }
-                if (strstr(titleStr, "ocis level-1b")) {
-                    ret.type = FT_OCIS;
-                    ret.sensor_id = OCIS;
-                    ret.subsensor_id = -1;
-                    if (want_verbose) {
-                        printf("Input file %s is PACE L1B Simulated file.\n", filename);
-                    }
-                    free(titleStr);
-                    endDS(ds_id);
-                    return ret;
-                }
-
                 if (strstr(titleStr, "hkt level-1a") ||
                     strstr(titleStr, "pace hkt data")) {
                     ret.type = FT_HKT;
-                    ret.sensor_id = OCIS;
+                    ret.sensor_id = OCI;
                     ret.subsensor_id = -1;
                     if (want_verbose) {
                         printf("Input file %s is PACE HKT file.\n", filename);
@@ -397,17 +374,6 @@ file_format getFormat(char *filename) {
                     ret.subsensor_id = -1;
                     if (want_verbose) {                       
                         printf("Input file %s is PACE OCI L1C file.\n", filename);
-                    }
-                    free(titleStr);
-                    endDS(ds_id);
-                    return ret;
-                }
-                if (strstr(titleStr, "pace ocis level-1c")) {
-                    ret.type = FT_L1C;
-                    ret.sensor_id = OCIS;
-                    ret.subsensor_id = -1;
-                    if (want_verbose) {                       
-                        printf("Input file %s is PACE OCIS L1C file.\n", filename);
                     }
                     free(titleStr);
                     endDS(ds_id);
@@ -506,7 +472,17 @@ file_format getFormat(char *filename) {
                     endDS(ds_id);
                     return ret;
                 }
-
+                if (strstr(titleStr, "czcs level-1a data")) {
+                    ret.type = FT_CZCSL1ANC;
+                    ret.sensor_id = CZCS;
+                    ret.subsensor_id = -1;
+                    if (want_verbose) {
+                        printf("Input file %s is CZCS Level-1A netCDF.\n", filename);
+                    }
+                    free(titleStr);
+                    endDS(ds_id);
+                    return ret;
+                }
                 char *platformStr = readAttrStr(ds_id, "platform");
 
                 if (platformStr) {
@@ -631,13 +607,6 @@ file_format getFormat(char *filename) {
                 if (want_verbose) {
                     printf("Input file %s is %s.\n", filename, title);
                 }
-            } else if (strcmp(title, "OSMI Level-1A Data") == 0) {
-                ret.type = FT_OSMIL1A;
-                ret.sensor_id = OSMI;
-                ret.subsensor_id = -1;
-                if (want_verbose) {
-                    printf("Input file %s is %s.\n", filename, title);
-                }
             } else if (strcmp(title, "CZCS Level-1A Data") == 0) {
                 ret.type = FT_CZCSL1A;
                 ret.sensor_id = CZCS;
@@ -718,23 +687,9 @@ file_format getFormat(char *filename) {
                 if (want_verbose) {
                     printf("Input file %s is %s.\n", filename, title);
                 }
-            } else if (strcmp(title, "MOS Level-1B") == 0) {
-                ret.type = FT_L1HDF;
-                ret.sensor_id = MOS;
-                ret.subsensor_id = -1;
-                if (want_verbose) {
-                    printf("Input file %s is %s.\n", filename, title);
-                }
             } else if (strcmp(title, "OCTS Level-1B LAC Data") == 0) {
                 ret.type = FT_OCTSL1B;
                 ret.sensor_id = OCTS;
-                ret.subsensor_id = -1;
-                if (want_verbose) {
-                    printf("Input file %s is %s.\n", filename, title);
-                }
-            } else if (strcmp(title, "OSMI Level-1B") == 0) {
-                ret.type = FT_L1HDF;
-                ret.sensor_id = OSMI;
                 ret.subsensor_id = -1;
                 if (want_verbose) {
                     printf("Input file %s is %s.\n", filename, title);
@@ -863,17 +818,6 @@ file_format getFormat(char *filename) {
         } else if ((SDfindattr(sd_id, "Path_number") != -1) && (SDfindattr(sd_id, "SOM_parameters.som_ellipsoid.a") != -1)) {
           ret.type = FT_MISR;
           ret.sensor_id = MISR;
-
-
-            /* Is it MOS L1B HDF standard product? */
-
-        } else if (GetFileDesc(filename) != NULL) {
-            ret.type = FT_MOSL1B;
-            ret.sensor_id = MOS;
-            ret.subsensor_id = -1;
-            if (want_verbose) {
-                printf("Input file %s is MOS Level-1B standard product.\n", filename);
-            }
         } else {
             fprintf(stderr, "-E- %s Line %d: Unrecognized input HDF file %s\n", __FILE__, __LINE__, filename);
             return ret;

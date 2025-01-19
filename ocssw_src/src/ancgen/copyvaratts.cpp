@@ -2,7 +2,6 @@
 
 #include <iostream>
 #include <netcdf>
-#include <cstdint>
 
 using namespace std;
 using namespace netCDF;

@@ -3,7 +3,7 @@
 #include "ocorient.h"
 #include "math_utils.h"
 void matmpy(const float xm1[3][3], const float xm2[3][3], float xm3[3][3]) {
-    int i, j, m, n;
+    int i, j, m;
     for (i = 0; i < 3; i++) {
         for (j = 0; j < 3; j++) {
             xm3[i][j] = 0;

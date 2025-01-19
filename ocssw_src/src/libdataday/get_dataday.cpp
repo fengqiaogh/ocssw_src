@@ -174,7 +174,6 @@ void getEquatorCrossingTime(int32_t sensorID, bool dayNight, time_t starttime, f
                 *equatorialCrossingTime = 12.0;
                 break;
             case OCI:
-            case OCIS:
             case SPEXONE:
             case HARP2:
                 *equatorialCrossingTime = 13.0;

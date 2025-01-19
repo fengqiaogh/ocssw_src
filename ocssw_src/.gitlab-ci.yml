@@ -30,9 +30,9 @@ variables:
     - if [ -d viirs_l1 ]; then
     -    rm -rf viirs_l1
     - fi
-    - git clone --recurse-submodules https://gitlab-ci-token:${CI_JOB_TOKEN}@oceandata.sci.gsfc.nasa.gov/rcs/viirs/viirs_l1.git
+    - git clone --recurse-submodules --branch master https://gitlab-ci-token:${CI_JOB_TOKEN}@oceandata.sci.gsfc.nasa.gov/rcs/viirs/viirs_l1.git
     - cd viirs_l1 
-    - mkdir build && cd build && cmake .. -DBUILD_OCSSW_LIBS=ON && make -j20 install
+    - mkdir build && cd build && cmake .. && make -j20 install
     - cd $OCSSWROOT
 
 .rules_template: &rules_definition

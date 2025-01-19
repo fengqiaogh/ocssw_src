@@ -20,10 +20,14 @@
 #include <rapidjson/ostreamwrapper.h>
 #include "rapidjson/error/en.h"
 #include <netcdf>
+#include <stack>
+
+#ifdef BUILD_ALL
 #include "productInfo.h"
 #include "sensorInfo.h"
-#include <stack>
 #include <l1.h>
+#endif
+
 namespace focs {
 namespace rj = rapidjson;
 namespace fs = std::filesystem;
@@ -49,7 +53,9 @@ class ConfigReader {
    protected:
     std::unique_ptr<rj::Document> document;
     std::optional<fs::path> path;
-    [[maybe_unused]] std::unique_ptr<productInfo_t> product_xml;  // from ocssw oel_util, not implemented yet
+#ifdef BUILD_ALL
+    std::unique_ptr<productInfo_t> product_xml;  // from ocssw oel_util, not implemented yet
+#endif
     ProdAttrGeneric attrs;
 
    public:
@@ -133,8 +139,9 @@ protected:
     std::unique_ptr<ConfigReader> _config;
     std::unordered_map<std::string,ConfigReader> configs;
     std::unordered_map<std::string,std::set<focs::Attribute>> _attributes;
+#ifdef BUILD_ALL
     productInfo_t *info = nullptr;
-
+#endif
    public:
     AttributeReader(const std::filesystem::path& path, const std::string& mode = "default",
                     const std::unordered_set<std::string>& products_requested = {});

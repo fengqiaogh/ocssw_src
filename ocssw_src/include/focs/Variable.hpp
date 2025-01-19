@@ -7,7 +7,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "genutils.h"
+#include <focs/Common.hpp>
 namespace focs {
 
 //TODO: change attributes to share with product attributes, or at least copy the theory

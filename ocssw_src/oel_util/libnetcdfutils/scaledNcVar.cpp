@@ -10,13 +10,18 @@
 #include "scaledNcVar.hpp"
 #include <ncVarAtt.h>
 #include <math.h>
+#include <cmath>  // For std::isnan()
 #include <limits>
 
 using namespace netCDF;
 using namespace netCDF::exceptions;
 using namespace std;
 
+ScaledNcVar::ScaledNcVar() : netCDF::NcVar() {
+}
+
 ScaledNcVar::ScaledNcVar(const NcVar &copied) : netCDF::NcVar(copied) {
+    thisVarType = getType().getTypeClass();
 }
 
 ScaledNcVar::~ScaledNcVar() {
@@ -25,7 +30,7 @@ ScaledNcVar::~ScaledNcVar() {
     }
 }
 
-bool ScaledNcVar::floatingPoint() {
+bool ScaledNcVar::isFloatingPoint() {
     return thisVarType == NcType::nc_DOUBLE || thisVarType == NcType::nc_FLOAT;
 }
 
@@ -135,7 +140,8 @@ void ScaledNcVar::assignFillValue(double newValue) {
     this->fillValue = newValue;
 }
 
-size_t getDimsSize(std::vector<NcDim> dims) {
+size_t ScaledNcVar::getDimsSize() {
+    const vector<NcDim> dims = this->getDims();
     size_t size = 1;
     for (const auto &dim : dims)
         size *= dim.getSize();
@@ -168,10 +174,10 @@ void ScaledNcVar::getVar(float *dataValues) {
     if (!scaleFactorsSet)
         getScaleFactorsFromFile();
 
-    if (thisVarType != NcType::nc_FLOAT && thisVarType != NcType::nc_DOUBLE)
-        ScaledNcVar::uncompress(dataValues, getDimsSize(getDims()));
+    if (!isFloatingPoint())
+        ScaledNcVar::uncompress(dataValues, getDimsSize());
     else
-        fillToBad(dataValues, getDimsSize(getDims()));  // since uncompress already does this
+        fillToBad(dataValues, getDimsSize());  // since uncompress already does this
 }
 
 void ScaledNcVar::getVar(double *dataValues) {
@@ -180,10 +186,10 @@ void ScaledNcVar::getVar(double *dataValues) {
     if (!scaleFactorsSet)
         getScaleFactorsFromFile();
 
-    if (thisVarType != NcType::nc_FLOAT && thisVarType != NcType::nc_DOUBLE)
-        ScaledNcVar::uncompress(dataValues, getDimsSize(getDims()));
+    if (!isFloatingPoint())
+        ScaledNcVar::uncompress(dataValues, getDimsSize());
     else
-        fillToBad(dataValues, getDimsSize(getDims()));  // since uncompress already does this
+        fillToBad(dataValues, getDimsSize());  // since uncompress already does this
 }
 
 void ScaledNcVar::getVar(vector<size_t> start, vector<size_t> count, float *dataValues) {
@@ -196,7 +202,7 @@ void ScaledNcVar::getVar(vector<size_t> start, vector<size_t> count, float *data
     if (!scaleFactorsSet)
         getScaleFactorsFromFile();
 
-    if (thisVarType != NcType::nc_FLOAT && thisVarType != NcType::nc_DOUBLE)
+    if (!isFloatingPoint())
         ScaledNcVar::uncompress(dataValues, sizeToGet);
     else
         fillToBad(dataValues, sizeToGet);  // since uncompress already does this
@@ -212,16 +218,16 @@ void ScaledNcVar::getVar(vector<size_t> start, vector<size_t> count, double *dat
     if (!scaleFactorsSet)
         getScaleFactorsFromFile();
 
-    if (thisVarType != NcType::nc_FLOAT && thisVarType != NcType::nc_DOUBLE)
+    if (!isFloatingPoint())
         ScaledNcVar::uncompress(dataValues, sizeToGet);
     else
         fillToBad(dataValues, sizeToGet);  // since uncompress already does this
 }
 
 void ScaledNcVar::putVar(const float *dataValues) {
-    size_t sizeToWrite = getDimsSize(getDims());
+    size_t sizeToWrite = getDimsSize();
 
-    if (floatingPoint() || !scaleFactorsSet) {
+    if (isFloatingPoint() || !scaleFactorsSet) {
         if (fillValue != badValue) {
             vector<double> buf(sizeToWrite);
             badToFill(dataValues, sizeToWrite, buf);
@@ -239,9 +245,9 @@ void ScaledNcVar::putVar(const float *dataValues) {
 }
 
 void ScaledNcVar::putVar(const double *dataValues) {
-    size_t sizeToWrite = getDimsSize(getDims());
+    size_t sizeToWrite = getDimsSize();
 
-    if (floatingPoint() || !scaleFactorsSet) {
+    if (isFloatingPoint() || !scaleFactorsSet) {
         if (fillValue != badValue) {
             vector<double> buf(sizeToWrite);
             badToFill(dataValues, sizeToWrite, buf);
@@ -264,7 +270,7 @@ void ScaledNcVar::putVar(vector<size_t> start, vector<size_t> count, const float
         sizeToWrite *= stop;
     }
 
-    if (floatingPoint() || !scaleFactorsSet) {
+    if (isFloatingPoint() || !scaleFactorsSet) {
         if (fillValue != badValue) {
             vector<double> buf(sizeToWrite);
             badToFill(dataValues, sizeToWrite, buf);
@@ -287,7 +293,7 @@ void ScaledNcVar::putVar(vector<size_t> start, vector<size_t> count, const doubl
         sizeToWrite *= stop;
     }
 
-    if (floatingPoint() || !scaleFactorsSet) {
+    if (isFloatingPoint() || !scaleFactorsSet) {
         if (fillValue != badValue) {
             vector<double> buf(sizeToWrite);
             badToFill(dataValues, sizeToWrite, buf);
@@ -316,7 +322,7 @@ void ScaledNcVar::compress(const double *toCompress, std::vector<int32_t> &compr
     pair<double, double> thisVarRange = range();  // [lowerBound, upperBound]
 
     for (size_t i = 0; i < count; i++) {
-        if (toCompress[i] == badValue) {
+        if (toCompress[i] == badValue || isnan(toCompress[i])) {
             compressed[i] = fillValue;
         } else {
             double value = (toCompress[i] - this->addOffset) / this->scaleFactor;
@@ -335,7 +341,7 @@ void ScaledNcVar::compress(const float *toCompress, std::vector<int32_t> &compre
     pair<double, double> thisVarRange = range();  // [lowerBound, upperBound]
 
     for (size_t i = 0; i < count; i++) {
-        if (toCompress[i] == badValue) {
+        if (toCompress[i] == badValue || isnan(toCompress[i])) {
             compressed[i] = fillValue;
         } else {
             double value = (toCompress[i] - this->addOffset) / this->scaleFactor;
@@ -351,7 +357,7 @@ void ScaledNcVar::compress(const float *toCompress, std::vector<int32_t> &compre
 
 void ScaledNcVar::uncompress(double *toUncompress, size_t count) {
     for (size_t i = 0; i < count; i++) {
-        if (toUncompress[i] == fillValue)
+        if (toUncompress[i] == fillValue || isnan(toUncompress[i]))
             toUncompress[i] = badValue;
         else if (scaleFactor != 1.0 || addOffset != 0.0)
             toUncompress[i] = (toUncompress[i] * scaleFactor) + addOffset;
@@ -360,7 +366,7 @@ void ScaledNcVar::uncompress(double *toUncompress, size_t count) {
 
 void ScaledNcVar::uncompress(float *toUncompress, size_t count) {
     for (size_t i = 0; i < count; i++) {
-        if (toUncompress[i] == fillValue)
+        if (toUncompress[i] == fillValue || isnan(toUncompress[i]))
             toUncompress[i] = badValue;
         else if (scaleFactor != 1.0 || addOffset != 0.0)
             toUncompress[i] = (toUncompress[i] * scaleFactor) + addOffset;
@@ -371,7 +377,7 @@ template <typename T>
 void ScaledNcVar::fillToBad(T *data, size_t count) {
     if (fillValue != badValue) {
         for (size_t i = 0; i < count; i++) {
-            if (data[i] == fillValue)
+            if (data[i] == fillValue || isnan(data[i]))
                 data[i] = badValue;
         }
     }
@@ -381,7 +387,7 @@ template <typename T, typename E>
 void ScaledNcVar::badToFill(const T *data, const size_t &count, vector<E> &out) {
     out.resize(count);
     for (size_t i = 0; i < count; i++) {
-        if (data[i] == badValue)
+        if (data[i] == badValue || isnan(data[i]))
             out[i] = fillValue;
         else
             out[i] = data[i];

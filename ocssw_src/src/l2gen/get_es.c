@@ -22,7 +22,6 @@
  * now returns in W/m2/um
  */
 void get_es(l2str *l2rec, int band, float Es[]) {
-    static float radeg = 3.141592654 / 180.;
     int32_t ip;
     int32_t ipb;
 
@@ -35,7 +34,7 @@ void get_es(l2str *l2rec, int band, float Es[]) {
             Es[ip] = l1rec->Fo[band]
                     * l1rec->tg_sol[ipb]
                     * l1rec->t_sol[ipb]
-                    * cos(l1rec->solz[ip] * radeg)
+                    * l1rec->csolz[ip]
                     * 10.0;
         } else
             Es[ip] = 0.0;

@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.12)
 # Make a version file containing the current version from git.
 #
 set (VERSION_MAJOR 9)
-set (VERSION_MINOR 8)
+set (VERSION_MINOR 10)
 set (VERSION_PATCH 0)
 include(GetOcsswVersion)
 
@@ -149,6 +149,8 @@ set(L2GEN_PRODUCT_FILES
   get_hyper_vi.cpp
   vegetation_indices.c
   get_sdp.c
+  get_gpig.c
+  trustopt.c
 #  myprod.c
 )
 

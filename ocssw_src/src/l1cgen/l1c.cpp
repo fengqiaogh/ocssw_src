@@ -659,15 +659,44 @@ int32_t L1C::l1_cloud_correct(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
 
 
 int32_t L1C::swtime_swt2_segment(int swt, L1C_input* l1cinput, l1c_filehandle* l1cfile, int32_t norbs,
-                                 double* tswt, double tcross, double mgv, double* tmgv) {
+                                 double* tswt, double tcross, double mgv, double* tmgv,double *orb_time_tot,size_t norbs_tot) {
     int16_t bina = 0, binb = 0, ngridlines, gd = 0;
     double tg = 0., mot = 0, t_start = -1, t_end = -1;
-
+    int16_t gn=-1,gn2=-1;
     t_start = tswt[0];
     t_end = tswt[norbs - 1];
 
     mot = ((l1cinput->grid_resolution) * 1000) / mgv;  // in seconds
+    l1cfile->mot=mot;
+    if(tcross>0)
+    {
+      if(orb_time_tot[0]>tcross)
+      { 
+      gn=(tcross+24*3600-orb_time_tot[0])/l1cfile->mot;
+      gn2=(orb_time_tot[norbs_tot-1]-tcross)/l1cfile->mot;
+      }
+      else if(orb_time_tot[norbs_tot-1]<tcross)
+      {
+      gn=(tcross-orb_time_tot[0])/l1cfile->mot;
+      gn2=(orb_time_tot[norbs_tot-1]+24*3600-tcross)/l1cfile->mot;
+      }
+      else
+      {
+      gn=(tcross-orb_time_tot[0])/l1cfile->mot;
+      gn2=(orb_time_tot[norbs_tot-1]-tcross)/l1cfile->mot;
+      }
 
+     if(l1cinput->verbose)
+     {
+     cout<<"tcross "<<tcross<<"orb_time_tot[ini] "<<orb_time_tot[0]<<"gn "<<gn<<"mot "<<l1cfile->mot<<"gn2 "<<gn2<<endl;
+     cout<<"#gridlines "<<gn+gn2<<"orb_time_tot[end] "<<orb_time_tot[norbs_tot-1]<<endl;
+     }
+
+
+    l1cfile->num_gridlines=gn+gn2;
+   }
+
+    
     ngridlines = l1cfile->num_gridlines;
 
     int flag_time = -1;
@@ -679,31 +708,32 @@ int32_t L1C::swtime_swt2_segment(int swt, L1C_input* l1cinput, l1c_filehandle* l
         // backward section of swath--before equat
         tg = tcross - mot / 2;
         gd = ngridlines / 2 - 1;
+
         tmgv[gd] = tg;
         binb = 1;
-        if(tg<0 && l1cinput->verbose){
-          //  cout<<"NEGATIVE TIME swtime_swt2_segment for  mean vel tmgv calc "<<endl; 
-            }
+
         while (tg >= t_start) {
+
             binb++;
             tg -= mot;
             gd--;
             tmgv[gd] = tg;
-            if(tg<0 && l1cinput->verbose){
-          //  cout<<"NEGATIVE TIME swtime_swt2_segment for mean vel tmgv calc "<<endl;
-            }
+
         }
         // forward section of swath--after equator
         tg = tcross + mot / 2;
         gd = ngridlines / 2;
+
         tmgv[gd] = tg;
         bina = 1;
 
         while (tg <= t_end) {
+
             bina++;
             tg += mot;
             gd++;
             tmgv[gd] = tg;
+
         }
 
         if(l1cinput->verbose)cout << "bina.." << bina << "binb.." << binb << endl;
@@ -722,13 +752,40 @@ int32_t L1C::swtime_swt2_segment(int swt, L1C_input* l1cinput, l1c_filehandle* l
 }
 
 int32_t L1C::swtime_swt2(int swt, L1C_input* l1cinput, l1c_filehandle* l1cfile, int32_t norbs, double* tswt,
-                         double tcross, double mgv, double* tmgv) {
-    int16_t bina = 0, binb = 0, ngridlines, gd = 0;
+                         double tcross, double mgv, double* tmgv, double *orb_time_tot, size_t norbs_tot) {
+    int16_t bina = 0, binb = 0, gd = 0;
     double tg = 0., mot = 0;
-
+    int16_t gn=-1,gn2=-1;
     mot = ((l1cinput->grid_resolution) * 1000) / mgv;  // in seconds
+    l1cfile->mot=mot;
+    if(tcross>0)
+    {
+    if(orb_time_tot[0]>tcross)
+      {
+      gn=(tcross+24*3600-orb_time_tot[0])/l1cfile->mot;
+      gn2=(orb_time_tot[norbs_tot-1]-tcross)/l1cfile->mot;
+      }
+      else if(orb_time_tot[norbs_tot-1]<tcross)
+      {
+      gn=(tcross-orb_time_tot[0])/l1cfile->mot;
+      gn2=(orb_time_tot[norbs_tot-1]+24*3600-tcross)/l1cfile->mot;
+      }
+      else
+      {
+      gn=(tcross-orb_time_tot[0])/l1cfile->mot;
+      gn2=(orb_time_tot[norbs_tot-1]-tcross)/l1cfile->mot;
+      }
 
-    ngridlines = l1cfile->num_gridlines;
+       if(l1cinput->verbose)
+       {cout<<"tcross "<<tcross<<"orb_time_tot[ini] "<<orb_time_tot[0]<<"gn "<<gn<<"mot "<<l1cfile->mot<<"gn2 "<<gn2<<endl;
+                cout<<"#gridlines "<<gn+gn2<<"orb_time_tot[end] "<<orb_time_tot[norbs_tot-1]<<endl;
+       }
+
+    l1cfile->num_gridlines=gn+gn2;  
+    }
+
+
+
 
     int flag_time = -1;
 
@@ -737,32 +794,35 @@ int32_t L1C::swtime_swt2(int swt, L1C_input* l1cinput, l1c_filehandle* l1cfile, 
         if(l1cinput->verbose)cout << "computing time series assuming mean swath velocity..for swath#." << swt << endl;
 
         tg = tcross - mot / 2;
-        gd = ngridlines / 2 - 1;
+
+        gd=gn-1;
         tmgv[gd] = tg;
         binb = 1;
+
         if(tg<0 && l1cinput->verbose){
             cout<<"NEGATIVE FIRST TIME BEFORE CROSSING"<<tg<<"in swtime_swt2 for mean vel tmgv calc "<<mgv<<"mot/2 "<<mot/2<<"tcross "<<tcross<<endl;
         }
-        while (binb < ngridlines / 2) {//&& tg>=(0+mot
+
+        while (binb < gn) {
             binb++;
             tg -= mot;
             gd--;
             tmgv[gd] = tg;
-            if(tg<0 && l1cinput->verbose){
-       //       cout<<"NEGATIVE TIME "<<tg<<"in swtime_swt2 for mean vel tmgv calc "<<mgv<<"mot/2 "<<mot/2<<"tcross "<<tcross<<endl;
-                 }
 
         }
         tg = tcross + mot / 2;
-        gd = ngridlines / 2;
+
+        gd=gn;
         tmgv[gd] = tg;
         bina = 1;
 
-        while (bina < ngridlines / 2 + 1) {// && tg<=(86400-mot)
+
+        while (bina < gn2+1) {  
             bina++;
             tg += mot;
             gd++;
             tmgv[gd] = tg;
+
         }
 
         if(l1cinput->verbose)cout << "bina.." << bina << "binb.." << binb << endl;
@@ -1513,9 +1573,12 @@ int32_t L1C::open_l1atol1c3(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
                 tlimits_swt[swt - 1][1] = k;  // this time is a 'local' end cause may continue circling the
                                               // earth after ascending or descending
                 swt++;
-                tlimits_swt[swt - 1][0] = k + 1;
+           //     tlimits_swt[swt - 1][0] = k + 1;
+              tlimits_swt[swt - 1][0]=0;
+         //   cout<<"k ----"<<tlimits_swt[swt - 1][0]<<endl;
             } else if (swt == 2) {  // another partial swath
                 tlimits_swt[swt - 1][1] = k;
+            
                 tlimits_swt[swt - 2][1] = number_orecords_tot - 1;
                 swt++;
             }
@@ -1533,11 +1596,10 @@ int32_t L1C::open_l1atol1c3(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
         if (nswath == 2) {
             if (sw == 0) {
                 ix1 = tlimits_swt[sw][0];
-                ix2 = tlimits_swt[sw][1];
+                ix2=number_orecords_tot - 1;
                 if(l1cinput->verbose)cout << "nswath#2......swat#1...ix1" << ix1 << "ix2.." << ix2 << endl;
             } else if (sw == 1) {
                 ix3 = tlimits_swt[sw][0];
-              //  ix4 = tlimits_swt[sw][1];
                 ix4 = number_orecords_tot - 1;
                 if(l1cinput->verbose)cout << "nswath2.....swat#2...ix3" << ix3 << "ix4.." << ix4 << endl;
             }
@@ -1550,34 +1612,31 @@ int32_t L1C::open_l1atol1c3(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
                 if(l1cinput->verbose)cout << "nswath3....swat#1...ix1" << ix1 << "ix2.." << ix2 << "ix3.." << ix3 << "ix4..."
                      << ix4 << endl;
             } else if (sw == 1) {
-                ix5 = tlimits_swt[sw][0];
-                //ix6 = tlimits_swt[sw][1];
-
-                // This is a cludge to get the end granule to work.
-                // Just use all of the HKT orbit records
-                //ix5 = 2;
+                ix5 = tlimits_swt[sw][0];         
                 ix6 = number_orecords_tot - 1;
 
                 if(l1cinput->verbose)cout << "nswath3....swat#2...ix5" << ix5 << "ix6.." << ix6 << endl;
             }
         } else {
             if(l1cinput->verbose)cout << "number of swaths is less than 2..!! exit..." << endl;
-         //   exit(1);
+        
         }
     }
 
     float tcross1 = -999., loncross1 = -999., tcross2 = -999., loncross2 = -999.;
 
 
-    l1cfile->num_gridlines = 4800;//3860
+    l1cfile->num_gridlines = 5200;//default 4800 before
     num_gridlines = l1cfile->num_gridlines;
     //--------------------------------------------------------------------------------------
     // nswath#2
     //----case type: half orbits are consecutive
     // swath1
     //--------------------------------------------------------------------------------------
-    if (nswath == 2) {
-        if (ix1 >= 0 && ix5 < 0) {
+    if (nswath == 2) 
+    {
+        if (ix1 >= 0 && ix5 < 0) 
+        {
             norbs = ix2 - ix1 + 1;               
             // compute solar zenith angle for checking day/night conditions for each swath ---
             //-------------------------------------------------------
@@ -1585,7 +1644,8 @@ int32_t L1C::open_l1atol1c3(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
 
             if(l1cinput->verbose)cout << "day_mode at nswath #2 SWATH1." << day_mode << endl;
 
-            if (day_mode == 1) {
+            if (day_mode == 1) 
+            {
                 // orbit direction
                 l1cfile->orb_dir = orb_dir_tot[ix1];
 
@@ -1612,7 +1672,7 @@ int32_t L1C::open_l1atol1c3(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
                     tmgv1 = (double*)calloc(l1cfile->num_gridlines, sizeof(double));
                     tmgvf = (double*)calloc(l1cfile->num_gridlines, sizeof(double));
 
-                    swtime_swt2(1, l1cinput, l1cfile, norbs, tswt, tcross1, mgv1, tmgv1);
+                    swtime_swt2(1, l1cinput, l1cfile, norbs, tswt, tcross1, mgv1, tmgv1,orb_time_tot,number_orecords_tot);
                     // ini/end times for swath
                     num_gridlines = l1cfile->num_gridlines;
                     if(l1cinput->verbose)cout << "number of across bins L1C grid...#.." << l1cfile->nbinx << "l1cfile->n_views..."
@@ -1621,7 +1681,7 @@ int32_t L1C::open_l1atol1c3(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
                     lat_gd = allocate2d_float(num_gridlines, l1cfile->nbinx);
                     lon_gd = allocate2d_float(num_gridlines, l1cfile->nbinx);
                     alt = allocate2d_float(num_gridlines, l1cfile->nbinx);
-
+                   
                     orb_to_latlon(ix1,ix4,num_gridlines, l1cfile->nbinx, orb_time_tot, posr_tot,
                                   velr_tot, mgv1, tmgv1, tmgvf, lat_gd, lon_gd, alt,FirsTerrain);
                 
@@ -1644,7 +1704,9 @@ int32_t L1C::open_l1atol1c3(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
                         l1cfile->tswt_ini_file = tswt_ini_file;
                         create_SOCEA2(1, l1cinput, l1cfile, lat_gd, lon_gd, alt,
                                       tmgvf);  // THIS IS SWATH PROCESSING
-                    } else if (l1cinput->grantype == 0) {
+                    } 
+                    else if (l1cinput->grantype == 0) 
+                    {
                         //--------------------------------------------------------------
                         // granule processing---------------------------------------------
                         //-----------------------------------------------------------
@@ -1664,7 +1726,9 @@ int32_t L1C::open_l1atol1c3(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
                              << gd_per_gran << "#gridlines.." << num_gridlines << endl;
                      
                      if(FirsTerrain)   write_L1C_granule2(1, l1cfile, l1cinput, tmgvf, lat_gd, lon_gd, alt,orb_time_tot);
-                    } else {
+                    } 
+                    else 
+                    {
                         cout << "ERROR selecting grantype, must be 0: granules or 1: "
                                 "swath........................."
                              << endl;
@@ -1688,138 +1752,12 @@ int32_t L1C::open_l1atol1c3(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
                 }  // status =0
 
             }  // end day_mode
-            else {
+            else 
+            {
                 if(l1cinput->verbose)cout << "ERROR swath #1 day_mode = " << day_mode
                      << "nightime...continue to swath2 (nswath#2).............." << endl;
             }
 
-            // nswath=2
-            //-------------------------------------------------------------------------------------------------------
-            // swath#2
-            //-------------------------------------------------------------------------------------------------------
-            //               if(l1cinput->swath_num==2){
-            norbs = ix4 - ix3 + 1;
-            // compute solar zenith angle for checking day/night conditions for each swath --
-            day_mode = sunz_swt(ix3, ix4, hour_tot, day_tot, year_tot, orb_lat_tot, orb_lon_tot);
-
-            if(l1cinput->verbose)cout << "day_mode at nswath #2 SWATH2" << day_mode << endl;
-
-            if (day_mode == 1) {
-                // orbit direction
-                l1cfile->orb_dir = orb_dir_tot[ix3];
-
-                tswt2 = (double*)calloc(norbs, sizeof(double));
-                latswt2 = (double*)calloc(norbs, sizeof(double));
-                lonswt2 = (double*)calloc(norbs, sizeof(double));
-
-                status = ect_swt(l1cfile, ix3, ix4, orb_time_tot, orb_lat_tot, orb_lon_tot, orb_vel_tot,
-                                 grn_vel_tot, tswt2, latswt2, lonswt2, &tcross2, &loncross2, &mov2, &mgv2);
-
-                if(l1cinput->verbose)cout << "nswath==2 ---tcross equat crossing in (s)..swath#2..." << tcross2 << "loncross2..."
-                     << loncross2 << endl;
-
-                if (latswt2 != nullptr)
-                    free (latswt2);
-                latswt2 = nullptr;
-                if (lonswt2 != nullptr)
-                    free (lonswt2);
-                lonswt2 = nullptr;
-
-
-
-                if (status == 0) {
-                    tmgv2 = (double*)calloc(l1cfile->num_gridlines, sizeof(double));
-                    tmgvf2 = (double*)calloc(l1cfile->num_gridlines, sizeof(double));
-
-                    swtime_swt2(2, l1cinput, l1cfile, norbs, tswt2, tcross2, mgv2, tmgv2);
-                    num_gridlines = l1cfile->num_gridlines;
-
-                    // granule processing ------------------------
-                    numgran = 144;
-                    l1cfile->numgran = numgran;
-                    gd_per_gran = round(num_gridlines / 10);
-                    l1cfile->gd_per_gran = gd_per_gran;
-
-                    if(l1cinput->verbose)cout << "# of granules to be processed..." << numgran << "gd_per_gran..." << gd_per_gran
-                         << endl;
-
-                    if (tswt2 != nullptr)
-                        free (tswt2);
-                    tswt2 = nullptr;
-
-                    if(l1cinput->verbose)cout << "number of across bins L1C grid...#.." << l1cfile->nbinx << endl;
-                    lat_gd = allocate2d_float(num_gridlines, l1cfile->nbinx);
-                    lon_gd = allocate2d_float(num_gridlines, l1cfile->nbinx);
-                    alt = allocate2d_float(num_gridlines, l1cfile->nbinx);
-
-                    orb_to_latlon(ix1,ix4,num_gridlines, l1cfile->nbinx, orb_time_tot, posr_tot,
-                                  velr_tot, mgv2, tmgv2, tmgvf2, lat_gd, lon_gd, alt,FirsTerrain);
-                
-
-                    if (tmgv2 != nullptr)
-                        free (tmgv2);
-                    tmgv2 = nullptr;
-
-                    l1cfile->num_gridlines = l1cfile->num_gridlines - 1;
-
-                    if (l1cinput->grantype == 1) {
-                        tswt_ini_sec = tfile_ini_sec + tmgvf2[0];
-                        tswt_end_sec = tfile_ini_sec + tmgvf2[num_gridlines - 2];
-
-                        create_time_swt(num_gridlines, tfile_ini_sec, tmgvf2, tswt_ini_sec, tswt_end_sec,
-                                        &tswt_ini, &tswt_ini_file, &tswt_mid,&tswt_end);
-
-                        l1cfile->tswt_ini = tswt_ini;
-                        l1cfile->tswt_mid = tswt_mid;
-                        l1cfile->tswt_end = tswt_end;
-                        l1cfile->tswt_ini_file = tswt_ini_file;
-                        create_SOCEA2(2, l1cinput, l1cfile, lat_gd, lon_gd, alt,
-                                      tmgvf2);  // THIS IS SWATH PROCESSING
-                    } else if (l1cinput->grantype == 0) {
-                        //--------------------------------------------------------------
-                        // granule processing---------------------------------------------
-                        //---------------------------------------------------------------
-                        deltasec = tmgvf2[num_gridlines - 2] - tmgvf2[0] + 1;
-                        if(l1cinput->verbose)cout << "deltasec..swath." << deltasec << endl;
-
-                        numgran = 144 * 2;
-                        l1cfile->numgran = numgran;
-                        gd_per_gran = round(num_gridlines / 10);  // 10 granules per half orbit
-                        l1cfile->gd_per_gran = gd_per_gran;
-
-                        if(l1cinput->verbose)cout << "estimated # of granules to be processed..." << numgran << "gd_per_gran..."
-                             << gd_per_gran << "#gridlines.." << num_gridlines << endl;
-                  if(FirsTerrain) write_L1C_granule2(2, l1cfile, l1cinput, tmgvf2, lat_gd, lon_gd, alt,orb_time_tot);
-                    } else {
-                        cout << "ERROR selecting grantype, must be 0: granules or 1: "
-                                "swath........................."
-                             << endl;
-                        exit(1);
-                    }
-                    //--------------------------------------------------------------------
-                    if (lat_gd != nullptr)
-                        free (lat_gd);
-                    lat_gd = nullptr;
-                    if (lon_gd != nullptr)
-                        free (lon_gd);
-                    lon_gd = nullptr;
-                    if (tmgvf2 != nullptr)
-                        free (tmgvf2);
-                    tmgvf2 = nullptr;
-                    if (alt != nullptr)
-                        free (alt);
-                    alt = nullptr;
-                }  // status 0
-                else {
-                    if(l1cinput->verbose)cout << "ERROR swath #2 does not cross the equator..NO L1C grid for swath #2" << endl;
-                }
-
-            } else {
-                if(l1cinput->verbose)cout << "day_mode = 0 nightime...no L1C grid produced--exit (swath#2 --- "
-                        "nswath#2).............."
-                     << day_mode << endl;
-//                exit(1);
-            }
 
         }  // end index x1 and x5 condition
 
@@ -1896,7 +1834,7 @@ int32_t L1C::open_l1atol1c3(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
 
                     swtime_swt2_segment(
                         1, l1cinput, l1cfile, norbs, tswt, tcross1, mgv1,
-                        tmgv1);  // number of gridlines may change here!!!!!!!!! not anymore 4000 and
+                        tmgv1,orb_time_tot,number_orecords_tot);  // number of gridlines may change here!!!!!!!!! not anymore 4000 and
                                  // assymetric around the equator so bina and binb not the same!!!
                     num_gridlines = l1cfile->num_gridlines;
 
@@ -2050,7 +1988,7 @@ int32_t L1C::open_l1atol1c3(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
                 tmgv2 = (double*)calloc(l1cfile->num_gridlines, sizeof(double));
                 tmgvf2 = (double*)calloc(l1cfile->num_gridlines, sizeof(double));
 
-                swtime_swt2(2, l1cinput, l1cfile, norbs, tswt2, tcross2, mgv2, tmgv2);
+                swtime_swt2(2, l1cinput, l1cfile, norbs, tswt2, tcross2, mgv2, tmgv2,orb_time_tot,number_orecords_tot);
                 num_gridlines = l1cfile->num_gridlines;
 
                 if (tswt2 != nullptr)
@@ -3062,6 +3000,14 @@ int32_t L1C::write_L1C_granule2(int swtd, l1c_filehandle* l1cfile, L1C_input* l1
                 tfile_ini_sec + tmgv[i];  // seconds of the day are added to second since unix time reference     
             if (tg_end > tgran_end_sec)
                 tg_end = tgran_end_sec;
+
+            // unix2ymdhms(tg_ini, &y_ini, &mo_ini, &d_ini, &h_ini, &mi_ini, &sec_ini);
+            // cout<<"gran# "<<gran+1<<"day ini "<<d_ini<<"h ini "<<h_ini<<"mi ini "<<mi_ini<<"sec ini "<<sec_ini<<"tgini "<<tg_ini<<endl;
+            //  unix2ymdhms(tg_end, &y_ini, &mo_ini, &d_ini, &h_ini, &mi_ini, &sec_ini);
+            // cout<<"gran# "<<gran+1<<"day ini "<<d_ini<<"h ini "<<h_ini<<"mi ini "<<mi_ini<<"sec ini "<<sec_ini<<"tgini "<<tg_ini<<endl;
+            // unix2ymdhms(tgridline, &y_ini, &mo_ini, &d_ini, &h_ini, &mi_ini, &sec_ini);
+            // cout<<"gridline# "<<i+1<<"gran# "<<gran+1<<"day ini "<<d_ini<<"h ini "<<h_ini<<"mi ini "<<mi_ini<<"sec ini "<<sec_ini<<"tgini "<<tg_ini<<endl;
+
             if (tgridline >= tg_ini && tgridline < tg_end) {  
 
                 if (l1cinput->start_time[0] != '\0' || l1cinput->end_time[0] != '\0') {
@@ -3157,15 +3103,15 @@ int32_t L1C::write_L1C_granule2(int swtd, l1c_filehandle* l1cfile, L1C_input* l1
     int16_t ngridlines, totlines = 0;
     // write files with granid>0 --------------------- 
     for (int gran = 0; gran < numgran; gran++) {
-   //     twodays=0;
+  
 
         NY1 = gdindex[gran][0];
         NY2 = gdindex[gran][1];
-  /*      for (int i = NY1; i < NY2 + 1; i++) 
-            {
-               if(tmgv[i]<0) twodays=1;
-            }
- */
+ 
+
+
+
+
         if(twodays)
         { 
         tfile_ini_offset=time_zero;

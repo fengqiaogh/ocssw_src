@@ -20,12 +20,8 @@
 #endif
 
 static float PHSA[NPHASE][NWAVE][NBIG][NGAUS][NPHI], PHSR[NBIG][NGAUS][NPHI];
-static float APHSRADA[NPHASE][NWAVE][NBIG][NGAUS][NPHI];
-static float MU[NGAUS], PDIV[NG], PWT[NG], THETA[NGAUS];
-static float PHSRADA[NGAUS][NGAUS][NPHI], PHSRADR[NGAUS][NGAUS][NPHI];
+static float MU[NGAUS], THETA[NGAUS];
 static float TAUA_RAT[NPHASE][NWAVE];
-static float RAD1[NRAD][NPHI];
-static float tst[2], tdf[2];
 static float TSTARR[NWAVE][NRAD], TSTARA[NPHASE][NWAVE][NRAD];
 namespace morel_vars {
     float BRDF[NWAVE][NSUN][NCHL][NRAD][NPHI];
@@ -386,12 +382,17 @@ extern "C" void diff_tran_corr_(int *iphase, float *solz, float *senz, float *ph
             break;
         }
     }
+    if(iview < 1) {
+        printf("-E- %s:%d - iview has to be at least 1\n", __FILE__, __LINE__);
+        exit(EXIT_FAILURE);
+    }
+
     float Ta = *taua;
     size_t mgaus = NGAUS;
     size_t maxphi = NPHI;
     for (size_t iwave = 0; iwave < NWAVE; iwave++) {
         float tstar1, tstar2, ans1, ans2, tdiff1, tdiff2;
-        for (size_t jup = iview - 1; jup <= iview; jup++) {
+        for (size_t jup = iview - 1; jup <= (size_t)iview; jup++) {
             //            float adelphi = (180.0 / M_PI) * (*phi);
             size_t jdn = mgaus + 1 - jup;
             float ya1 = 0.0f;
@@ -445,7 +446,7 @@ extern "C" void diff_tran_corr_(int *iphase, float *solz, float *senz, float *ph
             float plterm_r = (1.0f - aint_pl_r / 2.0f) / MU[jup];
             float t_diff_a = std::exp(-plterm_a * Ta * TAUA_RAT[*iphase][iwave]);
             float t_diff_r = std::exp(-plterm_r * tr[iwave]);
-            if (jup == iview - 1) {
+            if (jup == (size_t)(iview - 1)) {
                 tstar1 =
                         TSTARR[iwave][jup] * std::pow(TSTARA[*iphase][iwave][jup], Ta * TAUA_RAT[*iphase][iwave]);
                 tdiff1 = t_diff_a * t_diff_r;

@@ -1217,76 +1217,19 @@ void writeProj4File(L3File* l3File, char* projectionStr, vector<OutFile*> outFil
         // If no user input, grab extents from the file -
         // not taking the easy route and using metadata because of the square
         // Earth problem
-        double latmin = 999., latmax = -999., lonmin = 999., lonmax = -999.;
-        double lonmin360 = 999., lonmax360 = -999.;
+
         L3Shape* shape = l3File->getShape();
         for (int row = 0; row < l3File->getNumRows(); row++) {
-            // First column
             L3Row* l3row = l3File->getRow(row);
+            if(l3row->getNumBins() == 0)
+                continue;
             x = std::numeric_limits<double>::quiet_NaN();
             y = std::numeric_limits<double>::quiet_NaN();
             int32_t binindex = 0;
 
-            // search for first good bin
-            while ((!isfinite(x) || !(isfinite(y))) && binindex < l3row->getNumBins()) {
-                int64_t bin = l3row->getBinByIndex(binindex)->getBinNum();
-                if (bin > -1) {
-                    shape->bin2latlon(bin, lat, lon);
-                    c.xy.x = lon;
-                    c.xy.y = lat;
-                    c_out = proj_trans(pj_new, PJ_FWD, c);
-                    x = c_out.xy.x;
-                    y = c_out.xy.y;
-                    binindex++;
-                }
-            }
-            if (isfinite(x) && isfinite(y)) {
-                if (lon < lonmin)
-                    lonmin = lon;
-                if (lon > lonmax)
-                    lonmax = lon;
-
-                double lon360;
-                if (lon < 0)
-                    lon360 = lon + 360.0;
-                else
-                    lon360 = lon;
-                if (lon360 < lonmin360)
-                    lonmin360 = lon360;
-                if (lon360 > lonmax360)
-                    lonmax360 = lon360;
-
-                if (lat < latmin)
-                    latmin = lat;
-                if (lat > latmax)
-                    latmax = lat;
-
-                if (x < limitMax && x > limitMin) {
-                    if (x < minX) {
-                        minX = x;
-                    }
-                    if (x > maxX) {
-                        maxX = x;
-                    }
-                }
-                if (y < limitMax && y > limitMin) {
-                    if (y < minY) {
-                        minY = y;
-                    }
-                    if (y > maxY) {
-                        maxY = y;
-                    }
-                }
-            }
-
-            // Last column
-            if ((l3row->getNumBins() > 1) && (binindex != l3row->getNumBins())) {
-                binindex = l3row->getNumBins() - 1;
-                x = std::numeric_limits<double>::quiet_NaN();
-                y = std::numeric_limits<double>::quiet_NaN();
-
-                // search for last good bin
-                while ((!isfinite(x) || !(isfinite(y))) && (binindex > 0)) {
+            // if dateline crossed...search every bin
+            if (metaData->east < metaData->west) {
+                while (binindex < l3row->getNumBins()) {
                     int64_t bin = l3row->getBinByIndex(binindex)->getBinNum();
                     if (bin > -1) {
                         shape->bin2latlon(bin, lat, lon);
@@ -1295,30 +1238,42 @@ void writeProj4File(L3File* l3File, char* projectionStr, vector<OutFile*> outFil
                         c_out = proj_trans(pj_new, PJ_FWD, c);
                         x = c_out.xy.x;
                         y = c_out.xy.y;
-                        binindex--;
+                        binindex++;
+                        if (isfinite(x) && isfinite(y)) {
+                            if (x < limitMax && x > limitMin) {
+                                if (x < minX) {
+                                    minX = x;
+                                }
+                                if (x > maxX) {
+                                    maxX = x;
+                                }
+                            }
+                            if (y < limitMax && y > limitMin) {
+                                if (y < minY) {
+                                    minY = y;
+                                }
+                                if (y > maxY) {
+                                    maxY = y;
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                //First column
+                while ((!isfinite(x) || !(isfinite(y))) && binindex < l3row->getNumBins()) {
+                    int64_t bin = l3row->getBinByIndex(binindex)->getBinNum();
+                    if (bin > -1) {
+                        shape->bin2latlon(bin, lat, lon);
+                        c.xy.x = lon;
+                        c.xy.y = lat;
+                        c_out = proj_trans(pj_new, PJ_FWD, c);
+                        x = c_out.xy.x;
+                        y = c_out.xy.y;
+                        binindex++;
                     }
                 }
                 if (isfinite(x) && isfinite(y)) {
-                    if (lon < lonmin)
-                        lonmin = lon;
-                    if (lon > lonmax)
-                        lonmax = lon;
-
-                    double lon360;
-                    if (lon < 0)
-                        lon360 = lon + 360.0;
-                    else
-                        lon360 = lon;
-                    if (lon360 < lonmin360)
-                        lonmin360 = lon360;
-                    if (lon360 > lonmax360)
-                        lonmax360 = lon360;
-
-                    if (lat < latmin)
-                        latmin = lat;
-                    if (lat > latmax)
-                        latmax = lat;
-
                     if (x < limitMax && x > limitMin) {
                         if (x < minX) {
                             minX = x;
@@ -1336,7 +1291,45 @@ void writeProj4File(L3File* l3File, char* projectionStr, vector<OutFile*> outFil
                         }
                     }
                 }
-            }
+                // Last column
+                if ((l3row->getNumBins() > 1) && (binindex != l3row->getNumBins())) {
+                    binindex = l3row->getNumBins() - 1;
+                    x = std::numeric_limits<double>::quiet_NaN();
+                    y = std::numeric_limits<double>::quiet_NaN();
+
+                    // search for last good bin
+                    while ((!isfinite(x) || !(isfinite(y))) && (binindex > 0)) {
+                        int64_t bin = l3row->getBinByIndex(binindex)->getBinNum();
+                        if (bin > -1) {
+                            shape->bin2latlon(bin, lat, lon);
+                            c.xy.x = lon;
+                            c.xy.y = lat;
+                            c_out = proj_trans(pj_new, PJ_FWD, c);
+                            x = c_out.xy.x;
+                            y = c_out.xy.y;
+                            binindex--;
+                        }
+                    }
+                    if (isfinite(x) && isfinite(y)) {
+                        if (x < limitMax && x > limitMin) {
+                            if (x < minX) {
+                                minX = x;
+                            }
+                            if (x > maxX) {
+                                maxX = x;
+                            }
+                        }
+                        if (y < limitMax && y > limitMin) {
+                            if (y < minY) {
+                                minY = y;
+                            }
+                            if (y > maxY) {
+                                maxY = y;
+                            }
+                        }
+                    }
+                }
+           }
         }
 
         // add a little padding to get last pixel
@@ -1344,35 +1337,6 @@ void writeProj4File(L3File* l3File, char* projectionStr, vector<OutFile*> outFil
         maxX += resolution;
         minY -= resolution;
         maxY += resolution;
-
-        metaData->north = latmax;
-        metaData->south = latmin;
-
-        double delta = lonmax - lonmin;
-        lonmax360 = fmod(lonmax + 360.0, 360.0);
-        lonmin360 = fmod(lonmin + 360.0, 360.0);
-        double delta360 = lonmax360 - lonmin360;
-
-        if (delta360 < delta) {
-            if (lonmin360 > 180.0)
-                metaData->west = lonmin360 - 360.0;
-            else
-                metaData->west = lonmin360;
-            if (lonmax360 > 180.0)
-                metaData->east = lonmax360 - 360.0;
-            else
-                metaData->east = lonmax360;
-        } else {
-            metaData->west = lonmin;
-            metaData->east = lonmax;
-        }
-
-        mapEast = metaData->east;
-        mapWest = metaData->west;
-        if (mapEast < mapWest)
-            mapEast += 360;
-        widthInDeg = mapEast - mapWest;
-        heightInDeg = metaData->north - metaData->south;
 
     }  // "north" not set
 

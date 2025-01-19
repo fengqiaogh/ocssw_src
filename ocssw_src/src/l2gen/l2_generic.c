@@ -796,7 +796,7 @@ int openl2(filehandle *l2file) {
         } else {
             PTB(SetChrGA(ds_id, "platform", sensorId2PlatformName(l2file->sensorID)));
         }
-        PTB(SetChrGA(ds_id, "Conventions", "CF-1.8 ACDD-1.3"));
+        PTB(SetChrGA(ds_id, "Conventions", "CF-1.8, ACDD-1.3"));
         PTB(SetChrGA(ds_id, "license", LICENSE));
         PTB(SetChrGA(ds_id, "naming_authority", NAMING_AUTHORITY));
         // create the id -

@@ -18,7 +18,6 @@
 #include "l12_proto.h"
 
 void get_depth_classification(l2str *l2rec, float depth[]) {
-    static float radeg = 3.141592654 / 180.;
     static float *Fo;
     static int firstCall = 1;
 
@@ -59,8 +58,8 @@ void get_depth_classification(l2str *l2rec, float depth[]) {
         /* get flagged as land if the navigation is off by a pixel.*/
         /* Algorithm provided by F. S. Patt, SAIC GSC.             */
         /*                                                         */
-        mu0 = cos(l1rec->solz[ip] * radeg);
-        mu = cos(l1rec->senz[ip] * radeg);
+        mu0 = l1rec->csolz[ip];
+        mu = l1rec->csenz[ip];
         diff = (l2rec->l1rec->Lt[ipb + 7] - 0.7 * l2rec->l1rec->Lt[ipb + 1]) / (1.0 + mu0 / mu);
         if (diff > -1.5) {
             depth[ip] = -1.0;

@@ -6,27 +6,7 @@
 #include <string>
 #include <netcdf>
 #include "focs/Log.hpp"
-#include "genutils.h"
-
-namespace tmgrn {
-const boost::posix_time::ptime epoch(boost::gregorian::date(1970, 1, 1));
-
-std::string &granule_start_time();
-
-std::string &granule_end_time();
-
-namespace bt = boost::posix_time;
-const std::locale formats[] = {
-    std::locale(std::locale::classic(), new bt::time_input_facet("%Y-%m-%dT%H:%M:%S")),
-    std::locale(std::locale::classic(), new bt::time_input_facet("%Y/%m/%d %H:%M:%S")),
-    std::locale(std::locale::classic(), new bt::time_input_facet("%d.%m.%Y %H:%M:%S")),
-    std::locale(std::locale::classic(), new bt::time_input_facet("%Y-%m-%dT%H:%M:%SZ")),
-    std::locale(std::locale::classic(), new bt::time_input_facet("minutes since %Y-%m-%d %H:%M:%S"))
-    };
-std::time_t pt_to_time_t(const bt::ptime &pt);
-
-double seconds_from_epoch(const std::string &s);
-}  // namespace tmgrn
+#include "focs/Common.hpp"
 
 namespace interp {
 
@@ -86,8 +66,8 @@ class RegularGridInterpolator2D : public Interpolator {
     double start_y;
     std::vector<double> x_grid;
     std::vector<double> y_grid;
-    __attribute__((unused)) double end_x;
-    __attribute__((unused)) double end_y;
+    double end_x;
+    double end_y;
     size_t nx;
     size_t ny;
     std::vector<double> lut_data;

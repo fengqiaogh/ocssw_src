@@ -29,7 +29,8 @@ int32_t alloc_l1(filehandle* l1file, l1str *l1rec) {
     /* allocate data block as contiguous bytes              */
     /*                                                      */
     len = 34 * sizeof (float)*npix
-            + 23 * sizeof (float)*npix * nbands
+            + 20 * sizeof (float)*npix * nbands
+            + 3 * sizeof (double)*npix * nbands
             + 2 * sizeof (float)*npix * nbandsir
             + 1 * sizeof (float)*nbands
             + 4 * sizeof (int32_t) * npix
@@ -123,18 +124,12 @@ int32_t alloc_l1(filehandle* l1file, l1str *l1rec) {
     l1rec->rho_cirrus = (float *) p;
     p += sizeof (float)*npix;
 
-    //    + 23*sizeof(float)*npix*nbands
+    //    + 20*sizeof(float)*npix*nbands
     l1rec->Lt = (float *) p;
     p += sizeof (float)*npix*nbands;
     l1rec->t_h2o = (float *) p;
     p += sizeof (float)*npix*nbands;
     l1rec->t_o2 = (float *) p;
-    p += sizeof (float)*npix*nbands;
-    l1rec->tg_sol = (float *) p;
-    p += sizeof (float)*npix*nbands;
-    l1rec->tg_sen = (float *) p;
-    p += sizeof (float)*npix*nbands;
-    l1rec->tg = (float *) p;
     p += sizeof (float)*npix*nbands;
     l1rec->t_sol = (float *) p;
     p += sizeof (float)*npix*nbands;
@@ -170,6 +165,14 @@ int32_t alloc_l1(filehandle* l1file, l1str *l1rec) {
     p += sizeof (float)*npix*nbands;
     l1rec->radcor = (float *) p;
     p += sizeof (float)*npix*nbands;
+
+    //    + 3*sizeof(double)*npix*nbands
+    l1rec->tg_sol = (double *) p;
+    p += sizeof (double)*npix*nbands;
+    l1rec->tg_sen = (double *) p;
+    p += sizeof (double)*npix*nbands;
+    l1rec->tg = (double *) p;
+    p += sizeof (double)*npix*nbands;
 
     //    +  2*sizeof(float)*npix*nbandsir
     l1rec->Ltir = (float *) p;

@@ -19,15 +19,16 @@
 double fintexp3(float taur);
 double fintexp1(float taur);
 float csalbr(float taur);
+static const float a[6] = {-.57721566, 0.99999193, -0.24991055,
+        0.05519968, -0.00976004, 0.00107857};
 
 int get_rhos(l1str *l1rec, int32_t ip) {
     static float pi = 3.141592654;
-    static float radeg = 180. / 3.141592654;
     static float p0 = 1013.25;
     static int firstCall = TRUE;
     static float sphalb[5000];
 
-    float mu0 = cos(l1rec->solz[ip] / radeg);
+    float mu0 = l1rec->csolz[ip];
 
     float Ka = 0.8;
     float Taur;
@@ -98,8 +99,7 @@ double fintexp3(float xtau) {
 double fintexp1(float xtau) {
     double xx, xftau;
     int i;
-    const float a[6] = {-.57721566, 0.99999193, -0.24991055,
-        0.05519968, -0.00976004, 0.00107857};
+
     xx = a[0];
     xftau = 1.;
     for (i = 1; i < 6; i++) {

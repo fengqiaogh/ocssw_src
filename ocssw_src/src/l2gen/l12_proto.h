@@ -451,8 +451,6 @@ int giop_ran(int recnum);
 float first_deriv(float x[], float y[], int n);
 
 void gas_trans_uncertainty(l1str *l1rec);
-int noise_index_oci(float wave);
-void noise_model_ocis(l1str *l1rec, float *noise);
 void noise_model_hmodisa(l1str *l1rec, float *noise);
 void noise_model_hmodist(l1str *l1rec, float *noise);
 void lt_agregat_ocis(l1str*l1rec);
@@ -464,6 +462,7 @@ float get_aphstar_pderiv(float wave, int dwave, int ftype, float proxy);
 void get_Cphyt_unc(l2str *l2rec, float cphyt_unc[]);
 
 void get_sdp(l2str *l2rec, l2prodstr *p, float prod[]);
+void get_gpig(l2str *l2rec, l2prodstr *p, float prod[]);
 
 #ifdef __cplusplus
 }

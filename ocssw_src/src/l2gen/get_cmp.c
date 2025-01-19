@@ -294,9 +294,9 @@ int set_cmp( l2str *l2rec, float **tdat, int32_t *nfloat, int32_t **i32dat,
   int32_t cld_wav_oci[] = { 665, 865, 1250, 1616, 2130, 930, 2260, 1375,
     8550, 11000, 443, 12000, 13600, 469, 555 };
   */
-  // for inst OCIS
-  int32_t cld_wav_ocis[] = { 665, 865, 1250, 1616, 2130, 930, 2260, 1375,
-    8550, 11000, 443, 12000, 13600, 469, 555 };
+
+
+
   //  for inst OCI
   int32_t cld_wav_oci[] = { 665, 865, 1249, 1618, 2131, 940, 2258, 1378,
     8550, 11000, 442, 12000, 13600, 470, 555 };
@@ -367,7 +367,7 @@ int set_cmp( l2str *l2rec, float **tdat, int32_t *nfloat, int32_t **i32dat,
 
   sensor_id = l1rec->l1file->sensorID;
   n_sfc_albedo = 5;
-  if( ( sensor_id == OCIS ) || ( sensor_id == OCI ) ) n_sfc_albedo = 6;
+  if( sensor_id == OCI ) n_sfc_albedo = 6;
 
  /*  Allocate arrays to pass to the f90 routine with all the information
     together: all real arrays into a real array etc  */
@@ -420,15 +420,13 @@ int set_cmp( l2str *l2rec, float **tdat, int32_t *nfloat, int32_t **i32dat,
     */
     for( ibnd = 0; ibnd < ncmp_bnd; ibnd++ )
       {
-      if( sensor_id == OCIS )
-        cld_wav[ibnd] = cld_wav_ocis[ibnd];
-      else if( sensor_id == OCI )
+      if( sensor_id == OCI )
         cld_wav[ibnd] = cld_wav_oci[ibnd];
       else
         cld_wav[ibnd] = cld_wav_mod[ibnd];
       }
    /*  if OCI, make the 2.2 reflective band  */
-    if( ( sensor_id == OCIS ) || ( sensor_id == OCI ) ) 
+    if( sensor_id == OCI ) 
       {
       ref_for_cmb[6] = 1;
       cld_min_bnd[6] = 1;
@@ -850,7 +848,7 @@ printf( "flag: %d\n", l1que.r[qln].flags[ipx]);
       (*tdat)[foff2 + ipx + npix * iln ] =
         l1que.r[qln].cld_dat->sfc_albedo_2130[ipx];
      /* WDR for 2.2 as we don't have 2.2, duplicate the 2.1 here */
-      if( ( sensor_id == OCIS ) || ( sensor_id == OCI ) )
+      if( sensor_id == OCI  )
         {
         foff2 += npix * nlin;
         (*tdat)[foff2 + ipx + npix * iln ] =

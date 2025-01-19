@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 import argparse
 
 datetime.isoformat
-__version__ = "1.1 2024-09-12"
+__version__ = "1.2.1 2025-01-16"
 
 ## Converts an existing HDF formatted Seawifs L1A file to netCDF.
 
@@ -192,11 +192,11 @@ def copyGlobalAttributes(iFile: str, oFile: str):
         errorAt = "time_coverage_start"
         syear = globalAttr.get("Start Year")
         sday = globalAttr.get("Start Day")
-        ssec = float("{:.3f}".format(globalAttr.get("Start Millisec")/1000))
-        fssec = str(ssec).split('.')[1]
+        ssec = "{:.3f}".format(float(globalAttr.get("Start Millisec"))/1000.)
+        fssec = ssec.split('.')[1]
 
         start_of_year = datetime(syear, 1, 1,tzinfo=timezone.utc)
-        stime = start_of_year + timedelta(days=(sday-1), seconds=ssec)
+        stime = start_of_year + timedelta(days=(sday-1), seconds=float(ssec))
         
         ncFile.setncattr("time_coverage_start", str(stime.strftime('%Y-%m-%dT%H:%M:%S.') + fssec + 'Z'))
 
@@ -208,7 +208,7 @@ def copyGlobalAttributes(iFile: str, oFile: str):
 
         end_of_year = datetime(eyear, 1, 1, tzinfo=timezone.utc)
 
-        etime = end_of_year + timedelta(days=eday, seconds=esec)
+        etime = end_of_year + timedelta(days=eday, seconds=float(esec))
 
         ncFile.setncattr("time_coverage_end",str(etime.strftime('%Y-%m-%dT%H:%M:%S.') + fesec + 'Z'))
 
@@ -239,7 +239,7 @@ def copyGlobalAttributes(iFile: str, oFile: str):
         ncFile.setncattr("platform","Orbview-2")
         ncFile.setncattr("processing_level","L1A")
         ncFile.setncattr("processing_version","V2")
-        ncFile.setncattr("product_name","{}".format(oFile.name))
+        ncFile.setncattr("product_name","{}".format(oFile))
         ncFile.setncattr("project","Ocean Biology Processing Group")
         ncFile.setncattr("publisher_email","data@oceancolor.gsfc.nasa.gov")
         ncFile.setncattr("publisher_name","NASA/GSFC/OB.DAAC")
@@ -248,7 +248,7 @@ def copyGlobalAttributes(iFile: str, oFile: str):
 
     except:
         print(f"-E- Error copying global attributes. Was processing <{errorAt}> from HDF4 when error was caught.")
-        exit()
+        exit(1)
     errorAt = "" # reset 
 
 # Given a NetCDF variable, assign the attributes in attrList.
@@ -397,7 +397,7 @@ def copyDatasets():
     except Exception as e:
         print(f"-E- Error copying datasets/variables. Error occurred with HDF4 dataset named <{errorAt}>")
         print(f"Reason: {e}")
-        exit()
+        exit(1)
 
 def addTimeVariable():
     global ncFile
@@ -426,7 +426,7 @@ def addTimeVariable():
     except Exception as e:
         print(f"-E- Error copying datasets/variables. Error occurred with adding time dataset...")
         print(f"Reason: {e}")
-        exit()
+        exit(1)
 
 # Runs at the end of the program, closing both files.
 def closeFiles():
@@ -499,7 +499,7 @@ def setDimensions():
 
     except:
         print(f"-E- Error copying dimensions. Was trying to {errorAt} when error was caught.")
-        exit()
+        exit(1)
 
 def main():
     print(f"l1aconvert_seawifs {__version__}")
@@ -535,7 +535,7 @@ def main():
         print(f"Opening file:\t{fileName}")
     except:
         print(f"\n-E- Error opening file named: {fileName}.\n Make sure the filetype is hdf4.\n")
-        exit()
+        exit(1)
 
     # if opened successfully, create netcdf file to be written into
     ncFile = NC(oFileName, NC_WRITE, NC_FORMAT)

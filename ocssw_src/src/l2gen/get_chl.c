@@ -591,11 +591,9 @@ float chl_cdr(l2str *l2rec, float Rrs[]) {
         case OCTS:
         case OCM1:
         case OCM2:
-        case MOS:
         case HICO:
         case MODIST:
         case CZCS:
-        case OSMI:
         case VIIRSN:
         case VIIRSJ1:
         case VIIRSJ2:
@@ -679,10 +677,6 @@ float chl_abi(l2str *l2rec, float nLw[]) {
 float get_default_chl(l2str *l2rec, float Rrs[]) {
 
     switch (l2rec->l1rec->l1file->sensorID) {
-    case MOS:
-        return (chl_oc4(l2rec, Rrs));
-    case OSMI:
-        return (chl_oc3(l2rec, Rrs));
     case L5TM:
     case L7ETMP:
     case MISR:
@@ -702,12 +696,9 @@ float get_chl_ocx(l2str *l2rec, float Rrs[]) {
     case OCTS:
     case OCM1:
     case OCM2:
-    case MOS:
     case MERIS:
     case HICO:
-    case OCIA:
     case OCI:
-    case OCIS:
     case HAWKEYE:
     case AVIRIS:
     case OLCIS3A:
@@ -717,7 +708,6 @@ float get_chl_ocx(l2str *l2rec, float Rrs[]) {
     case MODIST:
     case MODISA:
     case CZCS:
-    case OSMI:
     case VIIRSN:
     case VIIRSJ1:
     case VIIRSJ2:

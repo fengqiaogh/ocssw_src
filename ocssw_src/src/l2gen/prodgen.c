@@ -26,7 +26,6 @@ static int32 numBandsIR;
 
 /* ----------------------------------------------------------- */
 /* extract_band() - extracts a product from a BIL array        */
-
 /* ----------------------------------------------------------- */
 VOIDP extract_band(float *fbuf, l2prodstr *p, int32 nbands) {
     static float32 *fbuf2 = NULL;
@@ -64,18 +63,71 @@ VOIDP extract_band(float *fbuf, l2prodstr *p, int32 nbands) {
     return ((VOIDP) fbuf2);
 }
 
+/* ----------------------------------------------------------- */
+/* extract_band() - extracts a product from a BIL array        */
+/* ----------------------------------------------------------- */
+float *extract_band_double(double *in_buf, l2prodstr *p, int32 nbands) {
+    static float32 *fbuf2 = NULL;
+
+    int32 band = MIN(MAX(p->prod_ix, 0), nbands - 1);
+    static int32 npix = 0;
+    int32 ip;
+
+    if (fbuf2 == NULL) {
+        npix = p->dim[1];
+        if ((fbuf2 = calloc(npix, sizeof (float32))) == NULL) {
+            fprintf(stderr,
+                    "-E- %s line %d: Unable to allocate buffer space.\n",
+                    __FILE__, __LINE__);
+            exit(1);
+        }
+    } else if (npix != p->dim[1]) {
+        npix = p->dim[1];
+        free(fbuf2);
+        // this is put here for l3gen which varies the number of pixels on each line
+
+        if ((fbuf2 = (float32 *) calloc(npix, sizeof (float32)))
+                == NULL) {
+            fprintf(stderr,
+                    "-E- %s line %d: Unable to allocate buffer space.\n",
+                    __FILE__, __LINE__);
+            exit(1);
+        }
+    }
+
+    for (ip = 0; ip < npix && ip < numPixels; ip++) {
+        fbuf2[ip] = (float)in_buf[ip * nbands + band];
+    }
+
+    return (fbuf2);
+}
+
 float *extract_band_3d(float *in_buf, float *out_buf) {
-        float * out_ptr = out_buf;
-        for (int pix = 0; pix < numPixels; pix++) {
-            float *in_ptr = in_buf + pix * numBands;
-            for (int band_3d = 0; band_3d < input->nwavelengths_3d; band_3d++) {
-                int band = input->wavelength_3d_index[band_3d];
-                *out_ptr = in_ptr[band];
-                out_ptr++; 
+    float *out_ptr = out_buf;
+    for (int pix = 0; pix < numPixels; pix++) {
+        float *in_ptr = in_buf + pix * numBands;
+        for (int band_3d = 0; band_3d < input->nwavelengths_3d; band_3d++) {
+            int band = input->wavelength_3d_index[band_3d];
+            *out_ptr = in_ptr[band];
+            out_ptr++;
         }
     }
     return out_buf;
 }
+
+float *extract_band_3d_double(double *in_buf, float *out_buf) {
+    float *out_ptr = out_buf;
+    for (int pix = 0; pix < numPixels; pix++) {
+        double *in_ptr = in_buf + pix * numBands;
+        for (int band_3d = 0; band_3d < input->nwavelengths_3d; band_3d++) {
+            int band = input->wavelength_3d_index[band_3d];
+            *out_ptr = (float)in_ptr[band];
+            out_ptr++;
+        }
+    }
+    return out_buf;
+}
+
 /**
  * loop through a float array applying a multiplier
  *
@@ -123,7 +175,7 @@ VOIDP prodgen(l2prodstr *p, l2str *l2rec) {
         if (l2rec->l1rec->npix > numPixels) {
 
             free(fbuf);
-            if ((fbuf = (float32 *) calloc(l2rec->l1rec->npix, sizeof (float32)))
+            if ((fbuf = (float32 *) calloc(numBands*l2rec->l1rec->npix, sizeof (float32)))
                     == NULL) {
                 fprintf(stderr,
                         "-E- %s line %d: Unable to allocate buffer space.\n",
@@ -268,10 +320,10 @@ VOIDP prodgen(l2prodstr *p, l2str *l2rec) {
         pbuf = p->rank == 3 ? extract_band_3d(l1rec->t_sen, fbuf) : extract_band(l1rec->t_sen, p, numBands);
         break;
     case CAT_tg_sol:
-        pbuf = p->rank == 3 ? extract_band_3d(l1rec->tg_sol, fbuf) : extract_band(l1rec->tg_sol, p, numBands);
+        pbuf = p->rank == 3 ? extract_band_3d_double(l1rec->tg_sol, fbuf) : extract_band_double(l1rec->tg_sol, p, numBands);
         break;
     case CAT_tg_sen:
-        pbuf = p->rank == 3 ? extract_band_3d(l1rec->tg_sen, fbuf) : extract_band(l1rec->tg_sen, p, numBands);
+        pbuf = p->rank == 3 ? extract_band_3d_double(l1rec->tg_sen, fbuf) : extract_band_double(l1rec->tg_sen, p, numBands);
         break;
     case CAT_t_h2o:
        pbuf = p->rank == 3 ? extract_band_3d(l1rec->t_h2o, fbuf) : extract_band(l1rec->t_h2o, p, numBands);
@@ -1185,6 +1237,14 @@ VOIDP prodgen(l2prodstr *p, l2str *l2rec) {
         pbuf=(VOIDP) fbuf;
         break;
 
+    case CAT_tchl_gpig:
+    case CAT_chlc12_gpig:
+    case CAT_tchlb_gpig:
+    case CAT_ppc_gpig:
+    case CAT_flags_gpig:
+        get_gpig(l2rec, p, fbuf);
+        pbuf = (VOIDP) fbuf;
+        break;  
 
     default:
         fprintf(stderr, "-E- %s Line %d: Unknown product catalogue ID %d.\n",

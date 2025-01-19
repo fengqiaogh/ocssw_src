@@ -58,9 +58,9 @@ class L1C {
                                     double tswt_ini_sec, double tswt_end_sec, std::string *tswt_ini,
                                     std::string *tswt_ini_file, std::string *tswt_mid,std::string *tswt_end);
     virtual int32_t swtime_swt2(int swt, L1C_input *l1cinput, l1c_filehandle *l1cfile, int32_t norbs,
-                                double *tswt, double tcross, double mgv, double *tmgv);
+                                double *tswt, double tcross, double mgv, double *tmgv, double *orb_time_tot,size_t norbs_tot);
     virtual int32_t swtime_swt2_segment(int swt, L1C_input *l1cinput, l1c_filehandle *l1cfile, int32_t norbs,
-                                        double *tswt, double tcross, double mgv, double *tmgv);
+                                        double *tswt, double tcross, double mgv, double *tmgv,double *orb_time_tot,size_t norbs_tot);
     virtual int32_t write_L1C_granule2(int swtd, l1c_filehandle *l1cfile, L1C_input *l1cinput, double *tmgv,
                                        float **lat_gd, float **lon_gd, float **alt_gd,double *orb_time_tot);
     virtual int32_t open_l1atol1c3(L1C_input *l1cinput, l1c_filehandle *l1cfile);
@@ -152,9 +152,9 @@ int32_t create_time_swt(int num_gridlines, double tfile_ini_sec, double *tmgvf, 
                         double tswt_end_sec, std::string *tswt_ini, std::string *tswt_ini_file,std::string *tswt_mid,
                         std::string *tswt_end);
 int32_t swtime_swt2(int swt, L1C_input *l1cinput, l1c_filehandle *l1cfile, int32_t norbs, double *tswt,
-                    double tcross, double mgv, double *tmgv);
+                    double tcross, double mgv, double *tmgv,double *orb_time_tot,size_t norbs_tot);
 int32_t swtime_swt2_segment(int swt, L1C_input *l1cinput, l1c_filehandle *l1cfile, int32_t norbs,
-                            double *tswt, double tcross, double mgv, double *tmgv);
+                            double *tswt, double tcross, double mgv, double *tmgv,double *orb_time_tot,size_t norbs_tot);
 int32_t write_L1C_granule2(int swtd, l1c_filehandle *l1cfile, L1C_input *l1cinput, double *tmgv,
                            float **lat_gd, float **lon_gd, float **alt_gd,double *orb_time_tot);
 int32_t open_l1atol1c3(L1C_input *l1cinput, l1c_filehandle *l1cfile);

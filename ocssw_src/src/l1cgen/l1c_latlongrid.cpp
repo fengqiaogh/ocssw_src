@@ -559,7 +559,7 @@ int meta_l1c_full(filehandle *l1file, bin_str *binl1c, const char *l1c_grid, NcF
     }
 
     if (format.type == FT_HKT || format.type == FT_L1C)
-        format.type = FT_OCIS;  // if HKT then FT_OCIS----
+        format.type = FT_OCIL1B;  // if HKT then FT_OCIS----
 
     if (format.type == FT_SPEXONE) {
         senstr = "SPEXONE";
@@ -575,12 +575,6 @@ int meta_l1c_full(filehandle *l1file, bin_str *binl1c, const char *l1c_grid, NcF
         NVIEWS = 90;
         NBANDS = 1;
         //    NBANDS_POL=1;
-    } else if (format.type == FT_OCIS) {
-        senstr = "OCI";
-        titlestr = "PACE OCI Level-1C Data";
-        xbins = 519;
-        NVIEWS = 2;
-        NBANDS = 239;  // 249 originally no polarization bands
     } else if (format.type == FT_OCIL1B) {
         senstr = "OCI";
         titlestr = "PACE OCI Level-1C Data";
@@ -941,7 +935,7 @@ int meta_l1c_grid(char *gridname, bin_str *binl1c, int16_t num_gridlines, NcFile
         xbins = 519;
         NVIEWS = 2;
         NBANDS = 239;  // 249 originally no polarization bands
-    } else             // OCIS
+    } else
     {
         senstr = "OCI";
         titlestr = "PACE OCI Level-1C Data";
@@ -1086,7 +1080,7 @@ int meta_l1c_global(char *gridname, bin_str *binl1c,int16_t num_gridlines, NcFil
 
     file_format format = getFormat(gridname);
     if (format.type == FT_HKT || format.type == FT_L1C)
-        format.type = FT_OCIS;
+        format.type = FT_OCIL1B;
 
     if (format.type == FT_SPEXONE) {
         senstr = "SPEXONE";
@@ -1104,13 +1098,6 @@ int meta_l1c_global(char *gridname, bin_str *binl1c,int16_t num_gridlines, NcFil
         NVIEWS = 90;
         NBANDS = 1;
         NBANDS_POL = 1;
-    } else if (format.type == FT_OCIS) {
-        senstr = "OCIS";
-        GATT_VAL1 = "PACE OCIS Level-1C Data";
-        nadir_bin_index =259;
-        xbins = 519;
-        NVIEWS = 2;
-        NBANDS = 239;  // 249 originally no polarization bands
     } else if (format.type == FT_OCIL1B) {
         senstr = "OCI";
         GATT_VAL1 = "PACE OCI Level-1C Data";
@@ -1118,7 +1105,7 @@ int meta_l1c_global(char *gridname, bin_str *binl1c,int16_t num_gridlines, NcFil
         xbins = 519;
         NVIEWS = 2;
         NBANDS = 286;  // 249 originally no polarization bands
-    } else             // OCI
+    } else
     {
         senstr = "OCI";
         GATT_VAL1 = "PACE OCI Level-1C Data";
@@ -1136,7 +1123,7 @@ int meta_l1c_global(char *gridname, bin_str *binl1c,int16_t num_gridlines, NcFil
         views[2] = 0;
         views[3] = 20;
         views[4] = 58;
-    } else if (format.type == FT_OCIS) {
+    } else if (format.type == FT_OCIL1B) {
         views[0] = -20;  // OCI
         views[1] = 20;
     } else if (format.type == FT_HARP2) {
@@ -1399,7 +1386,7 @@ int meta_l1c_global(char *gridname, bin_str *binl1c,int16_t num_gridlines, NcFil
     v1.putAtt("valid_max", ncShort, valid_max_s);
     v1.putAtt("coordinates", "geolocation_data/longitude geolocation_data/latitude");
 
-    if (format.type == FT_OCIL1B || format.type == FT_OCIS || format.type == FT_HARP2) {
+    if (format.type == FT_OCIL1B  || format.type == FT_HARP2) {
         uint8_t FillValue3, valid_min2, valid_max2;
 
         v1 = od_grp.addVar("qc", ncUbyte, dimvec4);

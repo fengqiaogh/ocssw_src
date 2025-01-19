@@ -18,7 +18,6 @@
 
 void get_toa_refl(l2str *l2rec, int band, float rhot[]) {
     static float pi = 3.141592654;
-    static float radeg = 57.29577951;
 
     float mu0;
     int32_t ip, ipb;
@@ -28,7 +27,7 @@ void get_toa_refl(l2str *l2rec, int band, float rhot[]) {
 
     for (ip = 0; ip < l1rec->npix; ip++) {
         ipb = ip * nbands + band;
-        mu0 = cos(l1rec->solz[ip] / radeg);
+        mu0 = l1rec->csolz[ip];
         rhot[ip] = pi * l2rec->l1rec->Lt[ipb] / l1rec->Fo[band] / mu0;
     }
 

@@ -20,6 +20,8 @@ demfile (string) (default=$OCDATAROOT/common/gebco_ocssw_v2020.nc) = Digital ele
 radiance (boolean) (default=false) = Generate radiances
 ``` 
 
+Required arguments include ```ifile``` and ```ofile```. 
+
 Some notable arguments are ```ifile```, ```ofile```, and ```par```. These specify the input file, the output file, and the parameter file, respectively.
 
 Parameter files are typically defined using the file extension ```.par```, and contain arguments (parameters) for the call to l1bgen_oci. This can make for a cleaner-looking command line for multiple runs, and increase reproducability between runs. Individual arguments are separated by newlines. The content of a par file (ex. foo.par) might look ike this: 

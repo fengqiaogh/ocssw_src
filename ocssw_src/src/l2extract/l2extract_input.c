@@ -6,12 +6,17 @@
 #include <assert.h>
 #include <genutils.h>
 #include <clo.h>
-#include <dfutils.h>
 #include <sensorInfo.h>
 #include <unistd.h>
+#include <netcdf.h>
 
-/** add all of the accepted command line options to list */
-int l2extract_init_options(clo_optionList_t* list, const char* softwareVersion) {
+/**
+ * @brief add all of the accepted command line options to list
+ * @param list options list
+ * @param softwareVersion
+ * @return  0
+ */
+int l2extractInitOptions(clo_optionList_t* list, const char* softwareVersion) {
     clo_setVersion2("l2extract", softwareVersion);
 
     clo_setHelpStr(
@@ -39,8 +44,6 @@ int l2extract_init_options(clo_optionList_t* list, const char* softwareVersion) 
     clo_addOption(list, "epix", CLO_TYPE_INT, "-1", "end pixel number. -1 = last pixel (1-based).");
     clo_addOption(list, "sline", CLO_TYPE_INT, "1", "start line (1-based).");
     clo_addOption(list, "eline", CLO_TYPE_INT, "-1", "end line.  -1 = last line (1-based).");
-    // clo_addOption(list, "pix_sub", CLO_TYPE_INT, "1", "pixel subsampling rate.");
-    // clo_addOption(list, "sc_sub", CLO_TYPE_INT, "1", "scan line subsampling rate.");
     clo_addOption(list, "suite", CLO_TYPE_STRING, NULL, "suite for default parameters");
     clo_addOption(list, "verbose", CLO_TYPE_BOOL, "false", "more information reporting");
     clo_addOption(list, "wavelist", CLO_TYPE_STRING, NULL,
@@ -49,38 +52,32 @@ int l2extract_init_options(clo_optionList_t* list, const char* softwareVersion) 
                   "        3D wavelengths (i.e. wavelist=353,355,358,360,360:370,450:600,700)");
     return 0;
 }
-
+/**
+ * @brief  get sensor ID
+ * @param fileName   input file
+ * @return  sensor ID
+ */
 int getSensorId(const char* fileName) {
-    idDS dsId;
+    int retval, dsId;
     int sensorId = -1;
+    char instrumentStr[50]="\0", platformStr[50]="\0", sensorStr[50]="\0";
 
-    dsId = openDS(fileName);
-    if (dsId.fid == -1) {
+    retval = nc_open(fileName, NC_NOWRITE, &dsId);
+    if (retval != NC_NOERR) {
         printf("-E- %s: Input file '%s' does not exist or cannot open.  \n", __FILE__, fileName);
         exit(EXIT_FAILURE);
     }
 
-    if (dsId.fftype == DS_NCDF) {
-        char* instrumentStr = readAttrStr(dsId, "instrument");
-        if (instrumentStr) {
-            char* platformStr = readAttrStr(dsId, "platform");
-            if (platformStr) {
-                sensorId = instrumentPlatform2SensorId(instrumentStr, platformStr);
-                free(platformStr);
-            }
-            free(instrumentStr);
-        } else {
-            char* sensorStr = readAttrStr(dsId, "Sensor");
-            if (sensorStr) {
-                sensorId = sensorName2SensorId(sensorStr);
-                free(sensorStr);
-            }
+    retval = nc_get_att_text(dsId, NC_GLOBAL, "instrument", instrumentStr);
+    if (retval==NC_NOERR) {
+        retval = nc_get_att_text(dsId, NC_GLOBAL, "platform", platformStr);
+        if (retval==NC_NOERR) {
+            sensorId = instrumentPlatform2SensorId(instrumentStr, platformStr);
         }
     } else {
-        char* sensorNameStr = readAttrStr(dsId, "Sensor Name");
-        if (sensorNameStr) {
-            sensorId = sensorName2SensorId(sensorNameStr);
-            free(sensorNameStr);
+        retval = nc_get_att_text(dsId, NC_GLOBAL, "Sensor", sensorStr);
+        if (retval==NC_NOERR) {
+            sensorId = sensorName2SensorId(sensorStr);
         }
     }
 
@@ -89,21 +86,22 @@ int getSensorId(const char* fileName) {
         sensorId = OCRVC;
     }
 
-    endDS(dsId);
+    retval = nc_close(dsId);
+    if (retval != NC_NOERR) {
+        fprintf(stderr, "-E- %s line %d: nc_close failed for file, %s.\n", __FILE__, __LINE__, fileName);
+        return (1);
+    }
     return sensorId;
 }
 
-/*
- Read the command line option and all of the default parameter files.
-
- This is the order for loading the options:
- - load the main program defaults file
- - load the command line (including specified par files)
- - re-load the command line disabling file descending so command
- line arguments will over ride
-
+/**
+ * @brief Read the command line option and all of the default parameter files.
+ * @param list options list
+ * @param argc
+ * @param argv
+ * @return  0 success or -1 failed
  */
-int l2extract_read_options(clo_optionList_t* list, int argc, char* argv[]) {
+int l2extractReadOptions(clo_optionList_t* list, int argc, char* argv[]) {
     char* dataRoot;
     char tmpStr[FILENAME_MAX];
 
@@ -142,7 +140,6 @@ int l2extract_read_options(clo_optionList_t* list, int argc, char* argv[]) {
 
     // load the sensor specific defaults file
     sprintf(tmpStr, "%s/%s/l2extract_defaults.par", dataRoot, sensorDir);
-    // int defaultLoaded = 0;
     if (access(tmpStr, R_OK) != -1) {
         if (want_verbose)
             printf("Loading default parameters from %s\n", tmpStr);

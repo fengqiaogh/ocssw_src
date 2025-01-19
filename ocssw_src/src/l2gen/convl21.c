@@ -150,7 +150,7 @@ int convl21(l2str *l2rec, tgstr *tgrec, int32_t spix, int32_t epix,
         if (foundneg) continue;
 
         /* Compute cos(solz) for sensor and in situ */
-        mu0_sensor = cos(l1rec->solz[ip] / RADEG);
+        mu0_sensor = l1rec->csolz[ip];
         if (tgrec != NULL)
             if (tgrec->solz[ip] >= 0.0)
                 solz_insitu = tgrec->solz[ip];

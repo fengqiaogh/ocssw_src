@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.12)
 
-set(LIBS genutils netcdfutils libterrain)
+set(LIBS genutils netcdfutils libterrain nav)
 
 find_package(NetCDF REQUIRED COMPONENTS C CXX)
 include_directories(${NETCDF_INCLUDE_DIRS})
@@ -11,31 +11,18 @@ include_directories(${GSL_INCLUDE_DIRS})
 list(APPEND LIBS ${GSL_LIBRARIES})
 
 add_executable(l1bgen_oci
-  l1bgen_oci.cpp
+  device.cpp
+  aggregate.cpp
+  corrections.cpp
+  calibrations.cpp
   geolocate_oci.cpp
-  common.cpp
+  l1b_file.cpp
+  dark_data.cpp
+  l1bgen_oci.cpp
 )
-
-#add_executable(geolocate_oci
-#  geolocate_oci.cpp
-#  common.cpp
-#)
 
 target_link_libraries(l1bgen_oci
   ${LIBS}
 )
 
-#target_link_libraries(geolocate_oci
-#  ${LIBS}
-#)
-
-#install (TARGETS l1bgen_oci geolocate_oci DESTINATION bin)
 install (TARGETS l1bgen_oci DESTINATION bin)
-
-
-
-
-
-
-
-

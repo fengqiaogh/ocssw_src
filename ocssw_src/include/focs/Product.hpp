@@ -24,7 +24,6 @@
 #include <type_traits>
 #include <typeindex>
 #include <typeinfo>
-// #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <unordered_set>
 #include <utility>
@@ -555,7 +554,6 @@ namespace focs {
             Product(std::string name, const std::vector<std::shared_ptr<AttributeCondition>>& conditions) : name_{name}, conditions_{conditions} {}
             Product(std::string name, std::vector<std::shared_ptr<AttributeCondition>>&& conditions) : name_{name}, conditions_{std::move(conditions)} {}
 
-
             // void name(const std::string& name) {name_.assign(name);}
             void name(std::string name) {name_ = name;}
             const std::string& name() const {return name_;}
@@ -686,20 +684,6 @@ namespace focs {
                 if (current_pos != product_start){
                     ret.push_back(parse(input.substr(product_start, current_pos - product_start)));
                 }
-                {
-                    std::unordered_set<std::string> prodnames;
-                    for(const auto &pr : ret)
-                    {
-                        prodnames.insert(pr.name());
-                    }
-                    for (const auto & pr : default_products)
-                    {
-                        if(prodnames.count(pr) == 0)
-                        {
-                            ret.push_back(Product(pr));
-                        }
-                    }
-                }
                 return ret;
             }
             static Product parse(const std::string& input){
@@ -756,8 +740,6 @@ namespace focs {
             std::vector<std::shared_ptr<AttributeCondition>> conditions_{}; // pointer for hierarchy, shared for copy-able
             std::set<Attribute> configuration_{};
             BaseVariable* variable_{nullptr};
-            const static std::unordered_set<std::string> default_products;
-
             // static bool attributes_equal( const std::unique_ptr<Attribute>& left, const std::unique_ptr<Attribute>& right){return *left == *right;}
             // static bool attributes_equal( const Attribute& left, const Attribute& right){return left == right;}
             // static bool attributes_equal( const std::unique_ptr<Attribute>& left, const std::unique_ptr<Attribute>& right){return *left == *right;}

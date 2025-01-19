@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.12)
 
 set(LIBS "")
 if (BUILD_HISTORICAL)
-    set(historical_src "l1_czcs.c" "l1_seawifs.c" "l1_osmi.c" "l1_aci.c" "l1_seawifs_netcdf.cpp"
+    set(historical_src "l1_czcs.c" "l1_seawifs.c" "l1_aci.c" "l1_seawifs_netcdf.cpp" "l1_czcs_netcdf.cpp"
     avhrrsub5h.f
     airmass_avhrr.f
     hmf8.f
@@ -12,7 +12,7 @@ if (BUILD_HISTORICAL)
     intpos.f
     raygetpol.f
     simpsn.f)
-    set(historical_libs czcs osmi )
+    set(historical_libs czcs seawifs)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D BUILD_HISTORICAL")
 endif(BUILD_HISTORICAL)
 
@@ -74,7 +74,6 @@ add_library(l1
     scene_meta.c
     ll2vec.c
     ftrim.c
-    l1_mos.c
     l1_octs.c
     l1_octs_netcdf.cpp
     getglint.c
@@ -82,7 +81,6 @@ add_library(l1
     l1_safe.cpp
     smile.c
     l1_meris_CC.c
-    l1_ocia.c
     l1_aviris.c
     l1_aviris_nc.c
     l1_prism.c
@@ -103,7 +101,6 @@ add_library(l1
     l1_hawkeye.c
     l1_misr.c
     l1_oci.c
-    l1_ocis.c
     l1_seabass.cpp
     l1_l1c.c
     l1_l1c_anc.c

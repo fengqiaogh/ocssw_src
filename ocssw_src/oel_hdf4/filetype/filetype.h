@@ -14,6 +14,7 @@ typedef enum {
     FT_AVIRIS,
     FT_CLASSAVHRR,
     FT_CZCSL1A,
+    FT_CZCSL1ANC,// CZCS L1A (Netcdf)
     FT_GOCIL1B,
     FT_HICOL1B,
     FT_L1BNCDF,
@@ -29,20 +30,16 @@ typedef enum {
     FT_MERISL1BSAFE,
     FT_MODISGEO, // MODIS Geolocation (hdf4)
     FT_MODISL1B, // MODIS L1B (hdf4, all bands)
-    FT_MOSL1B,
     FT_OCM2L1B,
     FT_OCML1B,
     FT_OCML1BDB,
     FT_OCTSL1A,
-    FT_OCTSL1ANC,
+    FT_OCTSL1ANC, // OCTS L1A (Netcdf)
     FT_OCTSL1B,
     FT_OLCI,
     FT_OLCIGEO,
     FT_OLIL1B,
-    FT_OCIA,
     FT_OCIL1B,
-    FT_OCIS, // OCI simulated data, L1B
-    FT_OSMIL1A,
     FT_PRISM,
     FT_SEAWIFSL1A,
     FT_SEAWIFSL1ANC, // Seawifs L1A (Netcdf)
