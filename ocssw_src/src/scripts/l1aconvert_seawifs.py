@@ -409,7 +409,14 @@ def addTimeVariable():
         timevar = np.zeros(len(msecs),np.float64)
         time_coverage_start = datetime.fromisoformat(ncFile.time_coverage_start[:23])
         day_start = datetime.strptime(time_coverage_start.strftime('%Y%m%d'),'%Y%m%d')
+        msec_tdelta = time_coverage_start - day_start
+        prev_msec = msec_tdelta.seconds * 1000. + msec_tdelta.microseconds / 1000.
         for i,msec in enumerate(msecs):
+            # if msec isn't valid, it is likely negative and we're at the day boundary.
+            # remember the previous valid and add a spin's worth of msec
+            if not msec:
+                msec = prev_msec + 666.5
+            prev_msec = msec
             seconds = msec / 1000.
             scantime = day_start + timedelta(seconds=seconds)
             if scantime < time_coverage_start:

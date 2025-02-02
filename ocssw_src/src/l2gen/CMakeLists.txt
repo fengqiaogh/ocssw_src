@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.12)
 # Make a version file containing the current version from git.
 #
 set (VERSION_MAJOR 9)
-set (VERSION_MINOR 10)
+set (VERSION_MINOR 11)
 set (VERSION_PATCH 0)
 include(GetOcsswVersion)
 

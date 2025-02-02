@@ -433,7 +433,7 @@ void o2_transmittance(l1str *l1rec, int32_t ip) {
         float ratio_total_o2;
         int index_amf_total_o2;
 
-        if (amf) {
+        if (amf && input->oxaband_opt == 3) {
             float amf_total_o2 = get_airmass_oxygen(l1rec, ip, 753.0221, 761.7891, 776.81335);
             float scaling_factor = amf_total_o2 / amf_total;
 
@@ -451,21 +451,21 @@ void o2_transmittance(l1str *l1rec, int32_t ip) {
                 int32_t index=iw*num_airmass;
                 float t_o2_interp;
 
-                if (l1rec->l1file->sensorID != OCI) {
-                    t_o2_interp = t_o2[index + index_amf_solz] * (1 - ratio_solz) +
-                                  t_o2[index + index_amf_solz + 1] * ratio_solz;
-                    l1rec->tg_sol[ipb + iw] *= t_o2_interp;
-
-                    t_o2_interp = t_o2[index + index_amf_total] * (1 - ratio_total) +
-                                  t_o2[index + index_amf_total + 1] * ratio_total;
-                    l1rec->tg[ipb + iw] *= t_o2_interp;
-                } else {
+                if (input->oxaband_opt == 3) {
                     t_o2_interp = t_o2[index + index_amf_solz_o2] * (1 - ratio_solz_o2) +
                                   t_o2[index + index_amf_solz_o2 + 1] * ratio_solz_o2;
                     l1rec->tg_sol[ipb + iw] *= t_o2_interp;
 
                     t_o2_interp = t_o2[index + index_amf_total_o2] * (1 - ratio_total_o2) +
                                   t_o2[index + index_amf_total_o2 + 1] * ratio_total_o2;
+                    l1rec->tg[ipb + iw] *= t_o2_interp;
+                } else {
+                    t_o2_interp = t_o2[index + index_amf_solz] * (1 - ratio_solz) +
+                                  t_o2[index + index_amf_solz + 1] * ratio_solz;
+                    l1rec->tg_sol[ipb + iw] *= t_o2_interp;
+
+                    t_o2_interp = t_o2[index + index_amf_total] * (1 - ratio_total) +
+                                  t_o2[index + index_amf_total + 1] * ratio_total;
                     l1rec->tg[ipb + iw] *= t_o2_interp;
                 }
             } else {
@@ -727,7 +727,7 @@ void gaseous_transmittance(l1str *l1rec, int32_t ip) {
                               (amf_mixed[index_amf_total + 1] - amf_mixed[index_amf_total]);
             }
 
-            if (input->oxaband_opt == 2) {
+            if (input->oxaband_opt == 2 || input->oxaband_opt == 3) {
                 o2_transmittance(l1rec, ip);
             }
         }

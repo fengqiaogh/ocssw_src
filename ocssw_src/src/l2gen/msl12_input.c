@@ -931,6 +931,7 @@ int l2gen_init_options(clo_optionList_t* list, const char* prog) {
     strcat(tmpStr, "        0: no correction\n");
     strcat(tmpStr, "        1: Apply Ding and Gordon (1995) correction\n");
     strcat(tmpStr, "        2: Apply oxygen transmittance from gas transmittance table (see gas_opt)");
+    strcat(tmpStr, "        3: Compute oxygen transmittance from A-band and surrounding window bands. Requires AMF gas trasmittance table");
     clo_addOption(list, "oxaband_opt", CLO_TYPE_INT, "0", tmpStr);
     clo_addOption(list, "filter_opt", CLO_TYPE_BOOL, NULL, "filtering input data option");
     clo_addOption(list, "filter_file", CLO_TYPE_IFILE, "$OCDATAROOT/sensor/sensor_filter.dat", "\n        data file for input filtering");

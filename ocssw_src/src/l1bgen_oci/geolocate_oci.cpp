@@ -1175,7 +1175,8 @@ GeoData geolocateOci(NcFile *l1aFile, Level1bFile &outfile, string geoLutFilenam
     outfile.l1bFile->putAtt("geospatial_lon_min", NC_FLOAT, 1, &westernmostLon);
     outfile.l1bFile->putAtt("geospatial_lon_max", NC_FLOAT, 1, &easternmostLon);
 
-    outfile.l1bFile->putAtt("geospatial_bounds_crs", "EPSG:4326");
+    // don't output this until we make the geospatial_bounds
+    //outfile.l1bFile->putAtt("geospatial_bounds_crs", "EPSG:4326");
 
     delete[] (quaternions);
     delete[] (positions);

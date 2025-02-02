@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <allocate2d.h>
+#include "l1_oci_private.h"
 
 #define SATURATION_BIT 1
 
@@ -71,6 +72,7 @@ static float solaOffset = 0.0;
 // Observation data
 static int observationGrp,navigationGrp;
 static int Lt_blueId, Lt_redId, Lt_SWIRId, tiltId, qual_SWIRId;
+static int ccdScanAnglesId;
 static float **Lt_blue;                //[num_blue_bands][num_pixels], This scan
 static float **Lt_red;                 //[num_red_bands][num_pixels], This scan
 static float **Lt_SWIR;                //[num_SWIR_bands][num_pixels], This scan
@@ -369,6 +371,9 @@ int openl1_oci(filehandle * file) {
     status = nc_get_var_float(navigationGrp,tiltId,tilt);
     check_err(status, __LINE__, __FILE__);
 
+    status = nc_inq_varid(navigationGrp, "CCD_scan_angles", &ccdScanAnglesId);
+    check_err(status, __LINE__, __FILE__);
+
     status = nc_inq_varid(observationGrp, "qual_SWIR", &qual_SWIRId);
     check_err(status, __LINE__, __FILE__);
 
@@ -432,8 +437,84 @@ int openl1_oci(filehandle * file) {
  * 
  */
 int readl1_oci(filehandle *file, int32_t line, l1str *l1rec, int lonlat) {
-
     int status;
+
+    PolcorOciData* polcorPrivateData = (PolcorOciData*)l1rec->private_data;
+
+    // allocate private data for OCI that is needed for polarization
+    // dont run if running lonlat mode
+    if (l1rec->private_data == NULL && !lonlat) {
+        polcorPrivateData = (PolcorOciData*)malloc(sizeof (PolcorOciData));
+        polcorPrivateData->ccdScanAngle = (float *)malloc(num_pixels * sizeof(float));
+
+        // read bands for m12 and m13 coefs
+        polcorPrivateData->blueM12Coefs = (float *)malloc((num_blue_bands * HAM_SIDES * POLARIZATION_COEFS) * sizeof(float));
+        polcorPrivateData->blueM13Coefs = (float *)malloc((num_blue_bands * HAM_SIDES * POLARIZATION_COEFS) * sizeof(float));
+
+        // red band for m12 and m13 coefs
+        polcorPrivateData->redM12Coefs = (float *)malloc((num_red_bands * HAM_SIDES * POLARIZATION_COEFS) * sizeof(float));
+        polcorPrivateData->redM13Coefs = (float *)malloc((num_red_bands * HAM_SIDES * POLARIZATION_COEFS) * sizeof(float));
+
+        // swir band for m12 and m13 coefs
+        polcorPrivateData->swirM12Coefs = (float *)malloc((num_SWIR_bands * HAM_SIDES * POLARIZATION_COEFS) * sizeof(float));
+        polcorPrivateData->swirM13Coefs = (float *)malloc((num_SWIR_bands * HAM_SIDES * POLARIZATION_COEFS) * sizeof(float));
+
+        // hook it onto l1rec's private_data
+        l1rec->private_data = polcorPrivateData;
+
+        // save the bands on initial read because it wont change for the rest of the scan
+        polcorPrivateData->num_blue_bands = num_blue_bands;
+        polcorPrivateData->num_red_bands = num_red_bands;
+        polcorPrivateData->num_swir_bands = num_SWIR_bands;
+
+        // read static data
+
+        // grab sensor_band_parameters group and ids for bands M12 an M13 coefs
+        int sensorBandGroup = -1;
+        int blueM12Id = -1;
+        int blueM13Id = -1;
+        int redM12Id = -1;
+        int redM13Id = -1;
+        int swirM12Id = -1;
+        int swirM13Id = -1;
+
+        status = nc_inq_grp_ncid(ncid_L1B, "sensor_band_parameters", &sensorBandGroup);
+        check_err(status, __LINE__, __FILE__);
+
+        // grab the ids for band m12 and m13
+        status = nc_inq_varid(sensorBandGroup, "blue_m12_coef", &blueM12Id);
+        check_err(status, __LINE__, __FILE__);
+        status = nc_inq_varid(sensorBandGroup, "blue_m13_coef", &blueM13Id);
+        check_err(status, __LINE__, __FILE__);
+        status = nc_inq_varid(sensorBandGroup, "red_m12_coef", &redM12Id);
+        check_err(status, __LINE__, __FILE__);
+        status = nc_inq_varid(sensorBandGroup, "red_m13_coef", &redM13Id);
+        check_err(status, __LINE__, __FILE__);
+        status = nc_inq_varid(sensorBandGroup, "SWIR_m12_coef", &swirM12Id);
+        check_err(status, __LINE__, __FILE__);
+        status = nc_inq_varid(sensorBandGroup, "SWIR_m13_coef", &swirM13Id);
+        check_err(status, __LINE__, __FILE__);
+
+        // grabbing blue M12 and M13
+        status = nc_get_var_float(sensorBandGroup, blueM12Id, polcorPrivateData->blueM12Coefs);
+        check_err(status, __LINE__, __FILE__);
+        status =nc_get_var_float(sensorBandGroup, blueM13Id, polcorPrivateData->blueM13Coefs);
+        check_err(status, __LINE__, __FILE__);
+
+        // grabbing red M12 and M13
+        status =nc_get_var_float(sensorBandGroup, redM12Id, polcorPrivateData->redM12Coefs);
+        check_err(status, __LINE__, __FILE__);
+        status =nc_get_var_float(sensorBandGroup, redM13Id, polcorPrivateData->redM13Coefs);
+        check_err(status, __LINE__, __FILE__);
+        
+        // grabbing swir M12 and M13
+        status =nc_get_var_float(sensorBandGroup, swirM12Id, polcorPrivateData->swirM12Coefs);
+        check_err(status, __LINE__, __FILE__);
+        status =nc_get_var_float(sensorBandGroup, swirM13Id, polcorPrivateData->swirM13Coefs);
+        check_err(status, __LINE__, __FILE__);
+
+    }
+
     size_t start[] = { 0, 0, 0 };
     size_t count[] = { 1, 1, 1 };
 
@@ -630,7 +711,23 @@ int readl1_oci(filehandle *file, int32_t line, l1str *l1rec, int lonlat) {
             ipb++;
         }
     }
-    
+
+    // read ccd_scan_angles for current scan
+
+    // read starting at current scan, starting at index 0
+    start[0] = line;
+    start[1] = 0;
+    start[2] = 0;
+
+    // read the line and num_pixels of data
+    count[0] = 1;
+    count[1] = num_pixels;
+    count[2] = 1;
+
+    // grab the id for ccd_scan_angle so that it can read from the file 
+    status = nc_get_vara_float(navigationGrp, ccdScanAnglesId, start, count, polcorPrivateData->ccdScanAngle);
+    check_err(status, __LINE__, __FILE__);
+
     return (LIFE_IS_GOOD);
 }
 

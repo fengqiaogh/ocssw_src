@@ -2313,6 +2313,12 @@ int cdf4_bin::open(const char* l3b_filename) {
 
         strcpy(proddata_name[n_data_prod++], nam_buf);
         //      n_datasets++;
+
+        if(n_data_prod >= MAXNPROD) {
+            printf("-E- %s:%d - Max number of products overflow\n", __FILE__, __LINE__);
+            exit(EXIT_FAILURE);
+        }
+
         if (first) {
             bindata_idx = i;
             first = false;

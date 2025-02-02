@@ -39,7 +39,7 @@ void get_Cpicophyt(l2str *l2rec, l2prodstr *p, float *cell_abundance)
 {
     int32_t i,j,ip,ipb;
     static int firstcall=1;
-    static int nbands, npix;
+    static int nbands, npix_malloc;
     static float32 *pca_table;
     static double *pro_coef, *syn_coef, *apeuk_coef;
     static int nwave_pca, npc,npc_used;
@@ -56,7 +56,7 @@ void get_Cpicophyt(l2str *l2rec, l2prodstr *p, float *cell_abundance)
         firstcall=0;
         nbands=l2rec->l1rec->l1file->nbands;
         wave=l2rec->l1rec->l1file->fwave;
-        npix=l2rec->l1rec->npix;
+        npix_malloc=l2rec->l1rec->npix;
 
         //read the pca components from the table
         char filename[FILENAME_MAX];
@@ -98,7 +98,7 @@ void get_Cpicophyt(l2str *l2rec, l2prodstr *p, float *cell_abundance)
         pc=(double *)malloc(npc*sizeof(double));
         wave_pca=(int *)malloc(nwave_pca*sizeof(int));
         bindx=(int *)malloc(nwave_pca*sizeof(int));
-        pcc_all=(float *)malloc(3*npix*sizeof(float));
+        pcc_all=(float *)malloc(3*npix_malloc*sizeof(float));
 
         count[0]=nwave_pca;
         count[1]=npc;
@@ -180,12 +180,19 @@ void get_Cpicophyt(l2str *l2rec, l2prodstr *p, float *cell_abundance)
 
     }
 
+    // Make this work for l3gen which has variable #pix
+    if(npix_malloc < l2rec->l1rec->npix) {
+        npix_malloc = l2rec->l1rec->npix;
+        free(pcc_all);
+        pcc_all = (float*)malloc(3 * npix_malloc * sizeof(float));
+    }
+
     if (input->proc_sst)
         sst = l2rec->sst;
     else
         sst=l2rec->l1rec->sstref;
 
-    for(ip=0;ip<npix;ip++){
+    for(ip=0;ip<l2rec->l1rec->npix;ip++){
 
         ipb=ip*nbands;
 

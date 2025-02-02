@@ -979,7 +979,7 @@ int sunz_swt(int ix1_swt, int ix2_swt, int16_t* hour_swt, int16_t* day_swt, int1
 
   // if(l1cfile->verbose)cout << "lat1.." << lat1 << "lon1.." << lon1 << "year1" << year1 << "day1" << day1 << "hour1" << hour1<< "sunz1..second index" << sunz1 << "ix1" << ix1_swt << "ix2" << ix2_swt << endl;
 
-    return day_mode;
+    return 1;
 }
 
 int32_t L1C::create_time_swt(int num_gridlines, double tfile_ini_sec, double* tmgvf, double tswt_ini_sec,

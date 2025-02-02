@@ -252,7 +252,8 @@ void get_habs_ci(l2str *l2rec, l2prodstr *p, float ci[]) {
 
     flags_habs = get_flags_habs(l2rec);
     for (ip = 0; ip < l2rec->l1rec->npix; ip++) {
-        if (flags_habs[ip] != 0){
+        // only look at the first 5 bits
+        if ((flags_habs[ip] & 0x1F) != 0) {
             ci[ip] = BAD_FLT;
             l2rec->l1rec->flags[ip] |= PRODFAIL;
         }

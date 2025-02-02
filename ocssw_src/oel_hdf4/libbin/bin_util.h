@@ -17,7 +17,7 @@
 #include "hdf5.h"
 #include "L3Shape.h"
 
-#define MAXNPROD 256
+#define MAXNPROD 1024
 #define MAXNVDATA MAXNPROD+3
 
 #define SWAP_4(x) ( ((x) << 24) | \
