@@ -3,6 +3,7 @@
 
 #include <array>
 #include "vecxD.hpp"
+#include <cstdint>
 
 enum GainDims {
     T,  // Time
