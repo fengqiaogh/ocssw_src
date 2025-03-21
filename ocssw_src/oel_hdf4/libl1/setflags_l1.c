@@ -113,6 +113,14 @@ int setflags(l1str *l1rec) {
                             cld_rhos_ratio = max_cld_rhos / min_cld_rhos;
                             if (cld_rhos_ratio > l1_input->cloud_eps && (evalmask & MODCLOUD) == 0)
                                 l1rec->cloud[ip] = OFF;
+                            else {
+                                if (l1rec->rhos[ip*nwave+ib412]<0.07)
+                                    l1rec->cloud[ip] = OFF; 
+                                else {
+                                    if (l1rec->rhos[ip * nwave + ib412]/l1rec->rhos[ip * nwave + ib670]<1)
+                                        l1rec->cloud[ip] = OFF;
+                                }  
+                            }
                         }
                     }
                 }
