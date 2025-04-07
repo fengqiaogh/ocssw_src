@@ -1,2 +1,5 @@
 # 忽略 opt 文件夹及其内容
 opt/
+# macOS system files
+.DS_Store
+**/.DS_Store  # 递归忽略所有子目录中的 .DS_Store
