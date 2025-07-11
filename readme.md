@@ -64,4 +64,39 @@ make
 - C/C++ Themes
 - CMake Tools
 - Makefile Tools
+
 以上插件的作者均为Microsoft
+.vscode/launch.json配置
+```json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch with Args",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/src/l2gen/l2gen", 
+            "args": [
+                "ifile=/home/ubuntu/goci/COMS_GOCI_L1B_GA_20210220021640.he5",
+                "--sline=3751",
+                "--eline=3752",
+                "--spixl=2051",
+                "--epixl=2052",
+                "--l2prod=Rrs_nnn"
+            ],           
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+        }
+    ]
+}
+```
