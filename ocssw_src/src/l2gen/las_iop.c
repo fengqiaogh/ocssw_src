@@ -331,7 +331,7 @@ void run_las(l2str *l2rec, int ip) {
         else
             solz = MIN(l1rec->solz[ip], 60.0);
         ratio = Rrs[ib443] / Rrs[ib555];
-        mu = cos(asin(sin(solz / RADEG) / nw));
+        mu = cos(asin(sin(solz / OEL_RADEG) / nw));
 
         for (ib = 0; ib < nwave; ib++) {
 

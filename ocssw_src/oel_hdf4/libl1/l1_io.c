@@ -48,7 +48,6 @@
 #include "l1_hico.h"
 #include "l1_goci.h"
 #include "l1_oli.h"
-#include "l1_viirs_l1a.h"
 #include "l1_aviris.h"
 #include "l1_prism.h"
 #include "l1_nc_generic_read.h"
@@ -135,9 +134,6 @@ void closel1(filehandle *l1file) {
         break;
     case FT_VIIRSL1BNC:
         closel1_viirs_l1b();
-        break;
-    case FT_VIIRSL1A:
-        closel1_viirs_l1a(l1file);
         break;
     case FT_HICOL1B:
         closel1_hico(l1file);
@@ -318,9 +314,6 @@ int openl1(filehandle *l1file) {
         case FT_VIIRSL1BNC:
             status = openl1_viirs_l1b(l1file);
             break;
-        case FT_VIIRSL1A:
-            status = openl1_viirs_l1a(l1file);
-            break;
         case FT_HICOL1B:
             status = openl1_hico(l1file);
             break;
@@ -494,16 +487,13 @@ int readl1(filehandle *l1file, int32_t recnum, l1str *l1rec) {
         status = readl1_meris_CC(l1file, recnum, l1rec);
         break;
     case FT_MERISL1BSAFE:
-        status = readl1_safe(l1file, recnum, l1rec);
+        status = readl1_safe(l1file, recnum, l1rec, 0);
         break;
     case FT_VIIRSL1B:
         status = readl1_viirs_h5(l1file, recnum, l1rec, 0);
         break;
     case FT_VIIRSL1BNC:
         status = readl1_viirs_l1b(l1file, recnum, l1rec, 0);
-        break;
-    case FT_VIIRSL1A:
-        status = readl1_viirs_l1a(l1file, recnum, l1rec);
         break;
     case FT_HICOL1B:
         status = readl1_hico(l1file, recnum, l1rec, 0);
@@ -529,7 +519,7 @@ int readl1(filehandle *l1file, int32_t recnum, l1str *l1rec) {
         //    status = 0;
         break;
     case FT_OLCI:
-        status = readl1_safe(l1file, recnum, l1rec);
+        status = readl1_safe(l1file, recnum, l1rec, 0);
         //    status = 0;
         break;
     case FT_SGLI:
@@ -654,6 +644,10 @@ int readl1_lonlat(filehandle *l1file, int32_t recnum, l1str *l1rec) {
          break;
     case FT_OCIL1B:
         status = readl1_oci(l1file, recnum, l1rec, 1);
+        break;
+    case FT_OLCI:
+    case FT_MERISL1BSAFE:
+        status = readl1_safe(l1file, recnum, l1rec, 1);
         break;
     case FT_L1C:
          status = readl1_l1c(l1file, recnum, l1rec);

@@ -391,8 +391,8 @@ int setgeom(float sun_theta, float sen_theta, float dphi) {
     /* check that the angle matches index */
     th_s_ent = (int32_t) floor(interp(th_s_lev, sun_theta, th_s_n) + 0.5);
     th_v_ent = (floor) (interp(th_v_lev, sen_theta, th_v_n) + 0.5);
-    if (dphi < 0.0) dphi = dphi + M_PI * 2.0;
-    if (dphi > M_PI * 2.0) dphi = dphi - M_PI * 2.0;
+    if (dphi < 0.0) dphi = dphi + OEL_PI * 2.0;
+    if (dphi > OEL_PI * 2.0) dphi = dphi - OEL_PI * 2.0;
     dphi_ent = (int32_t) floor(interp(dphi_lev, dphi, dphi_n) + 0.5);
     /* IOP data */
     refind = (int) (th_s_ent * th_v_n * dphi_n * nband * bp_n * ap_n)

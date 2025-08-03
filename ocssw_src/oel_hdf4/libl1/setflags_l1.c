@@ -14,8 +14,6 @@ void l1_mask_set(l1str *l1rec, int32_t ip) {
 }
 
 int setflags(l1str *l1rec) {
-    static float pi = PI;
-    static float radeg = RADEG;
     static int firstCall = 1;
 
     static int ib412;
@@ -49,7 +47,7 @@ int setflags(l1str *l1rec) {
     /*                                                     */
     for (ip = 0; ip < l1rec->npix; ip++) {
 
-        mu0 = cos(l1rec->solz[ip] / radeg);
+        mu0 = cos(l1rec->solz[ip] / OEL_RADEG);
 
         /* Check view angle limits */
         if (l1rec->senz[ip] > l1_input->satzen) {
@@ -75,7 +73,7 @@ int setflags(l1str *l1rec) {
 
             if (!l1rec->land[ip]) {
                 l1rec->cloud_albedo[ip] = l1rec->rhos[ip * nwave + ibcloud]
-                        - l1rec->TLg[ip * nwave + ibcloud] * pi / mu0 / l1rec->Fo[ibcloud];
+                        - l1rec->TLg[ip * nwave + ibcloud] * OEL_PI / mu0 / l1rec->Fo[ibcloud];
                 albedo = l1_input->albedo;
             } else {
                 l1rec->cloud_albedo[ip] = l1rec->rhos[ip * nwave + ib412];
@@ -113,14 +111,6 @@ int setflags(l1str *l1rec) {
                             cld_rhos_ratio = max_cld_rhos / min_cld_rhos;
                             if (cld_rhos_ratio > l1_input->cloud_eps && (evalmask & MODCLOUD) == 0)
                                 l1rec->cloud[ip] = OFF;
-                            else {
-                                if (l1rec->rhos[ip*nwave+ib412]<0.07)
-                                    l1rec->cloud[ip] = OFF; 
-                                else {
-                                    if (l1rec->rhos[ip * nwave + ib412]/l1rec->rhos[ip * nwave + ib670]<1)
-                                        l1rec->cloud[ip] = OFF;
-                                }  
-                            }
                         }
                     }
                 }

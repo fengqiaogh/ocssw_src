@@ -334,10 +334,10 @@ int main(int argc, char *argv[]) {
 
     }
     fprintf(stderr, "N: %f S: %f E: %f W:%f\n", north, south, east, west);
-    nrad = north * PI / 180;
-    srad = south * PI / 180;
-    wrad = west * PI / 180;
-    erad = east * PI / 180;
+    nrad = north * OEL_DEGRAD;
+    srad = south * OEL_DEGRAD;
+    wrad = west * OEL_DEGRAD;
+    erad = east * OEL_DEGRAD;
 
     if (nrad <= srad) {
         fprintf(stderr,
@@ -356,7 +356,7 @@ int main(int argc, char *argv[]) {
     if (wrad < erad)
         height = rint((nrad - srad) * width / (erad - wrad));
     else
-        height = rint((nrad - srad) * width / (erad - wrad + 2 * PI));
+        height = rint((nrad - srad) * width / (erad - wrad + 2 * OEL_PI));
 
     numbins = width * height;
     imscale = height / (nrad - srad);
@@ -428,8 +428,8 @@ int main(int argc, char *argv[]) {
 
             /* that fall outside the image */
 
-            plat = l1rec.lat[ip] * PI / 180;
-            plon = l1rec.lon[ip] * PI / 180;
+            plat = l1rec.lat[ip] * OEL_DEGRAD;
+            plon = l1rec.lon[ip] * OEL_DEGRAD;
 
             sinplat = sin(plat);
             cosplat = cos(plat);
@@ -442,8 +442,8 @@ int main(int argc, char *argv[]) {
                 double az; /* azimuth to next pixel */
                 double phw; /* pixel half width */
 
-                nlat = l1rec.lat[ip + 1] * PI / 180;
-                nlon = l1rec.lon[ip + 1] * PI / 180;
+                nlat = l1rec.lat[ip + 1] * OEL_DEGRAD;
+                nlon = l1rec.lon[ip + 1] * OEL_DEGRAD;
 
                 cosnlat = cos(nlat);
 
@@ -452,8 +452,8 @@ int main(int argc, char *argv[]) {
                 /*
                  * WDR if del long is big in radians, assume dateline wrap
                  */
-                if (dlon > 5.) dlon = nlon - plon - 2 * PI;
-                if (dlon < -5.) dlon = nlon + 2 * PI - plon;
+                if (dlon > 5.) dlon = nlon - plon - 2 * OEL_PI;
+                if (dlon < -5.) dlon = nlon + 2 * OEL_PI - plon;
 
                 sindlat2 = sin(dlat / 2);
                 sindlon2 = sin(dlon / 2);
@@ -488,7 +488,7 @@ int main(int argc, char *argv[]) {
                 sinaz[0] = sin(az);
                 cosaz[0] = cos(az);
                 for (i = 1; i < 8; i++) {
-                    az += PI / 4;
+                    az += OEL_PI / 4;
                     sinaz[i] = sin(az);
                     cosaz[i] = cos(az);
                 }
@@ -512,9 +512,9 @@ int main(int argc, char *argv[]) {
                     if (lon >= wrad && lon > erad) {
                         corners[i].x = (lon - wrad) * imscale;
                     } else if (lon < wrad && lon <= erad) {
-                        corners[i].x = (lon - wrad + 2 * PI) * imscale;
+                        corners[i].x = (lon - wrad + 2 * OEL_PI) * imscale;
                     } else if (lon - erad < wrad - lon) {
-                        corners[i].x = (lon - wrad + 2 * PI) * imscale;
+                        corners[i].x = (lon - wrad + 2 * OEL_PI) * imscale;
                     } else {
                         corners[i].x = (lon - wrad) * imscale;
                     }

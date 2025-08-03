@@ -1,8 +1,11 @@
 import sqlite3
 import re
-
+from seadasutils.anc_data_types import AncillaryDataTypes
 
 class ancDB:
+
+
+
     def __init__(self, dbfile=None, local=False):
         """A small set of functions to generate, update, and read from a local SQLite database of ancillary
         file information"""
@@ -186,56 +189,22 @@ class ancDB:
                     c.execute("DELETE from ancfiles WHERE ancid = ?", [ancid[0]])
 
         conn.commit()
+    
+    def isAncillaryTypeValid(self, ancillaryType):
+        if re.search("\d$", ancillaryType):
+            ancillaryType = ancillaryType[0 : len(ancillaryType) - 1]
+        if ancillaryType not in self.ancillaryTypeCheck:
+            return False
+        return True
 
     def check_dbrtn_status(self, dbstat, anctype):
-        """
-        Check the database return status.
-        DB return status bitwise values:
-            all bits off means all is well in the world
-            value of -1 means have not checked for ancfiles yet
-            Ancillary:
-                bit 0 - missing one or more MET
-                bit 1 - missing one or more OZONE
-                bit 2 - missing SST
-                bit 3 - missing NO2
-                bit 4 - missing ICE
-            Attitude-Ephemeris
-                bit 0 - predicted attitude selected
-                bit 1 - predicted ephemeris selected
-                bit 2 - no attitude found
-                bit 3 - no ephemeris found
-                bit 4 - invalid mission
-        """
-
-        statchk = {
-            "atm": 1,
-            "met": 1,  # bit 0
-            "ozone": 2,
-            "sstfile": 4,
-            "no2file": 8,
-            "icefile": 16,  # bit 4
-            "geo": 32,
-            # atteph
-            "att": 1,
-            "eph": 2,
-            # aquarius
-            "sssfile": 32,
-            "xrayfile": 64,
-            "scat": 128,
-            "tecfile": 256,
-            "swhfile": 512,
-            "frozenfile": 1024,
-            "geosfile": 2048,
-            "argosfile": 4096,
-            "sif": 8192,  # sif_file
-            "pert": 16384,  # l2_uncertainties_file
-            "sssmatchup": 32768,  # sss_matchup_file
-            "rim_file": 65536,
-        }
-
+        
+        # grab ancillary types that can have multiple files and strip the number
+        # ie. MET1, MET2, etc. to MET
         if re.search("\d$", anctype):
             anctype = anctype[0 : len(anctype) - 1]
-        if dbstat & statchk[anctype]:
+        # anctype exists in the lookup table. Check if it is missing and report it
+        if dbstat & AncillaryDataTypes.bitwiseErrorValues[anctype]:
             return 0
         else:
             return 1

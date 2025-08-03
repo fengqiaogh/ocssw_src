@@ -11,6 +11,8 @@
 #include <boost/multi_array.hpp>
 #include "gains.hpp"
 #include "dark_data.hpp"
+#include "device.hpp"
+#include "calibrations.hpp"
 
 #define NUMBER_OF_TAPS 16
 
@@ -41,26 +43,18 @@ int getDarkCorrection(const size_t scanIndex, const uint32_t numScans, const std
                       const int16_t numPixAverage, uint32_t ***darkPixels,
                       std::vector<double> &darkCorrections);
 
-//TODO: delete
-int getTempCorrection(uint32_t numBands, const Gains &gains, const float *referenceTemps,
-                      const double *calibrationTemps, uint32_t numScans, float *temperatureCorrections);
-
 /**
- * @brief Calculate temperature corrections for each band 
+ * @brief Calculate temperature corrections for each band
  *
  * @param numInsBands The number of instrument bands
  * @param refTemps Pointer to an array of reference temperatures for each temperature sensor
  * @param calibrationTemps Vector of measured temperatures
  * @param gains Object containing gain information
+ * @param fps For which device the temperature corrections are being calculated
  * @param temperatureCorrections Vector to store the calculated temperature corrections
  */
-void getTempCorrection(const size_t numInsBands, const float *refTemps,
-                       const std::vector<double> &calibrationTemps, const Gains &gains,
-                       std::vector<double> &temperatureCorrections);
-
-//TODO: delete
-int getRvsCorrection(uint32_t numBands, uint16_t numPixels, uint8_t hamSide, const Gains &gains,
-                     const double *scanAngles, float **rvsCorrections);
+double getTempCorrection(const size_t numInsBands, const float *refTemps,
+                         const std::vector<double> &calibrationTemps, const Gains &gains, Device fpa);
 
 /**
  * @brief Calculate response versus scan (RVS) corrections for each band and pixel
@@ -71,32 +65,27 @@ int getRvsCorrection(uint32_t numBands, uint16_t numPixels, uint8_t hamSide, con
  * @param gains Object containing gain information
  * @param scanAngles Vector of scan angles
  * @param rvsCorrections Vector to store the calculated RVS corrections
+ *
+ * @return The response versus scsan correction for the given band and pixel
  */
-
-void getRvsCorrection(const uint32_t numInsBands, const uint16_t numPixels, const uint8_t hamSide,
-                      const Gains &gains, const std::vector<double> scanAngles,
-                      vec2D<double> &rvsCorrections);
-
-//TODO: delete
-int getNonlinearityCorrection(uint32_t numInsBands, uint16_t numPixels, uint32_t numNonlinearTerms,
-                              const Gains &gains, float **digitalNumbers, float **nonlinearityCorrections);
+double getRvsCorrection(const size_t band, const size_t pixel, const uint8_t hamSide, const Gains &gains,
+                        double scanAngle);
 
 /**
- * @brief Calculate nonlinearity corrections for each band and pixel
+ * @brief Calculate nonlinearity corrections for one pixel in a single band
  *
- * @param numInsBands The number of instrument bands
- * @param numPixels The number of pixels
+ * @param numInsBands The band index for which to find a nonlinearity correction
+ * @param numPixels The pixel for which to find a nonlinearity correction
  * @param numNonlinearTerms The number of nonlinear terms in the correction
  * @param k5Coefs The K5 coefficients for nonlinearity correction
  * @param digitalNumbers The digital numbers (raw sensor readings)
  * @param nonlinearityCorrections Vector to store the calculated nonlinearity corrections
+ *
+ * @return The nonlinearity correction for the given pixel and band
  */
 
-void getNonlinearityCorrection(const uint32_t numInsBands, const size_t numPixels,
-                                                        const uint32_t numNonlinearTerms,
-                                                        const vec2D<double> &k5Coefs,
-                                                        const vec2D<float> &digitalNumbers,
-                                                        vec2D <double> &nonlinearityCorrections);
+double getNonlinearityCorrection(const size_t band, const size_t pixel, const uint32_t numNonlinearTerms,
+                                 const vec2D<double> &k5Coefs, const vec2D<float> &digitalNumbers);
 
 /**
  * @brief Compute and return quality flags for one line of data.
@@ -107,9 +96,32 @@ void getNonlinearityCorrection(const uint32_t numInsBands, const size_t numPixel
  * @param saturationThresholds The values above which each pixel will be considered saturated
  * @return A 2D array of flag values that indicate saturation for each pixel in the current line
  */
-void getQualityFlags(size_t numPix, size_t numBands, size_t numInsBands,
-                                               vec2D<float> &digitalNumbers, float **insAggMat,
-                                               std::vector<uint32_t> &saturationThresholds,
-                                               boost::multi_array<uint8_t, 2> &qualityFlags);
+void getQualityFlags(size_t numPix, size_t numBands, size_t numInsBands, vec2D<float> &digitalNumbers,
+                     float **insAggMat, std::vector<uint32_t> &saturationThresholds,
+                     boost::multi_array<uint8_t, 2> &qualityFlags);
+
+/**
+ * @brief Read the OCI cross-correlation matrix for a band and aggregate the coefficients for the instrument
+ *configuration
+ * @param taps. Spatial aggregation factor. Each tap is responsible for 32 bands.
+ * @param numInstrumentBands Number of instrument bands based on aggregation factors
+ * @param gainAggMatrix Matrix to aggregate gains from CCD to instrument output
+ * @param ncpix Number of influence pixels
+ * @param cmat crosstalk coefficient matrix
+ **/
+void makeXtalkMat(int16_t spatialAgg, CalibrationData &calData, float ***cmat_in, size_t ncpix,
+                  size_t nxbands, size_t nbands);
+
+/**
+ * @brief Compute along-scan stray light and crosstalk for OCI data from one FPA
+ * @param numInstrumentBands Number of instrument bands based on aggregation factors
+ * @param numCcdPix The number of pixels to work over
+ * @param ncpix Number of influence pixels around each pixel
+ * @param cmat crosstalk influence coefficient matrix
+ * @param digitalNumbers The digital numbers (raw sensor readings)
+ * @param The crosstalk correction for sensor bands in question
+ **/
+void getXtalkCorrection(uint32_t numInsBands, size_t numCcdPix, size_t ncpix, double ***cmat,
+                        const vec2D<float> &digitalNumbers, vec2D<double> &xtalkCorrection);
 
 #endif

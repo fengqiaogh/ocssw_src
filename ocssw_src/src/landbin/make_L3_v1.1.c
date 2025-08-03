@@ -36,6 +36,7 @@
 #include "proto.h"
 #include "proj_proto.h"
 #include "mfhdf.h"
+#include <genutils.h>
 
 enum {
     PLATECARREE, SINUSOIDAL, MOLLWEIDE, ROBINSON, HAMMER, NUMBEROFPROJECTIONS
@@ -89,8 +90,8 @@ enum {
 
 #define TWO_THIRDS 0.666666666666666666667
 #define FOUR_THIRDS 1.333333333333333333333
-#define TWO_PI  6.28318530717958647692
-#define RAD2DEG  57.29577951308232087684  /* 180.0 / M_PI */
+#define TWO_PI  (OEL_PI * 2)
+#define RAD2DEG  OEL_RADEG
 #define NpixelsLAC 1285
 #define OMF2  0.99330562 /* (1.0 - F) * (1.0 - F) */
 #define R  6371007.181 /* Earth radius (m) */
@@ -398,10 +399,10 @@ int main(int argc, char **argv) {
         input.doy_prev = input.doy;
 
         /* Precompute constants */
-        dsol = .9856 * (input.doy - 4) * M_PI / 180.;
+        dsol = .9856 * (input.doy - 4) * OEL_PI / 180.;
         dsol = 1. / pow(1. - .01673 * cos(dsol), 2);
         for (ib = 0; ib < NBANDS; ib++)
-            coefcalib[ib] = M_PI / Es[ib] / dsol;
+            coefcalib[ib] = OEL_PI / Es[ib] / dsol;
 
         for (ib = 0; ib < NBANDS; ib++)
             if (process.band[ib])
@@ -583,7 +584,7 @@ int main(int argc, char **argv) {
                 for (ipix = 0; ipix < input.Npixels; ipix += input.step) {
                     if (input.solz[ipix] == FILL_INT16) continue;
                     if (process.atmcor) {
-                        iline_psurf = (int) ((NLPSURF - 1) / 2. - input.lat[ipix] * (NLPSURF - 1) / M_PI + 0.5);
+                        iline_psurf = (int) ((NLPSURF - 1) / 2. - input.lat[ipix] * (NLPSURF - 1) / OEL_PI + 0.5);
                         ipix_psurf = (int) ((NPPSURF - 1) / 2. + input.lon[ipix] * (NPPSURF - 1) / TWO_PI + 0.5);
                         idx_psurf = iline_psurf * NPPSURF + ipix_psurf;
                         for (ib = 0; ib < NBANDS; ib++)
@@ -876,26 +877,26 @@ void resample_geo_scan(int Npixels, float *inlon, float *inlat, double *outlon, 
 
     outlon[0] = -0.5 * inlon[1] + 1.5 * inlon[0];
     outlat[0] = -0.5 * inlat[1] + 1.5 * inlat[0];
-    if (inlon[1] - inlon[0] >= M_PI) outlon[0] += 1.5 * TWO_PI;
-    if (inlon[0] - inlon[1] >= M_PI) outlon[0] -= 0.5 * TWO_PI;
-    if (outlon[0] > M_PI) outlon[0] -= TWO_PI;
-    if (outlon[0] < -M_PI) outlon[0] += TWO_PI;
+    if (inlon[1] - inlon[0] >= OEL_PI) outlon[0] += 1.5 * TWO_PI;
+    if (inlon[0] - inlon[1] >= OEL_PI) outlon[0] -= 0.5 * TWO_PI;
+    if (outlon[0] > OEL_PI) outlon[0] -= TWO_PI;
+    if (outlon[0] < -OEL_PI) outlon[0] += TWO_PI;
 
     for (ipix = 0; ipix < Npixels - 1; ipix++) {
         outlon[ipix + 1] = 0.5 * inlon[ipix] + 0.5 * inlon[ipix + 1];
         outlat[ipix + 1] = 0.5 * inlat[ipix] + 0.5 * inlat[ipix + 1];
-        if (inlon[ipix] - inlon[ipix + 1] >= M_PI) outlon[ipix + 1] += 0.5 * TWO_PI;
-        if (inlon[ipix + 1] - inlon[ipix] >= M_PI) outlon[ipix + 1] -= 0.5 * TWO_PI;
-        if (outlon[ipix + 1] > M_PI) outlon[ipix + 1] -= TWO_PI;
-        if (outlon[ipix + 1] < -M_PI) outlon[ipix + 1] += TWO_PI;
+        if (inlon[ipix] - inlon[ipix + 1] >= OEL_PI) outlon[ipix + 1] += 0.5 * TWO_PI;
+        if (inlon[ipix + 1] - inlon[ipix] >= OEL_PI) outlon[ipix + 1] -= 0.5 * TWO_PI;
+        if (outlon[ipix + 1] > OEL_PI) outlon[ipix + 1] -= TWO_PI;
+        if (outlon[ipix + 1] < -OEL_PI) outlon[ipix + 1] += TWO_PI;
     }
 
     outlon[Npixels] = 1.5 * inlon[Npixels - 1] - 0.5 * inlon[Npixels - 2];
     outlat[Npixels] = 1.5 * inlat[Npixels - 1] - 0.5 * inlat[Npixels - 2];
-    if (inlon[Npixels - 1] - inlon[Npixels - 2] >= M_PI) outlon[Npixels] += -0.5 * TWO_PI;
-    if (inlon[Npixels - 2] - inlon[Npixels - 1] >= M_PI) outlon[Npixels] -= -0.5 * TWO_PI;
-    if (outlon[Npixels] > M_PI) outlon[Npixels] -= TWO_PI;
-    if (outlon[Npixels] < -M_PI) outlon[Npixels] += TWO_PI;
+    if (inlon[Npixels - 1] - inlon[Npixels - 2] >= OEL_PI) outlon[Npixels] += -0.5 * TWO_PI;
+    if (inlon[Npixels - 2] - inlon[Npixels - 1] >= OEL_PI) outlon[Npixels] -= -0.5 * TWO_PI;
+    if (outlon[Npixels] > OEL_PI) outlon[Npixels] -= TWO_PI;
+    if (outlon[Npixels] < -OEL_PI) outlon[Npixels] += TWO_PI;
 
 }
 
@@ -1171,8 +1172,8 @@ void process_pixel(int ipix, int iline_out, int ipix_out, char **wl, INPUT input
 int get_xyproj(double lon, double lat, double *xproj, double *yproj, int projtype, double lon_center) {
 
     lon -= lon_center;
-    if (lon < -M_PI) lon += TWO_PI;
-    if (lon > M_PI) lon -= TWO_PI;
+    if (lon < -OEL_PI) lon += TWO_PI;
+    if (lon > OEL_PI) lon -= TWO_PI;
 
     switch (projtype) {
     case PLATECARREE: *xproj = lon * RAD2DEG; /* PLATECARREE was not initialized with RAD2DEG factor */
@@ -1199,9 +1200,9 @@ int get_lonlat(double xproj, double yproj, double *lon, double *lat, int projtyp
         *lat = yproj / RAD2DEG;
         break;
     case SINUSOIDAL: *lat = yproj / RAD2DEG;
-        if (fabs(*lat) >= M_PI_2) return -1;
+        if (fabs(*lat) >= OEL_PI) return -1;
         *lon = xproj / cos(*lat) / RAD2DEG;
-        if (fabs(*lon) > M_PI) return -1;
+        if (fabs(*lon) > OEL_PI) return -1;
         break;
     case MOLLWEIDE: if (molwinv(xproj, yproj, lon, lat) == -1) return -1;
         break;
@@ -1213,8 +1214,8 @@ int get_lonlat(double xproj, double yproj, double *lon, double *lat, int projtyp
     }
 
     *lon += lon_center;
-    if (*lon < -M_PI) *lon += TWO_PI;
-    if (*lon > M_PI) *lon -= TWO_PI;
+    if (*lon < -OEL_PI) *lon += TWO_PI;
+    if (*lon > OEL_PI) *lon -= TWO_PI;
 
     return 0;
 
@@ -1421,8 +1422,8 @@ void set_proj_parameters(OUTPUT *proj) {
         proj->Np = ceil(360. / proj->pixsz);
         break;
     case MOLLWEIDE: sprintf(proj->projname, "Mollweide");
-        proj->Nl = ceil(2 * sqrt(2.) / M_PI * 180. / proj->pixsz);
-        proj->Np = ceil(2 * sqrt(2.) / M_PI * 360. / proj->pixsz);
+        proj->Nl = ceil(2 * sqrt(2.) / OEL_PI * 180. / proj->pixsz);
+        proj->Np = ceil(2 * sqrt(2.) / OEL_PI * 360. / proj->pixsz);
         molwforint(RAD2DEG, 0., 0., 0.);
         molwinvint(RAD2DEG, 0., 0., 0.);
         break;
@@ -1997,8 +1998,8 @@ int project_scan(int iscan, char **wl, INPUT *input, OUTPUT *proj, PROCESSINFO p
     if (input->old_iscan != iscan - input->step) {
         for (ipix = 0; ipix < input->Npixels + 1; ipix += input->step) {
             input->lontop[ipix] = -1.5 * input->lon1[ipix] + 0.5 * input->lon2[ipix];
-            if (input->lon1[ipix] - input->lon2[ipix] > M_PI) input->lontop[ipix] += 0.5 * TWO_PI;
-            if (input->lon2[ipix] - input->lon1[ipix] > M_PI) input->lontop[ipix] -= 1.5 * TWO_PI;
+            if (input->lon1[ipix] - input->lon2[ipix] > OEL_PI) input->lontop[ipix] += 0.5 * TWO_PI;
+            if (input->lon2[ipix] - input->lon1[ipix] > OEL_PI) input->lontop[ipix] -= 1.5 * TWO_PI;
             input->lattop[ipix] = -1.5 * input->lat1[ipix] + 0.5 * input->lat2[ipix];
             if (get_xyproj(input->lontop[ipix], input->lattop[ipix], &input->xtop[ipix],
                     &input->ytop[ipix], proj->projection, proj->lon_center) == -1) continue;
@@ -2013,8 +2014,8 @@ int project_scan(int iscan, char **wl, INPUT *input, OUTPUT *proj, PROCESSINFO p
     if (iscan + input->step > input->Nscans - 1) {
         for (ipix = 0; ipix < input->Npixels + 1; ipix += input->step) {
             input->lonbot[ipix] = 1.5 * input->lon1[ipix] - 0.5 * input->lon2[ipix];
-            if (input->lon1[ipix] - input->lon2[ipix] > M_PI) input->lonbot[ipix] -= 0.5 * TWO_PI;
-            if (input->lon2[ipix] - input->lon1[ipix] > M_PI) input->lonbot[ipix] += 1.5 * TWO_PI;
+            if (input->lon1[ipix] - input->lon2[ipix] > OEL_PI) input->lonbot[ipix] -= 0.5 * TWO_PI;
+            if (input->lon2[ipix] - input->lon1[ipix] > OEL_PI) input->lonbot[ipix] += 1.5 * TWO_PI;
             input->latbot[ipix] = 1.5 * input->lat1[ipix] - 0.5 * input->lat2[ipix];
             if (get_xyproj(input->lonbot[ipix], input->latbot[ipix], &input->xbot[ipix],
                     &input->ybot[ipix], proj->projection, proj->lon_center) == -1) continue;
@@ -2022,7 +2023,7 @@ int project_scan(int iscan, char **wl, INPUT *input, OUTPUT *proj, PROCESSINFO p
     } else {
         for (ipix = 0; ipix < input->Npixels + 1; ipix += input->step) {
             input->lonbot[ipix] = 0.5 * input->lon1[ipix] + 0.5 * input->lon2[ipix];
-            if (fabs(input->lon1[ipix] - input->lon2[ipix]) > M_PI)
+            if (fabs(input->lon1[ipix] - input->lon2[ipix]) > OEL_PI)
                 input->lonbot[ipix] += 0.5 * TWO_PI;
             input->latbot[ipix] = 0.5 * input->lat1[ipix] + 0.5 * input->lat2[ipix];
             if (get_xyproj(input->lonbot[ipix], input->latbot[ipix], &input->xbot[ipix],

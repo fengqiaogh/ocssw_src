@@ -15,7 +15,7 @@
 
 #include <math.h>
 #include "l12_proto.h"
-
+#define N_SPHALB 5000
 double fintexp3(float taur);
 double fintexp1(float taur);
 float csalbr(float taur);
@@ -23,10 +23,9 @@ static const float a[6] = {-.57721566, 0.99999193, -0.24991055,
         0.05519968, -0.00976004, 0.00107857};
 
 int get_rhos(l1str *l1rec, int32_t ip) {
-    static float pi = 3.141592654;
     static float p0 = 1013.25;
     static int firstCall = TRUE;
-    static float sphalb[5000];
+    static float sphalb[N_SPHALB];
 
     float mu0 = l1rec->csolz[ip];
 
@@ -41,8 +40,8 @@ int get_rhos(l1str *l1rec, int32_t ip) {
     if (firstCall) {
         firstCall = FALSE;
         sphalb[0] = 0.0;
-        for (i = 1; i < 5000; i++)
-            sphalb[i] = csalbr(i / 10000.);
+        for (i = 1; i < N_SPHALB; i++)
+            sphalb[i] = csalbr(i / (N_SPHALB * 2.0));
     }
     /*                                                              */
     /* Loop through bands and compute transmittance and reflectance */
@@ -54,12 +53,12 @@ int get_rhos(l1str *l1rec, int32_t ip) {
         /* Compute surface reflectance */
         if (l1rec->Lt[ipb] > 0.) {
             if (cirrus_opt)
-                l1rec->rhos[ipb] = pi / l1rec->Fo[ib] / mu0
+                l1rec->rhos[ipb] = OEL_PI / l1rec->Fo[ib] / mu0
                     * ((l1rec->Lt[ipb] / l1rec->tg_sol[ipb] / l1rec->tg_sen[ipb]
                     - l1rec->Lr[ipb]) - l1rec->rho_cirrus[ip] / Ka)
                 / l1rec->t_sol[ipb] / l1rec->t_sen[ipb] / l1rec->t_o2[ipb] / l1rec->t_h2o[ipb];
             else
-                l1rec->rhos[ipb] = pi / l1rec->Fo[ib] / mu0
+                l1rec->rhos[ipb] = OEL_PI / l1rec->Fo[ib] / mu0
                     * (l1rec->Lt[ipb] / l1rec->tg_sol[ipb] / l1rec->tg_sen[ipb]
                     - l1rec->Lr[ipb])
                 / l1rec->t_sol[ipb] / l1rec->t_sen[ipb] / l1rec->t_o2[ipb] / l1rec->t_h2o[ipb];
@@ -70,8 +69,11 @@ int get_rhos(l1str *l1rec, int32_t ip) {
             /* knowledge of the ocean surface reflectance as fn of windspeed.*/
             if (l1rec->land[ip]) {
                 Taur = l1rec->l1file->Tau_r[ib] * l1rec->pr[ip] / p0;
-                l1rec->rhos[ipb] /=
-                        (1 + sphalb[(int) (Taur * 10000 + 0.5)] * l1rec->rhos[ipb]);
+                int index = (int)(Taur * N_SPHALB * 2 + 0.5);
+                if (index >= N_SPHALB) {
+                    index = N_SPHALB - 1;
+                }
+                l1rec->rhos[ipb] /= (1 + sphalb[index] * l1rec->rhos[ipb]);
             }
         } else
             l1rec->rhos[ipb] = BAD_FLT;

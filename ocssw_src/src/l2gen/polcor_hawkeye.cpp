@@ -72,7 +72,7 @@ extern "C" void polcor_hawkeye(l1str *l1rec, int32_t ip) {
     for(int band=0; band<numBands; band++) {
         int ipb = ip * numBands + band;
         
-        double alpha = l1rec->alpha[ip] / RADEG;
+        double alpha = l1rec->alpha[ip] / OEL_RADEG;
         double L_x = l1rec->Lt[ipb] / l1rec->tg_sol[ipb] / l1rec->tg_sen[ipb];
         double L_qp = l1rec->L_q[ipb] * cos(2 * alpha) + l1rec->L_u[ipb] * sin(2 * alpha);
         double L_up = l1rec->L_u[ipb] * cos(2 * alpha) - l1rec->L_q[ipb] * sin(2 * alpha);

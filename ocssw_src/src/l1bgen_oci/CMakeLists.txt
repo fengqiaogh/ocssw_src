@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.12)
 
-set(LIBS genutils netcdfutils libterrain nav)
+set(LIBS genutils netcdfutils libterrain nav gring)
 
 find_package(NetCDF REQUIRED COMPONENTS C CXX)
 include_directories(${NETCDF_INCLUDE_DIRS})
@@ -19,6 +19,8 @@ add_executable(l1bgen_oci
   l1b_file.cpp
   dark_data.cpp
   l1bgen_oci.cpp
+  processing_tracker.cpp
+  l1b_options.cpp
 )
 
 target_link_libraries(l1bgen_oci

@@ -31,6 +31,7 @@ from seadasutils.aquarius_utils import aquarius_timestamp
 
 
 import seadasutils.ancDB as db
+from seadasutils.anc_data_types import AncillaryDataTypes
 #import modules.ancDBmysql as db
 
 
@@ -554,37 +555,62 @@ Using current working directory for storing the ancillary database file: %s''' %
 
             self.db_status = 0
 
-            for f in results['files']:
-                if (len(str(f[1]))) == 0:
-                    if not self.atteph:
-                        if re.search('MET', f[0]):
-                           self.db_status = self.db_status | 1
-                        if re.search('OZONE', f[0]):
-                           self.db_status = self.db_status | 2
-                        if re.search('sst', f[0]):
-                           self.db_status = self.db_status | 4
-                        if re.search('no2', f[0]):
-                           self.db_status = self.db_status | 8
-                        if re.search('ice', f[0]):
-                           self.db_status = self.db_status | 16
-                    if self.atteph:
-                        if re.search('ATT', f[0]):
-                           self.db_status = self.db_status | 4
-                        if re.search('EPH', f[0]):
-                            self.db_status = self.db_status | 8
-                else:
-                    if self.atteph:
-                        if re.search('ATT|EPH', f[0]):
-                            self.files[str(f[0]).lower()] = str(f[1])
-                            if (f[2] != 1):
-                                if re.search('ATT', f[0]):
-                                    self.db_status = self.db_status | 1
-                                if re.search('EPH', f[0]):
-                                    self.db_status = self.db_status | 2
-                    else: 
-                        if re.search('MET|OZONE|sst|ice|AER|GEO', f[0]):
-                            self.files[str(f[0]).lower()] = str(f[1])
-            # self.db_status = int(results['status'])
+
+            # The returned server file json has **some** of its file type field in caps. 
+            # This loop goes over the result files to extract the file type and its file name.
+            # Then save it self.files so it is a dict with the format:
+            #
+            # {
+            #   "ancFileType" = "fileName.nc"
+            # }
+            #
+            # If the server json has missing filename, then assign a bitwise value to db_status 
+            # indicating the missing file for said file type. 
+            #
+            # As of 02/12/25, a total of 6 bits are used to indicate missing files for db_status.
+            # Refer to anc_data_types.py to see which bit is assigned to which type.
+            # Add additional bits when new files are being added and it needs a missing file indicator.
+            # ie: No missing files          ==  00 0000     ==  db_status = 0
+            # ie: Missing met               ==  00 0001     ==  db_status = 1
+            # ie: Missing met, ozone        ==  00 0011     ==  db_status = 3
+            # ie: Missing met, ozone, aer   ==  10 0011     ==  db_status = 35
+
+            for fileInfo in results['files']:
+                # API keys should not be case sensitive, so make it lower for consistency in the code
+                # and to avoid bugs related to case sensitivity
+                ancillaryType = str(fileInfo[0]).lower() 
+
+                # skip if the type is not recognized 
+                if (not AncillaryDataTypes.isValidType(ancillaryType)):
+                    print(f"--WARNING-- Update anc_utils.py to handle new API data containing the ancillary type: {ancillaryType}.")
+                    print(f"            Ignoring everything for {ancillaryType}...\n")
+                    continue
+
+                fileName = str(fileInfo[1])
+                fileReturnStatus = int(fileInfo[2])
+
+                # if filename is empty, update the database status by flipping the bit to 1 for that ancillary type
+                if (fileName == ""):
+                    self.db_status = AncillaryDataTypes.updateMissingFileStatus(self.db_status, ancillaryType, self.atteph)
+                    continue
+                
+                # otherwise, file exists. extract the file name 
+                # get ancillary types for attitude ephemeris 
+                if self.atteph:
+                    if re.search(AncillaryDataTypes.validApiAttEphTypesRegEx, ancillaryType):
+                        self.files[ancillaryType] = fileName
+                        # all files can be found but still have a bad return status for the file
+                        # means there might be more files coming and the user should consider 
+                        # reprocessing at a later date
+                        if (fileReturnStatus != 1):
+                            self.db_status = AncillaryDataTypes.updateMissingFileStatus(self.db_status, ancillaryType, self.atteph)
+                
+                # get ancillary types for everything else 
+                else: 
+                    # only accepts ancillary types that it knows from the regular expression
+                    if re.search(AncillaryDataTypes.validApiAncTypesRegEx, ancillaryType):
+                        self.files[ancillaryType] = fileName
+
 
         # FOR MET/OZONE:
         # For each anc type, DB returns either a zero status if all optimal files are
@@ -595,21 +621,6 @@ Using current working directory for storing the ancillary database file: %s''' %
         # where all 3 MET/ozone files are returned but status is negative and then
         # warn the user there might be more files to come and they should consider
         # reprocessing at a later date.
-        #
-        # DB return status bitwise values:
-        # -all bits off means all is well in the world
-        # -bit 0 = 1 - missing one or more MET
-        # -bit 1 = 1 - missing one or more OZONE
-        # -bit 2 = 1 - missing SST
-        # -bit 3 = 1 - missing NO2
-        # -bit 4 = 1 - missing ICE
-
-        # FOR ATT/EPH:
-        # all bits off means all is well in the world
-        # -bit 0 = 1 - predicted attitude selected
-        # -bit 1 = 1 - predicted ephemeris selected
-        # -bit 2 = 1 - no attitude found
-        # -bit 3 = 1 - no ephemeris found
 
         if self.server_status == 1 or dlstat or self.db_status is None:
             print("ERROR: The display_ancillary_files.cgi script encountered an error and returned the following text:")
@@ -646,14 +657,14 @@ Using current working directory for storing the ancillary database file: %s''' %
 
         missing = []
 
-        for anctype in self.files:
-            if self.files[anctype] == 'missing':
-                missing.append(anctype)
+        for ancillaryType in self.files:
+            if self.files[ancillaryType] == 'missing':
+                missing.append(ancillaryType)
                 continue
             if (self.filename and self.dl) or (self.start and self.dl):
                 path = self.dirs['anc']
                 if not self.curdir:
-                    year, day = self.yearday(self.files[anctype])
+                    year, day = self.yearday(self.files[ancillaryType])
                     path = os.path.join(path, year, day)
 
                 if self.filename:
@@ -663,11 +674,12 @@ Using current working directory for storing the ancillary database file: %s''' %
                         filekey = os.path.join(os.path.basename(os.path.dirname(self.filename)), filekey) 
                 else:
                     filekey = None
-                ancdatabase.insert_record(satfile=filekey, starttime=self.start, stoptime=self.stop, anctype=anctype,
-                                          ancfile=self.files[anctype], ancpath=path, dbstat=self.db_status,
+                ancdatabase.insert_record(satfile=filekey, starttime=self.start, stoptime=self.stop, anctype=ancillaryType,
+                                          ancfile=self.files[ancillaryType], ancpath=path, dbstat=self.db_status,
                                           atteph=self.atteph)
 
         ancdatabase.closeDB()
+        
         # remove missing items
         for anctype in missing:
             self.files.__delitem__(anctype)

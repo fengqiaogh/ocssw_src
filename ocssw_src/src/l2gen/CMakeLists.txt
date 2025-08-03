@@ -44,6 +44,9 @@ list(APPEND LIBS ${NETCDF_LIBRARIES})
 find_package(PNG REQUIRED)
 include_directories(${PNG_INCLUDE_DIRS})
 
+find_package(GSL REQUIRED)
+list(APPEND LIBS ${GSL_LIBRARIES})
+include_directories(${GSL_INCLUDE_DIRS})
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     find_package(X11 REQUIRED)
@@ -55,13 +58,14 @@ list(APPEND LIBS timeutils)
 list(APPEND LIBS h5io)
 list(APPEND LIBS filetype)
 list(APPEND LIBS bilio)
+list(APPEND LIBS gring)
 
 set(L2GEN_COMMON_FILES
   filter.c
   viirs_pxcvt.c
   setflags_l2.c
   wavelength_3d.cpp
-  geo_region.cpp
+  
 # fortran files to get rid of
   lenstr.cpp
 )
@@ -181,7 +185,7 @@ set(L2GEN_ANCILLARY_FILES
 # # trying out avx
 # set_source_files_properties(sst_cloud_mask.cpp PROPERTIES COMPILE_FLAGS "-g -mavx2")
 add_executable(l2gen
-  main_l2gen.c
+  main_l2gen.cpp
   msl12_input.c
   getl1rec.c
   loadl1.c
@@ -480,7 +484,6 @@ add_executable(l1bgen_generic
 add_executable(l1info
   main_l1info.cpp
   msl12_input.c
-  gringHelper.cpp
   ${L2GEN_COMMON_FILES}
   )
 

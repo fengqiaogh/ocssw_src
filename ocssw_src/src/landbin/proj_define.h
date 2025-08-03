@@ -33,6 +33,8 @@
   99 = User defined
  */
 
+#include <genutils.h>
+
 #define GEO 0
 #define UTM 1
 #define SPCS 2
@@ -79,17 +81,14 @@
 #define GEO_FALSE -1  /*  False val for geometric true/false flags */
 
 #ifndef PI
-#define PI  3.14159265358979323846
+#define PI OEL_PI
 #endif
-#define HALF_PI 1.57079632679489661923
-#define TWO_PI  6.28318530717958647692
+#define HALF_PI (OEL_PI / 2)
+#define TWO_PI (OEL_PI * 2)
 #define EPSLN 1.0e-10
-#define R2D     57.2957795131
-/*
-#define D2R     0.0174532925199
- */
-#define D2R     1.745329251994328e-2
-#define S2R 4.848136811095359e-6
+#define R2D OEL_RADEG
+#define D2R OEL_DEGRAD
+#define S2R (OEL_PI / (180 * 3600))
 
 #define OK 0
 #define ERROR  -1

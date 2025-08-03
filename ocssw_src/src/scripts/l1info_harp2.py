@@ -17,10 +17,11 @@
 
 import argparse
 import numpy as np
+from pyproj import Geod
 from netCDF4 import Dataset as NetCDF
 
 # year, month, day
-__version__ = "2.1 (2024-09-18)"
+__version__ = "2.2 (2024-12-17)"
 
 
 # Class that holds lon and lat points 
@@ -39,58 +40,14 @@ class Coordinates:
         self.east = east
 
 
-# Good gring is in clockwise order.
-def IsGoodGring(lons, lats):
-
-    # append first element to the end to make polygon closed
-    lons.append(lons[0])
-    lats.append(lats[0])
-    lons = list(reversed(lons))
-    lats = list(reversed(lats))
-    area = CalculatePolygonArea(lons, lats)
-    if area < 0: # negative == clockwise order
-        return True
-    return False
+# use pyproj's geod class to calculate the area of the lon and lats
+# to determine order
+def isClockwise(lons, lats):
+    geod = Geod(ellps="WGS84")
+    area, perimeter = geod.polygon_area_perimeter(lons, lats)
+    return area < 0 # negative area indicates clockwise order
 
 
-
-# Good geospatial bounds is in counter-clockwise order.
-def IsGoodGeospatialBounds(lons, lats):
-
-    area = CalculatePolygonArea(lons, lats)
-    if area > 0: # positive area == counter-clockwise order.
-        return True
-    return False
-
-
-
-
-# Return the area of a closed polygon from a list of points.
-#   @param points - list of Coordinate objects
-#   @ return area
-#
-# Code based on the formula from: https://mathworld.wolfram.com/PolygonArea.html
-#
-#  Area:
-#  Negative (-)    points arranged in clockwise order
-#  Positive (+)    points arranged in counter-clockwise order
-#
-# The formula is made for a 2D plane. Using Longitude and Latitude, 
-
-def CalculatePolygonArea(lons, lats):
-    runningSum = 0
-    for i in range(len(lons)-1):
-
-        x1 = lons[i] 
-        y1 = lats[i] 
-
-        x2 = lons[i+1] 
-        y2 = lats[i+1]
-
-        diff = (x1*y2) - (x2*y1)
-        runningSum += diff
-    
-    return runningSum
 
 
 # True if the view and line has at least 2 pixels that are not fill value
@@ -622,17 +579,16 @@ def main():
     geospatialLons, geospatialLats = ConstructGeospatialBounds(northViewCoordinates, southViewCoordinates)
 
 
-    ## TODO: Add gring order check later here. Polygon area is based on 2D plane ##
-    ## see: https://oceandata.sci.gsfc.nasa.gov/rcs/obpg/ocssw/-/issues/683#note_17260
-
-
-    
     #### print the basic time l1info
     print(f"Start_Date={start_time[:10]}")
     print(f"Start_Time={start_time[11:-1]}")
     print(f"End_Date={end_time[:10]}")
     print(f"End_Time={end_time[11:-1]}")
 
+    #### check if gring is in clockwise order
+    if not isClockwise(gringLons, gringLats):
+        status = 110
+    
     #### print gring
     PrintGring(gringLons, gringLats)
 

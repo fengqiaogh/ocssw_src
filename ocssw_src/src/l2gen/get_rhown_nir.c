@@ -87,7 +87,7 @@ void rhown_red(char *fqfile, float chl, float aw[], float bbw[], float Rrs[],
     Rrs_red = foq[ib_red] * salbedo;
     /* Normalized water-leaving reflectance */
     Rrs_red = below_to_above(Rrs_red);
-    rhown[ib_red] = PI*Rrs_red;
+    rhown[ib_red] = OEL_PI*Rrs_red;
 }
 
 
@@ -268,9 +268,9 @@ void rhown_nir(char *fqfile, float chl, float aw[], float bbw[], float Rrs[], fl
         }
         /* Normalized water-leaving reflectance */
         Rrs_nir = below_to_above(Rrs_nir);
-        rhown[ib] = PI*Rrs_nir;
+        rhown[ib] = OEL_PI*Rrs_nir;
         if(uncertainty)
-            drhown[ib]=PI*1/0.52* Rrs_nir*Rrs_nir/(Rrs_below*Rrs_below)*dRrs_nir;
+            drhown[ib]=OEL_PI*1/0.52* Rrs_nir*Rrs_nir/(Rrs_below*Rrs_below)*dRrs_nir;
     }
 }
 

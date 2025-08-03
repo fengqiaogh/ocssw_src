@@ -1,4 +1,4 @@
-  pro write_band_parms,l1bid,b1bwave,b1bf0,r1bwave,r1bf0,bm12,bm13,rm12,rm13,sm12,sm13
+  pro write_band_parms,l1bid,b1bwave,b1bf0,r1bwave,r1bf0,swave,sf0,bm12,bm13,rm12,rm13,sm12,sm13
 
 
 ; Program to write spectral band parameters to an OCI L1B file
@@ -10,6 +10,8 @@
 ;	b1bf0(*)	R*4	 I	Array of blue band solar irradiances
 ;	r1bwave(*)	R*4	 I	Array of red band center wavelengths
 ;	r1bf0(*)	R*4	 I	Array of red band solar irradiances
+;	swave(*)	R*4	 I	Array of SWIR band center wavelengths
+;	sf0(*)		R*4	 I	Array of SWIR band solar irradiances
 ;	bm12(*,*,*)	R*4	 I	Array of blue band m12 coefficients
 ;	bm13(*,*,*)	R*4	 I	Array of blue band m13 coefficients
 ;	rm12(*,*,*)	R*4	 I	Array of red band m12 coefficients
@@ -53,8 +55,8 @@
   ncdf_attput, gid, bdid, "units", "nm", /CHAR
   ncdf_attput, gid, bfid, "_FillValue", -32767, /FLOAT
   ncdf_attput, gid, bfid, "long_name", "Mean extraterrestrial solar irradiance at 1 astronomical unit for the wavelengths of the blue CCD", /CHAR
-  ncdf_attput, gid, bfid, "valid_min", 90., /FLOAT
-  ncdf_attput, gid, bfid, "valid_max", 215., /FLOAT
+  ncdf_attput, gid, bfid, "valid_min", 0., /FLOAT
+  ncdf_attput, gid, bfid, "valid_max", 2500., /FLOAT
   ncdf_attput, gid, bfid, "units", "W m^-2 um^-1", /CHAR
   ncdf_attput, gid, bm12id, "_FillValue", -32767, /FLOAT
   ncdf_attput, gid, bm12id, "long_name", "Blue band M12/M11 polynomial coefficients", /CHAR
@@ -69,8 +71,8 @@
   ncdf_attput, gid, rdid, "units", "nm", /CHAR
   ncdf_attput, gid, rfid, "_FillValue", -32767, /FLOAT
   ncdf_attput, gid, rfid, "long_name", "Mean extraterrestrial solar irradiance at 1 astronomical unit for the wavelengths of the red CCD", /CHAR
-  ncdf_attput, gid, rfid, "valid_min", 90., /FLOAT
-  ncdf_attput, gid, rfid, "valid_max", 180., /FLOAT
+  ncdf_attput, gid, rfid, "valid_min", 0., /FLOAT
+  ncdf_attput, gid, rfid, "valid_max", 2500., /FLOAT
   ncdf_attput, gid, rfid, "units", "W m^-2 um^-1", /CHAR
   ncdf_attput, gid, rm12id, "_FillValue", -32767, /FLOAT
   ncdf_attput, gid, rm12id, "long_name", "Red band M12/M11 polynomial coefficients", /CHAR
@@ -88,13 +90,13 @@
   ncdf_varput, gid, rfid, r1bf0
   ncdf_varput, gid, rm12id, rm12
   ncdf_varput, gid, rm13id, rm13
-  swave = [939.716, 1038.317, 1250.375, 1248.550, 1378.169, 1619.626, 1618.036, 2130.593, 2258.432]
+;  swave = [939.716, 1038.317, 1250.375, 1248.550, 1378.169, 1619.626, 1618.036, 2130.593, 2258.432]
   swdid = ncdf_varid( gid, 'SWIR_wavelength')
   ncdf_varput, gid, swdid, swave
   spass = [45, 80, 30, 30, 15, 75, 75, 50, 75]
   sbdid = ncdf_varid( gid, 'SWIR_bandpass')
   ncdf_varput, gid, sbdid, spass
-  sf0 = [81.959, 67.021, 44.350, 44.490, 35.551, 23.438, 23.476, 9.122, 7.427]
+;  sf0 = [81.959, 67.021, 44.350, 44.490, 35.551, 23.438, 23.476, 9.122, 7.427]
   sfdid = ncdf_varid( gid, 'SWIR_solar_irradiance')
   ncdf_varput, gid, sfdid, sf0
   sm12id = ncdf_varid(gid, 'SWIR_m12_coef')

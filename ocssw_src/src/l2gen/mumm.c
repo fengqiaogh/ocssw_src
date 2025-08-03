@@ -58,7 +58,7 @@ void get_rho_mumm(l2str *l2rec, int32_t ipix, int32_t iw, float *rhom) {
                     ) / l1rec->t_o2[ipb]
                     - l1rec->TLg[ipb];
 
-            *rhom++ = PI * Ltemp / l1rec->Fo[iw] / cos(solz / RADEG);
+            *rhom++ = OEL_PI * Ltemp / l1rec->Fo[iw] / cos(solz / OEL_RADEG);
 
         }
     }

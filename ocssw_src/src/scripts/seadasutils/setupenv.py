@@ -49,8 +49,6 @@ def env(self):
         if not os.path.exists(self.dirs['bin']):
             print("Error:  OCSSW_DEBUG set, but...\n\t%s\ndoes not exist!" % self.dirs['bin'])
             sys.exit(1)
-        else:
-            print("Running debug binaries...\n\t%s" % self.dirs['bin'])
 
     self.dirs['run'] = str(Path.cwd())
     if self.curdir:

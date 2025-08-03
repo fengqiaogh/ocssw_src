@@ -144,7 +144,7 @@ float chl_oc3c(l2str *l2rec, float Rrs[]) {
     if (ib1 < 0) {
         ib1 = bindex_get(443);
         ib2 = bindex_get(490);
-        ib3 = bindex_get_555();
+        ib3 = bindex_get_555(l2rec->l1rec->l1file->sensorID);
 
         if (ib1 < 0 || ib2 < 0 || ib3 < 0) {
             printf("chl_oc3: incompatible sensor wavelengths for this algorithm\n");
@@ -292,7 +292,7 @@ float chl_hu(l2str *l2rec, float Rrs[]) {
     if (ib1 == -1) {
         nbands=l2rec->l1rec->l1file->nbands;
         ib1 = bindex_get(443);
-        ib2 = bindex_get_555();
+        ib2 = bindex_get_555(l2rec->l1rec->l1file->sensorID);
         ib3 = bindex_get(670);
         if (ib3 < 0) ib3 = bindex_get(665);
         if (ib3 < 0) ib3 = bindex_get(655);
@@ -408,7 +408,7 @@ float get_dchl_oci(l2str *l2rec,float Rrs[],float chl1,float chl2){
     if (ib1 == -1) {
         nbands=l2rec->l1rec->l1file->nbands;
         ib1 = bindex_get(443);
-        ib2 = bindex_get_555();
+        ib2 = bindex_get_555(l2rec->l1rec->l1file->sensorID);
         ib3 = bindex_get(670);
         if (ib3 < 0) ib3 = bindex_get(665);
         if (ib3 < 0) ib3 = bindex_get(655);

@@ -15,42 +15,10 @@
 #include "l12_proto.h"
 #include <gsl/gsl_fit.h>
 
-#define PARW1 400 /**< Minimum wavelength for PAR */
-#define PARW2 700 /**< Maximum wavelength for PAR */
-#define PARWN (PARW2-PARW1)+1 /**< Number of wavelengths included in PAR */
-
 static float fqymin = 0.0;
 static float fqymax = 0.3;
 static float flhmin = 0.0;
 
-/*---------------------------------------------------------------------*/
-/* get_fsat_hyperspectral - similar to get_fsat but for hyperspectral sensors       */
-
-/* Implementation: M. Zhang, Jan. 2024          */
-
-void get_fit_coef(float *x,float *y,int n,float *coef)
-{
-    int i;
-    float mean_x=0, mean_y=0;
-    float xy_sum=0,x2_sum=0;
-
-    for(i=0;i<n;i++){
-        mean_x+=x[i];
-        mean_y+=y[i];
-    }
-    mean_x/=n;
-    mean_y/=n;
-
-    for(i=0;i<n;i++){
-        xy_sum+=(x[i]-mean_x)*(y[i]-mean_y);
-        x2_sum+=(x[i]-mean_x)*(x[i]-mean_x);
-    }
-
-    //slope
-    coef[0]=xy_sum/x2_sum;
-    //offset
-    coef[1]=mean_y-coef[0]*mean_x;
-}
 
 /*---------------------------------------------------------------------*/
 /* get_unc_fsat - normalized fluorescence line height uncertaintiy for */
@@ -125,7 +93,7 @@ void get_unc_fsat(l2str *l2rec, float uflh[]) {
             Lf2 = l1file->fwave[ib680];
             Lf3 = l1file->fwave[ib709];
 
-            /**
+            /*
              * if the pixel is already masked, or any of the input nLw values are
              * less than -0.01, set the PRODFAIL flag and move along
              */
@@ -218,17 +186,9 @@ void get_fsat(l2str *l2rec, float flh[]) {
         ipb = l1file->nbands * ip;
         nLw = &l2rec->nLw[ipb];
 
-        int bad_fit = 0;
         for (ib = 0; ib < nfit; ib++) {
             yfit[ib] = nLw[baseBands[ib]];
-            if (yfit[ib] < -0.01) {
-                l1rec->flags[ip] |= PRODFAIL;
-                bad_fit = 1;
-                break;
-            }
         }
-        if(bad_fit)
-            continue;
 
         gsl_fit_linear(xfit, 1, yfit, 1, nfit, &c0, &c1, &cov00, &cov01, &cov11, &chi_sq);
 
@@ -237,9 +197,8 @@ void get_fsat(l2str *l2rec, float flh[]) {
         flh[ip] = nLw[heightBand] - baseline - input->flh_offset;
 
         if (flh[ip] < flhmin) {
-            flh[ip] = BAD_FLT;
-            l1rec->flags[ip] |= PRODFAIL;
-            continue;
+            flh[ip] = flhmin;
+            l1rec->flags[ip] |= PRODWARN;
         }
     }
 }

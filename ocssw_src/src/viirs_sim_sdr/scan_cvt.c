@@ -447,7 +447,7 @@ int ang_avg(float theta1, float phi1, float theta2, float phi2,
 
 ----------------------------------------------------------------------------*/ {
     float v1[2], v2[2], v[2];
-    float rad2deg = 180. / M_PI;
+    float rad2deg = OEL_RADEG;
     /*
      *  convert to just the x, y parts of a vector - this assumes all are
      *  unit length

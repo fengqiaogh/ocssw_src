@@ -129,8 +129,8 @@ void no2_frac(float lon, float lat, float *no2_frac_200) {
 
     /* interpolate to pixel location */
 
-    i = MAX(MIN((int)((lon + 180.0 + dx / 2) / dx), nx + 1), 0);
-    j = MAX(MIN((int)((lat + 90.0 + dy / 2) / dy), ny + 1), 0);
+    i = MAX(MIN((int)((lon + 180.0 + dx / 2) / dx), nx), 0);
+    j = MAX(MIN((int)((lat + 90.0 + dy / 2) / dy), ny), 0);
 
     xx = i * dx - 180.0 - dx / 2;
     yy = j * dy - 90.0 - dy / 2;
@@ -220,8 +220,8 @@ void no2concGeosCf(char *no2file, float lon, float lat, float *no2_tropo, float 
 
     /* interpolate to pixel location */
 
-    i = MAX(MIN((int)((lon + 180.0 + dx / 2) / dx), nx + 1), 0);
-    j = MAX(MIN((int)((lat + 90.0 + dy / 2) / dy), ny + 1), 0);
+    i = MAX(MIN((int)((lon + 180.0 + dx / 2) / dx), nx), 0);
+    j = MAX(MIN((int)((lat + 90.0 + dy / 2) / dy), ny), 0);
 
     xx = i * dx - 180.0 - dx / 2;
     yy = j * dy - 90.0 - dy / 2;
@@ -423,8 +423,8 @@ void no2conc(char *no2file, float lon, float lat, int32_t doy, float *no2_tropo,
 
     /* interpolate to pixel location */
 
-    i = MAX(MIN((int)((lon + 180.0 + dx / 2) / dx), nx + 1), 0);
-    j = MAX(MIN((int)((lat + 90.0 + dy / 2) / dy), ny + 1), 0);
+    i = MAX(MIN((int)((lon + 180.0 + dx / 2) / dx), nx), 0);
+    j = MAX(MIN((int)((lat + 90.0 + dy / 2) / dy), ny), 0);
 
     xx = i * dx - 180.0 - dx / 2;
     yy = j * dy - 90.0 - dy / 2;
@@ -575,8 +575,8 @@ float ozone_climatology(char *file, int day, float lon, float lat) {
 
     /* interpolate to pixel location */
 
-    i = MAX(MIN((int)((lon + 180.0 + dx / 2) / dx), nx + 1), 0);
-    j = MAX(MIN((int)((lat + 90.0 + dy / 2) / dy), ny + 1), 0);
+    i = MAX(MIN((int)((lon + 180.0 + dx / 2) / dx), nx), 0);
+    j = MAX(MIN((int)((lat + 90.0 + dy / 2) / dy), ny), 0);
 
     xx = i * dx - 180.0 - dx / 2;
     yy = j * dy - 90.0 - dy / 2;
@@ -626,7 +626,7 @@ float ozone_climatology(char *file, int day, float lon, float lat) {
  ----------------------------------------------------------------------- */
 
 int setanc(l1str *l1rec) {
-    static float r2d = 57.29577951;
+    static float r2d = OEL_RADEG;
     static int firstCall = 1;
     static int32_t anc_id[] = {-1, -1};
     static short *ancqc = NULL;
@@ -778,11 +778,11 @@ int setanc(l1str *l1rec) {
                 if ((u + v) > 0.05 * (u_u + v_u)) {
                     uncertainty->dws[i] = sqrt((u * u * u_u * u_u + v * v * v_u * v_u) / ws_2);
                     uncertainty->dwd[i] = sqrt(v * v * u_u * u_u + u * u * v_u * v_u) / ws_2;
-                    if (uncertainty->dwd[i] > M_PI)
-                        uncertainty->dwd[i] = M_PI;
+                    if (uncertainty->dwd[i] > OEL_PI)
+                        uncertainty->dwd[i] = OEL_PI;
                 } else {
                     uncertainty->dws[i] = sqrt(0.5 * (u_u * u_u + v_u * v_u));
-                    uncertainty->dwd[i] = M_PI;
+                    uncertainty->dwd[i] = OEL_PI;
                 }
                 uncertainty->dwd[i] *= r2d;
             }

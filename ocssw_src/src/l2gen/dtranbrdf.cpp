@@ -3,6 +3,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <genutils.h>
 
 #define NBIG 10U
 #define NRAD 31U
@@ -15,9 +16,6 @@
 #define NUM 75U
 #define NCHL 6U
 #define NSUN 6U
-#ifndef M_PI
-#define M_PI 3.141592653589793238462643383279502884L
-#endif
 
 static float PHSA[NPHASE][NWAVE][NBIG][NGAUS][NPHI], PHSR[NBIG][NGAUS][NPHI];
 static float MU[NGAUS], THETA[NGAUS];
@@ -371,7 +369,7 @@ extern "C" void diff_tran_corr_(int *iphase, float *solz, float *senz, float *ph
         read_luts_txt();
         for (size_t i = 0; i < NGAUS; i++) {
             THETA[i] = static_cast<float>(i) * 90.0f / static_cast<float>(NRAD - 1);
-            MU[i] = std::cos(THETA[i] * M_PI / 180.0);
+            MU[i] = std::cos(THETA[i] * OEL_PI / 180.0);
         }
         initialized = true;
     }
@@ -393,7 +391,6 @@ extern "C" void diff_tran_corr_(int *iphase, float *solz, float *senz, float *ph
     for (size_t iwave = 0; iwave < NWAVE; iwave++) {
         float tstar1, tstar2, ans1, ans2, tdiff1, tdiff2;
         for (size_t jup = iview - 1; jup <= (size_t)iview; jup++) {
-            //            float adelphi = (180.0 / M_PI) * (*phi);
             size_t jdn = mgaus + 1 - jup;
             float ya1 = 0.0f;
             float yr1 = 0.0f;

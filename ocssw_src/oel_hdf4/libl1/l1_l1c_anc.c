@@ -37,7 +37,6 @@ int openl1_l1c_anc(filehandle * file) {
     int dimid, status;
     
     // Open the netcdf4 input file
-    printf("Opening L1C file\n");
     status = nc_open(file->name, NC_NOWRITE, &ncid_L1C);
     if (status != NC_NOERR) {
         fprintf(stderr, "-E- %s line %d: nc_open(%s) failed.\n",
@@ -187,7 +186,6 @@ int readl1_l1c_anc(filehandle *file, int32_t line, l1str *l1rec) {
 int closel1_l1c_anc(filehandle *file) {
     int status;
 
-    printf("Closing L1C Ancillary file\n");
     status = nc_close(file->sd_id);
     check_err(status, __LINE__, __FILE__);
 

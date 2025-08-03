@@ -157,23 +157,33 @@ void populateInstrumentAggMatrix(float **instrumentAggMatrix, int16_t *tapAggFac
     }
 }
 
-void aggToL1b(size_t currScan, size_t numBands, size_t numInsBands, const GeoData &geoData, float **cal,
-              float **calb, float **insAggMat, bool radianceGen, std::vector<double> &solIrrL1a,
-              const float *cosSolZens) {
-    for (size_t j = 0; j < numBands; j++) {
-        for (size_t k = 0; k < geoData.numCcdPix; k++) {
-            float sum = 0.0;
-            for (size_t l = 0; l < numInsBands; l++)
-                if (cal[l][k] != BAD_FLT)
-                    sum += insAggMat[l][j] * cal[l][k];
-            calb[j][k] = sum;
+void aggAndCalcRefls(size_t currScan, size_t numBands, size_t numInsBands, const GeoData &geoData,
+                     float *preAgg, float *aggregated, float **insAggMat, bool radianceGen,
+                     std::vector<double> &solIrrL1a, const float *cosSolZens) {
+    for (size_t insBand = 0; insBand < numInsBands; insBand++) {
+        for (size_t l1bBand = 0; l1bBand < numBands; l1bBand++) {
+            float instrumentAgg = insAggMat[insBand][l1bBand];
+
+            for (size_t pix = 0; pix < geoData.numCcdPix; pix++) {
+                size_t dataIndex = insBand * geoData.numCcdPix + pix;
+                size_t outIndex = l1bBand * geoData.numCcdPix + pix;
+
+                aggregated[outIndex] += instrumentAgg * preAgg[dataIndex];
+            }
+        }
+    }
+
+    for (size_t l1bBand = 0; l1bBand < numBands; l1bBand++) {
+        for (size_t pix = 0; pix < geoData.numCcdPix; pix++) {
+            size_t dataIndex = l1bBand * geoData.numCcdPix + pix;
+
             if (!radianceGen) {
-                if (geoData.solarZeniths[currScan * geoData.numCcdPix + k] <
-                    MAX_SOLZ)  // NOTE: solz is short with scale of 0.01
-                    calb[j][k] *= M_PI * geoData.auCorrection /
-                                  (solIrrL1a[j] * cosSolZens[currScan * geoData.numCcdPix + k]);
+                if (geoData.solarZeniths[currScan * geoData.numCcdPix + pix] < MAX_SOLZ)
+                    aggregated[dataIndex] *=
+                        OEL_PI * geoData.auCorrection /
+                        (solIrrL1a[l1bBand] * cosSolZens[currScan * geoData.numCcdPix + pix]);
                 else
-                    calb[j][k] = BAD_FLT;
+                    aggregated[dataIndex] = BAD_FLT;
             }
         }
     }

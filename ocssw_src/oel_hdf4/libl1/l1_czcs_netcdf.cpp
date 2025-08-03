@@ -30,7 +30,7 @@ static int32_t nsta;
 static int32_t ninc;
 
 static uint8_t *counts, cz_band_present;
-static int32_t *msec;
+static double *scanTime;  // scan time (unix time)
 static int16_t *gain;
 static float *tilt, *att_ang, *slope, *intercept;
 static float *ctl_pt_lat, *ctl_pt_lon, *pos, *pos_err;
@@ -85,8 +85,8 @@ extern "C" int32_t openl1_czcs_netcdf(filehandle *file) {
 
         strcpy(file->spatialResolution, "825 m");
         // Allocate space for data and read them in
-        msec = (int32_t *) calloc(nscan, sizeof (int32_t));
-        dataFile.getVar("scan_time").getVar(msec);
+        scanTime = (double *) calloc(nscan, sizeof (double));
+        dataFile.getVar("time").getVar(scanTime);
         tilt = (float *) calloc(nscan, sizeof (float));
         dataFile.getVar("tilt").getVar(tilt);
         att_ang = (float *) calloc(nscan * 3, sizeof (float));
@@ -163,6 +163,14 @@ extern "C" int32_t readl1_czcs_netcdf(filehandle *file, int32_t recnum, l1str *l
     char *cal_path = l1_input->calfile;
 
     float lonbuf[1968], latbuf[1968], senzbuf[1968], senabuf[1968];
+
+    l1rec->scantime = scanTime[recnum];
+
+    // set time varaibles for this scan
+    int16_t scanYear, scanDay;
+    double scanSecOfDay;
+    unix2yds(scanTime[recnum], &scanYear, &scanDay, &scanSecOfDay);
+    double scanMsecOfDay = scanSecOfDay * 1000.0;
 
     try {
         NcFile dataFile(file->name, NcFile::read);
@@ -245,7 +253,7 @@ extern "C" int32_t readl1_czcs_netcdf(filehandle *file, int32_t recnum, l1str *l
          *  call the fortran calibration routine 
          */
         orbit = (int) file->orbit_number;
-        status = get_czcscal(cal_path, orbit, syear, sday, msec[recnum],
+        status = get_czcscal(cal_path, orbit, scanYear, scanDay, (int)scanMsecOfDay,
                 cnt_vec, slope[4], intercept[4], gain[0], lt_lcl);
         /*
          *  assign the calibrated radiances
@@ -309,8 +317,8 @@ extern "C" int32_t readl1_czcs_netcdf(filehandle *file, int32_t recnum, l1str *l
         cz_posll_2_satang((pos + 3 * recnum), npix, l1rec->lat, l1rec->lon,
                 l1rec->senz, l1rec->sena);
     } else {
-        pi = PI;
-        radeg = RADEG;
+        pi = OEL_PI;
+        radeg = OEL_RADEG;
         for (i = 0; i < 1968; i++) {
             lonbuf[i] = 0.0;
             latbuf[i] = 0.0;
@@ -333,28 +341,13 @@ extern "C" int32_t readl1_czcs_netcdf(filehandle *file, int32_t recnum, l1str *l
         }
     }
 
-
-    /*  for( i = spix; i < epix; i = i + ninc )*/
+    int intYear = scanYear;
+    int intDay = scanDay;
+    gmt = scanSecOfDay / 3600.0; // time of day in hours
     for (i = 0; i < npix; i++) {
-        gmt = (float) msec[recnum] / (1000. * 3600);
-        sunangs_(&syear, &sday, &gmt, (l1rec->lon) + i, (l1rec->lat) + i,
+        sunangs_(&intYear, &intDay, &gmt, (l1rec->lon) + i, (l1rec->lat) + i,
                 (l1rec->solz) + i, (l1rec->sola) + i);
     }
-    /*
-     *  set scan time
-     */
-    double secs = (double) (msec[recnum] / 1000.0);
-    int16_t year = syear;
-    int16_t day = sday;
-
-    if (recnum > 0 && msec[recnum] < msec[recnum - 1]) { /* adjust for day rollover */
-        day += 1;
-        if (day > (365 + (year % 4 == 0))) {
-            year += 1;
-            day = 1;
-        }
-    }
-    l1rec->scantime = yds2unix(year, day, secs);
 
     return (status);
 }
@@ -362,7 +355,7 @@ extern "C" int32_t readl1_czcs_netcdf(filehandle *file, int32_t recnum, l1str *l
 /*  W. Robinson, SAIC, 6 Jan 2005   include the pos, pos_err arrays in free */
 
 extern "C" int32_t  closel1_czcs_netcdf(filehandle *file) {
-    free(msec);
+    free(scanTime);
     free(tilt);
     free(att_ang);
     free(counts);

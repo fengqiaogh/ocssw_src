@@ -2,15 +2,14 @@
 #define __L1B_DARK__
 
 struct DarkData {
-    uint16_t numScansAvg;  // Number of dark scans to average
-    uint16_t numPixSkip;   // Number of dark pixels to skip at the beginning of the file
+    uint16_t numScansAvg = 1;  // Number of dark scans to average
+    uint16_t numPixSkip = 0;   // Number of dark pixels to skip at the beginning of the file
     uint16_t numPix;
     int16_t darkZone = -1;  // Start of dark collect in terms of spatial zones
     int16_t spatialAgg;
-    uint32_t ***data;                // The actual dark data
+    uint32_t ***data;                 // The actual dark data
     std::vector<double> corrections;  // Should be sized in accordance with the number of instrument bands
 };
-
 
 /**
  * @brief Filters dark noise from the given dark values.

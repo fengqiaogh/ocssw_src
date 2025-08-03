@@ -542,8 +542,8 @@ float get_icefrac_nsidc(float lon, float lat) {
     lon += delta;
 
     /* Convert input coordinates to radians. */
-    lat *= PI / 180;
-    lon *= PI / 180;
+    lat *= OEL_DEGRAD;
+    lon *= OEL_DEGRAD;
 
     sinlat = sin((double) lat);
 
@@ -561,7 +561,7 @@ float get_icefrac_nsidc(float lon, float lat) {
     U.S. Geological Survey Professional Paper 1395
     Fourth Printing 1997
      */
-    t = tan((double) (PI / 4 - lat / 2))
+    t = tan((double) (OEL_PI / 4 - lat / 2))
             / pow((double) ((1 - EC * sinlat) / (1 + EC * sinlat)), (double) (EC / 2));
 
     /*
@@ -572,13 +572,13 @@ float get_icefrac_nsidc(float lon, float lat) {
     constants come from.
      */
     if (slat == 0.0) {
-        slat = SLAT * PI / 180;
+        slat = SLAT * OEL_PI / 180;
         sinslat = sin(slat);
 
         /*
         Equation 15-9 from page 161 of aforementioned publication.
          */
-        tc = tan((double) (PI / 4 - slat / 2))
+        tc = tan((double) (OEL_PI / 4 - slat / 2))
                 / pow((double) ((1 - EC * sinslat) / (1 + EC * sinslat)), (double) (EC / 2));
 
         /*

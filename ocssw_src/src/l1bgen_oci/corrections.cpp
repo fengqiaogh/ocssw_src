@@ -5,8 +5,11 @@
  * @date Aug 2024
  */
 
+#include "calibrations.hpp"
 #include "corrections.hpp"
+#include "types.hpp"
 #include <allocate2d.h>
+#include <gsl/gsl_cblas.h>
 
 using namespace std;
 
@@ -38,7 +41,7 @@ int getDarkCorrection(const size_t scanIndex, const uint32_t numScans, const vec
             matchingHamSideIndices[i] = (int32_t)i;
             matchingHamSideCount++;
         } else {
-            matchingHamSideIndices[i] = -1; // Would never be this value otherwise
+            matchingHamSideIndices[i] = -1;  // Would never be this value otherwise
         }
     }
 
@@ -72,8 +75,8 @@ int getDarkCorrection(const size_t scanIndex, const uint32_t numScans, const vec
 
         // If no valid dark data, expand scan range
         for (size_t i = averageLowerBound; i <= (size_t)averageUpperBound; i++) {
-            size_t hamScanLine = matchingHamSideIndices[i];
-            if (hamScanLine == -1) // HAM side doesn't match
+            int32_t hamScanLine = matchingHamSideIndices[i];
+            if (hamScanLine == -1)  // HAM side doesn't match
                 continue;
 
             for (size_t j = numPixSkip; j < (size_t)numPixAverage; j++) {
@@ -113,8 +116,8 @@ int getDarkCorrection(const size_t scanIndex, const uint32_t numScans, const vec
             int numValidPixels = 0;
 
             for (int tempScan = averageLowerBound; tempScan <= averageUpperBound; tempScan++) {
-                size_t hamScanLine = matchingHamSideIndices[tempScan];
-                if (hamScanLine == -1) // HAM side doesn't match
+                int32_t hamScanLine = matchingHamSideIndices[tempScan];
+                if (hamScanLine == -1)  // HAM side doesn't match
                     continue;
 
                 for (int pixelIndex = numPixSkip; pixelIndex < numPixAverage; pixelIndex++) {
@@ -138,162 +141,260 @@ int getDarkCorrection(const size_t scanIndex, const uint32_t numScans, const vec
     return 0;
 }
 
-int getTempCorrection(uint32_t numInsBands, const Gains &gains, const float *referenceTemps,
-                      const double *calibrationTemps, uint32_t numScans, float *temperatureCorrections) {
-    const uint16_t numTemperatures = gains.dimensions[TEMP];
-    const uint16_t numCoefficients = gains.dimensions[TEMP_CORR];
+double getTempCorrection(const size_t band, const float *referenceTemps, const vector<double> &measuredTemps,
+                         const Gains &gains, Device fpa) {
+    double correction = 1.0;
+    /* The reference and measured temperatures are both shared by the CCDs and the SWIR FPA, and SWIR temps
+     start at index 8 */
+    size_t tempIndex = (fpa == SWIR) ? 8 : 0;
+    size_t numTemps = gains.dimensions[TEMP];           // For data localization
+    size_t numTempCoefs = gains.dimensions[TEMP_CORR];  // For data localization
 
-    // Initialize all temperature corrections to 1.0
-    fill(temperatureCorrections, temperatureCorrections + numInsBands, 1.0f);
-
-    // Calculate temperature corrections for each band
-    for (size_t tempIndex = 0; tempIndex < numTemperatures; ++tempIndex) {
-        float temperatureDifference = calibrationTemps[tempIndex] - referenceTemps[tempIndex];
-
-        for (size_t coeffIndex = 0; coeffIndex < numCoefficients; ++coeffIndex) {
-            float temperatureFactor = std::pow(temperatureDifference, coeffIndex + 1);
-
-            for (size_t bandIndex = 0; bandIndex < numInsBands; ++bandIndex) {
-                temperatureCorrections[bandIndex] -=
-                    gains.k3Coefs[bandIndex][tempIndex][coeffIndex] * temperatureFactor;
-            }
+    for (; tempIndex < numTemps; tempIndex++) {
+        double tempDiff = measuredTemps[tempIndex] - referenceTemps[tempIndex];
+        for (size_t coefIndex = 0; coefIndex < numTempCoefs; coefIndex++) {
+            double tempFactor = pow(tempDiff, coefIndex + 1);
+            correction -= (gains.k3Coefs[band][tempIndex][coefIndex]) * tempFactor;
         }
     }
-    return EXIT_SUCCESS;
+
+    return correction;
 }
 
-void getTempCorrection(const size_t numInsBands, const float *referenceTemps,
-                       const vector<double> &calibrationTemps, const Gains &gains,
-                       vector<double> &temperatureCorrections) {
-    // Initialize temperature corrections for each band to 1.0
-    for (double &correction : temperatureCorrections) {
-        correction = 1.0;
-    }
-    for (size_t tempIndex = 0; tempIndex < gains.dimensions[TEMP]; ++tempIndex) {
-        float temperatureDifference = calibrationTemps[tempIndex] - referenceTemps[tempIndex];
-
-        for (size_t coeffIndex = 0; coeffIndex < gains.dimensions[TEMP_CORR]; ++coeffIndex) {
-            float temperatureFactor = std::pow(temperatureDifference, coeffIndex + 1);
-
-            for (size_t bandIndex = 0; bandIndex < numInsBands; ++bandIndex) {
-                temperatureCorrections[bandIndex] -=
-                    (gains.k3Coefs[bandIndex][tempIndex][coeffIndex] * temperatureFactor);
-            }
-        }
-    }
-}
-
-int getRvsCorrection(uint32_t numInsBands, uint16_t numPixels, uint8_t hamSide, const Gains &gains,
-                     const double *scanAngles, float **rvsCorrections) {
-    const uint16_t numRvsCoefficients = gains.dimensions[3];
-
-    // Initialize all RVS corrections to 1.0
-    for (size_t band = 0; band < numInsBands; ++band) {
-        std::fill_n(rvsCorrections[band], numPixels, 1.0f);
-    }
-
-    // Apply RVS corrections
-    for (size_t coeffIndex = 0; coeffIndex < numRvsCoefficients; ++coeffIndex) {
-        for (size_t band = 0; band < numInsBands; ++band) {
-            const float coefficient = gains.k4Coefs[band][hamSide][coeffIndex];
-
-            for (size_t pixel = 0; pixel < numPixels; ++pixel) {
-                const float scanAnglePower = std::pow(scanAngles[pixel], coeffIndex + 1);
-                rvsCorrections[band][pixel] += coefficient * scanAnglePower;
-            }
-        }
-    }
-    return EXIT_SUCCESS;
-}
-
-void getRvsCorrection(const uint32_t numInsBands, const uint16_t numPixels, const uint8_t hamSide,
-                      const Gains &gains, const vector<double> scanAngles, vec2D<double> &rvsCorrections) {
-    for (vector<double> &row : rvsCorrections) {
-        for (double &element : row) {
-            element = 1.0;
-        }
-    }
-
+double getRvsCorrection(const size_t band, const size_t numPixels, const uint8_t hamSide, const Gains &gains,
+                        double scanAngle) {
     const size_t numRvsCoefs = gains.dimensions[3];
+    double correction = 1.0;
+    double scanAnglePower = scanAngle;
 
-    // Apply RVS corrections
-    for (size_t coeffIndex = 0; coeffIndex < numRvsCoefs; ++coeffIndex) {
-        for (size_t band = 0; band < numInsBands; ++band) {
-            const float coefficient = gains.k4Coefs[band][hamSide][coeffIndex];
-
-            for (size_t pixel = 0; pixel < numPixels; ++pixel) {
-                const float scanAnglePower = std::pow(scanAngles[pixel], coeffIndex + 1);
-                rvsCorrections[band][pixel] += coefficient * scanAnglePower;
-            }
-        }
-    }
-}
-
-int getNonlinearityCorrection(uint32_t numInsBands, uint16_t numPixels, uint32_t numNonlinearTerms,
-                              const Gains &gains, float **digitalNumbers, float **nonlinearityCorrections) {
-    for (size_t band = 0; band < numInsBands; ++band) {
-        const vector<double>& k5CoefsForBand = gains.k5Coefs[band];
-        float* nonlinearityCorrectionForBand = nonlinearityCorrections[band];
-        float* digitalNumbersForBand = digitalNumbers[band];
-
-        for (size_t pixel = 0; pixel < numPixels; ++pixel) {
-            // Initialize with the zeroth-order correction
-            float correction = k5CoefsForBand[0];
-            float dn = digitalNumbersForBand[pixel];
-            float dnPower = dn;
-
-            // Add higher-order terms
-            for (size_t term = 1; term < numNonlinearTerms; ++term) {
-                correction += k5CoefsForBand[term] * dnPower;
-                dnPower *= dn;
-            }
-
-            nonlinearityCorrectionForBand[pixel] = correction;
-        }
+    for (size_t i = 0; i < numRvsCoefs; i++) {
+        const double coefficient = gains.k4Coefs[band][hamSide][i];
+        correction += coefficient * scanAnglePower;
+        scanAnglePower *= scanAngle;
     }
 
-    return EXIT_SUCCESS;
+    return correction;
 }
 
-void getNonlinearityCorrection(const uint32_t numInsBands, const size_t numPixels,
-                               const uint32_t numNonlinearTerms, const vec2D<double> &k5Coefs,
-                               const vec2D<float> &digitalNumbers, vec2D<double> &nonlinearityCorrections) {
-    for (size_t band = 0; band < numInsBands; ++band) {
-        for (size_t pixel = 0; pixel < numPixels; ++pixel) {  // TODO: Loop should be in the caller
-            // Initialize with the zeroth-order correction
-            float correction = k5Coefs[band][0];
+double getNonlinearityCorrection(const size_t band, const size_t pixel, const uint32_t numNonlinearTerms,
+                                 const vec2D<double> &k5Coefs, const vec2D<float> &digitalNumbers) {
+    // Initialize with the zeroth-order correction
+    float correction = k5Coefs[band][0];
 
-            // Add higher-order terms
-            for (size_t term = 1; term < numNonlinearTerms; ++term) {
-                float dnPower = std::pow(digitalNumbers[band][pixel], term);
-                correction += k5Coefs[band][term] * dnPower;
-            }
-
-            nonlinearityCorrections[band][pixel] = correction;
-        }
+    // Add higher-order terms
+    float dnPower = 1;  // Remove std::pow call
+    for (size_t term = 1; term < numNonlinearTerms; ++term) {
+        dnPower *= digitalNumbers[band][pixel];
+        correction += k5Coefs[band][term] * dnPower;
     }
+
+    return correction;
 }
 
+vector<uint8_t> saturationFlags;
+vector<float> qualityMatrix;
+size_t largestDim{0};
 void getQualityFlags(size_t numPix, size_t numBands, size_t numInsBands, vec2D<float> &digitalNumbers,
                      float **insAggMat, std::vector<uint32_t> &saturationThresholds,
                      boost::multi_array<uint8_t, 2> &qualityFlags) {
     using namespace boost;
 
-    vector<uint8_t> saturationFlags(numInsBands);
+    if (largestDim < max(numInsBands * numPix, numBands * numPix)) {
+        largestDim = max(numInsBands * numPix, numBands * numPix);
+        saturationFlags.resize(largestDim);
+        qualityMatrix.resize(largestDim);
+    }
 
-    for (size_t i = 0; i < numPix; i++) {
-                                           // Check saturation for all instrument bands
-        for (size_t j = 0; j < numInsBands; j++) {
-            saturationFlags[j] = (digitalNumbers[j][i] >= saturationThresholds[j]) ? 1 : 0;
+    fill(qualityMatrix.begin(), qualityMatrix.end(), 0);
+
+    for (size_t insBand = 0; insBand < numInsBands; insBand++) {
+        for (size_t pix = 0; pix < numPix; pix++) {
+            saturationFlags[insBand * numPix + pix] =
+                (digitalNumbers[insBand][pix] >= saturationThresholds[insBand]) ? 1 : 0;
         }
+    }
 
-        // Process all output bands
-        for (size_t j = 0; j < numBands; j++) {
-            float sum = 0.0;
-            for (size_t l = 0; l < numInsBands; l++) {
-                sum += insAggMat[l][j] * saturationFlags[l];
+    for (size_t insBand = 0; insBand < numInsBands; insBand++) {
+        for (size_t l1bBand = 0; l1bBand < numBands; l1bBand++) {
+            for (size_t pix = 0; pix < numPix; pix++) {
+                qualityMatrix[l1bBand * numPix + pix] +=
+                    insAggMat[insBand][l1bBand] * saturationFlags[insBand * numPix + pix];
             }
-            qualityFlags[j][i] = (sum > 0) ? 1 : 0;
         }
+    }
+
+    for (size_t l1bBand = 0; l1bBand < numBands; l1bBand++) {
+        for (size_t pix = 0; pix < numPix; pix++) {
+            qualityFlags[l1bBand][pix] = (qualityMatrix[l1bBand * numPix + pix] > 0) ? 1 : 0;
+        }
+    }
+}
+
+void makeXtalkMat(int16_t spatialAgg, CalibrationData &calData, float ***cmat_in, size_t ncpix,
+                  size_t nxbands, size_t nbands) {
+    // Program to generate the OCI cross-correlation matrix for a blue band
+    // and aggregate the coefficients for the instrument configuration
+
+    /*
+     * I/O:
+     * size_t ncpix : passed in (possibly modified and sent out)
+     * size_t nxbands: should be passed in
+     * size_t nbands: should be passed in
+     * float ***cmat_in : passed in
+     * NUM_BLUE_WAVELENGHS: preprocessor-defined macro constant
+     * uint32_t numInstrumentBands: passed in via blueCalData
+     * float **gainAggMAtrix: passed in via blueCalData
+     * double ***cmat: should be passed out
+     * int16_t spatialAgg: passed in
+     *
+     * local:
+     * double gmat_tmp[nbands][numInstrumentBands]
+     * double gmatu[nbands][numInstrumentBands]
+     * double cmat_tmp: [ncpix][numInsBands][numInsBands]
+     *
+     */
+
+    // Generate blue band correction matrix for aggregated bands
+    // This requires a unitized version of the gain aggregation matrix
+    // gmat is sized for 512 (NUM_BLUE_WAVELENGTHS) bands,
+    // the crosstalk coefficients are for 480 (nbands) bands.
+
+    double gmat_tmp[nbands][calData.numInsBands];
+    double gmatu[nbands][calData.numInsBands];
+    double cmat_tmp[ncpix][calData.numInsBands][calData.numInsBands];
+    string color = determineColor(calData.color);
+
+    cout << "generating " << color << " band crosstalk matrix ..." << endl;
+
+    for (size_t i = 0; i < nbands; i++) {
+        for (uint32_t j = 0; j < calData.numInsBands; j++) {
+            gmat_tmp[i][j] = calData.gainAgg[NUM_BLUE_WAVELENGTHS - nbands + i][j];
+            if (gmat_tmp[i][j] != 0.) {
+                gmatu[i][j] = 1.;
+            } else {
+                gmatu[i][j] = 0;
+            }
+        }
+    }
+
+    // flatten gmat_tmp and transpose(gmatu)
+    size_t gmat_tmpOneDSize = nbands * calData.numInsBands;
+    size_t gmatuOneDSize = nbands * calData.numInsBands;
+    std::vector<double> gmat_tmpOneD(gmat_tmpOneDSize);
+    std::vector<double> gmatuOneDT(gmatuOneDSize);
+    for (uint32_t i = 0; i < calData.numInsBands; i++) {
+        for (size_t n = 0; n < nbands; n++) {
+            gmat_tmpOneD[calData.numInsBands * n + i] = gmat_tmp[n][i];
+            gmatuOneDT[n + nbands * i] = gmatu[n][i];
+        }
+    }
+
+    // flatten cmat_in @ influence pixel
+    size_t cmat_inOneDSize = nxbands * nbands;
+    size_t cmat_tmpOneDSize = calData.numInsBands * calData.numInsBands;
+    for (size_t p = 0; p < ncpix; p++) {
+        std::vector<double> cmat_inOneD(cmat_inOneDSize);
+        for (size_t m = 0; m < nxbands; m++) {
+            for (size_t n = 0; n < nbands; n++) {
+                cmat_inOneD[m * nbands + n] = static_cast<double>(cmat_in[p][m][n]);
+            }
+        }
+        // calculate flattened cmat_tmp = transpose(gmatu) * cmat_in * gmat_tmp
+        // C = transpose(gmatu) * cmat_in
+        // D = C * gmat_tmp
+        std::vector<double> C(nbands * calData.numInsBands, 0.0);  // Initialize matrix C with zeros
+        std::vector<double> D(calData.numInsBands * calData.numInsBands, 0.0);
+        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, calData.numInsBands, nbands, nbands, 1.0,
+                    gmatuOneDT.data(), nbands, cmat_inOneD.data(), nbands, 0.0, C.data(), nbands);
+        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, calData.numInsBands, calData.numInsBands,
+                    nbands, 1.0, C.data(), nbands, gmat_tmpOneD.data(), calData.numInsBands, 0.0, D.data(),
+                    calData.numInsBands);
+        // form cmat_tmp
+        for (size_t k = 0; k < cmat_tmpOneDSize; k++) {
+            size_t i = k / calData.numInsBands;
+            size_t j = k - i * calData.numInsBands;
+            cmat_tmp[p][i][j] = D[k];
+        }
+    }
+
+    // If spatial aggregation is not 8
+
+    if (spatialAgg != 8) {
+        size_t iagf = 8 / spatialAgg;
+        size_t ncpixc = ncpix * iagf;
+        // allocate calData.mat and assign modified cmat_tmp to it.
+        calData.cmat = allocate3d_double(ncpixc, calData.numInsBands, calData.numInsBands);
+        for (size_t i = 0; i < ncpixc; ++i) {
+            for (size_t j = 0; j < calData.numInsBands; ++j) {
+                for (size_t k = 0; k < calData.numInsBands; k++) {
+                    for (size_t ic = 0; ic < iagf; ic++) {
+                        calData.cmat[iagf * i + ic][j][k] = cmat_tmp[i][j][k] / iagf;
+                    }
+                }
+            }
+        }
+        // assign ncpixc to calData.ncpix
+        calData.ncpix = ncpixc;
+    } else {
+        // allocate calData.cmat and assign cmat_tmp to it.
+        calData.cmat = allocate3d_double(ncpix, calData.numInsBands, calData.numInsBands);
+        for (size_t i = 0; i < ncpix; ++i) {
+            for (size_t j = 0; j < calData.numInsBands; ++j) {
+                for (size_t k = 0; k < calData.numInsBands; k++) {
+                    calData.cmat[i][j][k] = cmat_tmp[i][j][k];
+                }
+            }
+        }
+
+        // assign ncpix to calData.ncpix
+        calData.ncpix = ncpix;
+    }
+
+    cout << "done." << endl;
+}
+
+void getXtalkCorrection(uint32_t numInsBands, size_t numCcdPix, size_t ncpix, double ***cmat,
+                        const vec2D<float> &digitalNumbers, vec2D<double> &xtalkCorrection) {
+    size_t nco2 = ncpix / 2;
+    vec2D<float> bandPad = digitalNumbers;
+
+    // create band array with padding
+
+    for (auto &vec : bandPad) {
+        vec.resize(vec.size() + 2 * nco2);
+        std::rotate(vec.rbegin(), vec.rbegin() + nco2, vec.rend());
+    }
+
+    // make flattened matrices
+    size_t crossOneDSize = numInsBands * numCcdPix;
+    size_t xbandPadOneDSize = numInsBands * numCcdPix;
+    size_t cmatOneDSize = numInsBands * numInsBands;
+    std::vector<double> crossOneD(crossOneDSize, 0.0);
+
+    for (size_t p = 0; p < ncpix; p++) {
+        std::vector<double> cmatOneD(cmatOneDSize);
+        std::vector<double> xbandPadOneDT(xbandPadOneDSize);
+        std::vector<double> C(crossOneDSize);
+        for (size_t j = 0; j < numInsBands; j++) {
+            for (size_t k = 0; k < numInsBands; k++) {
+                cmatOneD[numInsBands * j + k] = cmat[p][j][k];
+            }
+            for (size_t q = 0; q < numCcdPix; q++) {
+                xbandPadOneDT[j + numInsBands * q] = bandPad[j][q + p];
+            }
+        }
+        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, numCcdPix, numInsBands, numInsBands, 1.0,
+                    xbandPadOneDT.data(), numInsBands, cmatOneD.data(), numInsBands, 0.0, C.data(),
+                    numInsBands);
+        for (size_t i = 0; i < crossOneDSize; i++) {
+            crossOneD[i] += C[i];
+        }
+    }
+
+    // form xtalkCorrection
+    for (size_t k = 0; k < crossOneDSize; k++) {
+        size_t ip = k / numInsBands;
+        size_t i = k - numInsBands * ip;
+        xtalkCorrection[i][ip] = crossOneD[k];
     }
 }

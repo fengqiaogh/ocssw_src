@@ -408,20 +408,26 @@ int32_t l1c_str::openl1b_oci_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile) {
 
     // num_scans
     if (l1cfile->format == FT_OCIL1B) {
-        status = nc_inq_dimid(ncid_L1B, "number_of_scans", &dimid);
+        status = nc_inq_dimid(ncid_L1B, "scans", &dimid);
         if (status != NC_NOERR) {
-            fprintf(stderr, "-E- Error reading number_of_scans.\n");
-            exit(EXIT_FAILURE);
+            status = nc_inq_dimid(ncid_L1B, "number_of_scans", &dimid);
+            if (status != NC_NOERR) {
+                fprintf(stderr, "-E- Error reading number_of_scans.\n");
+                exit(EXIT_FAILURE);
+            }
         }
         cout << "reading OCI" << endl;
         nc_inq_dimlen(ncid_L1B, dimid, &num_scans);
         l1cstr->nscan = num_scans;
 
         // num_pixels
-        status = nc_inq_dimid(ncid_L1B, "ccd_pixels", &dimid);
+        status = nc_inq_dimid(ncid_L1B, "pixels", &dimid);
         if (status != NC_NOERR) {
-            fprintf(stderr, "-E- Error reading num_pixels.\n");
-            exit(EXIT_FAILURE);
+            status = nc_inq_dimid(ncid_L1B, "ccd_pixels", &dimid);
+            if (status != NC_NOERR) {
+                fprintf(stderr, "-E- Error reading num_pixels.\n");
+                exit(EXIT_FAILURE);
+            }
         }
         nc_inq_dimlen(ncid_L1B, dimid, &num_pixels);
         l1cstr->npix = num_pixels;

@@ -24,7 +24,7 @@ const int32_t modis_b4_max = 565;   // MODIS Green
 const int32_t modis_b11_min = 526;  // MODIS Green
 const int32_t modis_b11_max = 536;  // MODIS Green
 
-float average_rhos_values(float rhos_values[], size_t length) {
+float average_rhos_values(const float rhos_values[], size_t length) {
     double sum = 0;
     for (int i = 0; i < length; i++) {
         sum += rhos_values[i];
@@ -32,13 +32,14 @@ float average_rhos_values(float rhos_values[], size_t length) {
     return (sum / length);
 }
 
-bool invalid_pixel(double pixel_elevation, double pixel_mask, double rhos_values[], int len_rhos_values) {
+bool invalid_pixel(double pixel_elevation, double pixel_mask, const double rhos_values[],
+                   int len_rhos_values) {
     if (pixel_elevation <= MIN_PIXEL_ELEVATION || pixel_mask == 0)
         return true;
 
     for (int idx_rhos = 0; idx_rhos < len_rhos_values; idx_rhos++) {
         double rho_s = rhos_values[idx_rhos];
-        if (rho_s < 0.0 || rho_s > 1.0)
+        if (rho_s < 0.0 || 1.0 < rho_s)
             return true;
     }
 

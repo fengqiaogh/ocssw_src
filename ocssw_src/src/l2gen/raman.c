@@ -123,8 +123,6 @@ static float *wvRam; //Water vapor absorption at Raman bands
 static float *oxyRam; //Oxygen absorption at Raman bands
 static float *no2Ram; //Oxygen absorption at Raman bands
 
-static float *Rrs_ram; //Rrs due to Raman scattering
-
 //Lee et al. 2013 Raman correction 1 coefficients
 //Pointers for interpolation/extrapolation
 static float *alphaCor;
@@ -218,9 +216,6 @@ void raman_pixel_alloc(l2str *l2rec) {
     eDSen = (float*) allocateMemory(nbandVis * sizeof (float), "eDSen");
     
     t_sol_ram = (float*) allocateMemory(nbandVis * sizeof (float), "t_sol_ram");
-    
-    Rrs_ram = (float*) allocateMemory(l2rec->l1rec->npix *
-            l2rec->l1rec->l1file->nbands * sizeof (float), "Rrs_ram");
     
     ramLam =  (float*) allocateMemory(nbandVis * sizeof (float), "ramLam");
     ramBandW =  (float*) allocateMemory(nbandVis * sizeof (float), "ramBandW");
@@ -522,7 +517,7 @@ void raman_k_func(l2str *l2rec, int ip) {
     float solzRad, solzRadSw, muD, muU;
 
     //Convert solar and sensor zenith angles from degrees to radianss
-    solzRad = l2rec->l1rec->solz[ip]*(M_PI / 180.0);
+    solzRad = l2rec->l1rec->solz[ip]*(OEL_PI / 180.0);
     solzRadSw = asin(sin(solzRad) / nWater); //subsurface solar zenith angle
     
     //Means cosines
@@ -553,7 +548,7 @@ void raman_radtran_ed(l2str *l2rec, int ip) {
 
     //Constants
     float p0 = 29.92 * 33.8639; //standard pressure (convert mmHg -> HPa);
-    float radCon = M_PI / 180.0; //degrees -> radians conversion
+    float radCon = OEL_PI / 180.0; //degrees -> radians conversion
     float ws = l2rec->l1rec->ws[ip]; //wind speed
     float nw2= pow(nWater,2.);  //refractive index of water squared
 
@@ -664,6 +659,8 @@ void raman_cor_lee1(l2str *l2rec, int ip) {
     float rFactor;
     float rrs_a;
     int nbands = l2rec->l1rec->l1file->nbands;
+    float *Rrs_ram = l2rec->Rrs_raman;
+
     //If pixel is already masked, return and do not attempt the correction.
     if (l2rec->l1rec->mask[ip]) {
         return;
@@ -709,6 +706,7 @@ void raman_cor_westberry(l2str *l2rec, int ip) {
     int nbands = l2rec->l1rec->l1file->nbands;
     float term0, term1, numer1, denom1;
     float Rrs_rc;
+    float *Rrs_ram = l2rec->Rrs_raman;
 
 
     //If pixel is already masked, return and do not attempt the correction.
@@ -733,7 +731,7 @@ void raman_cor_westberry(l2str *l2rec, int ip) {
     raman_radtran_ed(l2rec, ip);
 
     //From Mobley 2010 - assume isotropic emission
-    term0 = 1.0 / (4.0 * M_PI * nWater * nWater);
+    term0 = 1.0 / (4.0 * OEL_PI * nWater * nWater);
         
 
     //Loop over visible bands    
@@ -771,6 +769,7 @@ void raman_cor_lee2(l2str *l2rec, int ip) {
     int iw;
     int nbands = l2rec->l1rec->l1file->nbands;
     float Rrs_rc;
+    float *Rrs_ram = l2rec->Rrs_raman;
 
     //If pixel is already masked, return and do not attempt the correction.
     if (l2rec->l1rec->mask[ip]) {
@@ -817,6 +816,8 @@ void run_raman_cor(l2str *l2rec, int ip) {
     int iw;
     static int firstCall = 1;
     static int sensorSupported;
+    float *Rrs_ram = l2rec->Rrs_raman;
+
     //int32_t ocSensorID;
 
     //Number of visible bands
@@ -945,8 +946,6 @@ void run_raman_cor(l2str *l2rec, int ip) {
         raman_cor_lee2(l2rec, ip);
     }
 
-
-    l2rec->Rrs_raman = Rrs_ram;
 
 }
 

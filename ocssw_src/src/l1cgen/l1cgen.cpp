@@ -33,7 +33,7 @@ using namespace netCDF;
 using namespace netCDF::exceptions;
 
 #define PROGRAM_NAME "l1cgen"
-#define VERSION "5.67 12/14/2024"
+#define VERSION "5.70 02/11/2025"
 
 
 int main(int argc, char** argv) {
@@ -81,10 +81,11 @@ int main(int argc, char** argv) {
             printf("-E- %s: Error loading %sl1c filehandle.\n", argv[0], l1cfile.l1b_name.c_str());
             exit(1);
         }
+        if(l1cfile.l1c_pflag==0) cout<<"Error -- mode = "<<l1cfile.l1c_pflag<<"please provide processing mode >0"<<endl;
            //----- READING HKT FILES -----------------------------------------------------------------
         //**********************************************************************************************************-
         if (l1cfile.l1c_pflag == 5) {
-            cout << "Reading telemetry from L1A files..--> SOCEA -- L1C grid.." << endl;
+            cout << "Reading telemetry from HKT files..--> SOCEA -- L1C grid.." << endl;
 
             string history = "", stri;
             for (int i = 0; i < argc; i++) {
@@ -95,7 +96,7 @@ int main(int argc, char** argv) {
             strcpy(l1cinput.history, history.c_str());
 
             if (status = ptl1c->open_l1atol1c3(&l1cinput, &l1cfile) > 1) {
-                printf("-E- %d: status=2  error opening..L1A file for sensor...............\n", format.type);
+                printf("-E- %d: status=2  error opening..HKT file for sensor...............\n", format.type);
                 exit(1);
             }
 

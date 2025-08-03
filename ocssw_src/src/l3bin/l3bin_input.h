@@ -6,9 +6,9 @@
 #include "clo.h"
 
 typedef struct input_struct {
-    char infile [FILENAME_MAX];
-    char ofile [FILENAME_MAX];
-    char pfile [FILENAME_MAX];
+    char infile[FILENAME_MAX];
+    char ofile[FILENAME_MAX];
+    char pfile[FILENAME_MAX];
     char out_parm[16384];
     char tflag;
     char parms[16384];
@@ -40,17 +40,23 @@ typedef struct input_struct {
     int32_t union_bins;
 
     uint32_t deflate;
-    char oformat [20];
+    char oformat[20];
 
     char composite_prod[1024];
     char composite_scheme[1024];
     char doi[1024];
 } instr;
 
-int l3bin_input(int argc, char **argv, instr *input, const char* prog, const char* version);
-//int l3bin_init_options(clo_optionList_t* list, const char* prog, const char* version);
+/**
+ * @brief Convert the arguments from the command line into a a structure input
+ * variable.
+ * @param[in] argc number of command line arguments
+ * @param[in] argv list of command line arguments
+ * @param[out] input structure variable for inputs
+ * @param[in] prog utility name
+ * @param[in] version utility version
+ * @return negative if any error occurs, otherwise 0
+ */
+int l3bin_input(int argc, char** argv, instr* input, const char* prog, const char* version);
 
 #endif
-
-
-

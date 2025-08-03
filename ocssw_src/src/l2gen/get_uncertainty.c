@@ -184,16 +184,20 @@ float *get_uncertainty(l1str *l1rec) {
         if(!uncertainty_lut)
             return NULL;
         for (ip=0;ip<npix;ip++)
-            for(iw=0;iw<nbands;iw++){
+            for(iw=0;iw<nbands;iw++) {
                 tmp_poly=0.;
                 ipb=ip*nbands+iw;
                 scaled_lt=l1rec->Lt[ipb]*10.;
 
                 iw_table=bandindex[iw];
 
-                if(strstr(model_type,"polynomial"))
-                    for(iorder=0;iorder<=polynomial_order;iorder++)
-                        tmp_poly+=noise_coef[iw_table*(polynomial_order+1)+iorder]*pow(scaled_lt,iorder);
+                if (strstr(model_type, "polynomial")) {
+                    float pow_scaled = 1;
+                    for (iorder = 0; iorder <= polynomial_order; iorder++) {
+                        tmp_poly += noise_coef[iw_table * (polynomial_order + 1) + iorder] * pow_scaled;
+                        pow_scaled *= scaled_lt;
+                    }
+                }
 
                 noise_temp[ipb]=tmp_poly/SNR_scale[iw_table]/10.;
                 if(sensorID==OCI)
@@ -232,9 +236,13 @@ float *get_uncertainty(l1str *l1rec) {
             scaled_lt=l1rec->Lt[ipb]*10.;
 
             iw_table=bandindex[iw];
-            if(strstr(model_type,"polynomial"))
-                for(iorder=0;iorder<=polynomial_order;iorder++)
-                    tmp_poly+=noise_coef[iw_table*(polynomial_order+1)+iorder]*pow(scaled_lt,iorder);
+            if (strstr(model_type, "polynomial")) {
+                float pow_scaled = 1;
+                for (iorder = 0; iorder <= polynomial_order; iorder++) {
+                    tmp_poly += noise_coef[iw_table * (polynomial_order + 1) + iorder] * pow_scaled;
+                    pow_scaled *= scaled_lt;
+                }
+            }
 
             uncertainty->dsensor[ipb]=tmp_poly/SNR_scale[iw_table]/10.;
 

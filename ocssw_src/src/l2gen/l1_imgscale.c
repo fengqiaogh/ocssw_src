@@ -8,7 +8,7 @@
 float toa_reflect(l1str *l1rec, int32_t ip, int32_t ib) {
     int32_t ipb;
     float mu0;
-    static float pi = 3.141592654;
+    static float pi = OEL_PI;
     float rho;
 
     mu0 = l1rec->csolz[ip];

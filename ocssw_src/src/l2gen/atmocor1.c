@@ -7,6 +7,23 @@
 /* Conversion to C, May 2006                                                  */
 /* ========================================================================== */
 
+/* ------------------------------------------------------------------- */
+/* calculating spectral nw                                             */
+/* ------------------------------------------------------------------- */
+double get_nw (float fwave){
+    int i;
+    double a[3] = {5.98229534e+05, 6.77136722e+04, -2.33691767e+01};
+    double b[3] = {1.0, 5.13323450e+04, -1.75058059e+01};
+
+    double numerator=0., denominator=0.;
+
+    for(i=0;i<3;i++){
+        numerator+=a[i]*pow(fwave,i);
+        denominator+=b[i]*pow(fwave,i);
+    }
+
+    return (numerator/denominator);
+}
 
 /* ------------------------------------------------------------------- */
 /* correction factor to remove oxygen absorption from La(765)          */
@@ -62,6 +79,7 @@ void atmocor1(l1str *l1rec, int32_t ip) {
     float glint_coef_u;
     int32_t ib, ipb;
     float scaleRayleigh;
+    double nw=4.0e0 / 3.0e0;
 
     airmass = 1.0 / mu0 + 1.0 / mu;
     ipb = ip*nwave;
@@ -93,7 +111,7 @@ void atmocor1(l1str *l1rec, int32_t ip) {
     for (ib = 0; ib < nwave; ib++) {
         l1rec->t_sol [ipb + ib] = exp(-0.5 * pr / p0 * Tau_r[ib] / mu0);
         l1rec->t_sen [ipb + ib] = exp(-0.5 * pr / p0 * Tau_r[ib] / mu);
-        l1rec->tLf[ipb + ib] = l1rec->rhof[ipb + ib] * l1rec->t_sen[ipb + ib] * l1rec->t_sol[ipb + ib] * Fo[ib] * mu0 / M_PI;
+        l1rec->tLf[ipb + ib] = l1rec->rhof[ipb + ib] * l1rec->t_sen[ipb + ib] * l1rec->t_sol[ipb + ib] * Fo[ib] * mu0 / OEL_PI;
     }
 
     /* Rayleigh scattering */
@@ -127,11 +145,10 @@ void atmocor1(l1str *l1rec, int32_t ip) {
     /* for avhrr, l1_aci_hdf.c calls avhrrsub5h.f which calls getglint */
     if (sensorID != AVHRR) {
 
+        if (input->glint_opt == 3)
+                nw = get_nw(input->aer_wave_base);
         getglint_iqu(senz, solz, raz, ws, zero,
-                &l1rec->glint_coef[ip], &glint_coef_q, &glint_coef_u);
-
-        // getglint_iqu_(&senz, &solz, &raz, &ws, &zero,
-        //         &l1rec->glint_coef[ip], &glint_coef_q, &glint_coef_u);
+                &l1rec->glint_coef[ip], &glint_coef_q, &glint_coef_u,nw);
 
         for (ib = 0; ib < nwave; ib++) {
             l1rec->TLg[ipb + ib] = l1rec->glint_coef[ip] * exp(-(Tau_r[ib] + 0.1) * airmass) * Fo[ib];

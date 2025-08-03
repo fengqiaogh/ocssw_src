@@ -39,18 +39,6 @@ list(APPEND LIBS h5io)
 list(APPEND LIBS filetype)
 list(APPEND LIBS bilio)
 
-
-if (BUILD_VIIRS_L1)
-    find_package(LibViirsCal REQUIRED)
-    if(LibViirsCal_INCLUDE_DIRS)
-        include_directories(${LibViirsCal_INCLUDE_DIRS})
-    endif()
-    list(APPEND LIBS ${LibViirsCal_LIBRARIES})
-    set (VIIRS_L1_SRCS calibrate_viirs.c l1_viirs_l1b.c l1_viirs_l1a.c)
-else (BUILD_VIIRS_L1)
-    set (VIIRS_L1_SRCS calibrate_viirs.c l1_viirs_l1b.c l1_viirs_l1a_stub.c)
-endif (BUILD_VIIRS_L1)
-
 add_library(l1
     l1_options.c
     filehandle_init.c
@@ -89,7 +77,7 @@ add_library(l1
     l1_goci.c
     l1_sgli.c
     l1_modis.c
-    ${VIIRS_L1_SRCS}
+    l1_viirs_l1b.c
     ${historical_src}
     l1_ocm.c
     l1_ocm2.c

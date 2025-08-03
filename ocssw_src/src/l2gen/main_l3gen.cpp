@@ -16,6 +16,7 @@
 #include "netcdf.h"
 #include "hdf_bin.h"
 #include "version.h"
+#include "geo_region.h"
 
 #define NBINREAD MAXPIX
 #define FLAGMASK PRODFAIL
@@ -175,6 +176,15 @@ int main(int argc, char* argv[]) {
     }
 
     load_input_filehandle(&ifile);
+
+    if(input->georegionfile[0]) {
+        if (access(input->georegionfile, F_OK) || access(input->georegionfile, R_OK)) {
+            printf("-E-  georegionfile '%s' does not exist or cannot be opened.\n",
+                    input->georegionfile);
+            exit(FATAL_ERROR);
+        }
+        set_georegion_filename(input->georegionfile);
+    }
 
     char proc_con[2048];
     strcpy(proc_con, basename(argv[0]));
@@ -503,6 +513,15 @@ int main(int argc, char* argv[]) {
             input_binfile->bin2latlon(bin_num, lat, lon);
             l1rec->lon[ip] = lon;
             l1rec->lat[ip] = lat;
+
+            if(input->georegionfile[0]){
+                if(!get_georegion(l1rec->lat[ip], l1rec->lon[ip])) {
+                    l2rec->l1rec->flags[ip] |= NAVFAIL | ATMFAIL;
+                    l2rec->l1rec->navfail[ip] = 1;
+                    continue;
+                }
+            }
+
             l1rec->nobs[ip] = input_binfile->get_nobs(ip);
             for (int32 iw = 0; iw < n_nlw; iw++) {
                 ipw = ip * ifile.nbands + nlw_windex[iw];
@@ -559,7 +578,7 @@ int main(int argc, char* argv[]) {
                 if (l1rec->sola[ip] < -180)
                     l1rec->sola[ip] += 360.0;
             }
-        }
+        } //ip loop close
 
         // Add ancillary, Rayleigh, etc.
         loadl1(&ifile, l1rec);
@@ -721,6 +740,9 @@ int main(int argc, char* argv[]) {
     }
 
     // Close files and free memory
+    if(input->georegionfile[0]) {
+        close_georegion_file();
+    }
     if (atLeastOne == false) {
         cout << "No valid bins to output!" << endl << "...seems a selected product may have resulted in 100% PRODFAIL..." << endl;
         mainReturnCode = 110;  // no bins filled

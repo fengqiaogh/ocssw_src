@@ -37,7 +37,7 @@
 #include "l12_proto.h"
 #include "calfile_utils.h"
 #include <hdf5.h>
-#include <readL2scan.h>
+#include <l2_wrapper.h>
 
 int read9km_mask(char *file, char *mask);
 int is_masked(int32_t bin, char *mask, int32_t nrows);
@@ -87,10 +87,9 @@ int main(int argc, char* argv[]) {
     int numContiguousDetectorRuns; // number of scans for detector runs
     int status;
 
-    char buf[5000], *mask, *maskfile, maskname[1000];
+    char *mask, *maskfile, maskname[1000];
     float lat, lon, latbin;
     int32_t flagusemask;
-    uint32 required;
 
     if (argc == 1) {
         l2gen_usage("l1det2det");
@@ -238,7 +237,7 @@ int main(int argc, char* argv[]) {
     input->proc_land = 0;
     input->proc_sst = 0;
     input->atmocor = 1;
-    input->aer_opt = AERWANG;
+    input->aer_opt = AERRH;
     l1_input->outband_opt = 0;
     input->mode = FORWARD;
     char outprod[L1_MAXPROD][32];
@@ -321,7 +320,7 @@ int main(int argc, char* argv[]) {
     bin = 0;
     for (i = 0; i < nrows; i++) {
         latbin = (i + 0.5) * (180.0 / nrows) - 90.0;
-        numbin[i] = (int32) (cos(latbin * PI / 180.0) * (2.0 * nrows) + 0.5);
+        numbin[i] = (int32) (cos(latbin * OEL_PI / 180.0) * (2.0 * nrows) + 0.5);
         bin += numbin[i];
     }
     basebin[0] = 1;
@@ -329,35 +328,13 @@ int main(int argc, char* argv[]) {
         basebin[i] = basebin[i - 1] + numbin[i - 1];
     }
 
-    /**
-     * @brief Setup l2str to read l2_name
-     * 
-     */
-    l2_prod l2_str;
-    {
-        if (openL2(input->ifile[0], 0x0, &l2_str)) {
-        printf("-E- %s: Error reading L2 data %s.\n", argv[0], input->ifile[0]);
-        exit(EXIT_FAILURE);
-        }
-    }
-
-
-    strcpy(buf, l2_str.flagnames);
-
-    strcpy(buf, "\x0");
-    setupflags(buf, input->flaguse, (uint32 *) & flagusemask, &required, &status,l2_str.l2_bits);
-    if (status < 0) {
-        printf("-E- %s: Error reading L2 flags %s.\n", argv[0], input->ifile[0]);
-        exit(FATAL_ERROR);
-    }
-
-
-    // freeing memory
-    {
-        closeL2(&l2_str,0);
-        freeL2(&l2_str);
-    }
-
+    // NOTE: this hard-coded string will need to be updated if we ever change the l2gen flag definitions
+    char buf[1024];
+    uint32 required;
+    strcpy(buf, "ATMFAIL,LAND,PRODWARN,HIGLINT,HILT,HISATZEN,COASTZ,SPARE,STRAYLIGHT,CLDICE,COCCOLITH,TURBIDW,HISOLZEN,SPARE,LOWLW,CHLFAIL,NAVWARN,ABSAER,SPARE,MAXAERITER,MODGLINT,CHLWARN,ATMWARN,OPSHAL,SEAICE,NAVFAIL,FILTER,SPARE,BOWTIEDEL,HIPOL,PRODFAIL,SPARE");
+    setupflags(buf, input->flaguse, (uint32 *) & flagusemask, &required, &status);
+    printf("flagusemask (%d): %d",status,flagusemask);
+    printf("input flags: %s",input->flaguse);
     strcpy(vars1Dnames[0], "lon");
     strcpy(vars1Dnames[1], "lat");
 

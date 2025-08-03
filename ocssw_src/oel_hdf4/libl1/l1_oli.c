@@ -19,7 +19,7 @@ static float *Fobar;
 // following added by Sudipta for FPM based correction
 static double      *xcal_factor = NULL;               /* xcal factors for each FPM and band */
 static int tile_exist;
-static uint32_t tileLength = 0;
+static uint32_t tileHeight = 0;
 static uint32_t tileWidth = 0;
 static uint32_t imageWidth = 0;
 
@@ -377,23 +377,26 @@ int openl1_oli(filehandle *file) {
     }
 
     // allocate buffer to hold one scan line
-    int size = TIFFScanlineSize(data->tif[0]);
-    if (size != file->npix * 2) {
+    int bytesPerScanLine = TIFFScanlineSize(data->tif[0]);
+    if (bytesPerScanLine != file->npix * 2) { // Pixel values expected to be shorts
         fprintf(stderr, "-E- %s line %d: unexpected pixel data size in %s\n",
                 __FILE__, __LINE__, fileName);
         exit(1);
     }
-    data->buf = (uint16_t*) malloc(size);
+    data->buf = (uint16_t*) malloc(bytesPerScanLine);
 
+    tile_exist = TIFFIsTiled(data->tif[0]);
+    if (tile_exist) {
 
-    tile_exist = TIFFGetField(data->tif[0], TIFFTAG_TILELENGTH, &tileLength);
-        
-    if (tile_exist != 0) {    
+        TIFFGetField(data->tif[0], TIFFTAG_TILELENGTH, &tileHeight);
         TIFFGetField(data->tif[0], TIFFTAG_TILEWIDTH, &tileWidth);
-        TIFFGetField(data->tif[0], TIFFTAG_IMAGEWIDTH, &imageWidth);   
-        // allocate buffer to hold a row of tile * 8 bands
-        int size_tile_row =  maxReflBands * tileLength * size;
-        data->buf_tile_row = (uint16_t*) malloc(size_tile_row);
+        TIFFGetField(data->tif[0], TIFFTAG_IMAGEWIDTH, &imageWidth); // Otherwise, scan line size is used
+        
+        size_t tilesPerRow = (imageWidth + tileWidth) / tileWidth;
+        size_t rowBufferSize = tilesPerRow * TIFFTileSize(data->tif[0]);
+        size_t totalRowBufSize = rowBufferSize * maxReflBands;
+
+        data->buf_tile_row = (uint16_t*) malloc(totalRowBufSize);
     }
 
     // get date "2013-07-19"
@@ -574,18 +577,21 @@ int readl1_oli(filehandle *file, int recnum, l1str *l1rec, int lonlat) {
     if (lonlat)
         return (LIFE_IS_GOOD);
     
-    // int y = 0;
     int y_in_tile = 0;
     
     if (tile_exist != 0) {
-        // y = recnum / tileLength;
-        y_in_tile = recnum % tileLength;
-        if (data->line_num_cached == -1 || recnum < data->line_num_cached || recnum >= (data->line_num_cached + tileLength)) {
-            int y = recnum / tileLength;
-            data->line_num_cached = y * tileLength;
+        y_in_tile = recnum % tileHeight;
+        if (data->line_num_cached == -1 || recnum < data->line_num_cached || recnum >= (data->line_num_cached + tileHeight)) {
+            int y = recnum / tileHeight;
+            data->line_num_cached = y * tileHeight;
             for (ib = 0; ib < maxReflBands; ib++) { // read Bands 1-7 && 9
+                size_t bandOffset = ib * imageWidth * tileHeight;
+
                 for (int x = 0; x < imageWidth; x += tileWidth) {
-                    if (TIFFReadTile(data->tif[ib], (void*) (data->buf_tile_row + ib * imageWidth * tileLength + x * tileLength), x, y * tileLength, 0, 0) == -1) {
+                    size_t tileColumnOffset = x * tileHeight;
+                    void *currTileData = (void*) (data->buf_tile_row + bandOffset + tileColumnOffset);
+
+                    if (TIFFReadTile(data->tif[ib], currTileData, x, y * tileHeight, 0, 0) == -1) {
                         fprintf(stderr, "-E- %s line %d: Failed to read Lt, band %d, recnum %d\n",
                             __FILE__, __LINE__, ib, recnum);
                         exit(1);
@@ -606,10 +612,10 @@ int readl1_oli(filehandle *file, int recnum, l1str *l1rec, int lonlat) {
         } else {
             for (int x = 0; x < imageWidth; x += tileWidth) {
                 if ((imageWidth - x) >= tileWidth) {
-                    _TIFFmemcpy((void*) (data->buf + x), (void*) (data->buf_tile_row + ib * imageWidth * tileLength + x * tileLength + y_in_tile * tileWidth), tileWidth * 2);
+                    _TIFFmemcpy((void*) (data->buf + x), (void*) (data->buf_tile_row + ib * imageWidth * tileHeight + x * tileHeight + y_in_tile * tileWidth), tileWidth * 2);
                 }                    
                 else
-                    _TIFFmemcpy((void*) (data->buf + x), (void*) (data->buf_tile_row + ib * imageWidth * tileLength + x * tileLength + y_in_tile * tileWidth), (imageWidth - x) * 2);
+                    _TIFFmemcpy((void*) (data->buf + x), (void*) (data->buf_tile_row + ib * imageWidth * tileHeight + x * tileHeight + y_in_tile * tileWidth), (imageWidth - x) * 2);
             }                 
         }
 
@@ -621,7 +627,7 @@ int readl1_oli(filehandle *file, int recnum, l1str *l1rec, int lonlat) {
                 l1rec->Lt[ipb] = BAD_FLT; // I assume this is outside the projected tile
                 l1rec->navwarn[ip] = 1; // so set navigation failure
             } else {
-                l1rec->Lt[ipb] = (data->buf[ip] * data->refl_scale[ib] + data->refl_offset[ib]) * l1rec->Fo[ib] / PI;
+                l1rec->Lt[ipb] = (data->buf[ip] * data->refl_scale[ib] + data->refl_offset[ib]) * l1rec->Fo[ib] / OEL_PI;
                 // New addition by Sudipta to scale by band specific FPM gain factor
                 for (iw = 0; iw < l1_input->xcal_nwave; iw++) {
                     if ((bindex_get(l1_input->xcal_wave[iw]) == ib) &&
@@ -649,10 +655,10 @@ int readl1_oli(filehandle *file, int recnum, l1str *l1rec, int lonlat) {
     } else {
             for (int x = 0; x < imageWidth; x += tileWidth) {
                 if ((imageWidth - x) >= tileWidth) {
-                    _TIFFmemcpy((void*) (data->buf + x), (void*) (data->buf_tile_row + ib * imageWidth * tileLength + x * tileLength + y_in_tile * tileWidth), tileWidth * 2);
+                    _TIFFmemcpy((void*) (data->buf + x), (void*) (data->buf_tile_row + ib * imageWidth * tileHeight + x * tileHeight + y_in_tile * tileWidth), tileWidth * 2);
                 }                    
                 else
-                    _TIFFmemcpy((void*) (data->buf + x), (void*) (data->buf_tile_row + ib * imageWidth * tileLength + x * tileLength + y_in_tile * tileWidth), (imageWidth - x) * 2);
+                    _TIFFmemcpy((void*) (data->buf + x), (void*) (data->buf_tile_row + ib * imageWidth * tileHeight + x * tileHeight + y_in_tile * tileWidth), (imageWidth - x) * 2);
             }                 
     }
 
@@ -661,7 +667,7 @@ int readl1_oli(filehandle *file, int recnum, l1str *l1rec, int lonlat) {
             l1rec->rho_cirrus[ip] = BAD_FLT;
         else
             l1rec->rho_cirrus[ip] = (data->buf[ip] * data->refl_scale[ib] + data->refl_offset[ib])
-            / cos(l1rec->solz[ip] / RADEG);
+            / cos(l1rec->solz[ip] / OEL_RADEG);
 
     }
     return 0;

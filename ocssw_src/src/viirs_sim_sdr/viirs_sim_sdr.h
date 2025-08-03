@@ -22,10 +22,11 @@
  *  Note that hdf5.h is needed for this
  */
 #include "h5io.h"
-#include "readL2scan.h"
+#include "l2_wrapper.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <genutils.h>
 
 #define NDET 16
 #define N_VNIR_BND 7
@@ -35,7 +36,7 @@
 #define MAX_FILES MAX_BND + 1
 #define RAD_CGS_2_MKS 10.
 #define SEC_PER_SCAN 1.7864
-#define PI 3.141592654
+#define PI OEL_PI
 /*
  *  some needed missing data fill value indicators
  */

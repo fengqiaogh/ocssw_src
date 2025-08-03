@@ -13,6 +13,7 @@
 #include "prism.h"
 #include "jplaeriallib.h"
 #include <math.h>
+#include <genutils.h>
 #define SKIP -9999
 #define BIP 0
 #define BIL 1
@@ -548,7 +549,7 @@ double angular_distance(double lat1, double lon1, double lat2, double lon2) {
 
 /*:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
 double deg2rad(double deg) {
-    return (deg * M_PI / 180);
+    return (deg * OEL_PI / 180);
 }
 
 void prism_proj4_convert(prism4ocia_t * data, int numPoints, double *x, double *y) {

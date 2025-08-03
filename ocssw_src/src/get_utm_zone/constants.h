@@ -4,11 +4,11 @@
 #define CONSTANTS_H
 
 #include "LatLong-UTMconversion.h"
+#include <genutils.h>
 
-const double PI = 3.14159265;
-const double FOURTHPI = PI / 4;
-const double deg2rad = PI / 180;
-const double rad2deg = 180.0 / PI;
+const double FOURTHPI = OEL_PI / 4;
+const double deg2rad = OEL_DEGRAD;
+const double rad2deg = OEL_RADEG;
 
 static Ellipsoid ellipsoid[] ={//  id, Ellipsoid name, Equatorial Radius, square of eccentricity	
     Ellipsoid(-1, "Placeholder", 0, 0), //placeholder only, To allow array indices to match id numbers

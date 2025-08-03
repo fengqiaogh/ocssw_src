@@ -1,10 +1,11 @@
 #ifndef GRANULE_H
 #define GRANULE_H
 
-#include    "PGS_SMF.h"    /* define PGSt_SMF_status */  
-#include    "hdf.h"        /* contain prototype for hdf functions */
-#include    "mfhdf.h"      /* contain prototype for hdf functions */
-#include    "HdfEosDef.h"  /* contain prototype for eos hdf functions */
+#include "PGS_SMF.h"   /* define PGSt_SMF_status */
+#include "hdf.h"       /* contain prototype for hdf functions */
+#include "mfhdf.h"     /* contain prototype for hdf functions */
+#include "HdfEosDef.h" /* contain prototype for eos hdf functions */
+#include <genutils.h>  // OEL pi
 
 #define  MAX_NC_NAME   H4_MAX_NC_NAME
 #define  MAX_VAR_DIMS  H4_MAX_VAR_DIMS
@@ -497,7 +498,7 @@ typedef enum { OFF, ON } switch_t ;
 
 #define SCAN_QUALITY_ARRAY_NUM_ELEMENTS 4
 
-#define PGS_PI          3.14159265358979323846
+#define PGS_PI OEL_PI
 
 #define PGS_EXP    	2.7182818284590452354
 

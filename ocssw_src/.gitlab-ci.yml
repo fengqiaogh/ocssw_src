@@ -1,159 +1,148 @@
----
-# Define the image
+default:
+  retry: 2
+  cache:  # build results between jobs as branch@commit
+  - key: ${CI_COMMIT_REF_SLUG}@${CI_COMMIT_SHORT_SHA}
+    paths:
+      - build
+      - bin
+      - lib
 
-# List of stages 
-stages: 
+stages:
 - build
 - test
- 
+
 variables:
-    CI_REPOSITORY_URL: "https://oceandata.sci.gsfc.nasa.gov/rcs/obpg/ocssw.git"
+    CI_REPOSITORY_URL: "https://git.smce.nasa.gov/oel/ocssw.git"
     FF_USE_FASTZIP: "true"
     CACHE_COMPRESSION_LEVEL: "fastest"
     ARTIFACT_COMPRESSION_LEVEL: "fastest"
+    GIT_STRATEGY: "fetch"
+    GIT_SUBMODULE_STRATEGY: "recursive"
+    GIT_SUBMODULE_FORCE_HTTPS: "true"
 
 .before_template: &before_definition
-    - export OCSSWROOT=$(pwd) && source OCSSW_bash.env 
-    - git clean -xfdd -e share
-    # hack because of fuse-overlayfs issue where opt becomes impossible to remove
-    - if [ -d opt ]; then
-    -   rm -rf opt
-    - fi
+    - export OCSSWROOT=$(pwd) && source OCSSW_bash.env
+    - git clean -xfd -e share
+
+    # path to install_ocssw, before build
+    - install_cmd="python3 $OCSSWROOT/src/manifest/install_ocssw.py --tag $(cat $OCSSWROOT/.manifest_tag)"
+
+    # Make sure $OCSSWROOT/install_ocssw.json is present
+    - $install_cmd
+
+    # Rebuild opt as needed
+    - if [ -d opt ]; then rm -r opt; fi
+    - mkdir -pv $HOME/opt
     - ln -s $HOME/opt .
-    - if [[ $(python3 $OCSSWROOT/src/manifest/install_ocssw.py --tag $(cat .manifest_tag) --status --opt_src | wc -l) > 4 ]]; then
+    - if [[ $($install_cmd --status --opt_src | wc -l) > 4 ]]; then
     -   echo "UPDATING OPT"
-    -   python3 $OCSSWROOT/src/manifest/install_ocssw.py --tag $(cat .manifest_tag) --clean --opt_src
+    -   $install_cmd --clean --opt_src
     -   cd opt/src && ./BuildIt.py clean && ./BuildIt.py && ./BuildIt.py # hack for the mac
-    -   cd -
+    -   cd $OCSSWROOT
     - fi
-    - cd ../
-    - if [ -d viirs_l1 ]; then
-    -    rm -rf viirs_l1
-    - fi
-    - git clone --recurse-submodules --branch master https://gitlab-ci-token:${CI_JOB_TOKEN}@oceandata.sci.gsfc.nasa.gov/rcs/viirs/viirs_l1.git
-    - cd viirs_l1 
-    - mkdir build && cd build && cmake .. && make -j20 install
-    - cd $OCSSWROOT
 
 .rules_template: &rules_definition
     # Trigger a build if:
-    # 1. There is a push to develop
-    # 2. OR there is a merge request for develop
-    # 3. OR any branch is built manually by the web UI
-    - if:  $CI_COMMIT_BRANCH == "develop" || (($CI_PIPELINE_SOURCE == 'merge_request_event') && ( $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop")) || ($CI_PIPELINE_SOURCE == 'web')
+    # - There is a push to develop
+    # - OR any branch is built manually by the web UI
+    # - OR there is a merge request for develop
+    - if: |
+        $CI_COMMIT_BRANCH == "develop" ||
+        $CI_PIPELINE_SOURCE == "web" ||
+        (($CI_PIPELINE_SOURCE == "merge_request_event") && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"))
 
 .build_template: &build_definition
-    # We have to use this path for the script because it is not installed until
-    # after build, but we need to update opt/ before build (if necessary)
     - echo "Compiling the code..."
-    - git submodule update --init
-    - if [ -d build ]; then
-    -   rm -rf build
-    - fi
-    - mkdir build && cd build && cmake .. -DBUILD_ALL=ON
+    - if [ -d build ]; then rm -r build; fi
+    - mkdir -pv build && cd build && cmake .. -DBUILD_ALL=ON 2>&1|tee cmake_log.txt
     - if [ $? != 0 ]; then
-    -   exit 1
+      -   exit 1
     - fi
-    - make -j20 install
+    - make -j20 install 2>&1|tee build_log.txt
     - echo "Compile complete."
-    - cd ../
+    - cd $OCSSWROOT
 
 build-ubuntu-job:
     stage: build
-    tags: 
-    - ubuntu-shell
-    # Cache build artifacts between jobs
-    # Use a per-branch cache
-    cache:
-        - key: $CI_COMMIT_REF_SLUG
-          paths:
-          - build
-          - bin
-          - lib
+    tags:
+        - ubuntu-shell
+    artifacts:
+      paths:
+        - build/*_log.txt
     rules: *rules_definition
     before_script: *before_definition
     script: *build_definition
 
 build-redhat-job:
     stage: build
-    tags: 
-    - redhat-runner
-    rules: *rules_definition
-    before_script:
-    - *before_definition
-    script: *build_definition
-
-build-macos-job:
-    stage: build
     tags:
-    - macos
+        - redhat-runner
     rules: *rules_definition
-    before_script:
-    - export CC=gcc-12 && export CXX=g++-12 && export FC=gfortran-12 && export NM=gcc-nm-12 && export LD=gcc-12 && export AR=gcc-ar-12 && export RANLIB=gcc-ranlib-12
-    - export PATH=/opt/homebrew/bin:/opt/homebrew/sbin:$PATH
-    - *before_definition
+    before_script: *before_definition
     script: *build_definition
+    cache: []
+
+#build-macos-job:
+#    stage: build
+#    tags: macos
+#    rules: *rules_definition
+#    before_script:
+#    - export CC=clang && export CXX=clang++ && export FC=gfortran-12
+#    - export PATH=/opt/homebrew/bin:/opt/homebrew/sbin:$PATH
+#    - *before_definition
+#    script: *build_definition
+#    cache: []
 
 test-job:
     stage: test
-    tags: 
-    - ubuntu-shell
-    cache:
-        - key: $CI_COMMIT_REF_SLUG
-          paths:
-          - build
-          - bin
-          - lib
+    needs: ["build-ubuntu-job"]
+    tags:
+        - ubuntu-shell
+    artifacts:
+      paths:
+        - build/Testing/Temporary/*
     before_script:
-    - export OCSSWROOT=$(pwd) && source OCSSW_bash.env
+        - export OCSSWROOT=$(pwd) && source OCSSW_bash.env
     rules: *rules_definition
+
     script:
-    - git submodule update --init
-    - if [ -d opt ]; then
-    -   rm -rf opt
-    - fi
-    - ln -s $HOME/opt .
-    - if [ -d share ]; then
-    -   rm -rf share
-    - fi
-    - ln -s $HOME/share .
-    - if [ -d var ]; then
-    -   rm -rf var
-    - fi
-    - ln -s $HOME/var .
-    #
-    # sym link does not work because of metadata for filenames with $OCSSWROOT
-    #
-    - if [ -d testdata ]; then
-    -   rm -rf testdata
-    - fi
-    - if [ -d $HOME/testdata ]; then
-    -   mv $HOME/testdata .
-    - fi
-    #
-    # update var
-    #
-    - update_luts all
-    #
-    # update share
-    #
-    - install_ocssw --tag $(cat .manifest_tag) --all --clean
-    - echo "Running tests..."
-    - cd build
-    - ctest -R "data"
-    - cmake ..
-    - ctest -R "output"
-    - ctest -j8 -E "output|data" || true
-    - if [ -f Testing/Temporary/LastTestsFailed.log ]; then
-    -   cdata-log --list-failed
-    -   exit 1
-    - fi
-    - exit 0
+      #
+      # set up directories
+      #
+      - for d in opt share var; do
+      - if [ -d "$d" ]; then rm -r "$d"; fi
+      - mkdir -pv "$HOME/$d"
+      - ln -s "$HOME/$d" .
+      - done
+      # sym link does not work because of metadata for filenames with $OCSSWROOT
+      - if [ -d testdata ]; then rm -r testdata; fi
+      - if [ -d $HOME/testdata ]; then mv $HOME/testdata .; else mkdir testdata; fi
+      #
+      # update share and var
+      #
+      - install_ocssw --tag $(cat .manifest_tag) --all --clean
+      - update_luts all || echo update_luts failed
+      #
+      # run tests
+      #
+      - echo "Running tests..."
+      - cd build
+      - ctest -R "data"
+      - cmake ..
+      - ctest -R "output"
+      - ctest -j8 -E "output|data" || true
+      - if [ -f Testing/Temporary/LastTestsFailed.log ]; then
+      -   cdata-log --list-failed
+      -   exit 1
+      - fi
+      - exit 0
+
     after_script:
+      # this doesn't seem to work
     - cd $OCSSWROOT
     - if [ -d testdata ]; then
     -   if [ -d $HOME/testdata ]; then
-    -     rm -rf $HOME/testdata
+    -     rm -r $HOME/testdata
     -   fi
     -   mv testdata $HOME
     - fi

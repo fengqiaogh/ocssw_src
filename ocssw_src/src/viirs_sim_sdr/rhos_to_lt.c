@@ -48,7 +48,7 @@ int rhos_to_lt(int rhos_opt, float **rhos, in_rec_struc *in_rec, int idet,
     for (ipx = 0; ipx < npix; ipx++) {
         loc = ipx + idet * npix;
         solz = *(in_rec->solz + loc);
-        mu0 = cos(solz / RADEG);
+        mu0 = cos(solz / OEL_RADEG);
 
         /*
          *  derive the Lt for each band

@@ -19,7 +19,6 @@ void chand(float xphi, float xmuv, float xmus, float *xtau,
 
 int atmocor1_land(l1str *l1rec, int32_t ip) {
     static int32_t firstRun = 1;
-    static float pi = 3.141592654;
     static float p0 = 1013.25;
 
     float delphi = l1rec->delphi[ip] + 180.0;
@@ -77,7 +76,7 @@ int atmocor1_land(l1str *l1rec, int32_t ip) {
         ipb = ip * l1rec->l1file->nbands + ib;
 
         /* Compute and store Rayleigh radiance and diff trans */
-        l1rec->Lr[ipb] = rhor[ib] * l1rec->Fo[ib] * mu0 / pi;
+        l1rec->Lr[ipb] = rhor[ib] * l1rec->Fo[ib] * mu0 / OEL_PI;
         l1rec->t_sol[ipb] =
                 ((2.0 / 3.0 + mu0) + (2.0 / 3.0 - mu0) * trdown[ib])
                 / (4.0 / 3.0 + Taur[ib]);
@@ -102,7 +101,7 @@ int atmocor1_land(l1str *l1rec, int32_t ip) {
 /* Code below was provided by Jacques Descloitres, March 2000               */
 /* ------------------------------------------------------------------------ */
 
-#define fac 0.0174532925199  /* PI/180 */
+#define fac OEL_DEGRAD  /* PI/180 */
 
 void chand(float xphi, float xmuv, float xmus, float *xtau, float *rhoray, double *trup, double *trdown, int nbands) {
     /*

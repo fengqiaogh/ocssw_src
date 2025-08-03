@@ -8,7 +8,7 @@
 #include <math.h>
 #include <libnav.h>
 
-static int syear, sday; /* data start date                  */
+static int16 syear, sday; /* data start date                  */
 static int32 smsec; /* data start time                  */
 static int16 eyear, eday; /* data end date                    */
 static int32 emsec; /* data end time                    */
@@ -30,6 +30,7 @@ static float *ctl_pt_vx, *ctl_pt_vy, *ctl_pt_vz, *y2_vx, *y2_vy, *y2_vz, *ctl_pt
 static float *lt750; /* internal 750 mn data source */
 static char *ring_sat; /* set to 1 if 443, 520 or 550 are saturated for ringing 
                     mask computation */
+static double fileEpochTime; // unix time of file start of day
 
 int czcs_ring(int gain, float *lt750, char *ring_sat, l1str *l1rec)
 /*******************************************************************
@@ -356,7 +357,6 @@ int openl1_czcs(filehandle *file) {
     /*                                                                 */
     int32 fileID;
     int32 status;
-    int16 sy, sd;
     int i;
 
     /* open the file and get the file ID */
@@ -368,10 +368,8 @@ int openl1_czcs(filehandle *file) {
                 __FILE__, __LINE__, file->name);
         return (1);
     }
-    status = getHDFattr(fileID, "Start Year", "", (VOIDP) & sy);
-    syear = (int32) sy;
-    status = getHDFattr(fileID, "Start Day", "", (VOIDP) & sd);
-    sday = (int32) sd;
+    status = getHDFattr(fileID, "Start Year", "", (VOIDP) & syear);
+    status = getHDFattr(fileID, "Start Day", "", (VOIDP) & sday);
     status = getHDFattr(fileID, "Start Millisec", "", (VOIDP) & smsec);
     status = getHDFattr(fileID, "End Year", "", (VOIDP) & eyear);
     status = getHDFattr(fileID, "End Day", "", (VOIDP) & eday);
@@ -398,6 +396,8 @@ int openl1_czcs(filehandle *file) {
     /* call cdata.f to initialize global FORTRAN common block data	*/
     cdata_();
 
+    // set file epoch time
+    fileEpochTime = yds2unix(syear, sday, 0.0);
 
     file->npix = npix;
     file->nscan = nscan;
@@ -468,7 +468,7 @@ int readl1_czcs(filehandle *file, int32_t recnum, l1str *l1rec) {
     int ll2vec(float *, float *);
     int vec2ll(float *, float *);
     short cnt_vec[NBND_CZCS];
-    float lt_lcl[NBND_CZCS], yout1, yout2, yout3, llvec[2], vec[3], gmt;
+    float lt_lcl[NBND_CZCS], yout1, yout2, yout3, llvec[2], vec[3];
     int ipx, ibnd, orbit, i, tpix;
     uint8 cal_sum[5], cal_scan[6];
     int32 status, navbad, ltsat;
@@ -478,12 +478,23 @@ int readl1_czcs(filehandle *file, int32_t recnum, l1str *l1rec) {
     int32_t nwave = l1rec->l1file->nbands;
     int32_t *bindx = l1rec->l1file->bindx;
     char *cal_path = l1_input->calfile;
-    /* load scan times */
-    /*  int year = *l1rec->year;
-      int day = *l1rec->day;*/
-    /*  int32 msec = l1rec->msec[recnum];*/
-
     float lonbuf[1968], latbuf[1968], senzbuf[1968], senabuf[1968];
+
+    /*
+     *  set scan time
+     */
+    if(msec[recnum] < msec[0]) {
+        // adjust for day rollover (add 86400 sec in a day)
+        l1rec->scantime = fileEpochTime + (double)msec[recnum] / 1000.0 + 86400.0;
+    } else {
+        l1rec->scantime = fileEpochTime + (double)msec[recnum] / 1000.0;
+    }
+
+    double scanSecOfDay, scanMsecOfDay;
+    int16_t scanYear;
+    int16_t scanDay;
+    unix2yds(l1rec->scantime, &scanYear, &scanDay, &scanSecOfDay);
+    scanMsecOfDay = scanSecOfDay * 1000.0;
 
     /*
      *  read in the line of counts, latitude, longitude
@@ -541,7 +552,7 @@ int readl1_czcs(filehandle *file, int32_t recnum, l1str *l1rec) {
         orbit = (int) file->orbit_number;
         /*czcscal_( &orbit, slope + recnum * 6, 
           intercept + recnum * 6, cnt_vec, &lgain, lt_lcl );*/
-        status = get_czcscal(cal_path, orbit, syear, sday, msec[recnum],
+        status = get_czcscal(cal_path, orbit, scanYear, scanDay, scanMsecOfDay,
                 cnt_vec, slope[4], intercept[4], gain[0], lt_lcl);
         /*
          *  assign the calibrated radiances
@@ -605,8 +616,8 @@ int readl1_czcs(filehandle *file, int32_t recnum, l1str *l1rec) {
         cz_posll_2_satang((pos + 3 * recnum), npix, l1rec->lat, l1rec->lon,
                 l1rec->senz, l1rec->sena);
     } else {
-        pi = PI;
-        radeg = RADEG;
+        pi = OEL_PI;
+        radeg = OEL_RADEG;
         for (i = 0; i < 1968; i++) {
             lonbuf[i] = 0.0;
             latbuf[i] = 0.0;
@@ -629,28 +640,14 @@ int readl1_czcs(filehandle *file, int32_t recnum, l1str *l1rec) {
         }
     }
 
-
-    /*  for( i = spix; i < epix; i = i + ninc )*/
+    int intYear = scanYear;
+    int intDay = scanDay;
+    // gmt = time of day in hours
+    float gmt = scanSecOfDay / 3600.0;
     for (i = 0; i < npix; i++) {
-        gmt = (float) msec[recnum] / (1000. * 3600);
-        sunangs_(&syear, &sday, &gmt, (l1rec->lon) + i, (l1rec->lat) + i,
+        sunangs_(&intYear, &intDay, &gmt, (l1rec->lon) + i, (l1rec->lat) + i,
                 (l1rec->solz) + i, (l1rec->sola) + i);
     }
-    /*
-     *  set scan time
-     */
-    double secs = (double) (msec[recnum] / 1000.0);
-    int16_t year = syear;
-    int16_t day = sday;
-
-    if (recnum > 0 && msec[recnum] < msec[recnum - 1]) { /* adjust for day rollover */
-        day += 1;
-        if (day > (365 + (year % 4 == 0))) {
-            year += 1;
-            day = 1;
-        }
-    }
-    l1rec->scantime = yds2unix(year, day, secs);
 
     return (status);
 }

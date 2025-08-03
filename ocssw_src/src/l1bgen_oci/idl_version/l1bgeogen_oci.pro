@@ -95,6 +95,12 @@
   ncdf_varget, mgid, 'blue_spectral_mode', bagg
   ncdf_varget, mgid, 'red_spectral_mode', ragg
   ka = min(where(dtype ne 0 AND dtype ne 2 AND dtype ne 10))
+  solcal = 0
+  if (dtype(ka) eq 3) then begin
+    print,'Solar cal granule'
+    solcal = 1
+    geoloc = 0
+  endif
 
   if (geoloc) then begin
     if (seleno) then begin
@@ -115,30 +121,45 @@
     end
   
   endif else begin
-; Get number of EV lines and offset from scan start time to EV mid-time
-; Read geo LUT
-    read_oci_geo_lut,glutfile,geo_lut
-    read_mce_tlm, l1aid, geo_lut, revpsec, ppr_off, secpline, board_id, mspin, ot_10us, enc_count, hamenc, rtaenc, iret
-    if (iret eq 1) then begin
-      print,'No valid MCE telemetry in file'
-      return
-    endif
-    if (iret eq 2) then print, 'OCI static mode'
-    if (iret eq 3) then print, 'OCI reverse scan'
-
-    get_ev, secpline, dtype, lines, iagg, pcdim, psdim, ev_toff, clines, slines, deltc, delts, iret
-    if (iret lt 0) then begin
-      print,'No science collect in file ',l1afile
-      ncdf_close,l1aid
-      return
-    endif
-    qflg = bytarr(pcdim,nscan)
-;  Check for and fill in missing scan times
-    check_scan_times, sstime, sfl
-    evtime = sstime + ev_toff
 ; Create L1B file and data arrays
     spawn, 'ncgen OCI_Level-1B_Data_Structure.cdl -o Otemp.nc'
     file_move, 'Otemp.nc', l1bfile, /OVERWRITE
+; If solar cal granule
+    if (solcal) then begin
+; Compute EV time and angles for SCA
+      get_oci_sca_angles, l1afile, glutfile, l1bfile, pcdim, distcorr, board_id, $
+        evtime, rtain, rtaaz, solin, solaz, face, scpos, scana, iret
+      if (iret ne 0) then begin
+        print,'Unable to compute angles for solar cal file'
+        return
+      endif
+      psdim = pcdim
+      scans = scana
+      csolz = cos(solin/!radeg)
+    endif else begin
+    
+; Get number of EV lines and offset from scan start time to EV mid-time
+; Read geo LUT
+      read_oci_geo_lut,glutfile,geo_lut
+      read_mce_tlm, l1aid, geo_lut, revpsec, ppr_off, secpline, board_id, mspin, ot_10us, enc_count, hamenc, rtaenc, iret
+      if (iret eq 1) then begin
+        print,'No valid MCE telemetry in file'
+        return
+      endif
+      if (iret eq 2) then print, 'OCI static mode'
+      if (iret eq 3) then print, 'OCI reverse scan'
+
+      get_ev, secpline, dtype, lines, iagg, pcdim, psdim, ev_toff, clines, slines, deltc, delts, iret
+      if (iret lt 0) then begin
+        print,'No science collect in file ',l1afile
+        ncdf_close,l1aid
+        return
+      endif
+;  Check for and fill in missing scan times
+      check_scan_times, sstime, sfl
+      evtime = sstime + ev_toff
+    endelse
+    qflg = bytarr(pcdim,nscan)
   endelse
 
 ; Generate matrices for spectral and gain aggregation
@@ -231,11 +252,11 @@
 ;   Irradiances at L1A spectral aggregation for reflectance calculation
   if (bib ge 4) then begin
     b1bwave = bamat#bgmat#bwave 
-    bibf0 = bgmat#bf0 
+    b1bf0 = bamat#bgmat#bf0 
   endif else b1bwave = 0.
   if (rib ge 4) then begin
     r1bwave = ramat#rgmat#rwave 
-    ribf0 = rgmat#rf0 
+    r1bf0 = ramat#rgmat#rf0 
   endif else r1bwave = 0.
 
   ndsc = 1 ; number of scans of dark data to average; will make this an input parameter
@@ -250,6 +271,7 @@
 
 ; Calibrated data variables
   bdn = fltarr(pcdim, bib)
+  bdnc = fltarr(pcdim, bib)
   rdn = fltarr(pcdim, rib)
   sdn = fltarr(psdim, swb)
   bcal = fltarr(pcdim, bib)
@@ -277,7 +299,7 @@
     if (hside[iscn] eq 0 OR hside[iscn] eq 1) then begin
 
 ;  Get scan angle
-    if (geoloc) then begin
+    if (geoloc OR solcal) then begin
       thetap = scana[*,iscn]*!radeg
       thetas = scans[*,iscn]*!radeg
     endif else begin
@@ -305,28 +327,28 @@
         else bval = where(bsci[*,0] ne bfill)
       bcalb[*,*] = -32767.
       if (iret ne -1 AND bval[0] ne -1) then begin
+      	for j=0,bib-1 do bdn[*,j] = bsci[*,j] - bdc[j] ; Need to save dn for linearity correction
+      	
+;  Compute and apply crosstalk correction for blue band only
+	if (cross) then begin
+	  cross_corr_oci, bib, pcdim, ncpix, bcmat, bdn, bcross
+	  bdnc = bdn - bcross
+	endif else bdnc = bdn
+
+;  Compute and apply temperature correction      	
       	get_oci_temp_corr, bib, bgains, K3T[0:nctemps-1], caltemps[0:nctemps-1,iscn], k3
-      	for j=0,bib-1 do begin
-	  bdn[*,j] = bsci[*,j] - bdc[j] ; Need to save dn for linearity correction
-	  bcal[*,j] = k3[j]*bgains.k1k2[hside[iscn],j]*bdn[*,j]
-	  if (ociref) then bcal[*,j] = bcal[*,j]*!pi*distcorr/(bibf0[j]*csolz[*,iscn])
-      	endfor
+	for j=0,bib-1 do bcal[*,j] = bgains.k1k2[hside[iscn],j]*k3[j]*bdnc[*,j]
 
 ;  Compute and apply RVS and linearity
       	get_oci_rvs_corr, bib, pcdim, hside[iscn], bgains, thetap, k4
       	get_oci_lin_corr, bib, pcdim, bgains, bdn, k5
       	bcal = k5*k4*bcal
       	
-;  Compute and apply crosstalk correction for blue band only
-	if (cross) then begin
-	  cross_corr_oci, bib, pcdim, ncpix, bcmat, bcal, bcross
-	  bcal = bcal - bcross
-	endif
-	
-;  Aggregate to L1B bands
+;  Aggregate to L1B bands and compute reflectance
       	bcalb[bval,*] = transpose(bamat#transpose(bcal[bval,*]))
+	if (ociref) then for j=0,bbb-1 do bcalb[bval,j] = bcalb[bval,j]*!pi*distcorr/(b1bf0[j]*csolz[bval,iscn])
 
-; Check for saturation
+; Check for saturation 
 	bqual[*,*] = 0
 	for j=0,pcdim-1 do begin
 	  bsat[*] = (bdn[j,*] ge bgains.sat_thres); Check on dark-corrected dn
@@ -338,7 +360,6 @@
 ;  Output to L1B file
       ncdf_varput, gid, dids[0], bcalb, OFFSET = start, COUNT = bcount
       ncdf_varput, gid, dids[3], bqual, OFFSET = start, COUNT = bcount
-;      stop
     endif
 
 ;  Red bands
@@ -357,7 +378,6 @@
       	for j=0,rib-1 do begin
 	  rdn[*,j] = rsci[*,j] - rdc[j] ; Need to save dn for linearity correction
 	  rcal[*,j] = k3[j]*rgains.k1k2[hside[iscn],j]*rdn[*,j]
-	  if (ociref) then rcal[*,j] = rcal[*,j]*!pi*distcorr/(ribf0[j]*csolz[*,iscn])
       	endfor
 
 ;  Compute and apply RVS and linearity
@@ -365,8 +385,9 @@
       	get_oci_lin_corr, rib, pcdim, rgains, rdn, k5
       	rcal = k5*k4*rcal
 
-;  Aggregate to L1B bands
+;  Aggregate to L1B bands and compute reflectance
       	rcalb[rval,*] = transpose(ramat#transpose(rcal[rval,*]))
+	if (ociref) then for j=0,rbb-1 do rcalb[rval,j] = rcalb[rval,j]*!pi*distcorr/(r1bf0[j]*csolz[rval,iscn])
       	
 ; Check for saturation
 	rqual[*,*] = 0
@@ -396,6 +417,7 @@
 ;  Compute temperature, RVS and linearity
       	get_oci_temp_corr, swb, sgains, K3T[nctemps:*], caltemps[nctemps:*,iscn], k3
       	get_oci_rvs_corr, swb, psdim, hside[iscn], sgains, thetas, k4
+      	for j=0,swb-1 do sdn[*,j] = ssci[*,j] - sdc[j] 
       	get_oci_lin_corr, swb, psdim, sgains, sdn, k5
 ;  Interpolate solar zenith if needed
 	if (ociref) then begin
@@ -412,12 +434,11 @@
           if (ociref) then sval = where(ssci[*,j] ne sfill AND qflg[*,iscn] eq 0 AND csolz[*,iscn] ge csolz_min) $
        		else sval = where(ssci[*,j] ne sfill); May be different for every SWIR band
           if (sval[0] ne -1) then begin
-	    sdn[sval,j] = ssci[sval,j] - sdc[j] ; Need to save dn for linearity correction
+;	    sdn[sval,j] = ssci[sval,j] - sdc[j] ; Need to save dn for linearity correction
 	    get_hyst_corr, hysttime[*,j], hystamp[*,j], sdn[sval,j], thetas[sval], hyst
 	    scal[sval,j] = k3[j]*sgains.k1k2[hside[iscn],j]*(sdn[sval,j]-hyst)
       	    scal[sval,j] = k5[sval,j]*k4[sval,j]*scal[sval,j]
-	    if (ociref) then scal[sval,j] = scal[sval,j]*!pi*distcorr/(sf0[j]*csolzs[sval])
-	    scalb[sval,j] = scal[sval,j]
+	    if (ociref) then scalb[sval,j] = scal[sval,j]*!pi*distcorr/(sf0[j]*csolzs[sval]) else scalb[sval,j] = scal[sval,j]
 	  endif
       	endfor
 ;	stop
@@ -442,8 +463,8 @@
   ncdf_close,l1aid
 
 ; Write spectral band information
-  b1bf0 = bamat#bibf0 
-  r1bf0 = ramat#ribf0
+;  b1bf0 = bamat#bibf0 
+;  r1bf0 = ramat#ribf0
   pdim = blue_lut.ldims[6]
   b1bm12 = fltarr(pdim,2,bbb)
   b1bm13 = fltarr(pdim,2,bbb)
@@ -457,7 +478,8 @@
       r1bm13[ip,im,*] = ramat#rgmat#transpose(red_lut.m13_coef[ip,im,*])
     endfor
   endfor
-  write_band_parms, l1bid, b1bwave, b1bf0, r1bwave, r1bf0, b1bm12, b1bm13, r1bm12, r1bm13, swir_lut.m12_coef, swir_lut.m13_coef 
+  write_band_parms, l1bid, b1bwave, b1bf0, r1bwave, r1bf0, swave, sf0, b1bm12, $
+    b1bm13, r1bm12, r1bm13, swir_lut.m12_coef, swir_lut.m13_coef 
 
 ; Write scan-level metadata
   mgid = ncdf_ncidinq(l1bid,'scan_line_attributes')

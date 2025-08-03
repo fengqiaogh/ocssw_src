@@ -2,9 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <genutils.h>
 #include "fmt_check.h"
-#define PI      3.141592653589793
-#define RADCONV PI/180.L
 
 void l3_get_org(int resolve, l3_org_str *l3_org)
 /*******************************************************************
@@ -61,7 +60,7 @@ void l3_get_org(int resolve, l3_org_str *l3_org)
 
     l3_org->start_bin[0] = 1;
     latbin = (90.0L / l3_org->numrows) - 90.0L;
-    l3_org->max_bin[0] = (int32) (cos(latbin * RADCONV) *
+    l3_org->max_bin[0] = (int32) (cos(latbin * OEL_DEGRAD) *
             l3_org->bins_eq + 0.5);
     l3_org->hsize[0] = 360. / l3_org->max_bin[0];
 
@@ -72,7 +71,7 @@ void l3_get_org(int resolve, l3_org_str *l3_org)
 
     for (i = 1; i < l3_org->numrows; i++) {
         latbin = ((float64) i + 0.5) * (180.0L / l3_org->numrows) - 90.0L;
-        l3_org->max_bin[i] = (int32) (cos(latbin * RADCONV) *
+        l3_org->max_bin[i] = (int32) (cos(latbin * OEL_DEGRAD) *
                 l3_org->bins_eq + 0.5);
         l3_org->start_bin[i] = l3_org->start_bin[i - 1] +
                 l3_org->max_bin[i - 1];

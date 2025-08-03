@@ -15,7 +15,7 @@
 #include <allocate3d.h>
 #include "atrem_corl1.h"
 
-float get_wv_band_ratio(l1str *l1rec,int32_t ip,float window1, float absorp_band,float window2);
+float get_wv_band_ratio(l1str *l1rec,int32_t ip, int iw);
 float get_airmass_oxygen(l1str *l1rec,int32_t ip,float window1, float absorp_band,float window2);
 int32_t get_index_lowerbound(float *table_val, int32_t num_val, float val);
 int32_t get_index_uppperbound(float *table_val, int32_t num_val, float val);
@@ -32,6 +32,7 @@ static float *t_o2 = NULL;
 static float *t_co = NULL;
 static float *t_ch4 = NULL;
 static float *t_n2o = NULL;
+static float *t_o4  =NULL;
 static float *cwv_all = NULL;
 
 static float *amf_mixed = NULL;
@@ -188,6 +189,20 @@ void load_gas_tables(l1str *l1rec) {
         exit(EXIT_FAILURE);
     }
 
+    /* Read the o4 transmittance */
+    if ((nc_inq_varid(ncid, "o4_transmittance", &varid)) == NC_NOERR) {
+        if ((t_o4 = (float *)malloc(num_wavelengths * sizeof(float))) == NULL) {
+            printf("-E- %s line %d : error allocating memory for o4 transmittance table.\n", __FILE__,
+                   __LINE__);
+            exit(1);
+        }
+        if ((nc_get_var_float(ncid, varid, t_o4)) != NC_NOERR) {
+            printf("-E- %s: failed to read o4_transmittance from %s\n", __FILE__,
+                   input->gas_transmittance_file);
+            exit(EXIT_FAILURE);
+        }
+    }
+
     /* Read the carbon dioxide transmittance */
     if ((t_co2 = (float *)malloc(num_wavelengths*num_airmass*sizeof(float))) == NULL) {
         printf("-E- %s line %d : error allocating memory for carbon dioxide transmittance table.\n", __FILE__,
@@ -287,26 +302,22 @@ void load_gas_tables(l1str *l1rec) {
 
 int32_t get_index_lowerbound(float *table_val, int32_t num_val, float val) {
     int32_t index;
-    int32_t i;
 
-    for (i = 0; i < num_val; i++)
-        if (val < table_val[i])
+    for (index = 1; index < num_val - 1; index++)
+        if (val < table_val[index])
             break;
-    index=MAX(i-1,0);
-    index=MIN(index,num_val-2);
-    return index;
+    return index - 1;
 }
 
 int32_t get_index_upperbound(float *table_val, int32_t num_val, float val) {
     int32_t index;
 
-    for (index = 0; index < num_val; index++)
+    for (index = 1; index < num_val - 1; index++)
         if (val >= table_val[index])
             break;
 
     return index;
 }
-
 
 void ozone_transmittance(l1str *l1rec, int32_t ip) {
     float tau_oz;
@@ -323,6 +334,23 @@ void ozone_transmittance(l1str *l1rec, int32_t ip) {
             l1rec->tg[ipb + iw]*=exp(-tau_oz* (1.0/ l1rec->csolz[ip]+1.0/ l1rec->csenz[ip]));
         } else {
             l1rec->tg_sen[ipb + iw] *= exp(-(tau_oz / l1rec->csenz[ip]));
+        }
+
+    }
+}
+
+void o4_transmittance(l1str *l1rec, int32_t ip) {
+    int32_t iw;
+    filehandle *l1file = l1rec->l1file;
+    int32_t nwave = l1file->nbands;
+    int32_t ipb = ip * nwave;
+
+    for (iw = 0; iw < nwave; iw++) {
+        l1rec->tg_sol[ipb + iw] *= pow(t_o4[iw], 1.0/l1rec->csolz[ip]);
+        if(amf) {
+            l1rec->tg[ipb + iw]*=pow(t_o4[iw],1.0/ l1rec->csolz[ip]+1.0/ l1rec->csenz[ip]);
+        } else {
+            l1rec->tg_sen[ipb + iw] *= pow(t_o4[iw],1.0/l1rec->csenz[ip]);
         }
 
     }
@@ -419,6 +447,7 @@ void ch4_transmittance(l1str *l1rec, int32_t ip) {
     }
 }
 
+
 void o2_transmittance(l1str *l1rec, int32_t ip) {
     int32_t iw;
 
@@ -473,6 +502,9 @@ void o2_transmittance(l1str *l1rec, int32_t ip) {
                 l1rec->tg_sen[ipb + iw] *= pow(t_o2[iw], amf_senz);
             }
         }
+
+        if (t_o4)
+            o4_transmittance(l1rec, ip);
     }
 }
 
@@ -569,8 +601,7 @@ void h2o_transmittance(l1str *l1rec, int32_t ip) {
     if (amf && input->watervapor_bands) {
         wv = 0;
         for (iw = 0; iw < input->nbands_watervapor;) {
-            wv += get_wv_band_ratio(l1rec, ip, input->watervapor_bands[iw], input->watervapor_bands[iw + 1],
-                                    input->watervapor_bands[iw + 2]);
+            wv += get_wv_band_ratio(l1rec, ip, iw);
             iw += 3;
         }
         wv /= (input->nbands_watervapor / 3);
@@ -687,7 +718,7 @@ void gaseous_transmittance(l1str *l1rec, int32_t ip) {
         /* Copy surface reflectance to temp. var for atrem calculation */
         for (ib = 0; ib < nwave; ib++) {
             ipb = ip * nwave + ib;
-            rhot [ib] = M_PI * l1rec->Lt[ipb] / l1rec->Fo[ib] / l1rec->csolz[ip];
+            rhot [ib] = OEL_PI * l1rec->Lt[ipb] / l1rec->Fo[ib] / l1rec->csolz[ip];
         }
 
         get_atrem_cor(l1rec, ip, rhot, tg_tot, &l1rec->tg_sol[ip * nwave], &l1rec->tg_sen[ip * nwave]);
@@ -778,7 +809,7 @@ void gas_trans_uncertainty(l1str *l1rec) {
     int32_t nwave = l1file->nbands;
     int npix = l1rec->npix;
     int32_t ipb, ip, ib;
-    float tg_oz, tg_co2, tg_no2, dt_oz, dt_co2, dt_no2;
+    float dt_oz, dt_no2;
 
     float mu0, mu, tau_oz;
 
@@ -808,15 +839,14 @@ void gas_trans_uncertainty(l1str *l1rec) {
             tau_oz = l1rec->oz[ip] * l1file->k_oz[ib];
 
             /* calculate error in tg_sol */
-            tg_oz = exp(-tau_oz / mu0);
-            dt_oz = tg_oz / mu0 * l1file->k_oz[ib] * uncertainty->doz[ip];
+            // tg_oz = exp(-tau_oz / mu0);
+            dt_oz = 1 / mu0 * l1file->k_oz[ib] * uncertainty->doz[ip];
+            dt_oz*=dt_oz;
+            // tg_co2 = pow(t_co2[ib], 1.0 / mu0);
 
-            tg_co2 = pow(t_co2[ib], 1.0 / mu0);
-            dt_co2 = 0.0;
-
-            tg_no2 = 1.0;
-            dt_no2 = 0.0;
-
+            // tg_no2 = 1.0;
+            dt_no2 = 0.0f;
+            tau_to200 = 0;
             if (l1file->k_no2[ib] > 0) {
                 a_285 = l1file->k_no2[ib] * (1.0 - 0.003 * (285.0 - 294.0));
                 a_225 = l1file->k_no2[ib] * (1.0 - 0.003 * (225.0 - 294.0));
@@ -824,40 +854,36 @@ void gas_trans_uncertainty(l1str *l1rec) {
                 tau_to200 = a_285 * no2_tr200 + a_225 * l1rec->no2_strat[ip];
                 dtau_to200 = sqrt(pow(a_285*dno2_tr200, 2) + pow(a_225 * uncertainty->dno2_strat[ip], 2));
 
-                tg_no2 = exp(-tau_to200 / mu0);
-                dt_no2 = tg_no2 / mu0*dtau_to200;
+                // tg_no2 = exp(-tau_to200 / mu0);
+                dt_no2 = 1 / mu0*dtau_to200;
             }
-            uncertainty->dtg_sol[ipb] = sqrt(pow(tg_no2 * tg_co2*dt_oz, 2) + pow(tg_oz * tg_co2*dt_no2, 2) + pow(tg_no2 * tg_oz*dt_co2, 2));
+            dt_no2*=dt_no2;
+            float t_gases = expf((-tau_to200 - tau_oz  + logf(t_co2[ib]))/mu0);
+            uncertainty->dtg_sol[ipb] =  t_gases *  sqrtf(dt_oz + dt_no2 );
 
 
             /* calculate error in tg_sen */
-            tg_oz = exp(-tau_oz / mu);
-            dt_oz = tg_oz / mu * l1file->k_oz[ib] * uncertainty->doz[ip];
+            // tg_oz = exp(-tau_oz / mu);
+            dt_oz = 1 / mu * l1file->k_oz[ib] * uncertainty->doz[ip];
+            dt_oz*=dt_oz;
+            // tg_co2 = pow(t_co2[ib], 1.0 / mu);
 
-            tg_co2 = pow(t_co2[ib], 1.0 / mu);
-            dt_co2 = 0.0;
-
-            tg_no2 = 1.0;
-            dt_no2 = 0.0;
+            // tg_no2 = 1.0;
+            dt_no2 = 0.0f;
             if (l1file->k_no2[ib] > 0) {
-                a_285 = l1file->k_no2[ib] * (1.0 - 0.003 * (285.0 - 294.0));
-                a_225 = l1file->k_no2[ib] * (1.0 - 0.003 * (225.0 - 294.0));
-
-                tau_to200 = a_285 * no2_tr200 + a_225 * l1rec->no2_strat[ip];
-
-                dtau_to200 = sqrt(pow(a_285*dno2_tr200, 2) + pow(a_225 * uncertainty->dno2_strat[ip], 2));
-
-                tg_no2 = exp(-tau_to200 / mu);
-                dt_no2 = tg_no2 / mu*dtau_to200;
+                // tg_no2 = exp(-tau_to200 / mu);
+                dt_no2 = 1 / mu*dtau_to200;
             }
-            uncertainty->dtg_sen[ipb] = sqrt(pow(tg_no2 * tg_co2*dt_oz, 2) + pow(tg_oz * tg_co2*dt_no2, 2) + pow(tg_no2 * tg_oz*dt_co2, 2));
+            dt_no2*=dt_no2;
+            t_gases = powf(t_gases, mu0 / mu);
+            uncertainty->dtg_sen[ipb] = t_gases *  sqrtf(dt_oz + dt_no2 );
         }
     }
 }
 
 // TODO: Modify this function to work with non-AMF table
 // ...*maybe*, if we push all sensors to use AMF, this would not be necessary
-float get_wv_band_ratio(l1str *l1rec,int32_t ip,float window1, float absorp_band,float window2){
+float get_wv_band_ratio(l1str *l1rec,int32_t ip,int iw){
 
     static int32_t firstcall=1;
     static float *tran_interp;
@@ -868,6 +894,7 @@ float get_wv_band_ratio(l1str *l1rec,int32_t ip,float window1, float absorp_band
     int32_t band1;
     int32_t band2;
     int32_t band_absorp;
+    static int * bands;
     float wv;
     float rhot_interp;
     float trans_wv_true;
@@ -878,18 +905,32 @@ float get_wv_band_ratio(l1str *l1rec,int32_t ip,float window1, float absorp_band
 
     if(firstcall){
         firstcall=0;
+        bands = (int *) malloc(sizeof(int) * input->nbands_watervapor);
         tran_interp=(float *)malloc(num_water_vapors * sizeof(float));
+        for  (int iw1 = 0; iw1 < input->nbands_watervapor;) {
+            bands[iw1] = windex(input->watervapor_bands[iw1], l1file->fwave, l1file->nbands);
+            bands[iw1 + 1] = windex(input->watervapor_bands[iw1 + 1], l1file->fwave, l1file->nbands);
+            bands[iw1 + 2] = windex(input->watervapor_bands[iw1 + 2], l1file->fwave, l1file->nbands);
+            iw1 += 3;
+        }
     }
-
+    float absorp_band = input->watervapor_bands[iw + 1];
+    float window2 = input->watervapor_bands[iw + 2];
+    float window1 = input->watervapor_bands[iw];
     // derive a transmittance using a line height (or in this case, depth) approach
-    band1 = windex(window1, l1file->fwave, l1file->nbands);
-    rhot[0] = M_PI * l1rec->Lt[ip * l1file->nbands + band1] / l1rec->Fo[band1] / l1rec->csolz[ip];
+    band1 = bands[iw];
+    rhot[0] = OEL_PI * l1rec->Lt[ip * l1file->nbands + band1] / l1rec->Fo[band1] / l1rec->csolz[ip];
 
-    band2 = windex(window2, l1file->fwave, l1file->nbands);
-    rhot[1] = M_PI * l1rec->Lt[ip * l1file->nbands + band2] / l1rec->Fo[band2] / l1rec->csolz[ip];
+    band2 = bands[iw + 2];
+    rhot[1] = OEL_PI * l1rec->Lt[ip * l1file->nbands + band2] / l1rec->Fo[band2] / l1rec->csolz[ip];
 
-    band_absorp = windex(absorp_band, l1file->fwave, l1file->nbands);
-    rhot[2] = M_PI * l1rec->Lt[ip * l1file->nbands + band_absorp] / l1rec->Fo[band_absorp] / l1rec->csolz[ip];
+    band_absorp = bands[iw + 1];
+    // OCI 940 is fill for the last pixel in the scan
+    // Since we can't compute water vapor without it, bail and report the value from the ancillary input
+    if (l1rec->Lt[ip * l1file->nbands + band_absorp] == BAD_FLT) {
+        return l1rec->wv[ip];
+    }
+    rhot[2] = OEL_PI * l1rec->Lt[ip * l1file->nbands + band_absorp] / l1rec->Fo[band_absorp] / l1rec->csolz[ip];
 
     rhot_interp = rhot[0] + ((absorp_band - window1) / (window2 - window1)) * (rhot[1] - rhot[0]);
     trans_wv_true = rhot[2] / rhot_interp;
@@ -931,16 +972,20 @@ float get_airmass_oxygen(l1str *l1rec,int32_t ip,float window1, float absorp_ban
     float rhot_interp,trans_o2_true;
     float rhot[3];
     
-    int band1,band2,band_absorp;
+    static int band1,band2,band_absorp, first_call = 1;
+    if (first_call) {
+        band1 = windex(window1, wave, nwave);
+        band2 = windex(window2, wave, nwave);
+        band_absorp = windex(absorp_band, wave, nwave);
+        first_call = 0;
+    }
+    rhot[0]=OEL_PI*Lt[band1]/F0[band1]/u0;
 
-    band1=windex(window1,wave,nwave);
-    rhot[0]=M_PI*Lt[band1]/F0[band1]/u0;
 
-    band2=windex(window2,wave,nwave);
-    rhot[1]=M_PI*Lt[band2]/F0[band2]/u0;
+    rhot[1]=OEL_PI*Lt[band2]/F0[band2]/u0;
 
-    band_absorp=windex(absorp_band,wave,nwave);
-    rhot[2]=M_PI*Lt[band_absorp]/F0[band_absorp]/u0;
+
+    rhot[2]=OEL_PI*Lt[band_absorp]/F0[band_absorp]/u0;
 
     rhot_interp=rhot[0]+(absorp_band-window1)*(rhot[1]-rhot[0])/(window2-window1);
 

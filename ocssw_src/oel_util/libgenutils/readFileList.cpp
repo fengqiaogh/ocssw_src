@@ -4,18 +4,28 @@
 #include <vector>
 #include <cctype> 
 #include <netcdf>
+#include <string.h>
 using namespace netCDF;
+
+int check_url(const char *file) {
+    return (strstr(file, "s3://") != NULL) || (strstr(file, "https://") != NULL) ||
+           (strstr(file, "http://") != NULL);
+}
 
 std::vector<std::string> readFileList(std::string fileName) { 
 
     //Declare vector 
     std::vector<std::string> fileList;
 
+    
     //Read file 
     std::ifstream file(fileName);
-
-    if (!file) {
-        std::cerr << "Error: The file" << fileName << "could not be read." << std::endl;
+    if (check_url(fileName.c_str())) {
+        fileList.push_back(fileName);
+        return fileList;
+    }
+    if (!file && !check_url(fileName.c_str())) {
+        std::cerr << "Error: The file " << fileName << " could not be read." << std::endl;
         exit(EXIT_FAILURE);
     }
     
@@ -58,8 +68,11 @@ std::vector<std::string> readFileList(std::string fileName) {
             if (file_exists.good())
                 fileList.push_back(line);
             else {
-                std::cerr << "Error: The file" << line << "could not be found." << std::endl;
-                exit(EXIT_FAILURE);
+                if (!check_url(line.c_str())) {
+                    std::cerr << "Error: The file " << line << " could not be found." << std::endl;
+                    exit(EXIT_FAILURE);
+                }
+		fileList.push_back(line);
             }
 
         }

@@ -237,7 +237,7 @@ namespace cldmsk {
         const float lt = l1str_.Lt[pixel * nbands + ib];
         const float fo = l1str_.Fo[ib];
         const float csolz = l1str_.csolz[pixel];
-        const float rho = M_PI * lt / fo / csolz;
+        const float rho = OEL_PI * lt / fo / csolz;
         return rho;
     };
 
@@ -249,7 +249,7 @@ namespace cldmsk {
         const float tg_sen = l1str_.tg_sen[pixel * nbands + ib];
         const float t_sen = l1str_.t_sen[pixel * nbands + ib];
         const float t_sol = l1str_.t_sol[pixel * nbands + ib];
-        const float cldrh = M_PI * lt / fo / tg_sol / tg_sen / t_sol / t_sen; // /csolz
+        const float cldrh = OEL_PI * lt / fo / tg_sol / tg_sen / t_sol / t_sen; // /csolz
         return cldrh;
     };
     const get_valid cldrh_mask = [](const l1str &l1str_, int pixel, int nbands, int ib) {

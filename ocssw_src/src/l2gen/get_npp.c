@@ -1009,572 +1009,519 @@ float opp_cafe( float PAR,
          float bbp_443,
          float bbp_s,
          float sst ) {
-
-/* ----------------------------------------------------------------------------------------------*/
-
-/* Description: Computes daily net primary production following the Carbon, Absorption, Fluorescence
-                Euphotic-resolving (CAFE) model. For a full description of the model, please see:
-
-                Silsbe, G.M., M.J. Behrenfeld, K.H. Halsey, A.J. Milligan, and T.K. Westberry. 2016.
-                The CAFE model. A net production model for global ocean phytoplankton. Global
-                Biogeochemical Cycles. doi: 10.1002/2016GB005521.
-
-   Model inputs:
-    PAR     - Daily photosynthetic active radiation [mol photons m^-2 day^-1]
-    chl     - Chlorophyll concentration, NASA OCI algorithm [mg m^-3]
-    mld     - Mixed layer depth [m]
-    lat     - Latitude [Degrees, north positive]
-    yd      - Day of year
-    aph_443 - Absorption due to phytoplankton at 443 nm, NASA GIOP algorithm [m-1]
-    adg_443 - Absorption due to gelbstoff and detratial material at 443 nm, NASA GIOP model [m-1]
-    bbp_443 - Particulate backscatter at 443 nm, NASA GIOP model [m-1]
-    bbp_s   - Backscattering spectral parameter for GIOP model [dimensionless]
-    sst     - Sea surface temperature [Degrees Celcuis]
-
-  Modeling code below is divided into 10 steps:
-
-    1) Declare all local variables
-    2) Derive inherent optical properties (IOPs) at 10 nm increments from 400 to 700 nm
-    3) Calculate the amount of energy in the eupotic zone that is absorbed by phytoplankton
-    4) Derive the spectral attenunation coefficient and the attenuation coefficient of PAR
-    5) Derive conversion factor (Eu) that converts downwelling planar irradiance to scalar
-       irradiance
-    6) Calculate the photoacclimation parameter (Ek) through depth
-    7) Scale Ek to a spectrally explicit parameter (KPUR)
-    8) Model the maximum quantum efficiency of net carbon fixation (phi_max)
-    9) If the mixed layer depth (MLD) is shallower than the euphotic depth, then apply scaling
-       factor to phytoplankton absorption beneath the MLD and adjust the energy absorbed by
-       phytoplankton.
-    10) Derive net phytoplankton production (NPP).
-    11) Dependent function that calculates the wavelength, salinity and temperature dependence
-        of the backscattering of pure water.
-*/
-
-
-/* ----------------------------------------------------------------------------------------------*/
-/* Step 1: Declare all local variables */
-/* ----------------------------------------------------------------------------------------------*/
-
-  int w; /* Wavelength step 10 nm between 400 and 700 nm */
-  int t; /* Time step, day is divided into 101 evenly spaced increments */
-  int tsym; /* morning index for equivalent afternoon time */
-  int z; /* Depth step, euphotic zone is divided into 101 evenly spaced increments */
-
-  /* Inherent Optical Properties*/
-  double aphi[31];    /* Absorption[wavelength] due to phytoplankton */
-  double a[31];       /* Total absorption[wavelength] */
-  double bb[31];      /* Total backscattering[wavelength] */
-  double bbw[31];     /* Backscattering of pure water[wavelength] */
-
-  /* Wavelength */
-  double wv[] = { 400, 410, 420, 430, 440, 450, 460, 470, 480, 490, 500, 510, 520, 530, 540, 550, 560,
-          570, 580, 590, 600, 610, 620, 630, 640, 650, 660, 670, 680, 690, 700 };
-
-  /* Absorption due to pure water[wavelength] */
-  double aw[] = { 0.00663, 0.00473, 0.00454, 0.00495, 0.00635, 0.00922, 0.00979, 0.0106, 0.0127,
-          0.015, 0.0204, 0.0325, 0.0409, 0.0434, 0.0474, 0.0565, 0.0619, 0.0695,
-          0.0896, 0.1351, 0.2224, 0.2644, 0.2755, 0.2916, 0.3108, 0.34, 0.41, 0.439, 0.465,
-          0.516, 0.624 };
-
-  /*Spectral shape of of aphi */
-  double A_Bricaud[] = { 0.0241, 0.0287, 0.0328, 0.0359, 0.0378, 0.0350, 0.0328, 0.0309, 0.0281,
-             0.0254, 0.0210, 0.0162, 0.0126, 0.0103, 0.0085, 0.0070, 0.0057, 0.0050,
-             0.0051, 0.0054, 0.0052, 0.0055, 0.0061, 0.0066, 0.0071, 0.0078, 0.0108,
-             0.0174, 0.0161, 0.0069, 0.0025 };
-
-  double E_Bricaud[] = { 0.6877, 0.6834, 0.6664, 0.6478, 0.6266, 0.5993, 0.5961, 0.5970, 0.5890,
-             0.6074, 0.6529, 0.7212, 0.7939, 0.8500, 0.9036, 0.9312, 0.9345, 0.9298,
-             0.8933, 0.8589, 0.8410, 0.8548, 0.8704, 0.8638, 0.8524, 0.8155, 0.8233,
-             0.8138, 0.8284, 0.9255, 1.0286 };
-
-  /* Spectral shape of PAR */
-  double PAR_spectrum[] = { 0.00227, 0.00218, 0.00239, 0.00189, 0.00297, 0.00348, 0.00345,
-                0.00344, 0.00373, 0.00377, 0.00362, 0.00364, 0.00360, 0.00367,
-                0.00354, 0.00368, 0.00354, 0.00357, 0.00363, 0.00332, 0.00358,
-                0.00357, 0.00359, 0.00340, 0.00350, 0.00332, 0.00342, 0.00347,
-                0.00342, 0.00290, 0.00314 };
-
-  /* Parameters related to euphotic zone*/
-  double decl;   /* Solar declination [rads] */
-  double m0;     /* Coefficient to calculate kd (Lee et al. 2005) [m-1] */
-  double DL;     /* Daylength [day] */
-  double solzen; /* Solar zenith angle [rads] */
-  double kd[31]; /* Downwelling attenuation coefficient of irradiance [m-1] */
-  double zeu;    /* Euphotic depth [m] */
-  double kdpar;  /* Downwelling attenuation coefficient of PAR [m-1] */
-
-  /* Parameters related to light and absorbed photons through depth, time, and wavelength */
-  double tseq[101];               /* Fractional time of day */
-  double zseq[101];               /* Euphotic depth divided into 101 increments */
-  double delz;                    /* Depth of zseq (i.e. zeu/101) */
-  double absorbed_photons = 0.0;  /* Absorbed photons calculated in Step 3 */
-  double PAR_noon[31];            /* PAR at solar noon[wavelength] [mol photons m-2 day-1 wv-] */
-  double AP_tzw[101][101][31];    /* Absorbed photons[depth, time, wavelength] */
-  double AP_tz[101][101];         /* Absorbed photons[depth, time] */
-  double AP_tz2[101][101];         /* Absorbed photons[depth, time] */
-  double AP_z[101];               /* Absorbed photons[depth] */
-  double AP_z2[101];               /* Absorbed photons[depth] */
-  double AP = {0.0};              /* Absorbed photons [mol m-2 day-1] */
-  double AP2 = {0.0};              /* Absorbed photons [mol m-2 day-1] */
-  double E_tzw[101][101][31];     /* Irradiance [depth, time, wavelength] */
-  double E_tz[101][101];          /* Irradiance [depth, time] */
-  double Eu;                      /* conversion factor (Eu) that converts downwelling planar
-                                   irradiance to scalar irradiance */
-
-  /* Parameters related to derivation of Ek*/
-  double Ek[101];  /* Photoacclimation parameter[depth] (Behrenfeld et al. 2016) [mol m-2 day-1] */
-  double IML;      /* Median irradiance in the mixed layer [umol m-2 day-1] */
-  double Eg;       /* Growth irradiance at a specific depth */
-  double Eg_mld;   /* Growth irradiance at a specific depth */
-
-  /* Parameters used to convert Ek into the spectrally explicit equivalent KPUR */
-  double KPUR[101];        /* Spectrally explicit Ek */
-  double numerator;        /* Numerator to calculate spectral correction factor */
-  double denominator;      /* Denominator to calculate spectral correction factor */
-  double mean_aphi = 0.0;  /* Spectrally averaged absorption due to phytoplankton */
-
-  /* Parameters used to calculate the maximum quantum yield of net carbon fixation */
-  double phimax[101];  /* maximum quantum yield of net carbon fixation [mol C (mol photons)-1] */
-  double phirange[2] = {0.018, 0.030};            /* range of phimax values */
-  double Ekrange[2] = {150*0.086400, 10*0.0864};  /* relates phimax to Ek */
-  double slope;                                   /* relates phimax to Ek */
-
-  double aphi_fact[101]; /* Parameter to increase aphi beneath the MLD */
-
-  /* Net primary production [mg C m-2 day-1] */
-  double NPP_tz[101][101] = {{0.0}};
-  double NPP_z[101] = {0.0};
-  double NPP = {0.0};
-
-
-  //FILE *fp;
-  //  fp = fopen("test.txt", "a");
-
-  /* ----------------------------------------------------------------------------------------------*/
-  /* Step 2: Derive IOPs at 10 nm increments from 400 to 700 nm                                    */
-  /*   Comment: Currently assume salinity is 32.5 ppmil                                            */
-  /* ----------------------------------------------------------------------------------------------*/
-
-  for ( w=0; w<31; w++ ){
-    bbw[w]  = betasw_ZHH2009(wv[w], 32.5, sst) / 2;
-    aphi[w] = aph_443 * A_Bricaud[w] * pow(chl, E_Bricaud[w]) / (0.03711 * pow(chl, 0.61479));
-    a[w]    = aw[w] + aphi[w] + adg_443 * exp(-0.018 * (wv[w] - 443));
-    bb[w]   = bbw[w] + bbp_443 * pow(443 / wv[w], bbp_s);
-  }
-
-  /* ----------------------------------------------------------------------------------------------*/
-  /* Step 3: Calculate Absorbed Energy */
-  /* ----------------------------------------------------------------------------------------------*/
-
-  for (w=0; w<30; w++){
-    absorbed_photons += 0.5 * 10 * (PAR_spectrum[w+1] * aphi[w+1]/a[w+1] +
-                    PAR_spectrum[w] * aphi[w]/a[w]);
-  }
-
-  absorbed_photons *= PAR * 0.95;
-
-  /* ----------------------------------------------------------------------------------------------*/
-  /* Step 4: Derive Kd following Lee et al 2005, Eq. 11 and kdpar */
-  /*         from Morel et al 2007, Eq. 9'                        */
-  /*---------- ------------------------------------------------------------------------------------*/
-
-  decl = 23.5 * cos (2 * M_PI * (yd - 172) / 365) * M_PI / 180;
-  DL   = -1 * tan(lat*M_PI/180) * tan(decl);
-
-  if (DL > 1)  {DL = 1;}   /* Check for daylength less than 0 hours */
-  if (DL < -1) {DL = -1;}  /* Check for daylength greater than 24 hours */
-
-  DL = acos(DL) / M_PI; /* Daylength in days */
-
-  solzen = 90 - asin (sin(lat*M_PI/180) * sin(decl) - cos(lat*M_PI/180) * cos(decl) *
-              cos(M_PI)) * 180 / M_PI;
-  m0     = sqrt((1 + 0.005 * solzen) * (1 + 0.005 * solzen)); /* absolute value */
-
-  for (w=0; w<31; w++){
-    kd[w] =  m0 * a[w] + 4.18 * (1 - 0.52 * exp(-10.8 * a[w])) * bb[w];
-  }
-
-  kdpar = 0.0665 + (0.874 * kd[9]) - (0.00121 / kd[9]);
-  zeu   = -1 * log (0.1 /(PAR * 0.95)) / kdpar;
-
-  /* debug variable */
-  //   oppDebugDepthEu = z_eu;
-
-
-  /* ----------------------------------------------------------------------------------------------*/
-  /* Step 5: Derive conversion factor (Eu) that converts downwelling planar irradiance to scalar   */
-  /*   irradiance */
-  /* ----------------------------------------------------------------------------------------------*/
-
-  for (t=0; t<101; t++){
-    ////  tseq[t] = (double)t / 100;
-    zseq[t] = (double)t / 100 * ceil(zeu);
-  }
-  for (t=0; t<51; t++){
-    tseq[t] = (double)t / 50;
-  }
-  delz = zseq[1] - zseq[0];
-
-  for (w=0; w<31; w++){
-    PAR_noon[w] = M_PI / 2 * PAR * 0.95  * PAR_spectrum[w];
-  }
-
-  ////for (t=0; t<101; t++){
-
-  /* ==================================== */
-  /*   light is symmetrical about noon    */
-  /*   take advantage of that             */
-  /*   to get rid of 1/2 the calculations */
-  /* ==================================== */
-
-  //  for (t=0; t<51; t++){
-  for (t=0; t<26; t++){
-    for (z=0; z<101; z++){
-      for (w=0; w<31; w++){
-    E_tzw[t][z][w]  = PAR_noon[w] * sin(M_PI*tseq[t]) * exp(-1*kd[w]*zseq[z]);
-    AP_tzw[t][z][w] = E_tzw[t][z][w] * aphi[w];
-      }
-    }
-  }
-  for (t=26; t<51; t++){
-    tsym = 25 - (t - 25);
-    for (z=0; z<101; z++){
-      for (w=0; w<31; w++){
-    E_tzw[t][z][w]  = E_tzw[tsym][z][w];
-    AP_tzw[t][z][w] = AP_tzw[tsym][z][w];
-      }
-    }
-  }
-
-  /* Integrate E and AP through wavelength*/
-  for (z=0; z<101; z++){
-    ////  for (t=0; t<101; t++){
-
-  /* ==================================== */
-  /*   light is symmetrical about noon    */
-  /*   take advantage of that             */
-  /*   to get rid of 1/2 the calculations */
-  /* ==================================== */
-
-    //    for (t=0; t<51; t++){
-    for (t=0; t<26; t++){
-      E_tz[t][z] = 0.0;
-      AP_tz[t][z] = 0.0;
-      for (w=0; w<30; w++){
-    E_tz[t][z]  += 10 * (E_tzw[t][z][w+1] + E_tzw[t][z][w])/2;
-    AP_tz[t][z] += 10 * (AP_tzw[t][z][w+1] + AP_tzw[t][z][w])/2;
-      }
-    }
-    for (t=26; t<51; t++){
-      tsym = 25 - (t - 25);
-      for (w=0; w<30; w++){
-    E_tz[t][z]  = E_tz[tsym][z];
-    AP_tz[t][z] = AP_tz[tsym][z];
-      }
-    }
-  }
-
-  /* Integrate AP through time*/
-  for (z=0; z<101; z++){
-    AP_z[z] = 0.0;
-    ////  for (t=0; t<100; t++){
-
-  /* ==================================== */
-  /*   light is symmetrical about noon    */
-  /*   take advantage of that             */
-  /*   to get rid of 1/2 the calculations */
-  /* ==================================== */
-
-    //    for (t=0; t<50; t++){
-    for (t=0; t<25; t++){
-      ////    AP_z[z] += 0.01 * (AP_tz[t+1][z] + AP_tz[t][z])/2;
-      AP_z[z] += 0.02 * (AP_tz[t+1][z] + AP_tz[t][z])/2;
-    }
-    AP_z[z] = 2*AP_z[z];
- }
-
-  /* Integrate AP through depth*/
-  for (z=0; z<100; z++){
-    AP += delz * (AP_z[z] + AP_z[z+1])/2;
-  }
-
-  /* Derive Upwelling Irradiance, absorbed energy is from Section 3 */
-  Eu = absorbed_photons / AP;
-
-  /* Multiply E_tz by Eu */
-
-  ////for (t=0; t<101; t++){
-
-  /* ==================================== */
-  /*   light is symmetrical about noon    */
-  /*   take advantage of that             */
-  /*   to get rid of 1/2 the calculations */
-  /* ==================================== */
-
-  //  for (t=0; t<51; t++){
-  for (t=0; t<26; t++){
-    for (z=0; z<101; z++){
-      E_tz[t][z] *= Eu;
-      AP_tz[t][z] *= Eu;
-    }
-  }
-  for (t=26; t<51; t++){
-    tsym = 25 - (t - 25);
-    for (z=0; z<101; z++){
-      E_tz[t][z] =  E_tz[tsym][z];
-      AP_tz[t][z] =  AP_tz[tsym][z];
-    }
-  }
-
-  /* ----------------------------------------------------------------------------------------------*/
-  /* Step 6: CALCULATE EK through depth (modified from Behrenfeld et al. 2016) */
-  /* ----------------------------------------------------------------------------------------------*/
-
-  IML   = (PAR * 0.95 / (DL* 24)) * exp(-0.5 * kdpar * mld);
-
-  for (z=0; z<101; z++){
-    Ek[z] = 19 * exp(0.038 * pow(PAR * 0.95 / (DL * 24), 0.45) / kdpar);
-  }
-
-  /* Modify Ek beneath the MLD */
-
-  if (mld < zeu){
-    Eg_mld = (PAR / DL)  * exp(-1*kdpar*mld);
-    for (z=0; z<101; z++){
-      Ek[z] *= (1 + exp(-0.15 * (0.95  * PAR / (DL * 24)))) / (1 + exp(-3 * IML));
-      if (zseq[z] > mld){
-    Eg = (PAR / DL)  * exp(-1*kdpar*zseq[z]);
-    Ek[z] = 10 + (Ek[z] - 10) / (Eg_mld - 0.1) * (Eg -0.1);
-      }
-      if (Ek[z] < 10) {Ek[z] = 10;}
-    }
-  }
-
-  for (z=0; z<101; z++){
-    Ek[z] *= 0.0864;    /* 0.0864 #Convert to mol photons/m2/day */
-  }
-
-  /* debug variable */
-  // oppDebugEk0 = Ek[0];
-
-
-  /* ----------------------------------------------------------------------------------------------*/
-  /* Step 7: Make Ek spectrally explicit (KPUR) using a spectral correction factor */
-  /* ----------------------------------------------------------------------------------------------*/
-
-  for (w=0; w<31; w++){
-    mean_aphi += aphi[w];
-  }
-  mean_aphi /= 31;
-
-  for (z=0; z<101; z++){
-    numerator   = 0.0;
-    denominator = 0.0;
-    for (w=0; w<30; w++){
-      ////    numerator +=   10 * 0.5 * (AP_tzw[49][z][w] + AP_tzw[49][z][w+1]);
-      ////    denominator += 10 * 0.5 * (E_tzw[49][z][w] + E_tzw[49][z][w+1]);
-
-      numerator +=   10 * 0.5 * (AP_tzw[24][z][w] + AP_tzw[24][z][w+1]);
-      denominator += 10 * 0.5 * (E_tzw[24][z][w] + E_tzw[24][z][w+1]);
-    }
-    KPUR[z] = Ek[z] / (numerator / (denominator * mean_aphi) / 1.3);
-  }
-
-  /* ----------------------------------------------------------------------------------------------*/
-  /* Step 8: Calculate phimax as a function of Ek */
-  /* ----------------------------------------------------------------------------------------------*/
-
-  slope = (phirange[1] - phirange[0]) / (Ekrange[1] - Ekrange[0]);
-
-  for (z=0; z<101; z++){
-    phimax[z] = phirange[1] + (Ek[z] - Ekrange[1]) * slope;
-    if (phimax[z] > phirange[1]) {phimax[z] = phirange[1];}
-    if (phimax[z] < phirange[0]) {phimax[z] = phirange[0];}
-  }
-
-  /* ----------------------------------------------------------------------------------------------*/
-  /* Step 9: Scale aphi beneath the MLD to Ek */
-  /* ----------------------------------------------------------------------------------------------*/
-
-  if ( mld < zeu ) {
-    for (z=0; z<101; z++){
-      if (zseq[z] > mld){
-    aphi_fact[z] = 1 + Ek[0]/Ek[z] * 0.15;
-      } else {
-    aphi_fact[z] = 1;
-      }
+    /* ----------------------------------------------------------------------------------------------*/
+
+    /* Description: Computes daily net primary production following the Carbon, Absorption, Fluorescence
+                    Euphotic-resolving (CAFE) model. For a full description of the model, please see:
+
+                    Silsbe, G.M., M.J. Behrenfeld, K.H. Halsey, A.J. Milligan, and T.K. Westberry. 2016.
+                    The CAFE model. A net production model for global ocean phytoplankton. Global
+                    Biogeochemical Cycles. doi: 10.1002/2016GB005521.
+
+       Model inputs:
+        PAR     - Daily photosynthetic active radiation [mol photons m^-2 day^-1]
+        chl     - Chlorophyll concentration, NASA OCI algorithm [mg m^-3]
+        mld     - Mixed layer depth [m]
+        lat     - Latitude [Degrees, north positive]
+        yd      - Day of year
+        aph_443 - Absorption due to phytoplankton at 443 nm, NASA GIOP algorithm [m-1]
+        adg_443 - Absorption due to gelbstoff and detratial material at 443 nm, NASA GIOP model [m-1]
+        bbp_443 - Particulate backscatter at 443 nm, NASA GIOP model [m-1]
+        bbp_s   - Backscattering spectral parameter for GIOP model [dimensionless]
+        sst     - Sea surface temperature [Degrees Celcuis]
+
+      Modeling code below is divided into 10 steps:
+
+        1) Declare all local variables
+        2) Derive inherent optical properties (IOPs) at 10 nm increments from 400 to 700 nm
+        3) Calculate the amount of energy in the eupotic zone that is absorbed by phytoplankton
+        4) Derive the spectral attenunation coefficient and the attenuation coefficient of PAR
+        5) Derive conversion factor (Eu) that converts downwelling planar irradiance to scalar
+           irradiance
+        6) Calculate the photoacclimation parameter (Ek) through depth
+        7) Scale Ek to a spectrally explicit parameter (KPUR)
+        8) Model the maximum quantum efficiency of net carbon fixation (phi_max)
+        9) If the mixed layer depth (MLD) is shallower than the euphotic depth, then apply scaling
+           factor to phytoplankton absorption beneath the MLD and adjust the energy absorbed by
+           phytoplankton.
+        10) Derive net phytoplankton production (NPP).
+        11) Dependent function that calculates the wavelength, salinity and temperature dependence
+            of the backscattering of pure water.
+    */
+
+    /* ----------------------------------------------------------------------------------------------*/
+    /* Step 1: Declare all local variables */
+    /* ----------------------------------------------------------------------------------------------*/
+
+    int w;    /* Wavelength step 10 nm between 400 and 700 nm */
+    int t;    /* Time step, day is divided into 101 evenly spaced increments */
+    int tsym; /* morning index for equivalent afternoon time */
+    int z;    /* Depth step, euphotic zone is divided into 101 evenly spaced increments */
+
+    /* Inherent Optical Properties*/
+    double aphi[31]; /* Absorption[wavelength] due to phytoplankton */
+    double a[31];    /* Total absorption[wavelength] */
+    double bb[31];   /* Total backscattering[wavelength] */
+    double bbw[31];  /* Backscattering of pure water[wavelength] */
+
+    /* Wavelength */
+    double wv[] = {400, 410, 420, 430, 440, 450, 460, 470, 480, 490, 500, 510, 520, 530, 540, 550,
+                   560, 570, 580, 590, 600, 610, 620, 630, 640, 650, 660, 670, 680, 690, 700};
+
+    /* Absorption due to pure water[wavelength] */
+    double aw[] = {0.00663, 0.00473, 0.00454, 0.00495, 0.00635, 0.00922, 0.00979, 0.0106,
+                   0.0127,  0.015,   0.0204,  0.0325,  0.0409,  0.0434,  0.0474,  0.0565,
+                   0.0619,  0.0695,  0.0896,  0.1351,  0.2224,  0.2644,  0.2755,  0.2916,
+                   0.3108,  0.34,    0.41,    0.439,   0.465,   0.516,   0.624};
+
+    /*Spectral shape of of aphi */
+    double A_Bricaud[] = {0.0241, 0.0287, 0.0328, 0.0359, 0.0378, 0.0350, 0.0328, 0.0309,
+                          0.0281, 0.0254, 0.0210, 0.0162, 0.0126, 0.0103, 0.0085, 0.0070,
+                          0.0057, 0.0050, 0.0051, 0.0054, 0.0052, 0.0055, 0.0061, 0.0066,
+                          0.0071, 0.0078, 0.0108, 0.0174, 0.0161, 0.0069, 0.0025};
+
+    double E_Bricaud[] = {0.6877, 0.6834, 0.6664, 0.6478, 0.6266, 0.5993, 0.5961, 0.5970,
+                          0.5890, 0.6074, 0.6529, 0.7212, 0.7939, 0.8500, 0.9036, 0.9312,
+                          0.9345, 0.9298, 0.8933, 0.8589, 0.8410, 0.8548, 0.8704, 0.8638,
+                          0.8524, 0.8155, 0.8233, 0.8138, 0.8284, 0.9255, 1.0286};
+
+    /* Spectral shape of PAR */
+    double PAR_spectrum[] = {0.00227, 0.00218, 0.00239, 0.00189, 0.00297, 0.00348, 0.00345, 0.00344,
+                             0.00373, 0.00377, 0.00362, 0.00364, 0.00360, 0.00367, 0.00354, 0.00368,
+                             0.00354, 0.00357, 0.00363, 0.00332, 0.00358, 0.00357, 0.00359, 0.00340,
+                             0.00350, 0.00332, 0.00342, 0.00347, 0.00342, 0.00290, 0.00314};
+
+    /* Parameters related to euphotic zone*/
+    double decl;   /* Solar declination [rads] */
+    double m0;     /* Coefficient to calculate kd (Lee et al. 2005) [m-1] */
+    double DL;     /* Daylength [day] */
+    double solzen; /* Solar zenith angle [rads] */
+    double kd[31]; /* Downwelling attenuation coefficient of irradiance [m-1] */
+    double zeu;    /* Euphotic depth [m] */
+    double kdpar;  /* Downwelling attenuation coefficient of PAR [m-1] */
+
+    /* Parameters related to light and absorbed photons through depth, time, and wavelength */
+    double tseq[101];              /* Fractional time of day */
+    double zseq[101];              /* Euphotic depth divided into 101 increments */
+    double delz;                   /* Depth of zseq (i.e. zeu/101) */
+    double absorbed_photons = 0.0; /* Absorbed photons calculated in Step 3 */
+    double PAR_noon[31];           /* PAR at solar noon[wavelength] [mol photons m-2 day-1 wv-] */
+    double AP_tzw[101][101][31];   /* Absorbed photons[depth, time, wavelength] */
+    double AP_tz[101][101];        /* Absorbed photons[depth, time] */
+    double AP_tz2[101][101];       /* Absorbed photons[depth, time] */
+    double AP_z[101];              /* Absorbed photons[depth] */
+    double AP_z2[101];             /* Absorbed photons[depth] */
+    double AP = {0.0};             /* Absorbed photons [mol m-2 day-1] */
+    double AP2 = {0.0};            /* Absorbed photons [mol m-2 day-1] */
+    double E_tzw[101][101][31];    /* Irradiance [depth, time, wavelength] */
+    double E_tz[101][101];         /* Irradiance [depth, time] */
+    double Eu;                     /* conversion factor (Eu) that converts downwelling planar
+                                    irradiance to scalar irradiance */
+
+    /* Parameters related to derivation of Ek*/
+    double Ek[101]; /* Photoacclimation parameter[depth] (Behrenfeld et al. 2016) [mol m-2 day-1] */
+    double IML;     /* Median irradiance in the mixed layer [umol m-2 day-1] */
+    double Eg;      /* Growth irradiance at a specific depth */
+    double Eg_mld;  /* Growth irradiance at a specific depth */
+
+    /* Parameters used to convert Ek into the spectrally explicit equivalent KPUR */
+    double KPUR[101];       /* Spectrally explicit Ek */
+    double numerator;       /* Numerator to calculate spectral correction factor */
+    double denominator;     /* Denominator to calculate spectral correction factor */
+    double mean_aphi = 0.0; /* Spectrally averaged absorption due to phytoplankton */
+
+    /* Parameters used to calculate the maximum quantum yield of net carbon fixation */
+    double phimax[101]; /* maximum quantum yield of net carbon fixation [mol C (mol photons)-1] */
+    double phirange[2] = {0.018, 0.030};               /* range of phimax values */
+    double Ekrange[2] = {150 * 0.086400, 10 * 0.0864}; /* relates phimax to Ek */
+    double slope;                                      /* relates phimax to Ek */
+
+    double aphi_fact[101]; /* Parameter to increase aphi beneath the MLD */
+
+    /* Net primary production [mg C m-2 day-1] */
+    double NPP_tz[101][101] = {{0.0}};
+    double NPP_z[101] = {0.0};
+    double NPP = {0.0};
+
+    /* ----------------------------------------------------------------------------------------------*/
+    /* Step 2: Derive IOPs at 10 nm increments from 400 to 700 nm                                    */
+    /*   Comment: Currently assume salinity is 32.5 ppmil                                            */
+    /* ----------------------------------------------------------------------------------------------*/
+
+    for (w = 0; w < 31; w++) {
+        bbw[w] = betasw_ZHH2009(wv[w], 32.5, sst);
+        aphi[w] = aph_443 * A_Bricaud[w] * pow(chl, E_Bricaud[w]) / (0.03711 * pow(chl, 0.61479));
+        a[w] = aw[w] + aphi[w] + adg_443 * exp(-0.018 * (wv[w] - 443));
+        bb[w] = bbw[w] + bbp_443 * pow(443 / wv[w], bbp_s);
     }
 
-    //  for (z=21; z<23; z++){
-    //    fprintf(fp, "z =  %d\n",z);
-    //    fprintf(fp, " %lf",aphi_fact[z]);
-    //    fprintf(fp,"\n");
-    //  }
+    /* ----------------------------------------------------------------------------------------------*/
+    /* Step 3: Calculate Absorbed Energy */
+    /* ----------------------------------------------------------------------------------------------*/
 
-    /* Modify Irradiance and absorbed energy to account for any change to aphi */
-    ////for (t=0; t<101; t++){
-
-  /* ==================================== */
-  /*   light is symmetrical about noon    */
-  /*   take advantage of that             */
-  /*   to get rid of 1/2 the calculations */
-  /* ==================================== */
-
-    //    for (t=0; t<51; t++){
-    for (t=0; t<26; t++){
-      for (w=0; w<31; w++){
-    AP_tzw[t][0][w] = E_tzw[t][0][w] * aphi[w];
-      }
-      for (z=1; z<101; z++){
-    for (w=0; w<31; w++){
-      a[w]            = aw[w] + aphi[w] * aphi_fact[z] + adg_443 * exp(-0.018 * (wv[w] - 443));
-      kd[w]           = m0 * a[w] + 4.18 * (1 - 0.52 * exp(-10.8 * a[w])) * bb[w];
-      E_tzw[t][z][w]  = E_tzw[t][z-1][w] * exp(-1*kd[w]*delz);
-      AP_tzw[t][z][w] = E_tzw[t][z][w] * aphi[w] * aphi_fact[z];
-    }
-      }
-    }
-    for (t=26; t<51; t++){
-      tsym = 25 - (t - 25);
-      for (w=0; w<31; w++){
-    AP_tzw[t][0][w] = AP_tzw[tsym][0][w];
-      }
-      for (z=1; z<101; z++){
-    for (w=0; w<31; w++){
-      E_tzw[t][z][w]  = E_tzw[tsym][z][w];
-      AP_tzw[t][z][w] = AP_tzw[tsym][z][w];
-    }
-      }
+    for (w = 0; w < 30; w++) {
+        absorbed_photons +=
+            0.5 * 10 * (PAR_spectrum[w + 1] * aphi[w + 1] / a[w + 1] + PAR_spectrum[w] * aphi[w] / a[w]);
     }
 
-    /* Integrate AP through wavelength and multiply by Eu*/
-    for (z=0; z<101; z++){
-      ////  for (t=0; t<101; t++){
+    absorbed_photons *= PAR * 0.95;
 
-  /* ==================================== */
-  /*   light is symmetrical about noon    */
-  /*   take advantage of that             */
-  /*   to get rid of 1/2 the calculations */
-  /* ==================================== */
+    /* ----------------------------------------------------------------------------------------------*/
+    /* Step 4: Derive Kd following Lee et al 2005, Eq. 11 and kdpar */
+    /*         from Morel et al 2007, Eq. 9'                        */
+    /*---------- ------------------------------------------------------------------------------------*/
 
-      //      for (t=0; t<51; t++){
-      for (t=0; t<26; t++){
-    AP_tz2[t][z] = 0.0;
-    for (w=0; w<30; w++){
-      AP_tz2[t][z] += 10 * (AP_tzw[t][z][w+1] + AP_tzw[t][z][w])/2;
-    }
-    AP_tz2[t][z] *= Eu;
-      }
-      for (t=26; t<51; t++){
-    tsym = 25 - (t - 25);
-    AP_tz2[t][z] = AP_tz2[tsym][z];
-      }
-    }
-    //    fprintf(fp, "\nEu =  %lf\n",Eu);
-  } else {
+    decl = 23.5 * cos(2 * OEL_PI * (yd - 172) / 365) * OEL_PI / 180;
+    DL = -1 * tan(lat * OEL_PI / 180) * tan(decl);
 
-    for (z=0; z<101; z++){
-      ////  for (t=0; t<101; t++){
-      for (t=0; t<51; t++){
-    AP_tz2[t][z] = AP_tz[t][z];
-      }
+    if (DL > 1) {
+        DL = 1;
+    } /* Check for daylength less than 0 hours */
+    if (DL < -1) {
+        DL = -1;
+    } /* Check for daylength greater than 24 hours */
+
+    DL = acos(DL) / OEL_PI; /* Daylength in days */
+
+    solzen =
+        90 - asin(sin(lat * OEL_PI / 180) * sin(decl) - cos(lat * OEL_PI / 180) * cos(decl) * cos(OEL_PI)) *
+                 180 / OEL_PI;
+    m0 = sqrt((1 + 0.005 * solzen) * (1 + 0.005 * solzen)); /* absolute value */
+
+    for (w = 0; w < 31; w++) {
+        kd[w] = m0 * a[w] + 4.18 * (1 - 0.52 * exp(-10.8 * a[w])) * bb[w];
     }
 
-  }
+    kdpar = 0.0665 + (0.874 * kd[9]) - (0.00121 / kd[9]);
+    zeu = -1 * log(0.1 / (PAR * 0.95)) / kdpar;
 
 
-  /* ------------------------------------------------------------------------------------*/
-  /* Step 9: CALCULATE NPP */
-  /* ------------------------------------------------------------------------------------*/
+    /* ----------------------------------------------------------------------------------------------*/
+    /* Step 5: Derive conversion factor (Eu) that converts downwelling planar irradiance to scalar   */
+    /*   irradiance */
+    /* ----------------------------------------------------------------------------------------------*/
 
-  ////for (t=0; t<101; t++){
-
-  /* ==================================== */
-  /*   light is symmetrical about noon    */
-  /*   take advantage of that             */
-  /*   to get rid of 1/2 the calculations */
-  /* ==================================== */
-
-  //  for (t=0; t<51; t++){
-  for (t=0; t<26; t++){
-    for (z=0; z<101; z++){
-      NPP_tz[t][z] = phimax[z] * AP_tz2[t][z] * tanh(KPUR[z] / E_tz[t][z]) * 12000;
+    for (t = 0; t < 101; t++) {
+        zseq[t] = (double)t / 100 * ceil(zeu);
     }
-  }
-  for (t=26; t<51; t++){
-    tsym = 25 - (t - 25);
-    for (z=0; z<101; z++){
-      NPP_tz[t][z] = NPP_tz[tsym][z];
+    for (t = 0; t < 51; t++) {
+        tseq[t] = (double)t / 50;
     }
-  }
+    delz = zseq[1] - zseq[0];
 
-
-  /* Integrate NPP through time */
-  for (z=0; z<101; z++){
-    NPP_z[z] = 0.0;
-    AP_z2[z] = 0.0;
-    ////  for (t=0; t<100; t++){
-
-  /* ==================================== */
-  /*   light is symmetrical about noon    */
-  /*   take advantage of that             */
-  /*   to get rid of 1/2 the calculations */
-  /* ==================================== */
-
-    //    for (t=0; t<50; t++){
-    for (t=0; t<25; t++){
-      ////    NPP_z[z] += 0.01 * (NPP_tz[t+1][z] + NPP_tz[t][z])/2;
-      NPP_z[z] += 0.02 * (NPP_tz[t+1][z] + NPP_tz[t][z])/2;
-      AP_z2[z] += 0.02 * (AP_tz2[t+1][z] + AP_tz2[t][z])/2;
+    for (w = 0; w < 31; w++) {
+        PAR_noon[w] = OEL_PI / 2 * PAR * 0.95 * PAR_spectrum[w];
     }
-    NPP_z[z] = 2*NPP_z[z];
-    AP_z2[z] = 2*AP_z2[z];
-  }
 
-  /* Integrate NPP through depth */
-  NPP = 0.0;
-  AP2 = 0.0;
-  for (z=0; z<100; z++){
-    NPP += delz * (NPP_z[z] + NPP_z[z+1])/2;
-    AP2 += delz * (AP_z2[z] + AP_z2[z+1])/2;
-  }
+    /* ==================================== */
+    /*   light is symmetrical about noon    */
+    /*   take advantage of that             */
+    /*   to get rid of 1/2 the calculations */
+    /* ==================================== */
+    double sin_array[26];
+    double kd_array[101][31];
+    for (t = 0; t < 26; t++) {
+        sin_array[t] = sin(OEL_PI * tseq[t]);
+    }
+    for (z = 0; z < 101; z++) {
+        for (w = 0; w < 31; w++) {
+            kd_array[z][w] = exp(-1 * kd[w] * zseq[z]);
+        }
+    }
 
-  //  FILE *fp;
-  //  fp = fopen("test.txt", "a");
+    for (t = 0; t < 26; t++) {
+        for (z = 0; z < 101; z++) {
+            for (w = 0; w < 31; w++) {
+                E_tzw[t][z][w] = PAR_noon[w] * sin_array[t] * kd_array[z][w];
+                AP_tzw[t][z][w] = E_tzw[t][z][w] * aphi[w];
+            }
+        }
+    }
+    for (t = 26; t < 51; t++) {
+        tsym = 25 - (t - 25);
+        for (z = 0; z < 101; z++) {
+            for (w = 0; w < 31; w++) {
+                E_tzw[t][z][w] = E_tzw[tsym][z][w];
+                AP_tzw[t][z][w] = AP_tzw[tsym][z][w];
+            }
+        }
+    }
 
-  //  fprintf(fp, "\n %.14lf %.12lf %.13lf %.14lf\n", AP2, NPP, zeu, Ek[0]);
-  //  fprintf(fp, " %lf %lf %lf\n",delz,Eu,absorbed_photons);
+    /* Integrate E and AP through wavelength*/
+    for (z = 0; z < 101; z++) {
 
-  //  for (z=0; z<100; z++){
-  //    fprintf(fp, " %lf",AP_z2[z]);
-  //  }
+        /* ==================================== */
+        /*   light is symmetrical about noon    */
+        /*   take advantage of that             */
+        /*   to get rid of 1/2 the calculations */
+        /* ==================================== */
 
-  //  fprintf(fp,"\n");
+        for (t = 0; t < 26; t++) {
+            E_tz[t][z] = 0.0;
+            AP_tz[t][z] = 0.0;
+            for (w = 0; w < 30; w++) {
+                E_tz[t][z] += 10 * (E_tzw[t][z][w + 1] + E_tzw[t][z][w]) / 2;
+                AP_tz[t][z] += 10 * (AP_tzw[t][z][w + 1] + AP_tzw[t][z][w]) / 2;
+            }
+        }
+        for (t = 26; t < 51; t++) {
+            tsym = 25 - (t - 25);
+            for (w = 0; w < 30; w++) {
+                E_tz[t][z] = E_tz[tsym][z];
+                AP_tz[t][z] = AP_tz[tsym][z];
+            }
+        }
+    }
+
+    /* Integrate AP through time*/
+    for (z = 0; z < 101; z++) {
+        AP_z[z] = 0.0;
+        /* ==================================== */
+        /*   light is symmetrical about noon    */
+        /*   take advantage of that             */
+        /*   to get rid of 1/2 the calculations */
+        /* ==================================== */
+        for (t = 0; t < 25; t++) {
+            AP_z[z] += 0.02 * (AP_tz[t + 1][z] + AP_tz[t][z]) / 2;
+        }
+        AP_z[z] = 2 * AP_z[z];
+    }
+
+    /* Integrate AP through depth*/
+    for (z = 0; z < 100; z++) {
+        AP += delz * (AP_z[z] + AP_z[z + 1]) / 2;
+    }
+
+    /* Derive Upwelling Irradiance, absorbed energy is from Section 3 */
+    Eu = absorbed_photons / AP;
+
+    /* Multiply E_tz by Eu */
+
+    /* ==================================== */
+    /*   light is symmetrical about noon    */
+    /*   take advantage of that             */
+    /*   to get rid of 1/2 the calculations */
+    /* ==================================== */
+
+    for (t = 0; t < 26; t++) {
+        for (z = 0; z < 101; z++) {
+            E_tz[t][z] *= Eu;
+            AP_tz[t][z] *= Eu;
+        }
+    }
+    for (t = 26; t < 51; t++) {
+        tsym = 25 - (t - 25);
+        for (z = 0; z < 101; z++) {
+            E_tz[t][z] = E_tz[tsym][z];
+            AP_tz[t][z] = AP_tz[tsym][z];
+        }
+    }
+
+    /* ----------------------------------------------------------------------------------------------*/
+    /* Step 6: CALCULATE EK through depth (modified from Behrenfeld et al. 2016) */
+    /* ----------------------------------------------------------------------------------------------*/
+
+    IML = (PAR * 0.95 / (DL * 24)) * exp(-0.5 * kdpar * mld);
+
+    for (z = 0; z < 101; z++) {
+        Ek[z] = 19 * exp(0.038 * pow(PAR * 0.95 / (DL * 24), 0.45) / kdpar);
+    }
+
+    /* Modify Ek beneath the MLD */
+
+    if (mld < zeu) {
+        Eg_mld = (PAR / DL) * exp(-1 * kdpar * mld);
+        for (z = 0; z < 101; z++) {
+            Ek[z] *= (1 + exp(-0.15 * (0.95 * PAR / (DL * 24)))) / (1 + exp(-3 * IML));
+            if (zseq[z] > mld) {
+                Eg = (PAR / DL) * exp(-1 * kdpar * zseq[z]);
+                Ek[z] = 10 + (Ek[z] - 10) / (Eg_mld - 0.1) * (Eg - 0.1);
+            }
+            if (Ek[z] < 10) {
+                Ek[z] = 10;
+            }
+        }
+    }
+
+    for (z = 0; z < 101; z++) {
+        Ek[z] *= 0.0864; /* 0.0864 #Convert to mol photons/m2/day */
+    }
 
 
-  //  fprintf(fp, " %.11lf %.11lf %.11lf\n",kd[0], kd[9], kdpar);
-  //  fprintf(fp, " %.14lf %.14lf %.14lf\n",m0, a[9], bb[9]);
-  //  fprintf(fp, " %.14lf %lf\n",bbw[9], wv[9]);
-  //  fprintf(fp, " %.14lf %lf\n",aw[9], aphi[9]);
+    /* ----------------------------------------------------------------------------------------------*/
+    /* Step 7: Make Ek spectrally explicit (KPUR) using a spectral correction factor */
+    /* ----------------------------------------------------------------------------------------------*/
 
-  //  for (w=0; w<30; w++){
-  //    fprintf(fp, " %lf",aw[w] + aphi[w] + adg_443*exp(-0.018*(wv[w]-443)));
-  //  }
-  //  fprintf(fp,"\n");
+    for (w = 0; w < 31; w++) {
+        mean_aphi += aphi[w];
+    }
+    mean_aphi /= 31;
 
-  //  fprintf(fp, "adg_443:  %lf\n",adg_443);
+    for (z = 0; z < 101; z++) {
+        numerator = 0.0;
+        denominator = 0.0;
+        for (w = 0; w < 30; w++) {
+            numerator += 10 * 0.5 * (AP_tzw[24][z][w] + AP_tzw[24][z][w + 1]);
+            denominator += 10 * 0.5 * (E_tzw[24][z][w] + E_tzw[24][z][w + 1]);
+        }
+        KPUR[z] = Ek[z] / (numerator / (denominator * mean_aphi) / 1.3);
+    }
+
+    /* ----------------------------------------------------------------------------------------------*/
+    /* Step 8: Calculate phimax as a function of Ek */
+    /* ----------------------------------------------------------------------------------------------*/
+
+    slope = (phirange[1] - phirange[0]) / (Ekrange[1] - Ekrange[0]);
+
+    for (z = 0; z < 101; z++) {
+        phimax[z] = phirange[1] + (Ek[z] - Ekrange[1]) * slope;
+        if (phimax[z] > phirange[1]) {
+            phimax[z] = phirange[1];
+        }
+        if (phimax[z] < phirange[0]) {
+            phimax[z] = phirange[0];
+        }
+    }
+
+    /* ----------------------------------------------------------------------------------------------*/
+    /* Step 9: Scale aphi beneath the MLD to Ek */
+    /* ----------------------------------------------------------------------------------------------*/
+
+    if (mld < zeu) {
+        for (z = 0; z < 101; z++) {
+            if (zseq[z] > mld) {
+                aphi_fact[z] = 1 + Ek[0] / Ek[z] * 0.15;
+            } else {
+                aphi_fact[z] = 1;
+            }
+        }
 
 
-  //  fprintf(fp,"      NPP     Ek     phimax    aphi_fact  KPUR    Ap_tz  zseq    index\n");
-  //  for (z=0; z<101; z++){
-  //    fprintf(fp, " %lf %lf %lf %lf %lf %lf %lf %lf %d\n",NPP_z[z],Ek[z],phimax[z],aphi_fact[z],KPUR[z],AP_tz[26][z],AP_tz2[26][z],zseq[z],z+1);
-  //  }
-  //  fprintf(fp,"\n");
+        /* Modify Irradiance and absorbed energy to account for any change to aphi */
 
-  //  fclose(fp);
+        /* ==================================== */
+        /*   light is symmetrical about noon    */
+        /*   take advantage of that             */
+        /*   to get rid of 1/2 the calculations */
+        /* ==================================== */
 
-  return NPP;
+        double kwz_array[101][31];
+        double w_array[31];
+        for (w = 0; w < 31; w++) {
+            w_array[w] = exp(-0.018 * (wv[w] - 443));
+        }
+        for (z = 0; z < 101; z++) {
+            for (w = 0; w < 31; w++) {
+                double awz = aw[w] + aphi[w] * aphi_fact[z] + adg_443 * w_array[w];
+                double kwz = m0 * awz + 4.18 * (1 - 0.52 * exp(-10.8 * awz)) * bb[w];
+                kwz_array[z][w] = exp(-1 * kwz * delz);
+            }
+        }
 
+        for (t = 0; t < 26; t++) {
+            for (w = 0; w < 31; w++) {
+                AP_tzw[t][0][w] = E_tzw[t][0][w] * aphi[w];
+            }
+            for (z = 1; z < 101; z++) {
+                for (w = 0; w < 31; w++) {
+                    E_tzw[t][z][w] = E_tzw[t][z - 1][w] * kwz_array[z][w];
+                    AP_tzw[t][z][w] = E_tzw[t][z][w] * aphi[w] * aphi_fact[z];
+                }
+            }
+        }
+        for (t = 26; t < 51; t++) {
+            tsym = 25 - (t - 25);
+            for (w = 0; w < 31; w++) {
+                AP_tzw[t][0][w] = AP_tzw[tsym][0][w];
+            }
+            for (z = 1; z < 101; z++) {
+                for (w = 0; w < 31; w++) {
+                    E_tzw[t][z][w] = E_tzw[tsym][z][w];
+                    AP_tzw[t][z][w] = AP_tzw[tsym][z][w];
+                }
+            }
+        }
+
+        /* Integrate AP through wavelength and multiply by Eu*/
+        for (z = 0; z < 101; z++) {
+            /* ==================================== */
+            /*   light is symmetrical about noon    */
+            /*   take advantage of that             */
+            /*   to get rid of 1/2 the calculations */
+            /* ==================================== */
+
+            for (t = 0; t < 26; t++) {
+                AP_tz2[t][z] = 0.0;
+                for (w = 0; w < 30; w++) {
+                    AP_tz2[t][z] += 10 * (AP_tzw[t][z][w + 1] + AP_tzw[t][z][w]) / 2;
+                }
+                AP_tz2[t][z] *= Eu;
+            }
+            for (t = 26; t < 51; t++) {
+                tsym = 25 - (t - 25);
+                AP_tz2[t][z] = AP_tz2[tsym][z];
+            }
+        }
+    } else {
+        for (z = 0; z < 101; z++) {
+            for (t = 0; t < 51; t++) {
+                AP_tz2[t][z] = AP_tz[t][z];
+            }
+        }
+    }
+
+    /* ------------------------------------------------------------------------------------*/
+    /* Step 9: CALCULATE NPP */
+    /* ------------------------------------------------------------------------------------*/
+
+
+    /* ==================================== */
+    /*   light is symmetrical about noon    */
+    /*   take advantage of that             */
+    /*   to get rid of 1/2 the calculations */
+    /* ==================================== */
+
+    for (t = 0; t < 26; t++) {
+        for (z = 0; z < 101; z++) {
+            NPP_tz[t][z] = phimax[z] * AP_tz2[t][z] * tanh(KPUR[z] / E_tz[t][z]) * 12000;
+        }
+    }
+    for (t = 26; t < 51; t++) {
+        tsym = 25 - (t - 25);
+        for (z = 0; z < 101; z++) {
+            NPP_tz[t][z] = NPP_tz[tsym][z];
+        }
+    }
+
+    /* Integrate NPP through time */
+    for (z = 0; z < 101; z++) {
+        NPP_z[z] = 0.0;
+        AP_z2[z] = 0.0;
+
+
+        /* ==================================== */
+        /*   light is symmetrical about noon    */
+        /*   take advantage of that             */
+        /*   to get rid of 1/2 the calculations */
+        /* ==================================== */
+
+
+        for (t = 0; t < 25; t++) {
+            NPP_z[z] += 0.02 * (NPP_tz[t + 1][z] + NPP_tz[t][z]) / 2;
+            AP_z2[z] += 0.02 * (AP_tz2[t + 1][z] + AP_tz2[t][z]) / 2;
+        }
+        NPP_z[z] = 2 * NPP_z[z];
+        AP_z2[z] = 2 * AP_z2[z];
+    }
+
+    /* Integrate NPP through depth */
+    NPP = 0.0;
+    AP2 = 0.0;
+    for (z = 0; z < 100; z++) {
+        NPP += delz * (NPP_z[z] + NPP_z[z + 1]) / 2;
+        AP2 += delz * (AP_z2[z] + AP_z2[z + 1]) / 2;
+    }
+    return NPP;
 }
 
 double betasw_ZHH2009 (double lambda, double S, double Tc){
@@ -1593,152 +1540,5 @@ double betasw_ZHH2009 (double lambda, double S, double Tc){
   bw: total scattering coefficient. Its size is [1 y]
   for backscattering coefficients, divide total scattering by 2
   */
-
-  /* values of the constants */
-  double Na  = 6.0221417930e23 ;   /*  Avogadro's constant */
-  double Kbz = 1.3806503e-23 ;     /*  Boltzmann constant */
-  double Tk  = Tc + 273.15 ;       /*  Absolute tempearture */
-  double M0  = 18e-3;              /*  Molecular weigth of water in kg/mol */
-  double delta= 0.039;
-  //double rad[181];
-  double nsw;
-  //double dnds;
-  double IsoComp;
-  double density;
-  double dlnawds;
-  double DFRI;
-  double beta_df;
-  double flu_con;
-  double beta_cf;
-  double beta90sw;
-  double bsw;
-  //double betasw;
-  double n_air;
-  double dnswds;
-
-  //for (i=0; i<181; i++){
-  //  rad[i] = i * M_PI/180;  /* angle in radian as a colum variable */
-  //}
-
-  /* nsw: absolute refractive index of seawater */
-  /* dnds: partial derivative of seawater refractive index w.r.t. salinity */
-
-
-  /* refractive index of air is from Ciddor (1996,Applied Optics) */
-  n_air = 1.0 + (5792105.0 / (238.0185 - 1 / pow(lambda / 1e3, 2)) + 167917.0 /
-                (57.362 - 1 / pow(lambda/1e3,2))) /1e8;
-
-  /* refractive index of seawater is from Quan and Fry (1994, Applied Optics) */
-  double n0 = 1.31405; double n1 = 1.779e-4 ; double n2 = -1.05e-6 ;
-  double n3 = 1.6e-8 ; double n4 = -2.02e-6 ; double n5 = 15.868;
-  double n6 = 0.01155; double n7 = -0.00423;  double n8 = -4382 ;
-  double n9 = 1.1455e6;
-
-  /* pure seawater */
-  nsw    = n0 + (n1 + n2 * Tc + n3 * pow(Tc, 2)) * S + n4 * pow(Tc, 2) +
-  (n5+n6*S+n7*Tc)/ lambda + n8 / pow(lambda, 2) + n9 / pow(lambda, 3);
-  nsw   *= n_air;
-  dnswds = (n1 + n2 * Tc + n3 * pow(Tc, 2) + n6 / lambda) * n_air;
-
-  /* isothermal compressibility is from Lepple & Millero (1971,Deep Sea-Research), pages 10-11
-  The error ~ ?0.004e-6 bar-1  */
-  double kw;
-  //double Btw_cal;
-  //double Btw;
-  double g0;
-  double g1;
-  double Ks;
-
-  /* pure water secant bulk Millero (1980, Deep-sea Research) */
-  kw = 19652.21 + 148.4206 * Tc - 2.327105 * pow(Tc, 2) + 1.360477e-2 * pow(Tc, 3) -
-       5.155288e-5 * pow(Tc, 4);
-  //Btw_cal = 1/kw;
-
-  /* isothermal compressibility from Kell sound measurement in pure water */
-  //Btw = (50.88630 + 0.717582 * Tc + 0.7819867e-3 * pow(Tc, 2) + 31.62214e-6 * pow(Tc, 3) -
-  //       0.1323594e-6 * pow(Tc, 4) +
-  //0.634575e-9 * pow(Tc, 5)) / (1 + 21.65928e-3 * Tc)*1e-6;
-
-  /* seawater secant bulk */
-  g0 = 54.6746 - 0.603459 * Tc + 1.09987e-2 * pow(Tc, 2) - 6.167e-5 * pow(Tc, 3);
-  g1 = 7.944e-2 + 1.6483e-2 * Tc - 5.3009e-4 * pow(Tc, 2);
-
-  Ks = kw + g0 * S + g1 * pow(S, 1.5);
-
-  /* calculate seawater isothermal compressibility from the secant bulk */
-  IsoComp = ( 1 / Ks * 1e-5); /* unit is pa */
-
-
-  /* density of water and seawater,unit is Kg/m3, from UNESCO,38,1981
-
-  density = density_sw(Tc, S);*/
-  double a0 = 8.24493e-1; double a1 = -4.0899e-3; double a2 = 7.6438e-5;
-  double a3 = -8.2467e-7; double a4 = 5.3875e-9; double a5 = -5.72466e-3;
-  double a6 = 1.02270e-4; double a7 = -1.6546e-6; double a8 = 4.8314e-4;
-  double b0 = 999.842594; double b1 = 6.793952e-2; double b2 = -9.09529e-3;
-  double b3 = 1.001685e-4; double b4 = -1.120083e-6; double b5 = 6.536332e-9;
-
-  /* density for pure water */
-  density = b0 + b1 * Tc + b2 * pow(Tc, 2) + b3 * pow(Tc, 3) + b4 * pow(Tc, 4) + b5 * pow(Tc, 5);
-  /* density for pure seawater */
-  density += (( a0 + a1 * Tc + a2 * pow(Tc, 2) + a3 * pow(Tc, 3) + a4 * pow(Tc, 4)) * S +
-  ( a5 + a6 * Tc + a7 * pow(Tc, 2)) * pow(S, 1.5) + a8 * pow(S, 2));
-
-  /* water activity data of seawater is from Millero and Leung (1976,American
-  Journal of Science,276,1035-1077). Table 19 was reproduced using
-  Eq.(14,22,23,88,107) then were fitted to polynominal equation.
-  dlnawds is partial derivative of natural logarithm of water activity
-  w.r.t.salinity */
-
-//  dlnawds = (-5.58651e-4 + 2.40452e-7 * Tc -3.12165e-9 * pow(Tc, 2) + 2.40808e-11 * pow(Tc, 3)) +
-//            1.5*(1.79613e-5 -9.9422e-8 * Tc +2.08919e-9 * pow(Tc, 2) - 1.39872e-11 * pow(Tc, 3)) *
-//            pow(S, 1.5) + 2 * (-2.31065e-6 - 1.37674e-9 * Tc -1.93316e-11 * pow(Tc, 2)) * S;
-
-  dlnawds = (-5.58651e-4 + 2.40452e-7 * Tc -3.12165e-9 * pow(Tc, 2) + 2.40808e-11 * pow(Tc, 3)) +
-            1.5*(1.79613e-5 -9.9422e-8 * Tc +2.08919e-9 * pow(Tc, 2) - 1.39872e-11 * pow(Tc, 3)) *
-            pow(S, 0.5) + 2 * (-2.31065e-6 - 1.37674e-9 * Tc -1.93316e-11 * pow(Tc, 2)) * S;
-
-  /* density derivative of refractive index from PMH model */
-  double n_wat2;
-  double base;
-  //  double val;
-
-  n_wat2 = pow(nsw, 2);
-//  base   = (nsw/3 - 0.333333333333 / nsw);
-  base   = (nsw/3 - (1.0/3.0) / nsw);
-//  DFRI   = (n_wat2 - 1) * (1 + 0.666666666667 * (n_wat2 + 2) * pow(base, 2)) ;
-  DFRI   = (n_wat2 - 1) * (1 + (2.0/3.0) * (n_wat2 + 2) * pow(base, 2)) ;
-//  val = 1/3;
-//  base   = (nsw/3) - (val/nsw);
-//  DFRI   = (n_wat2 - 1) * (1 + (2/3) * (n_wat2 + 2) * pow(base, 2)) ;
-
-  /* volume scattering at 90 degree due to the density fluctuation */
-  beta_df = M_PI * M_PI / 2 * pow(lambda*1e-9, -4) * Kbz * Tk * IsoComp * pow(DFRI,2) *
-            (6 + 6*delta) / (6-7*delta);
-
-  /* volume scattering at 90 degree due to the concentration fluctuation */
-  flu_con = S * M0 * pow(dnswds,2) / density / (-1 * dlnawds) / Na;
-  beta_cf = 2 * M_PI * M_PI * pow(lambda*1e-9, -4) * pow(nsw, 2) * flu_con * (6 + 6 * delta) /
-            (6 - 7 * delta);
-
-  /* total volume scattering at 90 degree */
-  beta90sw = beta_df + beta_cf;
-  bsw      = 8 * M_PI / 3 * beta90sw * (2+delta) / (1+delta);
-
-
-  //if ( lambda == 490 ) {
-  //  FILE *fp2;
-  //  fp2 = fopen("test2.txt", "a");
-  //  fprintf(fp2, " %.9lf %.9lf %.9lf %.9lf\n",bsw/2, beta90sw, beta_df, beta_cf);
-  //  fprintf(fp2, " %e %.9lf %e %.9lf\n",Kbz, Tk, IsoComp, DFRI);
-  //  fprintf(fp2, " %.14lf %.14lf %.14lf \n",nsw,n_wat2,base);
-
-//  fprintf(fp2, " %.9lf %e\n",nsw, flu_con);
-//  fprintf(fp2, " %lf %lf %e %e %e %e\n",S, M0, dnswds, density, dlnawds, Na);
-//  fprintf(fp2, " %lf\n",DFRI);
-//}
-
-
-  return(bsw);
-
+  return seawater_bb(lambda,Tc,S,0.039);
 }

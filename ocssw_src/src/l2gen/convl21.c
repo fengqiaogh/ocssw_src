@@ -162,7 +162,7 @@ int convl21(l2str *l2rec, tgstr *tgrec, int32_t spix, int32_t epix,
             else
                 solz_insitu = l1rec->solz[ip];
         }
-        mu0_insitu = cos(solz_insitu / RADEG);
+        mu0_insitu = cos(solz_insitu / OEL_RADEG);
 
 
         /* Build target nLw from target Lw, using retrieved atmosphere */

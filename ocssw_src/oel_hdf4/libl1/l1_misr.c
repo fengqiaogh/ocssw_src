@@ -642,7 +642,7 @@ int readl1_misr(filehandle *l1file, l1str *l1rec) {
     
     if (slz_interp_data[gp_index][ip] != -555) {
       l1rec->solz[ip] = slz_interp_data[gp_index][ip];
-      l1rec->csolz[ip] = cos(l1rec->solz[ip] / RADEG);
+      l1rec->csolz[ip] = cos(l1rec->solz[ip] / OEL_RADEG);
     }
     
     if (sna_interp_data[jcamera][gp_index][ip] != -555) {
@@ -653,7 +653,7 @@ int readl1_misr(filehandle *l1file, l1str *l1rec) {
     
     if (snz_interp_data[jcamera][gp_index][ip] != -555) {
       l1rec->senz[ip] = snz_interp_data[jcamera][gp_index][ip];
-      l1rec->csenz[ip] = cos(l1rec->senz[ip] / RADEG);
+      l1rec->csenz[ip] = cos(l1rec->senz[ip] / OEL_RADEG);
     }
 
     if (sla_interp_data[gp_index][ip] != -555 &&

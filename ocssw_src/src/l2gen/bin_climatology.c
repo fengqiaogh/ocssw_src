@@ -204,7 +204,7 @@ void initbin(void) {
     basebin[0] = 1;
     for (row = 0; row < nrows; row++) {
         latbin = ((row + 0.5)*180.0 / nrows) - 90.0;
-        numbin[row] = (int32) (2 * nrows * cos(latbin * PI / 180.0) + 0.5);
+        numbin[row] = (int32) (2 * nrows * cos(latbin * OEL_PI / 180.0) + 0.5);
         if (row > 0) {
             basebin[row] = basebin[row - 1] + numbin[row - 1];
         }

@@ -56,7 +56,7 @@ exit(EXIT_FAILURE);\
 }}
 
 inline float kasten_equation(float solz) {
-    float CosSZ = cos(solz * M_PI / 180.0);
+    float CosSZ = cos(solz * OEL_PI / 180.0);
     return (1.003198 * CosSZ + 0.101632) /
            (CosSZ * CosSZ + 0.090560 * CosSZ + 0.003198);
 }
@@ -1117,7 +1117,7 @@ float varsol(int32_t jday) {
     float om;
     float dsol;
 
-    om = (0.9856f * (float) (jday - 4)) * M_PI / 180.f;
+    om = (0.9856f * (float) (jday - 4)) * OEL_PI / 180.f;
     dsol = 1.f / powf((1.f - .01673f * cosf(om)), 2.f);
 
     return dsol;
@@ -1132,7 +1132,7 @@ void triseset(int32_t jday, float xlon, float xlat, float *trise, float *tset) {
     float fac, xlo, xla, xj, a1, a2, et, a3, delta, cosah, ah1, ah2, tsv1, tsv2,
             tsm1, tsm2;
 
-    fac = (float) M_PI / 180.f;
+    fac = (float) OEL_PI / 180.f;
 
     xlo = xlon * fac;
     xla = xlat * fac;
@@ -1178,11 +1178,11 @@ float get_solz(int32_t jday, float time, float lon, float lat) {
     //    j is the day number in the year
     //
     //   mean solar time (heure decimale) (aka decimal time)
-    double fac = M_PI / 180.;
+    double fac = OEL_PI / 180.;
     tsm = time + lon / 15.;
     xla = lat * fac;
     xj = (float) (jday - 1);
-    tet = 2. * M_PI * xj / 365.;
+    tet = 2. * OEL_PI * xj / 365.;
 
     //    time equation (in mn.dec)
     a1 = 0.000075;
@@ -1192,7 +1192,7 @@ float get_solz(int32_t jday, float time, float lon, float lat) {
     a5 = 0.040849;
     et = a1 + a2 * cos(tet) - a3 * sin(tet) - a4 * cos(2. * tet) -
          a5 * sin(2. * tet);
-    et = et * 12. * 60. / M_PI;
+    et = et * 12. * 60. / OEL_PI;
 
     //     true solar time
 
@@ -1227,12 +1227,12 @@ float get_solz(int32_t jday, float time, float lon, float lat) {
             (-cos(xla) * sin(delta) + sin(xla) * cos(delta) * cos(ah)) / cos(elev);
     azim = asin(az);
 
-    if (caz <= 0.) azim = M_PI - azim;
+    if (caz <= 0.) azim = OEL_PI - azim;
 
-    if (caz > 0. && az <= 0.) azim = 2. * M_PI + azim;
+    if (caz > 0. && az <= 0.) azim = 2. * OEL_PI + azim;
 
-    azim = azim + M_PI;
-    pi2 = 2.f * M_PI;
+    azim = azim + OEL_PI;
+    pi2 = 2.f * OEL_PI;
 
     if (azim > pi2) azim -= pi2;
 
@@ -1551,7 +1551,7 @@ float getosa(float wl, float sza, float wind, float chl, float fr,
 
     const float refm = getrefm(wl, luts_data);
 
-    const float csz = cos(sza * M_PI / 180.);
+    const float csz = cos(sza * OEL_PI / 180.);
 
     const float xx2 = sqrt(1.0 - (1.0 - csz * csz) / refm / refm);
 
@@ -1612,11 +1612,12 @@ float getosa(float wl, float sza, float wind, float chl, float fr,
 }
 
 float SunGlint(float sz, float vz, float ra, float ws) {
-    const float ssz = sin(sz * M_PI / 180.);
-    const float svz = sin(vz * M_PI / 180.);
-    const float csz = cos(sz * M_PI / 180.);
-    const float cvz = cos(vz * M_PI / 180.);
-    const float cra = cos(ra * M_PI / 180.);
+    double radeg = OEL_RADEG;
+    const float ssz = sin(sz * radeg);
+    const float svz = sin(vz * radeg);
+    const float csz = cos(sz * radeg);
+    const float cvz = cos(vz * radeg);
+    const float cra = cos(ra * radeg);
 
     // # Determine omega
     const float cos_2omega = csz * cvz + ssz * svz * cra;
@@ -1630,16 +1631,16 @@ float SunGlint(float sz, float vz, float ra, float ws) {
     const float term1 = sin(omegaDm) / sin(omegaDp);
     const float term2 = tan(omegaDm) / tan(omegaDp);
     float r_omega = 0.5 * (term1 * term1 + term2 * term2);
-    if (omega < 0.0174533) r_omega = 0.0211119;
+    if (omega < OEL_DEGRAD) r_omega = 0.0211119;
 
     const float beta = acos((csz + cvz) / (2.0 * cOmega));  //   #  in radians
     const float cBeta = cos(beta);
     const float tBeta = tan(beta);
     const float sig2 = 0.003 + 0.00512 * ws;
     const float P_V_beta =
-            (1.0 / (2.0 * sig2 * M_PI)) * exp(-tBeta * tBeta / (2.0 * sig2));
+            (1.0 / (2.0 * sig2 * OEL_PI)) * exp(-tBeta * tBeta / (2.0 * sig2));
     const float rho_g =
-            M_PI * P_V_beta * r_omega / (4.0 * csz * cvz * pow((cBeta), 4));
+            OEL_PI * P_V_beta * r_omega / (4.0 * csz * cvz * pow((cBeta), 4));
     return rho_g;
 }
 

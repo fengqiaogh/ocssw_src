@@ -6,7 +6,6 @@ Created on Tue Sep 18 11:08:27 2018
 @author: dshea
 """
 
-from operator import indexOf
 import sys
 import re
 import argparse
@@ -19,7 +18,7 @@ import json
 import datetime
 import tempfile
 import tarfile
-import smtplib 
+import smtplib
 from email.message import EmailMessage
 
 #sys.path.insert(0, os.path.dirname(__file__))
@@ -43,25 +42,22 @@ bundleList = []
 initialBundleList = [
     {"name":"root", "dir":".", "help":"random files in the root dir", "extra":"--exclude . --include bundleList.json --include OCSSW_bash.env --include OCSSW.env", "commandLine":True},
     {"name":"python", "dir":"python", "help":"OCSSW required python modules", "commandLine":True},
-    {"name":"bin_linux_64", "dir":"bin_linux_64", "help":"executables for Linux", "commandLine":False}, 
-    {"name":"bin_linux_hpc", "dir":"bin_linux_hpc", "help":"executables for Linux HPC", "commandLine":False}, 
-    {"name":"bin_macosx_intel", "dir":"bin_macosx_intel", "help":"executables for Mac", "commandLine":False},
+    {"name":"bin_linux_64", "dir":"bin_linux_64", "help":"executables for Linux", "commandLine":False},
+    {"name":"bin_linux_hpc", "dir":"bin_linux_hpc", "help":"executables for Linux HPC", "commandLine":False},
     {"name":"bin_macosx_arm64", "dir":"bin_macosx_arm64", "help":"executables for Mac ARM64", "commandLine":False},
     {"name":"bin_odps", "dir":"bin_odps", "help":"executables for ODPS", "commandLine":False},
-    {"name":"lib_linux_64", "dir":"lib_linux_64", "help":"shared libraries for Linux", "commandLine":False}, 
-    {"name":"lib_linux_hpc", "dir":"lib_linux_hpc", "help":"shared libraries for Linux HPC", "commandLine":False}, 
-    {"name":"lib_macosx_intel", "dir":"lib_macosx_intel", "help":"shared libraries for Mac", "commandLine":False},
+    {"name":"lib_linux_64", "dir":"lib_linux_64", "help":"shared libraries for Linux", "commandLine":False},
+    {"name":"lib_linux_hpc", "dir":"lib_linux_hpc", "help":"shared libraries for Linux HPC", "commandLine":False},
     {"name":"lib_macosx_arm64", "dir":"lib_macosx_arm64", "help":"shared libraries for Mac ARM64", "commandLine":False},
     {"name":"lib_odps", "dir":"lib_odps", "help":"shared libraries for ODPS", "commandLine":False},
     {"name":"opt_linux_64", "dir":"opt_linux_64", "help":"3rd party library for Linux", "extra": "--exclude src", "commandLine":False},
     {"name":"opt_linux_hpc", "dir":"opt_linux_hpc", "help":"3rd party library for Linux HPC", "extra": "--exclude src", "commandLine":False},
-    {"name":"opt_macosx_intel", "dir":"opt_macosx_intel", "help":"3rd party library for Mac", "extra": "--exclude src", "commandLine":False},
     {"name":"opt_macosx_arm64", "dir":"opt_macosx_arm64", "help":"3rd party library for Mac ARM64", "extra": "--exclude src", "commandLine":False},
     {"name":"opt_odps", "dir":"opt_odps", "help":"3rd party library for ODPS", "extra": "--exclude src", "commandLine":False},
 
     {"name":"ocssw_src", "dir":"ocssw_src", "help":"OCSSW source code", "commandLine":False},
     {"name":"opt_src", "dir":"opt/src", "help":"3rd party library sources", "extra":"--exclude .buildit.db", "commandLine":True},
-    
+
     {"name":"afrt", "dir":"share/afrt", "help":"Ahmad-Fraser RT data", "commandLine":True},
     {"name":"aquaverse", "dir":"share/aquaverse", "help":"Algorithm based on Mixture Density Networks", "commandLine":True},
     {"name":"avhrr", "dir":"share/avhrr", "help":"AVHRR", "commandLine":True},
@@ -107,10 +103,9 @@ initialBundleList = [
     {"name":"wv3", "dir":"share/wv3", "help":"WV3", "commandLine":True},
     {"name":"aerosol", "dir":"share/aerosol", "help":"aerosol processing with dtdb", "commandLine":True},
     {"name":"cloud", "dir":"share/cloud", "help":"cloud properties processing", "commandLine":True},
-    {"name":"telemetery", "dir":"share/telemetry", "help":"telemetry packet descriptions", "commandLine":True},
-    {"name":"benchmark", "dir":"benchmark", "help":"benchmark MOSIS Aqua, level0 -> level3 Mapped", "commandLine":True},
+    {"name":"telemetry", "dir":"share/telemetry", "help":"telemetry packet description", "commandLine":True},
+    {"name":"benchmark", "dir":"benchmark", "help":"benchmark MODIS Aqua, level0 -> level3 Mapped", "commandLine":True},
     {"name":"viirs_l1_benchmark", "dir":"viirs_l1_benchmark", "help":"VIIRS benchmark data", "commandLine":True},
-    {"name":"viirs_l1_bin_macosx_intel", "dir":"viirs_l1_bin_macosx_intel", "help":"Subset of binary files for VIIRS", "commandLine":False},
     {"name":"viirs_l1_bin_macosx_arm64", "dir":"viirs_l1_bin_macosx_arm64", "help":"Subset of binary files for VIIRS", "commandLine":False},
     {"name":"viirs_l1_bin_linux_64", "dir":"viirs_l1_bin_linux_64", "help":"Subset of binary files for VIIRS", "commandLine":False},
     {"name":"viirs_l1_bin_odps", "dir":"viirs_l1_bin_odps", "help":"Subset of binary files for VIIRS", "commandLine":False}
@@ -132,15 +127,20 @@ def getArch():
     """
     (sysname, _, _, _, machine) = os.uname()
     if sysname == 'Darwin':
-        if machine == 'x86_64' or machine == 'i386':
-            return 'macosx_intel'
         if machine == 'arm64':
             return 'macosx_arm64'
         print("unsupported Mac machine =", machine)
         exit(1)
     if sysname == 'Linux':
         if machine == 'x86_64':
-            return 'linux_64'
+            str = "none"
+            proc = subprocess.run("lsb_release -a | grep Release:", stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+            if proc.returncode == 0:
+                str = proc.stdout.decode("utf-8")
+            if "20.04" in str:
+                return "odps"
+            else:
+                return 'linux_64'
         print("Error: can only install OCSSW software on 64bit Linux")
         exit(1)
     if sysname == 'Windows':
@@ -163,13 +163,13 @@ def runCommand(command, pipe=False, shellVal=False):
 
 def listTags(options):
     manifest_options = mf.create_default_options()
-    manifest_options.wget = options.wget
+    manifest_options.timestamp = options.timestamp
     mf.list_tags(manifest_options, None)
 
 def checkTag(options):
     manifest_options = mf.create_default_options()
     manifest_options.tag = options.tag
-    manifest_options.wget = options.wget
+    manifest_options.timestamp = options.timestamp
     if not mf.check_tag(manifest_options, None):
         print("tag=%s," % (options.tag), "Does not exist.")
         sys.exit(1)
@@ -223,7 +223,7 @@ def installBundle(options, bundleInfo):
     manifest_options.dest_dir = "%s/%s" % (options.install_dir, bundleInfo["dir"])
     manifest_options.save_dir = options.save_dir
     manifest_options.local_dir = options.local_dir
-    manifest_options.wget = options.wget
+    manifest_options.timestamp = options.timestamp
 
     mf.download(manifest_options, None)
 
@@ -272,7 +272,7 @@ def downloadBundleList(options):
         checkTag(options)
 
     tempDir = tempfile.TemporaryDirectory(prefix="install_ocssw-")
-    tempBundleFilePath = dest = "%s/%s" % (tempDir.name, BUNDLELIST_BASENAME)
+    tempBundleFilePath = "%s/%s" % (tempDir.name, BUNDLELIST_BASENAME)
     if options.local_dir:
         manifestFilename = "%s/%s/root/%s" % (options.local_dir, options.tag, MANIFEST_BASENAME)
         bundleFilename = "%s/%s/root/%s" % (options.local_dir, getBundleListTag(manifestFilename),BUNDLELIST_BASENAME)
@@ -280,13 +280,6 @@ def downloadBundleList(options):
             print(bundleFilename, "file does not exist")
             sys.exit(1)
         shutil.copy(bundleFilename, tempBundleFilePath)
-    elif options.wget:
-        command = "cd %s; wget -q %s/%s/root/%s" % (tempDir.name, options.base_url, options.tag, MANIFEST_BASENAME)
-        runCommand(command, shellVal=True)
-        manifestFilename = "%s/%s" % (tempDir.name, MANIFEST_BASENAME)
-        bundleListUrl = "%s/%s/root/%s" % (options.base_url, getBundleListTag(manifestFilename), BUNDLELIST_BASENAME)
-        command = "cd %s; wget -q %s" % (tempDir.name, bundleListUrl)
-        runCommand(command, shellVal=True)
     else:
         manifestUrl = "%s/%s/root/%s" % (options.base_url, options.tag, MANIFEST_BASENAME)
         parts = urllib.parse.urlparse(manifestUrl)
@@ -321,32 +314,25 @@ def downloadFile(options, tag, bundleInfo, fileName, destDir):
             print("Copying %s from %s" % (fileName, src))
         shutil.copy(src, dest)
         return True
-    
+
     url = "%s/%s/%s/%s" % (baseUrl, tag, bundleInfo["name"], fileName)
     if options.verbose:
         print("Downloading %s from %s" % (fileName, url))
-    if options.wget:
-        if os.path.isfile(dest):
-            os.remove(dest)
-        command = "cd %s; wget -q %s" % (dest_dir, url)
-        runCommand(command, shellVal=True)
-    else:
-        parts = urllib.parse.urlparse(url)
-        host = parts.netloc
-        request = parts.path
-        status = mf.httpdl(host, request, localpath=dest_dir, 
-                        outputfilename=os.path.basename(dest),
-                        verbose=options.verbose,
-                        force_download=True)
-        if status != 0:
-            print("Error downloading", dest, ": return code =", status)
-            return False
+    parts = urllib.parse.urlparse(url)
+    host = parts.netloc
+    request = parts.path
+    status = mf.httpdl(host, request, localpath=dest_dir,
+                    outputfilename=os.path.basename(dest),
+                    verbose=options.verbose,
+                    force_download=True)
+    if status != 0:
+        print("Error downloading", dest, ": return code =", status)
+        return False
     return True
 
 def bundleStatus(options, bundleInfo, fileLst_chg, fileLst_relPath_chg, fileLst_del):
     returnStatus = True
     statusTag = "tempStatusTag"
-    #os.chdir(options.install_dir)
 
     currentManifest = {}
     tempDir = tempfile.TemporaryDirectory(prefix="install_ocssw-")
@@ -355,7 +341,7 @@ def bundleStatus(options, bundleInfo, fileLst_chg, fileLst_relPath_chg, fileLst_
         with open(currentManifestFilename, 'rb') as manifestFile:
             currentManifest = json.load(manifestFile)
 
-    command = "cd %s; " % (options.install_dir) 
+    command = "cd %s; " % (options.install_dir)
     command += manifestCommand + " generate"
     command += " -n " + bundleInfo["name"]
     command += " -t " + statusTag
@@ -364,8 +350,8 @@ def bundleStatus(options, bundleInfo, fileLst_chg, fileLst_relPath_chg, fileLst_
     if "extra" in bundleInfo:
         command += " " + bundleInfo["extra"]
 
-    # command = [manifestCommand, "generate", 
-    #            "-n", bundleInfo["name"], 
+    # command = [manifestCommand, "generate",
+    #            "-n", bundleInfo["name"],
     #            "-t", statusTag,
     #            "-b", currentManifestFilename,
     #            bundleInfo["dir"]]
@@ -383,8 +369,6 @@ def bundleStatus(options, bundleInfo, fileLst_chg, fileLst_relPath_chg, fileLst_
     else:
         print(bundleInfo["name"])
 
-    
-        
     # list new files
     fileList = []
     for f, info in statusManifest["files"].items():
@@ -398,44 +382,44 @@ def bundleStatus(options, bundleInfo, fileLst_chg, fileLst_relPath_chg, fileLst_
         print("  New Files:")
         for f in fileList:
             print("    %s/%s" % (bundleInfo["dir"], f))
-        
+
     # list modified files
     fileList = []
     for f, info in statusManifest["files"].items():
         if ("files" in currentManifest) and (f in currentManifest["files"]):
             if "symlink" in currentManifest["files"][f]:
-                 # both symlink
-                if "symlink" in info:                                              
+                # both symlink
+                if "symlink" in info:
                     if info["symlink"] != currentManifest["files"][f]["symlink"]:
-                        fileList.append(f)  
+                        fileList.append(f)
                         if options.create_change:
                             fileLst_chg.append("%s/%s/%s" % (options.install_dir, bundleInfo["dir"], f))
                             fileLst_relPath_chg.append("%s/%s" % (bundleInfo["dir"], f))
-                # remote symlink 
+                # remote symlink
                 else:
                     fileList.append(f)
                     if options.create_change:
                         fileLst_chg.append("%s/%s/%s" % (options.install_dir, bundleInfo["dir"], f))
                         fileLst_relPath_chg.append("%s/%s" % (bundleInfo["dir"], f))
-            # local symlink                  
-            elif "symlink" in info: 
+            # local symlink
+            elif "symlink" in info:
                 fileList.append(f)
                 if options.create_change:
                     fileLst_chg.append("%s/%s/%s" % (options.install_dir, bundleInfo["dir"], f))
                     fileLst_relPath_chg.append("%s/%s" % (bundleInfo["dir"], f))
-            # neither symlink              
+            # neither symlink
             elif info["tag"] != currentManifest["files"][f]["tag"]:
                 localFilename = "%s/%s/%s" % (options.install_dir, bundleInfo["dir"], f)
                 with open(localFilename, "rb") as localFile:
                     bytes = localFile.read()
-                    localFileChecksum = hashlib.sha256(bytes).hexdigest() 
-                    if "checksum" in currentManifest["files"][f]:    
+                    localFileChecksum = hashlib.sha256(bytes).hexdigest()
+                    if "checksum" in currentManifest["files"][f]:
                         if localFileChecksum != currentManifest["files"][f]["checksum"]:
-                            fileList.append(f)   
+                            fileList.append(f)
                             if options.create_change:
                                 fileLst_chg.append("%s/%s/%s" % (options.install_dir, bundleInfo["dir"], f))
                                 fileLst_relPath_chg.append("%s/%s" % (bundleInfo["dir"], f))
-    if fileList:                
+    if fileList:
         returnStatus = False
         print("  Modified Files:")
         for f in fileList:
@@ -443,7 +427,7 @@ def bundleStatus(options, bundleInfo, fileLst_chg, fileLst_relPath_chg, fileLst_
             if options.diff:
                 if "symlink" in currentManifest["files"][f]:
                     # both symlink
-                    if  "symlink" in "symlink" in statusManifest["files"][f]:
+                    if "symlink" in "symlink" in statusManifest["files"][f]:
                         print("diff %s remote..local" % (f))
                         print("<      " + currentManifest["files"][f]["tag"] + "     = " + currentManifest["files"][f]["symlink"])
                         print("---")
@@ -467,8 +451,6 @@ def bundleStatus(options, bundleInfo, fileLst_chg, fileLst_relPath_chg, fileLst_
                             localFilename = "%s/%s" % (options.install_dir, f)
                         else:
                             localFilename = "%s/%s/%s" % (options.install_dir, bundleInfo["dir"], f)
-                        with open(localFilename) as file_1:
-                            file_1_text = file_1.readlines()
                         remoteFilename = "%s/%s" % (tempDir.name, f)
                         file_tag = currentManifest["files"][f]["tag"]
                         if downloadFile(options, file_tag, bundleInfo, f, tempDir.name):
@@ -479,11 +461,11 @@ def bundleStatus(options, bundleInfo, fileLst_chg, fileLst_relPath_chg, fileLst_
                                 print("diff %s remote..local" % (f))
                                 command = "diff %s %s" % (remoteFilename, localFilename)
                                 subprocess.run(command, shell=True)
-                            
+
                     except:
                         continue
 
-    # deleted file     
+    # deleted file
     fileList = []
     if "files" in currentManifest:
         for f, info in currentManifest["files"].items():
@@ -512,10 +494,10 @@ def status(options):
     bundle_found = False
     theInstalledTag = ''
     fileList_change = []
-    #relative path of the fileList_change    
-    fileList_relPath_change = []              
+    #relative path of the fileList_change
+    fileList_relPath_change = []
     fileList_delete = []
-     
+
 
     #loop through provided bundles e.g. --hico
     for bundleInfo in bundleList:
@@ -559,7 +541,7 @@ def status(options):
         if not options.tag:
             options.tag = theInstalledTag
 
-        for bundleInfo in bundleList:    
+        for bundleInfo in bundleList:
                 if os.path.exists("%s/%s/%s" % (options.install_dir, bundleInfo["dir"], MANIFEST_BASENAME)):
                     bundle_found = True
                     if not bundleStatus(options, bundleInfo, fileList_change, fileList_relPath_change, fileList_delete):
@@ -584,11 +566,11 @@ def status(options):
                 for name in fileList_delete:
                     # write each item on a new line
                     fp.write("%s\n" % name)
-        
+
         if options.deliver_change or options.deliver_email_from is not None:
             glusteruser_dir = "/glusteruser/analyst/share_delivery"
 
-            if(os.path.exists(glusteruser_dir)):
+            if os.path.exists(glusteruser_dir):
                 if len(fileList_change) != 0:
                     print("Copying .tar to /glusteruser/analyst/share_delivery")
                     shutil.copyfile(tar_filename, os.path.join(glusteruser_dir, tar_filename))
@@ -606,7 +588,7 @@ def status(options):
                         print("Sending email to swdevels@oceancolor.gsfc.nasa.gov notifying the delivery of the .remove files")
                         message.set_content(remove_filename)
                         message['Subject'] = '.remove file copied to /glusteruser/analyst/share_delivery'
-                    else: 
+                    else:
                         print("Sending email to swdevels@oceancolor.gsfc.nasa.gov notifying the delivery of the .tar and .remove files")
                         message.set_content(tar_filename + "\n" + remove_filename)
                         message['Subject'] = '.tar and.remove file copied to /glusteruser/analyst/share_delivery'
@@ -624,7 +606,6 @@ def status(options):
                     smtp_server.quit()
             else:
                 print("You do not have access to /glusteruser/analyst/share_dir")
-      
 
     return theStatus
 
@@ -655,15 +636,15 @@ def run():
     parser = argparse.ArgumentParser(description="Install OCSSW bundles", add_help=False)
     parser.add_argument("-t", "--tag", default=None,
                         help="tag that you want to install")
-    parser.add_argument("-b", "--base_url", default=baseUrl, 
+    parser.add_argument("-b", "--base_url", default=baseUrl,
                         help="remote url for the bundle server")
-    parser.add_argument("-l", "--local_dir", default=None, 
+    parser.add_argument("-l", "--local_dir", default=None,
                         help="local directory to use for bundle source instead of the bundle server")
-    parser.add_argument("--wget", default=False, action="store_true", 
-                        help="use wget for file download")
-    parser.add_argument("--list_tags", default=False, action="store_true", 
+    parser.add_argument("--timestamp", default=False, action="store_true",
+                        help="preserve timestamps of downloaded files")
+    parser.add_argument("--list_tags", default=False, action="store_true",
                         help="list the tags that exist on the server")
-    parser.add_argument("--version", default=False, action="store_true", 
+    parser.add_argument("--version", default=False, action="store_true",
                         help="print this program's version")
 
     options1 = parser.parse_known_args()
@@ -672,76 +653,76 @@ def run():
 
     epilog = """
         The content of the config file ~/.install_ocssw --
-            deliver_email_from=a valid email address that is on the list of swdevels@oceancolor.gsfc.nasa.gov 
+            deliver_email_from=a valid email address that is on the list of swdevels@oceancolor.gsfc.nasa.gov
     """
     # now make the real parser
     parser = argparse.ArgumentParser(description="Install OCSSW bundles", epilog=epilog, formatter_class=argparse.RawDescriptionHelpFormatter,)
-    parser.add_argument("--version", default=False, action="store_true", 
+    parser.add_argument("--version", default=False, action="store_true",
                         help="print this program's version")
-    parser.add_argument("--list_tags", default=False, action="store_true", 
+    parser.add_argument("--list_tags", default=False, action="store_true",
                         help="list the tags that exist on the server")
-    parser.add_argument("--installed_tag", default=False, action="store_true", 
+    parser.add_argument("--installed_tag", default=False, action="store_true",
                         help="list the currently installed tag")
-    parser.add_argument("--status", default=False, action="store_true", 
+    parser.add_argument("--status", default=False, action="store_true",
                         help="compare the main tag manifest to the files in the bundle directories")
-    parser.add_argument("--update", default=False, action="store_true", 
+    parser.add_argument("--update", default=False, action="store_true",
                         help="update all installed bundles to the tag given")
-    parser.add_argument("--diff", default=False, action="store_true", 
+    parser.add_argument("--diff", default=False, action="store_true",
                         help="show the difference between the old and new text files")
-    parser.add_argument("--difftool", default=None, 
+    parser.add_argument("--difftool", default=None,
                         help="show the difference between the old and new text files using diff tool such as meld")
-    parser.add_argument("--create_change", default=False, action="store_true", 
+    parser.add_argument("--create_change", default=False, action="store_true",
                         help="create a tar file of new and modified files and a text file with a list of files to be deleted")
-    parser.add_argument("--deliver_change", default=False, action="store_true", 
+    parser.add_argument("--deliver_change", default=False, action="store_true",
                         help="create and copy to /glusteruser/analyst/share_delivery/ a tar file of new and modified files and a text file with a list of files to be deleted, and email to swdevels@oceancolor.gsfc.nasa.gov from the email address stored in .install_ocssw")
-    parser.add_argument("--deliver_email_from", default=None, 
+    parser.add_argument("--deliver_email_from", default=None,
                         help="create and copy to /glusteruser/analyst/share_delivery/ a tar file of new and modified files and a text file with a list of files to be deleted, and email to swdevels@oceancolor.gsfc.nasa.gov from the email address you provide")
     parser.add_argument("-t", "--tag", default=None,
                         help="tag that you want to install")
-    parser.add_argument("-i", "--install_dir", default=os.environ.get("OCSSWROOT", None), 
+    parser.add_argument("-i", "--install_dir", default=os.environ.get("OCSSWROOT", None),
                         help="root directory for bundle installation (default=$OCSSWROOT)")
-    parser.add_argument("-b", "--base_url", default=baseUrl, 
+    parser.add_argument("-b", "--base_url", default=baseUrl,
                         help="remote url for the bundle server")
-    parser.add_argument("-l", "--local_dir", default=None, 
+    parser.add_argument("-l", "--local_dir", default=None,
                         help="local directory to use for bundle source instead of the bundle server")
-    parser.add_argument("-s", "--save_dir", default=None, 
+    parser.add_argument("-s", "--save_dir", default=None,
                         help="local directory to save a copy of the downloaded bundles")
-    parser.add_argument("-c", "--clean", default=False, action="store_true", 
+    parser.add_argument("-c", "--clean", default=False, action="store_true",
                         help="delete extra files in the destination directory")
-    parser.add_argument("--wget", default=False, action="store_true", 
-                        help="use wget for file download")
-    parser.add_argument("-a", "--arch", default=None, 
-                        help="use this architecture instead of guessing the local machine (linux_64,linux_hpc,macosx_intel,macosx_arm64,odps)")
+    parser.add_argument("--timestamp", default=False, action="store_true",
+                        help="preserve timestamps of downloaded files")
+    parser.add_argument("-a", "--arch", default=None,
+                        help="use this architecture instead of guessing the local machine (linux_64,linux_hpc,macosx_arm64,odps)")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="increase output verbosity")
 
     # add weird bundle switches
-    parser.add_argument("--bin", default=False, action="store_true", 
+    parser.add_argument("--bin", default=False, action="store_true",
                         help="install binary executables")
-    parser.add_argument("--opt", default=False, action="store_true", 
+    parser.add_argument("--opt", default=False, action="store_true",
                         help="install 3rd party programs and libs")
-    parser.add_argument("--src", default=False, action="store_true", 
+    parser.add_argument("--src", default=False, action="store_true",
                         help="install source files")
-    parser.add_argument("--luts", default=False, action="store_true", 
+    parser.add_argument("--luts", default=False, action="store_true",
                         help="install LUT files")
-    parser.add_argument("--viirs_l1_bin", default=False, action="store_true", 
+    parser.add_argument("--viirs_l1_bin", default=False, action="store_true",
                         help="install VIIRS binary executables subset")
 
     # add bundles from the bundle list
     for bundleInfo in bundleList:
         if bundleInfo["commandLine"]:
-            parser.add_argument("--" + bundleInfo["name"], default=False, action="store_true", 
+            parser.add_argument("--" + bundleInfo["name"], default=False, action="store_true",
                                 help="install " + bundleInfo["help"] + " files")
 
     # add argument
-    parser.add_argument("--direct_broadcast", default=False, action="store_true", 
+    parser.add_argument("--direct_broadcast", default=False, action="store_true",
                         help="toggle on bundles needed for MODIS direct broadcast")
-    parser.add_argument("--seadas", default=False, action="store_true", 
+    parser.add_argument("--seadas", default=False, action="store_true",
                         help="toggle on the base set of bundles for SeaDAS")
-    parser.add_argument("--odps", default=False, action="store_true", 
+    parser.add_argument("--odps", default=False, action="store_true",
                         help="toggle on the base set of bundles for ODPS systems")
-    parser.add_argument("--viirs_l1", default=False, action="store_true", 
+    parser.add_argument("--viirs_l1", default=False, action="store_true",
                         help="install everything to run and test the VIIRS executables")
-    parser.add_argument("--all", default=False, action="store_true", 
+    parser.add_argument("--all", default=False, action="store_true",
                         help="toggle on all satellite bundles")
 
     options = parser.parse_args()
@@ -750,7 +731,7 @@ def run():
     if options.version:
         print(os.path.basename(sys.argv[0]), versionString)
         sys.exit(0)
-    
+
     if options.list_tags:
         listTags(options)
         sys.exit(0)
@@ -776,13 +757,13 @@ def run():
 
     if options.difftool is not None:
         options.diff = True
-    
+
     if options.diff:
         if status(options):
             sys.exit(0)
         else:
             sys.exit(1)
-        
+
     if options.deliver_change or options.deliver_email_from is not None:
         options.create_change = True
 
@@ -825,23 +806,23 @@ def run():
         options.seadas = True
         options.modisa = True
         options.modist = True
-        
+
     if options.seadas:
         options.root = True
-        options.bin =True
+        options.bin = True
         options.opt = True
         options.luts = True
         options.common = True
         options.ocrvc = True
-        
+
     if options.odps:
         options.root = True
-        options.bin =True
+        options.bin = True
         options.opt = True
         options.common = True
         options.ocrvc = True
         options.all = True
-        
+
     if options.all:
         for bundleInfo in bundleList:
             if bundleInfo["commandLine"]:
@@ -927,7 +908,7 @@ def run():
     for bundleInfo in bundleList:
         if hasattr(options, bundleInfo["name"]) and getattr(options, bundleInfo["name"]):
             totalNumThings += 1
-        
+
     # count bin and lib bundles
     if options.bin:
         totalNumThings += 2
@@ -954,7 +935,7 @@ def run():
     if options.bin:
         bundleName = "bin_" + options.arch
         bundleInfo = findBundleInfo(bundleName)
-        bundleInfo["dir"] = "bin"   # fix the install directory
+        bundleInfo["dir"] = "bin"  # fix the install directory
         installBundle(options, bundleInfo)
 
     if options.viirs_l1_bin:
@@ -963,19 +944,19 @@ def run():
         if not bundleInfo:
             print("Error: tag does not contain the viirs_l1_bin bundles")
             sys.exit(1)
-        bundleInfo["dir"] = "bin"   # fix the install directory
+        bundleInfo["dir"] = "bin"  # fix the install directory
         installBundle(options, bundleInfo)
 
     if options.bin or options.viirs_l1_bin:
         bundleName = "lib_" + options.arch
         bundleInfo = findBundleInfo(bundleName)
-        bundleInfo["dir"] = "lib"   # fix the install directory
+        bundleInfo["dir"] = "lib"  # fix the install directory
         installBundle(options, bundleInfo)
 
     if options.opt:
         bundleName = "opt_" + options.arch
         bundleInfo = findBundleInfo(bundleName)
-        bundleInfo["dir"] = "opt"   # fix the install directory
+        bundleInfo["dir"] = "opt"  # fix the install directory
         installBundle(options, bundleInfo)
 
     if options.src:
@@ -983,12 +964,12 @@ def run():
         installBundle(options, bundleInfo)
         bundleInfo = findBundleInfo("ocssw_src")
         installBundle(options, bundleInfo)
-        
+
     # do the normal bundles
     for bundleInfo in bundleList:
         if hasattr(options, bundleInfo["name"]) and getattr(options, bundleInfo["name"]):
             installBundle(options, bundleInfo)
-    
+
     # update luts
     if options.luts:
         commonUpdated = False

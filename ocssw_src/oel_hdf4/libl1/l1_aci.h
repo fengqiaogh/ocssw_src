@@ -19,11 +19,18 @@
 #include <stdint.h>
 #include "l1.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int closel1_aci(filehandle *l1file);
 int openl1_aci(filehandle *l1file);
 int readl1_aci(filehandle *l1file, int32_t recnum, l1str *l1rec);
 const char* xsatid2name(int xsatid);
 int satname2xsatid(const char* satname);
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif

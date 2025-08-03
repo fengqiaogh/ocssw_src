@@ -5295,7 +5295,7 @@ Updated earth-sun distance function (was 1998-specific) for all but SeaWiFS
   * parse_file_name.c, don't overwrite a string.
   * MScaltarget.c, new error code. No pixel averaging. Better handling of polar cases.
   * readL2scan.c, defunct.  Now linking to libl2.
-  * readL2scan.h, defunct.  Included from swfinc.
+  * l2_wrapper.h, defunct.  Included from swfinc.
 
   * [libswfcal]  get_cal_misc.c, fixed cal segment selection.
 
@@ -5303,7 +5303,7 @@ Updated earth-sun distance function (was 1998-specific) for all but SeaWiFS
 
   * [libl2] readL2scan.c, updates to support MScaltarget.
 
-  * readL2scan.h, updates to support MScaltarget.
+  * l2_wrapper.h, updates to support MScaltarget.
 
 ### Data Added
   * common/f0_table.dat, defunct
@@ -5371,7 +5371,7 @@ the new utilities.
 
   * MScaltarget.c, new calibration target generation code
   * readL2scan.c, new code to support MScaltarget
-  * readL2scan.h, new code to support MScaltarget
+  * l2_wrapper.h, new code to support MScaltarget
   * setupflags.c, new code to support MScaltarget
   * get_brdf.f, new code consolidation of brdf functions
 

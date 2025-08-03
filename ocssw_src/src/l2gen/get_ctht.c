@@ -677,8 +677,8 @@ int32_t comp_ctht_lin( l1str *l1rec, ctht_lin_str *ctht_lin )
           foff = l1_bnd_ix[ibnd] + nbnd_ref * ipix;
           if( !( isfinite( l1rec->Lt[foff] ) ) || l1rec->Lt[foff] == BAD_FLT )
             bad_lt = 1;
-          rhot[ibnd] = l1rec->Lt[foff] * PI / ( cos(solz *
-            PI / 180. ) * l1rec->Fo[l1_bnd_ix[ibnd]] );
+          rhot[ibnd] = l1rec->Lt[foff] * OEL_PI / ( cos(solz *
+            OEL_PI / 180. ) * l1rec->Fo[l1_bnd_ix[ibnd]] );
           }
         if( bad_lt ) break;  // just skip this pixel
         //  get the pixel type: 0 water, 1 land, 2 snow/ice
@@ -1634,8 +1634,6 @@ int32_t ctht_tbl_init( int32_t nband, l1str *l1rec, ctht_unc_str *unc,
   return 0;
   }
 
-#define DTOR PI / 180.
-
 float ctht_glint( float solz, float senz, float relaz, float windsp )
  /*
   *  ctht_glint will vget the glint for a pixel and wind speed, adapted from 
@@ -1663,17 +1661,17 @@ float ctht_glint( float solz, float senz, float relaz, float windsp )
 
   int32_t do_gordon = 1;
 
-  dsenz = (double) senz * DTOR;
-  dsolz = (double) solz * DTOR;
-  drelaz = ( do_gordon ) ? ( 180. - (double)relaz ) * DTOR : 
-                           (double)relaz * DTOR;
+  dsenz = (double) senz * OEL_DEGRAD;
+  dsolz = (double) solz * OEL_DEGRAD;
+  drelaz = ( do_gordon ) ? ( 180. - (double)relaz ) * OEL_DEGRAD : 
+                           (double)relaz * OEL_DEGRAD;
 
   nr = 1.341;
 
   //  Specular reflectance from ruffled sea
   kai = 0.;
   rgl = 0.0;
-  kai = kai * DTOR;
+  kai = kai * OEL_DEGRAD;
 
   //  Defines surface slopes
   zx = ( -1.0 * sin(dsenz) * sin(drelaz) ) / ( cos(dsolz) + cos(dsenz) );
@@ -1692,7 +1690,7 @@ float ctht_glint( float solz, float senz, float relaz, float windsp )
   zeta = zxprime / sigx;
   eta = zyprime / sigy;
 
-  p_gram = ( 1. / ( 2. * PI * sigx * sigy ) ) * 
+  p_gram = ( 1. / ( 2. * OEL_PI * sigx * sigy ) ) * 
     exp( -0.5 * ( pow( zeta, 2. ) + pow( eta, 2. ) ) );
 
   //  Cox and Munk (1954) geometry (Measurements of...)
@@ -1716,7 +1714,7 @@ float ctht_glint( float solz, float senz, float relaz, float windsp )
   else {
     ref_coef = 0.5 * ( ( a1 * a1 ) / ( b1 * b1 ) + ( c1 * c1 ) / ( d1 * d1 ) );
     //  compute the glint reflectance
-    rgl = PI * p_gram * ref_coef / ( 4. * cos( dsolz ) * cos( dsenz ) * 
+    rgl = OEL_PI * p_gram * ref_coef / ( 4. * cos( dsolz ) * cos( dsenz ) * 
       ( pow( cos_beta, 4. ) ) );
   }
   return rgl;

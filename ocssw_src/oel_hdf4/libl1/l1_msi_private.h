@@ -2,19 +2,12 @@
 #ifndef L1C_MSI_PRIVATE_H
 #define L1C_MSI_PRIVATE_H
 
-#include <boost/geometry.hpp>                                                                               
-#include <boost/geometry/geometries/point_xy.hpp>                                                           
-#include <boost/geometry/geometries/polygon.hpp>
-#include <boost/geometry/geometries/linestring.hpp>
 #include <openjpeg.h>
 
 #include <proj.h>
 
 #define maxBands 13 
 #define numDetectors 12
-
-typedef boost::geometry::model::d2::point_xy<double> Point_t;
-typedef boost::geometry::model::polygon<Point_t> Polygon_t;
 
 typedef struct msi_struct {
     double scene_start_time;
@@ -28,7 +21,7 @@ typedef struct msi_struct {
     char* granuleMetadataFile; //MTD_TL.xml for the granule - contains view angles
     char* datastripMetadataFile; // MTD_DS.xml file for the 'datastrip' - contains orbit info
     char* jp2[maxBands]; // char array for jp2 file name
-    char* detectorFootprintFiles[maxBands]; // for simplicity, choose just one 20m band
+    char* l1cProductMetadataFile; // MTD_MSIL1C.xml file for the L1C product metadata
 
     // members for projection
     int32_t CSCode; // EPSG Coordinate System Code
@@ -41,9 +34,6 @@ typedef struct msi_struct {
     double *position[3];
     double *gpstime;
 
-    // detector footprint polygons
-    // there are 12 detectors arrays - not all are filled for every "scene"
-    Polygon_t detectorFootprints[numDetectors];
     // This delta time is the relative difference in time between the detectors
     double detectorDeltaTime[numDetectors][maxBands];
     // The time between each line (ne scan) use to propagate start time to scantime
@@ -62,6 +52,11 @@ typedef struct msi_struct {
     opj_codestream_info_v2_t* cstr_info[maxBands]; //tile info
 
     uint32_t *buf; //buffer for data manipulations...meh.
+
+    // scale and offset for band data
+    float quantificationValue; // usually 10000
+    float radiometricOffset[maxBands]; // old files missing = 0, new files = -1000
+
 } msi_t;
 
 msi_t* createPrivateData_msi(int numBands);

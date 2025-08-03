@@ -1,8 +1,8 @@
 #include <stdlib.h>
 #include "l1czcs.h"
+#include <genutils.h>
+
 #define N_ANCHOR 77
-#define PI 3.14159265359
-#define RADEG 180. / PI
 
 void czcs_ctl_pt(DATA_REC_TYPE data, gattr_struc *gattr, int line,
         l1_data_struc *l1_data)
@@ -55,8 +55,8 @@ void czcs_ctl_pt(DATA_REC_TYPE data, gattr_struc *gattr, int line,
     /*
      * get the sensor zenith angle (needed for final nav correction)
      */
-    pi = PI;
-    radeg = RADEG;
+    pi = OEL_PI;
+    radeg = OEL_RADEG;
     satang_(&pi, &radeg, &(gattr->tilt), &(gattr->roll), &(gattr->pitch),
             &(gattr->yaw), xlon, ylat, senz, sena);
     /*

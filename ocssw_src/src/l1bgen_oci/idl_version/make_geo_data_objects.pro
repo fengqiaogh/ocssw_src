@@ -12,7 +12,7 @@
 ;	ncps	int	 I	Number of CCD band pixels 
 
   dnames = ['latitude','longitude','height','sensor_azimuth','sensor_zenith','solar_azimuth','solar_zenith','quality_flag']
-  dimnames = ['number_of_scans','pixels']
+  dimnames = ['number_of_scans','ccd_pixels']
   dimsizes = [nscn, ncps]
 
   dimids = intarr(2)
@@ -24,7 +24,7 @@
   dimids(1) = ncdf_dimdef(fid, dimnames(1), dimsizes(1))
 
 ; Open the group containing the EV data
-  if (KEYWORD_SET(seleno)) then gname = 'selenolocation_data' else gname = 'geolocation_data'
+  gname = 'geolocation_data'
   gid = ncdf_groupdef(fid,gname)
 
 ; Define data objects
@@ -38,11 +38,16 @@
 
 ; Set attributes
 ;  Variable specific
-  ncdf_attput, gid, dids(0), "long_name", "Latitudes of pixel locations", /CHAR
+  if (KEYWORD_SET(seleno)) then begin
+    ncdf_attput, gid, dids(0), "long_name", "Selenographic latitudes of pixel locations", /CHAR  
+    ncdf_attput, gid, dids(1), "long_name", "Selenographic longitudes of pixel locations", /CHAR
+  endif else begin
+    ncdf_attput, gid, dids(0), "long_name", "Latitudes of pixel locations", /CHAR
+    ncdf_attput, gid, dids(1), "long_name", "Longitudes of pixel locations", /CHAR
+  endelse
   ncdf_attput, gid, dids(0), "units", "degrees north", /CHAR
   ncdf_attput, gid, dids(0), "valid_min", -90., /FLOAT
   ncdf_attput, gid, dids(0), "valid_max", 90., /FLOAT
-  ncdf_attput, gid, dids(1), "long_name", "Latitudes of pixel locations", /CHAR
   ncdf_attput, gid, dids(1), "units", "degrees east", /CHAR
   ncdf_attput, gid, dids(1), "valid_min", -90., /FLOAT
   ncdf_attput, gid, dids(1), "valid_max", 90., /FLOAT

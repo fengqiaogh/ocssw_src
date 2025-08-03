@@ -208,7 +208,9 @@ void clo_parseOptionString(clo_option_t *option) {
     int i;
     char *str;
     char *ptr;
-
+    char default_delimeter[] = CLO_ARRAY_DELIMITER;
+    char url_delimeter[] = " \t,[]()\"";
+    char *delim = default_delimeter;
     // delete old string array
     if (option->strArray) {
         for (i = 0; i < option->count; i++) {
@@ -229,13 +231,16 @@ void clo_parseOptionString(clo_option_t *option) {
     else {
         return;
     }
-
-    ptr = strtok(str, CLO_ARRAY_DELIMITER);
+    // Handle the case for s3, ftp(s) and http(s)
+    if (strstr(str, "://") != NULL) {
+        delim = url_delimeter;
+    }
+    ptr = strtok(str, delim);
     while (ptr) {
         clo_addToArray((void***) &(option->strArray), &storage,
                 &(option->count), (void*) strdup(ptr));
 
-        ptr = strtok(NULL, CLO_ARRAY_DELIMITER);
+        ptr = strtok(NULL, delim);
     }
 
     free(str);

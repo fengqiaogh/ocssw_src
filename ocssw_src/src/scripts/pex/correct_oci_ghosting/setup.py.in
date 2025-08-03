@@ -1,0 +1,7 @@
+from distutils.core import setup
+
+setup(name='correct_oci_ghosting',
+      version='${PACKAGE_VERSION}',
+      package_dir={ '': '${CMAKE_CURRENT_SOURCE_DIR}' },
+      scripts=['$ENV{OCSSWROOT}/src/scripts/correct_oci_ghosting.py']
+)

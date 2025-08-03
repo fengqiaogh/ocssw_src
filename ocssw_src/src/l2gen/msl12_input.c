@@ -185,12 +185,15 @@ static char *l2gen_optionKeys[] = {
     "icefile",
     "ice_threshold",
     "sstcoeffile",
+    "sstjsonfile",
     "dsdicoeffile",
     "sstssesfile",
     "sst4coeffile",
     "sst4ssesfile",
+    "sst4jsonfile",
     "sst3coeffile",
     "sst3ssesfile",
+    "sst3jsonfile",
     "sstfile",
     "sstreftype",
     "sstrefdif",
@@ -837,15 +840,11 @@ int l2gen_init_options(clo_optionList_t* list, const char* prog) {
     strncpy(tmpStr1, tmpStr, SILLYSTRING);
     sprintf(tmpStr, "%s      %3d: White aerosol extrapolation.\n", tmpStr1, AERWHITE);
     strncpy(tmpStr1, tmpStr, SILLYSTRING);
-    sprintf(tmpStr, "%s      %3d: Multi-scattering with 2-band model selection\n", tmpStr1, AERWANG);
+    sprintf(tmpStr, "%s      %3d: Multi-scattering with 2-band, RH-based model selection\n", tmpStr1, AERRH);
     strncpy(tmpStr1, tmpStr, SILLYSTRING);
     sprintf(tmpStr, "%s      %3d: Multi-scattering with 2-band, RH-based model selection and\n", tmpStr1, AERRHNIR);
     strncpy(tmpStr1, tmpStr, SILLYSTRING);
     sprintf(tmpStr, "%s           iterative NIR correction\n", tmpStr1);
-    strncpy(tmpStr1, tmpStr, SILLYSTRING);
-    sprintf(tmpStr, "%s      %3d: Multi-scattering with 2-band model selection\n", tmpStr1, AERWANGNIR);
-    strncpy(tmpStr1, tmpStr, SILLYSTRING);
-    sprintf(tmpStr, "%s           and iterative NIR correction\n", tmpStr1);
     strncpy(tmpStr1, tmpStr, SILLYSTRING);
     sprintf(tmpStr, "%s      %3d: Multi-scattering with fixed model pair\n", tmpStr1, FIXMODPAIR);
     strncpy(tmpStr1, tmpStr, SILLYSTRING);
@@ -871,13 +870,13 @@ int l2gen_init_options(clo_optionList_t* list, const char* prog) {
     strncpy(tmpStr1, tmpStr, SILLYSTRING);
     sprintf(tmpStr, "%s           (requires taua specification)\n", tmpStr1);
     strncpy(tmpStr1, tmpStr, SILLYSTRING);
-    sprintf(tmpStr, "%s      %3d: Multi-scattering with 2-band model selection using Wang et al. 2009\n", tmpStr1, AERWANGSWIR);
+    sprintf(tmpStr, "%s      %3d: Multi-scattering with 2-band model selection using Wang et al. 2009\n", tmpStr1, AERRHSWIR);
     strncpy(tmpStr1, tmpStr, SILLYSTRING);
     sprintf(tmpStr, "%s           to switch between SWIR and NIR. (MODIS only, requires aer_swir_short,\n", tmpStr1);
     strncpy(tmpStr1, tmpStr, SILLYSTRING);
     sprintf(tmpStr, "%s           aer_swir_long, aer_wave_short, aer_wave_long)\n", tmpStr1);
     strncpy(tmpStr1, tmpStr, SILLYSTRING);
-    sprintf(tmpStr, "%s      %3d: Multi-scattering with MUMM correction\n", tmpStr1, AERMUMM);
+    sprintf(tmpStr, "%s      %3d: Multi-scattering with MUMM correction\n", tmpStr1, AERRHMUMM);
     strncpy(tmpStr1, tmpStr, SILLYSTRING);
     sprintf(tmpStr, "%s           and MUMM NIR calculation\n", tmpStr1);
     strncpy(tmpStr1, tmpStr, SILLYSTRING);
@@ -888,10 +887,6 @@ int l2gen_init_options(clo_optionList_t* list, const char* prog) {
     sprintf(tmpStr, "%s      %3d: Spectral Matching of aerosols reflectance\n", tmpStr1, AERRHSM);
     strncpy(tmpStr1, tmpStr, SILLYSTRING);
     sprintf(tmpStr, "%s           and iterative NIR correction\n", tmpStr1);
-    strncpy(tmpStr1, tmpStr, SILLYSTRING);
-    sprintf(tmpStr, "%s      %3d: Multi-scattering epsilon (linear), RH-based model selection\n", tmpStr1, AERRHMSEPS_lin);
-    strncpy(tmpStr1, tmpStr, SILLYSTRING);
-    sprintf(tmpStr, "%s           and iterative NIR correction", tmpStr1);
     clo_addOption(list, "aer_opt", CLO_TYPE_INT, "99", tmpStr);
 
     clo_addOption(list, "aermodfile", CLO_TYPE_IFILE, NULL, "aerosol model filename leader");
@@ -923,6 +918,7 @@ int l2gen_init_options(clo_optionList_t* list, const char* prog) {
     strcat(tmpStr, "        0: glint correction off\n");
     strcat(tmpStr, "        1: standard glint correction\n");
     strcat(tmpStr, "        2: simple glint correction");
+    strcat(tmpStr, "        3: glint correction using spectral dependent nw");
     clo_addOption(list, "glint_opt", CLO_TYPE_INT, "1", tmpStr);
 
     clo_addOption(list, "cirrus_opt", CLO_TYPE_BOOL, NULL, "cirrus cloud reflectance correction option");
@@ -958,7 +954,7 @@ int l2gen_init_options(clo_optionList_t* list, const char* prog) {
     strcat(tmpStr, "      256: N2O");
     clo_addOption(list, "gas_opt", CLO_TYPE_INT, "1", tmpStr);
 
-    clo_addOption(list, "gas_transmittance_file", CLO_TYPE_IFILE, NULL, "gaseous transmittance file");
+    clo_addOption(list, "gas_transmittance_file", CLO_TYPE_IFILE, "none", "gaseous transmittance file");
 
     strcpy(tmpStr, "ATREM gaseous transmittance bitmask selector\n");
     strcat(tmpStr, "        0: H2O only\n");
@@ -1153,10 +1149,13 @@ int l2gen_init_options(clo_optionList_t* list, const char* prog) {
     clo_addOption(list, "sstcoeffile", CLO_TYPE_IFILE, NULL, "IR sst algorithm coefficients file");
     clo_addOption(list, "dsdicoeffile", CLO_TYPE_IFILE, NULL, "SST dust correction algorithm coefficients file");
     clo_addOption(list, "sstssesfile", CLO_TYPE_IFILE, NULL, "IR sst algorithm error statistics file");
+    clo_addOption(list, "sstjsonfile", CLO_TYPE_IFILE, NULL, "IR sst algorithm decision tree file"); 
     clo_addOption(list, "sst4coeffile", CLO_TYPE_IFILE, NULL, "SWIR sst algorithm coefficients file");
-    clo_addOption(list, "sst4ssesfile", CLO_TYPE_IFILE, NULL, "SWIR sst algorithm error statistics file");
+    clo_addOption(list, "sst4ssesfile", CLO_TYPE_IFILE, NULL, "SWIR sst algorithm error statistics file"); 
+    clo_addOption(list, "sst4jsonfile", CLO_TYPE_IFILE, NULL, "SWIR sst algorithm decision tree file"); 
     clo_addOption(list, "sst3coeffile", CLO_TYPE_IFILE, NULL, "Triple window sst algorithm coefficients file");
     clo_addOption(list, "sst3ssesfile", CLO_TYPE_IFILE, NULL, "Triple window sst algorithm error statistics file");
+    clo_addOption(list, "sst3jsonfile", CLO_TYPE_IFILE, NULL, "Triple window sst algorithm decision tree file"); 
     clo_addOption(list, "vcnnfile", CLO_TYPE_IFILE, NULL, "virtual constellation neural net file");
     clo_addOption(list, "picfile", CLO_TYPE_IFILE, NULL, "pic table for Balch 2-band algorithm");
     clo_addOption(list, "owtfile", CLO_TYPE_IFILE, NULL, "optical water type file");
@@ -1606,8 +1605,11 @@ int l2gen_load_input(clo_optionList_t *list, instr *input, int32_t nbands) {
             ;
         else if (strcmp(keyword, "ifile") == 0) {
             strVal = clo_getOptionString(option);
-            parse_file_name(strVal, tmp_file);
-            strcpy(input->ifile[0], tmp_file);
+            if (check_url(strVal) == 0) {
+                parse_file_name(strVal, tmp_file);
+                strcpy(input->ifile[0], tmp_file);
+            } else
+                strcpy(input->ifile[0], strVal);
 
         } else if (strncmp(keyword, "ifile", 5) == 0) {
             for (i = 1; i < MAX_IFILES; i++) {
@@ -2155,6 +2157,13 @@ int l2gen_load_input(clo_optionList_t *list, instr *input, int32_t nbands) {
                 strcpy(input->dsdicoeffile, tmp_file);
             }
 
+        }  else if (strcmp(keyword, "sstjsonfile") == 0) {
+            if (clo_isOptionSet(option)) {
+                strVal = clo_getOptionString(option);
+                parse_file_name(strVal, tmp_file);
+                strcpy(input->sstjsonfile, tmp_file);
+            }
+
         } else if (strcmp(keyword, "sstssesfile") == 0) {
             if (clo_isOptionSet(option)) {
                 strVal = clo_getOptionString(option);
@@ -2169,7 +2178,14 @@ int l2gen_load_input(clo_optionList_t *list, instr *input, int32_t nbands) {
                 strcpy(input->sst4coeffile, tmp_file);
             }
 
-        } else if (strcmp(keyword, "sst4ssesfile") == 0) {
+        }  else if (strcmp(keyword, "sst4jsonfile") == 0) {
+            if (clo_isOptionSet(option)) {
+                strVal = clo_getOptionString(option);
+                parse_file_name(strVal, tmp_file);
+                strcpy(input->sst4jsonfile, tmp_file);
+            }
+
+        }else if (strcmp(keyword, "sst4ssesfile") == 0) {
             if (clo_isOptionSet(option)) {
                 strVal = clo_getOptionString(option);
                 parse_file_name(strVal, tmp_file);
@@ -2195,6 +2211,13 @@ int l2gen_load_input(clo_optionList_t *list, instr *input, int32_t nbands) {
                 strVal = clo_getOptionString(option);
                 parse_file_name(strVal, tmp_file);
                 strcpy(input->sst3coeffile, tmp_file);
+            }
+
+        } else if (strcmp(keyword, "sst3jsonfile") == 0) {
+            if (clo_isOptionSet(option)) {
+                strVal = clo_getOptionString(option);
+                parse_file_name(strVal, tmp_file);
+                strcpy(input->sst3jsonfile, tmp_file);
             }
 
         } else if (strcmp(keyword, "sst3ssesfile") == 0) {
@@ -2839,11 +2862,6 @@ int l2gen_load_input(clo_optionList_t *list, instr *input, int32_t nbands) {
                     exit(1);
                 }
                 input->nbands_ac=count;
-                for(i=0;i<input->nbands_ac;i++){
-                    if(iArray[i]>input->aer_wave_long)
-                        count--;
-                }
-                input->nbands_ac=count;
                 input->mbac_wave=(int32_t *)malloc(count*sizeof(int32_t));
                 input->acbands_index=(int32_t *)malloc(count*sizeof(int32_t));
                 for (i = 0; i < count; i++)
@@ -2960,6 +2978,7 @@ int msl12_option_input(int argc, char **argv, clo_optionList_t* list,
         return (-1);
     }
 
+    // go through l1_input CLO options and load them
     l1_load_options(list, l1file);
 
     l1file->geofile = input->geofile;
@@ -3828,6 +3847,10 @@ int msl12_option_input(int argc, char **argv, clo_optionList_t* list,
     strcat(l1_input->input_parms, str_buf);
     strcat(l1_input->input_parms, "\n");
 
+    sprintf(str_buf, "sstjsonfile = %s", input->sstjsonfile);
+    strcat(l1_input->input_parms, str_buf);
+    strcat(l1_input->input_parms, "\n");
+
     sprintf(str_buf, "sstssesfile = %s", input->sstssesfile);
     strcat(l1_input->input_parms, str_buf);
     strcat(l1_input->input_parms, "\n");
@@ -3836,11 +3859,19 @@ int msl12_option_input(int argc, char **argv, clo_optionList_t* list,
     strcat(l1_input->input_parms, str_buf);
     strcat(l1_input->input_parms, "\n");
 
+    sprintf(str_buf, "sst4jsonfile = %s", input->sst4jsonfile);
+    strcat(l1_input->input_parms, str_buf);
+    strcat(l1_input->input_parms, "\n");
+
     sprintf(str_buf, "sst4ssesfile = %s", input->sst4ssesfile);
     strcat(l1_input->input_parms, str_buf);
     strcat(l1_input->input_parms, "\n");
 
     sprintf(str_buf, "sst3coeffile = %s", input->sst3coeffile);
+    strcat(l1_input->input_parms, str_buf);
+    strcat(l1_input->input_parms, "\n");
+
+    sprintf(str_buf, "sst3jsonfile = %s", input->sst3jsonfile);
     strcat(l1_input->input_parms, str_buf);
     strcat(l1_input->input_parms, "\n");
 

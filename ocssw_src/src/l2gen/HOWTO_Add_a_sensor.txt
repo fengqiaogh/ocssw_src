@@ -14,7 +14,6 @@ l2gen/get_chl.c
 l2gen/get_l2prod_index.c
 $OCDATAROOT/mysensor
 $OCDATAROOT/common/SensorInfo.json
-$OCDATAROOT/common/SensorInfo.txt
 $OCDATAROOT/common/missionList.xml
 
 

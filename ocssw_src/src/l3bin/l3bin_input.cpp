@@ -9,63 +9,64 @@
 
 static char mainProgramName[50];
 
-static char *l3bin_optionKeys[] = {
-    "help",
-    "version",
-    "verbose",
-    "dump_options",
-    "dump_options_paramfile",
-    "dump_options_xmlfile",
-    "par",
-    "pversion",
-    "ifile",
-    "ofile",
-    "oformat",
-    "merged",
-    "latnorth",
-    "latsouth",
-    "loneast",
-    "lonwest",
-    "sday",
-    "eday",
-    "deflate",
-    "orbit1",
-    "orbit2",
-    "median",
-    "noext",
-    "unit_wgt",
-    "composite_scheme",
-    "composite_prod",
-    "reduce_fac",
-    "resolve",
-    "prod",
-    "doi",
-    NULL
-};
+static char* l3bin_optionKeys[] = {"help",
+                                   "version",
+                                   "verbose",
+                                   "dump_options",
+                                   "dump_options_paramfile",
+                                   "dump_options_xmlfile",
+                                   "par",
+                                   "pversion",
+                                   "ifile",
+                                   "ofile",
+                                   "oformat",
+                                   "merged",
+                                   "latnorth",
+                                   "latsouth",
+                                   "loneast",
+                                   "lonwest",
+                                   "sday",
+                                   "eday",
+                                   "deflate",
+                                   "orbit1",
+                                   "orbit2",
+                                   "median",
+                                   "noext",
+                                   "unit_wgt",
+                                   "composite_scheme",
+                                   "composite_prod",
+                                   "reduce_fac",
+                                   "resolve",
+                                   "prod",
+                                   "doi",
+                                   NULL};
 
-static char *l3binmerge_optionKeys[] = {
-    "help",
-    "version",
-    "verbose",
-    "dump_options",
-    "dump_options_paramfile",
-    "dump_options_xmlfile",
-    "par",
-    "pversion",
-    "eval",
-    "ifile",
-    "ofile",
-    "latnorth",
-    "latsouth",
-    "loneast",
-    "lonwest",
-    "noext",
-    "u",
-    "prod",
-    NULL
-};
+static char* l3binmerge_optionKeys[] = {"help",
+                                        "version",
+                                        "verbose",
+                                        "dump_options",
+                                        "dump_options_paramfile",
+                                        "dump_options_xmlfile",
+                                        "par",
+                                        "pversion",
+                                        "eval",
+                                        "ifile",
+                                        "ofile",
+                                        "latnorth",
+                                        "latsouth",
+                                        "loneast",
+                                        "lonwest",
+                                        "noext",
+                                        "u",
+                                        "prod",
+                                        NULL};
 
-int input_init(instr *input_str) {
+/**
+ * @brief initialize input values to defaults
+ * @param[out] input_str structure of command line inputs
+ * @return 0, if successful
+ */
+int input_init(instr* input_str) {
     input_str->infile[0] = '\0';
     input_str->ofile[0] = '\0';
     input_str->pfile[0] = '\0';
@@ -109,6 +110,13 @@ int input_init(instr *input_str) {
     return 0;
 }
 
+/**
+ * @brief initialize the option list with descriptions and default values
+ * @param[out] list list of CLO options
+ * @param[in] prog utility name
+ * @param[in] version utility version
+ * @return 0 if successful
+ */
 int l3bin_init_options(clo_optionList_t* list, const char* prog, const char* version) {
     char tmpStr[2048];
     clo_option_t* option;
@@ -143,7 +151,6 @@ int l3bin_init_options(clo_optionList_t* list, const char* prog, const char* ver
     option = clo_addOption(list, "merged", CLO_TYPE_OFILE, NULL, "merged file name");
 
     strcpy(tmpStr, "output file format\n");
-    strcat(tmpStr, "           hdf4:    output a HDF4 file\n");
     strcat(tmpStr, "           netCDF4: output a netCDF4 file\n");
     strcat(tmpStr, "           hdf5:    output a HDF5 file\n");
     clo_addOption(list, "oformat", CLO_TYPE_STRING, "netCDF4", tmpStr);
@@ -188,21 +195,28 @@ int l3bin_init_options(clo_optionList_t* list, const char* prog, const char* ver
     option = clo_addOption(list, "prod", CLO_TYPE_STRING, "DEFAULT", tmpStr);
     clo_addOptionAlias(option, "out_parm");
 
-    option = clo_addOption(list, "union_bins", CLO_TYPE_BOOL, "off", "Output file contains the union of input bins");
+    option = clo_addOption(list, "union_bins", CLO_TYPE_BOOL, "off",
+                           "Output file contains the union of input bins");
     clo_addOptionAlias(option, "u");
 
     clo_addOption(list, "doi", CLO_TYPE_STRING, NULL, "Digital Object Identifier (DOI) string");
-   
+
     clo_setVersion(version);
     return 0;
 }
 
-int l3bin_load_input(clo_optionList_t* list, instr *input) {
-    char *tmp_str;
-    char keyword [50];
+/**
+ * @brief load command line list of options into input structure
+ * @param[in] list list of command line options
+ * @param[out] input structure of command line inputs
+ * @return 0 if successful, -1 for invalid argument keyword
+ */
+int l3bin_load_input(clo_optionList_t* list, instr* input) {
+    char* tmp_str;
+    char keyword[50];
     char tmp_file[FILENAME_MAX];
     int numOptions, optionId;
-    clo_option_t *option;
+    clo_option_t* option;
 
     numOptions = clo_getNumOptions(list);
     for (optionId = 0; optionId < numOptions; optionId++) {
@@ -217,7 +231,8 @@ int l3bin_load_input(clo_optionList_t* list, instr *input) {
         /* change keyword to lower case */
         tmp_str = keyword;
         while (*tmp_str != '\0') {
-            if (isupper(*tmp_str)) *tmp_str = tolower(*tmp_str);
+            if (isupper(*tmp_str))
+                *tmp_str = tolower(*tmp_str);
             tmp_str++;
         }
         if (strcmp(keyword, "help") == 0)
@@ -230,8 +245,13 @@ int l3bin_load_input(clo_optionList_t* list, instr *input) {
             ;
         else if (strcmp(keyword, "ifile") == 0) {
             if (clo_isOptionSet(option)) {
-                parse_file_name(clo_getOptionString(option), tmp_file);
-                strcpy(input->infile, tmp_file);
+                char* ifile = clo_getOptionString(option);
+                if (check_url(ifile) == 0) {
+                    parse_file_name(ifile, tmp_file);
+                    strcpy(input->infile, tmp_file);
+                } else {
+                    strcpy(input->infile, ifile);
+                }
             }
         } else if (strcmp(keyword, "ofile") == 0) {
             if (clo_isOptionSet(option)) {
@@ -272,7 +292,7 @@ int l3bin_load_input(clo_optionList_t* list, instr *input) {
         } else if (strcmp(keyword, "reduce_fac") == 0) {
             input->reduce_fac = clo_getOptionInt(option);
 
-       } else if (strcmp(keyword, "resolve") == 0) {
+        } else if (strcmp(keyword, "resolve") == 0) {
             if (clo_isOptionSet(option)) {
                 strcpy(input->resolve, clo_getOptionString(option));
             }
@@ -332,12 +352,9 @@ int l3bin_load_input(clo_optionList_t* list, instr *input) {
             }
         } else {
             goto Invalid_return;
-
         }
-
     }
     return 0;
-
 
 Invalid_return:
     printf("Invalid argument \"%s\"\n", keyword);
@@ -363,8 +380,18 @@ Invalid_return:
         instr     input         O   structure variable for inputs
 
 ----------------------------------------------------------------------------*/
+/**
+ * @brief Convert the arguments from the command line into a a structure input
+ * variable.
+ * @param[in] argc number of command line arguments
+ * @param[in] argv list of command line arguments
+ * @param[out] input structure variable for inputs
+ * @param[in] prog utility name
+ * @param[in] version utility version
+ * @return negative if any error occurs, otherwise 0
+ */
 
-int l3bin_input(int argc, char **argv, instr *input, const char* prog, const char* version) {
+int l3bin_input(int argc, char** argv, instr* input, const char* prog, const char* version) {
     char str_buf[4096];
 
     /*                                                                  */
@@ -402,7 +429,7 @@ int l3bin_input(int argc, char **argv, instr *input, const char* prog, const cha
     clo_deleteList(list);
 
     readFileList(input->infile);
-    
+
     /*                                                                  */
     /* Build string of parameters for metadata                          */
     /*                                                                  */

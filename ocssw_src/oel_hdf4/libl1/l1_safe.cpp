@@ -193,7 +193,7 @@ int openl1_safe(filehandle * l1file) {
     return (LIFE_IS_GOOD);
 }
 
-int readl1_safe(filehandle *file, int32_t scan, l1str *l1rec) {
+int readl1_safe(filehandle *file, int32_t scan, l1str *l1rec, int lonlat) {
     static int firstCall = 1;
     static double time_interval;
     static double tai93at2000;
@@ -245,7 +245,7 @@ int readl1_safe(filehandle *file, int32_t scan, l1str *l1rec) {
     size_t start[3], count[3];
 
     int xid, yid;
-
+    
     if (firstCall) {
         firstCall = 0;
         if (want_verbose)
@@ -465,7 +465,7 @@ int readl1_safe(filehandle *file, int32_t scan, l1str *l1rec) {
         }
         DPTB(nc_get_var_int(tieGeometriesFileID, solaVarID, tmp_int));
         for(int i=0; i<num_tie_points; i++) {
-            double angle = tmp_int[i] * scale_sola / RADEG;
+            double angle = tmp_int[i] * scale_sola / OEL_RADEG;
             sola_x_za[i] = cos(angle);
             sola_y_za[i] = sin(angle);
         }
@@ -475,7 +475,7 @@ int readl1_safe(filehandle *file, int32_t scan, l1str *l1rec) {
         }
         DPTB(nc_get_var_int(tieGeometriesFileID, senaVarID, tmp_int));
         for(int i=0; i<num_tie_points; i++) {
-            double angle = tmp_int[i] * scale_sena / RADEG;
+            double angle = tmp_int[i] * scale_sena / OEL_RADEG;
             sena_x_za[i] = cos(angle);
             sena_y_za[i] = sin(angle);
         }
@@ -599,52 +599,52 @@ int readl1_safe(filehandle *file, int32_t scan, l1str *l1rec) {
                 __FILE__, __LINE__, qualityFlagsFilename.c_str(), "quality_flags");
         exit(FATAL_ERROR);
     }
-
-    // read in radiance data
-    for (ib = 0; ib < nbands; ib++) {
-        retval = nc_get_vara_ushort(radFileID[ib], radVarID[ib], start, count, rad_data); //BYSCAN
-        if (retval != NC_NOERR) {
-            fprintf(stderr,
-                    "-E- %s line %d: nc_get_vara_float failed for file, %s  field, %s.\n",
-                    __FILE__, __LINE__, radFilename[ib].c_str(), radVarname[ib].c_str());
-            exit(FATAL_ERROR);
-        }
-        // copy to Lt record.
-        for (ip = 0; ip < npix; ip++) {
-            ipb = ip * nbands + ib;
-            if(rad_data[ip] == radFillValue[ib]) {
-                l1rec->Lt[ipb] = BAD_FLT;
-                l1rec->navfail[ip] = 1;
-            } else {
-                l1rec->Lt[ipb] = (rad_data[ip] * radScale[ib] + radOffset[ib]) / 10.; //BYSCAN
-
-                // mark negative input data as HILT
-                if (l1rec->Lt[ipb] < 0.0)
-                    l1rec->hilt[ip] = 1;
+    // only read radiances and compute angles if lonlat set to zero
+    if (lonlat == 0) {
+            // read in radiance data
+        for (ib = 0; ib < nbands; ib++) {
+            retval = nc_get_vara_ushort(radFileID[ib], radVarID[ib], start, count, rad_data);  // BYSCAN
+            if (retval != NC_NOERR) {
+                fprintf(stderr, "-E- %s line %d: nc_get_vara_float failed for file, %s  field, %s.\n",
+                        __FILE__, __LINE__, radFilename[ib].c_str(), radVarname[ib].c_str());
+                exit(FATAL_ERROR);
             }
-        }
-    } // for ib
+            // copy to Lt record.
+            for (ip = 0; ip < npix; ip++) {
+                ipb = ip * nbands + ib;
+                if (rad_data[ip] == radFillValue[ib]) {
+                    l1rec->Lt[ipb] = BAD_FLT;
+                    l1rec->navfail[ip] = 1;
+                } else {
+                    l1rec->Lt[ipb] = (rad_data[ip] * radScale[ib] + radOffset[ib]) / 10.;  // BYSCAN
 
-    for (ip = 0; ip < npix; ip++) {
-        double x, y;
-        l1rec->solz[ip] = gsl_spline2d_eval(solz_spline, ip, scan, solz_xacc, solz_yacc);
-        x = gsl_spline2d_eval(sola_x_spline, ip, scan, sola_x_xacc, sola_x_yacc);
-        y = gsl_spline2d_eval(sola_y_spline, ip, scan, sola_y_xacc, sola_y_yacc);
-        l1rec->sola[ip] = atan2(y, x) * RADEG;
-        l1rec->senz[ip] = gsl_spline2d_eval(senz_spline, ip, scan, senz_xacc, senz_yacc);
-        x = gsl_spline2d_eval(sena_x_spline, ip, scan, sena_x_xacc, sena_x_yacc);
-        y = gsl_spline2d_eval(sena_y_spline, ip, scan, sena_y_xacc, sena_y_yacc);
-        l1rec->sena[ip] = atan2(y, x) * RADEG;
+                    // mark negative input data as HILT
+                    if (l1rec->Lt[ipb] < 0.0)
+                        l1rec->hilt[ip] = 1;
+                }
+            }
+        }  // for ib invoke spline
+        for (ip = 0; ip < npix; ip++) {
+            double x, y;
+            l1rec->solz[ip] = gsl_spline2d_eval(solz_spline, ip, scan, solz_xacc, solz_yacc);
+            x = gsl_spline2d_eval(sola_x_spline, ip, scan, sola_x_xacc, sola_x_yacc);
+            y = gsl_spline2d_eval(sola_y_spline, ip, scan, sola_y_xacc, sola_y_yacc);
+            l1rec->sola[ip] = atan2(y, x) * OEL_RADEG;
+            l1rec->senz[ip] = gsl_spline2d_eval(senz_spline, ip, scan, senz_xacc, senz_yacc);
+            x = gsl_spline2d_eval(sena_x_spline, ip, scan, sena_x_xacc, sena_x_yacc);
+            y = gsl_spline2d_eval(sena_y_spline, ip, scan, sena_y_xacc, sena_y_yacc);
+            l1rec->sena[ip] = atan2(y, x) * OEL_RADEG;
 
-        // radcor needs all Lts populated before running so...one more time around the block...
-        if (l1_input->rad_opt != 0) {
-            uint32_t isLand = qualityFlags[ip] & 2147483648;
-            // es corrected f0, so setting 1 as 4 element - seemed silly to make a variable for it
-            radcor(l1rec, ip, isLand, 1);
-            for (ib = 0; ib < nbands; ib++) {
-                if(l1rec->navfail[ip] != 1) {
-                    ipb = ip * nbands + ib;
-                    l1rec->Lt[ipb] += l1rec->radcor[ipb];
+            // radcor needs all Lts populated before running so...one more time around the block...
+            if (l1_input->rad_opt != 0) {
+                uint32_t isLand = qualityFlags[ip] & 2147483648;
+                // es corrected f0, so setting 1 as 4 element - seemed silly to make a variable for it
+                radcor(l1rec, ip, isLand, 1);
+                for (ib = 0; ib < nbands; ib++) {
+                    if (l1rec->navfail[ip] != 1) {
+                        ipb = ip * nbands + ib;
+                        l1rec->Lt[ipb] += l1rec->radcor[ipb];
+                    }
                 }
             }
         }

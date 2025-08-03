@@ -3,19 +3,20 @@
 import argparse
 import hashlib
 import json
-import os
-import os.path
-import re
-import sys
-import urllib.request
-import subprocess
-import shutil
 import logging
-from contextlib import closing
-from datetime import datetime, timedelta, date
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.parse
+from datetime import datetime
+from pathlib import Path
+
 import requests
 from requests.adapters import HTTPAdapter
-import tempfile
 
 DEFAULT_BASE_URL = "https://oceandata.sci.gsfc.nasa.gov/manifest/tags"
 MANIFEST_BASENAME = "manifest.json"
@@ -74,13 +75,13 @@ def isRequestAuthFailure(req) :
 # See comment above
 def httpdl(server, request, localpath='.', outputfilename=None, ntries=5,
            uncompress=False, timeout=30., verbose=0, force_download=False,
-           chunk_size=DEFAULT_CHUNK_SIZE):
+           chunk_size=DEFAULT_CHUNK_SIZE, timestamp=False):
 
     status = 0
     urlStr = 'https://' + server + request
 
     global obpgSession
-
+    localpath = Path(localpath)
     getSession(verbose=verbose, ntries=ntries)
 
     modified_since = None
@@ -88,25 +89,31 @@ def httpdl(server, request, localpath='.', outputfilename=None, ntries=5,
 
     if not force_download:
         if outputfilename:
-            ofile = os.path.join(localpath, outputfilename)
+            ofile = localpath / outputfilename
             modified_since = get_file_time(ofile)
         else:
-            ofile = os.path.join(localpath, os.path.basename(request.rstrip()))
+            rpath = Path(request.rstrip())
+            if 'requested_files' in request:
+                rpath = Path(request.rstrip().split('?')[0])
+            ofile = localpath / rpath.name
+            if re.search(r'(?<=\?)(\w+)', ofile.name):
+                ofile = Path(ofile.name.split('?')[0])
+
             modified_since = get_file_time(ofile)
 
         if modified_since:
             headers = {"If-Modified-Since":modified_since.strftime("%a, %d %b %Y %H:%M:%S GMT")}
 
-    with closing(obpgSession.get(urlStr, stream=True, timeout=timeout, headers=headers)) as req:
+    with obpgSession.get(urlStr, stream=True, timeout=timeout, headers=headers) as req:
 
         if req.status_code != 200:
             status = req.status_code
         elif isRequestAuthFailure(req):
             status = 401
         else:
-            if not os.path.exists(localpath):
+            if not Path.exists(localpath):
                 os.umask(0o02)
-                os.makedirs(localpath, mode=0o2775)
+                Path.mkdir(localpath, mode=0o2775, parents=True)
 
             if not outputfilename:
                 cd = req.headers.get('Content-Disposition')
@@ -115,7 +122,7 @@ def httpdl(server, request, localpath='.', outputfilename=None, ntries=5,
                 else:
                     outputfilename = urlStr.split('/')[-1]
 
-            ofile = os.path.join(localpath, outputfilename)
+            ofile = localpath / outputfilename
 
             # This is here just in case we didn't get a 304 when we should have...
             download = True
@@ -129,17 +136,43 @@ def httpdl(server, request, localpath='.', outputfilename=None, ntries=5,
                             print("Skipping download of %s" % outputfilename)
 
             if download:
+                total_length = req.headers.get('Content-Length')
+                if total_length is None:
+                    total_length = len(req.content)
+                length_downloaded = 0
+                total_length = int(total_length)
+                if verbose >0:
+                    print("Downloading %s (%8.2f MBs)" % (outputfilename,total_length /1024/1024))
+
                 with open(ofile, 'wb') as fd:
+
                     for chunk in req.iter_content(chunk_size=chunk_size):
                         if chunk: # filter out keep-alive new chunks
+                            length_downloaded += len(chunk)
                             fd.write(chunk)
+                            if verbose > 0:
+                                percent_done = int(50 * length_downloaded / total_length)
+                                sys.stdout.write("\r[%s%s]" % ('=' * percent_done, ' ' * (50-percent_done)))
+                                sys.stdout.flush()
 
-                if uncompress and re.search(".(Z|gz|bz2)$", ofile):
-                    compressStatus = uncompressFile(ofile)
-                    if compressStatus:
-                        status = compressStatus
+                if uncompress:
+                    if ofile.suffix in {'.Z', '.gz', '.bz2'}:
+                        if verbose:
+                            print("\nUncompressing {}".format(ofile))
+                        compressStatus = uncompressFile(ofile)
+                        if compressStatus:
+                            status = compressStatus
                 else:
                     status = 0
+
+                if timestamp:
+                    if 'Last-Modified' in req.headers:
+                        last_modified = req.headers["Last-Modified"]
+                        last_modified_time = datetime.strptime(last_modified, '%a, %d %b %Y %H:%M:%S %Z')
+                        last_modified_timestamp = time.mktime(last_modified_time.timetuple())
+                        file_path = os.path.join(localpath, os.path.basename(request))
+                        if os.path.exists(file_path):
+                            os.utime(file_path, (last_modified_timestamp, last_modified_timestamp))
 
     return status
 
@@ -155,10 +188,11 @@ def uncompressFile(compressed_file):
         UNIX compress
     """
 
-    compProg = {"gz": "gunzip -f ", "Z": "gunzip -f ", "bz2": "bunzip2 -f "}
-    exten = os.path.basename(compressed_file).split('.')[-1]
+    compProg = {".gz": "gunzip", ".Z": "gunzip", ".bz2": "bunzip2"}
+    exten = Path(compressed_file).suffix
     unzip = compProg[exten]
-    p = subprocess.Popen(unzip + compressed_file, shell=True)
+    cmd = [unzip, "-f", str(compressed_file.resolve())]
+    p = subprocess.Popen(cmd, shell=False)
     status = os.waitpid(p.pid, 0)[1]
     if status:
         print("Warning! Unable to decompress %s" % compressed_file)
@@ -170,13 +204,17 @@ def uncompressFile(compressed_file):
 # See comment above
 def get_file_time(localFile):
     ftime = None
-    if not os.path.isfile(localFile):
-        localFile = re.sub(r".(Z|gz|bz2)$", '', localFile)
+    localFile = Path(localFile)
+    if not Path.is_file(localFile):
+        while localFile.suffix in {'.Z', '.gz', '.bz2'}:
+            localFile = localFile.with_suffix('')
 
-    if os.path.isfile(localFile):
-        ftime = datetime.fromtimestamp(os.path.getmtime(localFile))
+    if Path.is_file(localFile):
+        ftime = datetime.fromtimestamp(localFile.stat().st_mtime)
 
     return ftime
+
+#  ------------------ Start of non-duplicated code -------------------
 
 def run():
     parser = argparse.ArgumentParser()
@@ -262,10 +300,10 @@ def _add_subparser_download(subparsers):
     parser_download.add_argument("--chunk-size", type=int, default=DEFAULT_CHUNK_SIZE, help="download chunk size")
     parser_download.add_argument("-s", "--save-dir", help="save a copy of the manifest files to this directory")
     parser_download.add_argument("-l", "--local-dir", help="directory containing local manifest files")
-    parser_download.add_argument("-w", "--wget", default=False, action="store_true", help="use wget to download")
+    parser_download.add_argument("--timestamp", default=False, action="store_true", help="preserve timestamps of downloaded files")
     parser_download.add_argument("-v", "--verbose", action="count", default=0, help="increase output verbosity")
     parser_download.add_argument("files", action="append", nargs="*", default=None, type=str, help="files to download if needed")
-    
+
     parser_download.set_defaults(func=download)
     parser_download.set_defaults(dest_dir=".")
 
@@ -285,7 +323,7 @@ def _add_subparser_list_tags(subparsers):
     parser_list_tags = subparsers.add_parser('list_tags')
     parser_list_tags.add_argument("-b", "--base-url", default=DEFAULT_BASE_URL, help="base URL")
     parser_list_tags.add_argument("--chunk-size", type=int, default=DEFAULT_CHUNK_SIZE, help="download chunk size")
-    parser_list_tags.add_argument("-w", "--wget", default=False, action="store_true", help="use wget to download")
+    parser_list_tags.add_argument("--timestamp", default=False, action="store_true", help="preserve timestamps of downloaded files")
     parser_list_tags.add_argument("-v", "--verbose", action="count", default=0, help="increase output verbosity")
     parser_list_tags.set_defaults(func=list_tags)
 
@@ -299,7 +337,7 @@ def create_default_options():
                 chunk_size=DEFAULT_CHUNK_SIZE,
                 save_dir=None,
                 local_dir=None,
-                wget=False,
+                timestamp=False,
                 files=None,
                 func=list_tags)
     return options
@@ -328,9 +366,9 @@ def update_file(options, args):
             checksum = _get_checksum(manifest, options.path)
             if not current_entry or current_entry.get('checksum') != checksum:
                 info = {
-                    "checksum": checksum, 
-                    "size": os.stat(options.path).st_size, 
-                    "mode": os.stat(options.path).st_mode, 
+                    "checksum": checksum,
+                    "size": os.stat(options.path).st_size,
+                    "mode": os.stat(options.path).st_mode,
                     "tag": manifest['tag']
                 }
                 manifest['files'][options.path] = info
@@ -357,7 +395,7 @@ def get_value(options, args):
                 print("Path not found, invalid part: %s" % part)
                 return
         print(manifest)
-        
+
 def get_first_tag(options, args):
     with open(options.manifest, 'rb') as manifest:
         manifest = json.load(manifest)
@@ -365,14 +403,14 @@ def get_first_tag(options, args):
 
 def getFileList(excludeList=None, includeList=None):
     allFiles = []
-    
+
     for root, _, files in os.walk(".", followlinks=True):
         for f in files:
             if '/' in root:
                 name = root[2:]+'/'+f
             else:
                 name = f
-    
+
             # exclude files if not in include list
             addIt = True
             if excludeList:
@@ -389,7 +427,7 @@ def getFileList(excludeList=None, includeList=None):
             if addIt:
                 if "__pycache__" not in name:
                     allFiles.append(name)
-    
+
     return allFiles
 
 def clean(options, args):
@@ -400,7 +438,7 @@ def clean(options, args):
         for exclude in options.exclude:
             if exclude[0] == ".":
                 return
-    
+
     if not os.path.isfile(MANIFEST_BASENAME):
         print("directory needs to contain a", MANIFEST_BASENAME)
         return 1
@@ -486,9 +524,9 @@ def generate(options, args):
             checksum = _get_checksum(manifest, f)
             if not current_entry or current_entry.get('size') != fileSize or current_entry.get('checksum') != checksum:
                 info = {
-                    "checksum": checksum, 
-                    "size": fileSize, 
-                    "mode": os.stat(f).st_mode, 
+                    "checksum": checksum,
+                    "size": fileSize,
+                    "mode": os.stat(f).st_mode,
                     "tag": options.tag
                 }
                 files_entries[f] = info
@@ -529,7 +567,7 @@ def download(options, args):
     # if files on command line only look at those
     if options.files and options.files[0]:
         newList = {}
-        for f in  options.files[0]:
+        for f in options.files[0]:
             try:
                 newList[f] = modified_files[f]
             except:
@@ -550,7 +588,7 @@ def download(options, args):
                 destDir = os.path.dirname(dest)
                 if not os.path.isdir(destDir):
                     os.makedirs(destDir)
-                shutil.copy(src, dest)
+                shutil.copy2(src, dest)
                 os.chmod(dest, info["mode"])
 
 def get_tags(options, args):
@@ -558,20 +596,17 @@ def get_tags(options, args):
     tempDir = tempfile.TemporaryDirectory(prefix="manifest-")
     status = 0
     url = options.base_url + "/"
-    if options.wget:
-        command = "cd %s; wget -q %s" % (tempDir.name, url)
-        run_command(command)
-    else:
-        parts = urllib.parse.urlparse(url)
-        host = parts.netloc
-        request = parts.path
-        status = httpdl(host, request, localpath=tempDir.name, 
-                        outputfilename="index.html",
-                        verbose=options.verbose,
-                        force_download=True,
-                        chunk_size=options.chunk_size)
+    parts = urllib.parse.urlparse(url)
+    host = parts.netloc
+    request = parts.path
+    status = httpdl(host, request, localpath=tempDir.name,
+                    outputfilename="index.html",
+                    verbose=options.verbose,
+                    force_download=True,
+                    chunk_size=options.chunk_size,
+                    timestamp=options.timestamp)
     if status == 0:
-        with open("%s/index.html" % (tempDir.name)) as f: 
+        with open("%s/index.html" % (tempDir.name)) as f:
             inBody = False
             for line in f:
                 if "<body>" in line:
@@ -579,10 +614,10 @@ def get_tags(options, args):
                 if "</body>" in line:
                     break
                 if inBody:
-                    if line.startswith("<a href="): 
-                        parts = line.split('"') 
-                        s = parts[1].split("/")[0] 
-                        if s != "..": 
+                    if line.startswith("<a href="):
+                        parts = line.split('"')
+                        s = parts[1].split("/")[0]
+                        if s != "..":
                             tag_list.append(s)
         return tag_list
     else:
@@ -624,35 +659,33 @@ def _download_file(options, fileName):
     dest_dir = os.path.dirname(dest)
     if not os.path.isdir(dest_dir):
         os.makedirs(dest_dir)
-    
+
     if options.local_dir:
         src = "%s/%s/%s/%s" % (options.local_dir, options.tag, options.name, fileName)
         if options.verbose:
             print("Copying %s from %s" % (fileName, src))
-        shutil.copy(src, dest)
+        if options.timestamp:
+            shutil2.copy(src, dest)
+        else:
+            shutil.copy(src, dest)
         return True
-    
+
     url = "%s/%s/%s/%s" % (options.base_url, options.tag, options.name, fileName)
     if options.verbose:
         print("Downloading %s from %s" % (fileName, url))
-    if options.wget:
-        if os.path.isfile(dest):
-            os.remove(dest)
-        command = "cd %s; wget -q %s" % (dest_dir, url)
-        run_command(command)
-    else:
-        parts = urllib.parse.urlparse(url)
-        #host = "%s://%s" % (parts.scheme, parts.netloc)
-        host = parts.netloc
-        request = parts.path
-        status = httpdl(host, request, localpath=dest_dir, 
-                        outputfilename=os.path.basename(dest),
-                        verbose=options.verbose,
-                        force_download=True,
-                        chunk_size=options.chunk_size)
-        if status != 0:
-            print("Error downloading", dest, ": return code =", status)
-            return False
+    parts = urllib.parse.urlparse(url)
+    #host = "%s://%s" % (parts.scheme, parts.netloc)
+    host = parts.netloc
+    request = parts.path
+    status = httpdl(host, request, localpath=dest_dir,
+                    outputfilename=os.path.basename(dest),
+                    verbose=options.verbose,
+                    force_download=True,
+                    chunk_size=options.chunk_size,
+                    timestamp=options.timestamp)
+    if status != 0:
+        print("Error downloading", dest, ": return code =", status)
+        return False
 
     if options.save_dir:
         src = "%s/%s" % (options.dest_dir, fileName)
@@ -660,7 +693,7 @@ def _download_file(options, fileName):
         destDir = os.path.dirname(dest)
         if not os.path.isdir(destDir):
             os.makedirs(destDir)
-        shutil.copy(src, dest)
+        shutil.copy2(src, dest)
     return True
 
 def _download_files(options, file_list):
@@ -672,29 +705,11 @@ def _download_files(options, file_list):
                 os.makedirs(dest_dir)
             if info.get('checksum'):
                 src = "%s/%s/%s/%s" % (options.local_dir, info["tag"], options.name, path)
-                shutil.copy(src, dest)
+                shutil.copy2(src, dest)
                 os.chmod(dest, info["mode"])
             else:
                 src = info['symlink']
                 os.symlink(src, dest)
-        return
-        
-    if options.wget:
-        if not os.path.isdir(options.dest_dir):
-            os.makedirs(options.dest_dir)
-        with tempfile.NamedTemporaryFile(prefix="manifest-") as txt_file:
-            for path, info in file_list.items():
-                if info.get('checksum'):
-                    txt_file.write("%s\n" % path)
-                else:
-                    dest = "%s/%s" % (options.dest_dir, path)
-                    src = info['symlink']
-                    os.symlink(src, dest)
-            command = "cd %s; wget -x -nH -i %s --cut-dirs=3 --base=%s/%s/%s/" % (options.dest_dir, txt_file.name, options.base_url, info["tag"], options.name)
-            run_command(command)
-        for path, info in file_list.items():
-            if info.get('checksum'):
-                os.chmod(dest, info["mode"])
         return
 
     for path, info in file_list.items():
@@ -712,11 +727,12 @@ def _download_files(options, file_list):
             parts = urllib.parse.urlparse(url)
             host = parts.netloc
             request = parts.path
-            status = httpdl(host, request, localpath=dest_dir, 
+            status = httpdl(host, request, localpath=dest_dir,
                         outputfilename=os.path.basename(dest),
                         verbose=options.verbose,
                         force_download=True,
-                        chunk_size=options.chunk_size)
+                        chunk_size=options.chunk_size,
+                        timestamp=options.timestamp)
             if status == 0:
                 os.chmod(dest, info["mode"])
             else:

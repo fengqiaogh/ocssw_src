@@ -13,12 +13,12 @@ list(APPEND LIBS ${GSL_LIBRARIES})
 
 add_executable(ancgen
   ancgen.cpp
-  copyvaratts.cpp
+  copy_var_utils.cpp
 )
 
 add_executable(extractSPEX
   extractSPEX.cpp
-  copyvaratts.cpp
+  copy_var_utils.cpp
 )
 
 target_link_libraries(ancgen ${LIBS})

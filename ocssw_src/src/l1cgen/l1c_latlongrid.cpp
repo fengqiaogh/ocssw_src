@@ -1599,36 +1599,39 @@ int parallax(filehandle *l1file, const char *l1c_anc, const char *l1c_grid, l1st
         gd_row = gdindex[pix][0] - 1;
         gd_col = gdindex[pix][1] - 1;
         // Displacement vector -- wang et al. 2011 ----
-        if (l1rec->senz[pix]!= binl1c->fillval1 && l1rec->sena[pix]!= binl1c->fillval1  && l1rec->senz[pix] >= senz_min && l1rec->senz[pix] <= senz_max && l1rec->sena[pix] >= sena_min &&
+        if (l1rec->senz[pix] != binl1c->fillval1 && l1rec->sena[pix] != binl1c->fillval1 &&
+            l1rec->senz[pix] >= senz_min && l1rec->senz[pix] <= senz_max && l1rec->sena[pix] >= sena_min &&
             l1rec->sena[pix] <= sena_max) {
-            look_angle=acos(cos(l1rec->tilt * M_PI / 180)*cos(scan_angle[pix]*M_PI/180));
+            look_angle = acos(cos(l1rec->tilt * OEL_DEGRAD) * cos(scan_angle[pix] * OEL_DEGRAD));
             if (binl1c->cloudem_flag == 1)  // CTH constant in km
             {
-                dv = Hsat * cth[gd_row][gd_col] * tan(look_angle) /
-                     (Hsat - cth[gd_row][gd_col]);
+                dv = Hsat * cth[gd_row][gd_col] * tan(look_angle) / (Hsat - cth[gd_row][gd_col]);
             } else if (binl1c->cloudem_flag == 2)  // DEM constant in km
             {
-                dv = Hsat * 0.001 * l1rec->height[pix] * tan(look_angle) /
-                     (Hsat - 0.001 * l1rec->height[pix]);    
+                dv =
+                    Hsat * 0.001 * l1rec->height[pix] * tan(look_angle) / (Hsat - 0.001 * l1rec->height[pix]);
             }
 
-            lat_new[pix] = l1rec->lat[pix] * M_PI / 180 - dv * cos(l1rec->sena[pix] * M_PI / 180 + M_PI) / Re;
-            lon_new[pix] = l1rec->lon[pix] * M_PI / 180 - dv * sin((l1rec->sena[pix] * M_PI / 180 + M_PI)) /
-                                                              (Re * cos(lat_new[pix] * M_PI / 180));
+            lat_new[pix] = l1rec->lat[pix] * OEL_DEGRAD - dv * cos(l1rec->sena[pix] * OEL_DEGRAD + OEL_PI) / Re;
+            lon_new[pix] = l1rec->lon[pix] * OEL_DEGRAD - dv * sin((l1rec->sena[pix] * OEL_DEGRAD + OEL_PI)) /
+                                                              (Re * cos(lat_new[pix] * OEL_DEGRAD));
 
-            if (lon_new[pix] * 180 / M_PI > 180) {
-                lon_new[pix] -= 2 * M_PI;
+            if (lon_new[pix] * OEL_RADEG > 180) {
+                lon_new[pix] -= 2 * OEL_PI;
             }
-            if (lon_new[pix] * 180 / M_PI < -180) {
-                lon_new[pix] += 2 * M_PI;
+            if (lon_new[pix] * OEL_RADEG < -180) {
+                lon_new[pix] += 2 * OEL_PI;
             }
-            lat_new[pix] *= 180 / M_PI;
-            lon_new[pix] *= 180 / M_PI;
+            lat_new[pix] *= OEL_RADEG;
+            lon_new[pix] *= OEL_RADEG;
         } else {
             lat_new[pix] = binl1c->fillval2;
             lon_new[pix] = binl1c->fillval2;
         }
-      if(pix==635 && binl1c->verbose) cout<<"sline # "<<sline+1<<"look_angle in m "<<look_angle*180/M_PI<<"dv "<<dv<<"scan_angle "<<180/M_PI*scan_angle[pix]<<"lat_new "<<lat_new[pix]<<"lon_new "<<lon_new[pix]<<"height "<<l1rec->height[pix]<<endl;
+        if (pix == 635 && binl1c->verbose)
+            cout << "sline # " << sline + 1 << "look_angle in m " << look_angle * OEL_RADEG << "dv " << dv
+                 << "scan_angle " << OEL_RADEG * scan_angle[pix] << "lat_new " << lat_new[pix] << "lon_new "
+                 << lon_new[pix] << "height " << l1rec->height[pix] << endl;
     }
 
     // recompute row/col
@@ -1657,7 +1660,6 @@ int bin_l1c(filehandle *l1file, l1str *l1rec, bin_str *binl1c, short **gdindex, 
     int nbands = l1file->nbands;
     int view;
 
-    //   int nadpix=(npix-1)/2;
     float term1, term2, term3, sca_pix, cosu, cose;
     float scale_all[7], offset_all[7];
     short minval1_all[7], maxval1_all[7];
@@ -1737,18 +1739,6 @@ int bin_l1c(filehandle *l1file, l1str *l1rec, bin_str *binl1c, short **gdindex, 
     a1 = v1.getAtt("valid_max");  // root group
     a1.getValues(&maxval1_all[5]);
 
-    // rotation angle
-    // v1 = geo_grp.getVar("rotation_angle");
-    // a1 = v1.getAtt("scale_factor");  // root group
-    // a1.getValues(&scale_all[6]);
-    // a1 = v1.getAtt("add_offset");  // root group
-    // a1.getValues(&offset_all[6]);
-    // a1 = v1.getAtt("valid_min");  // root group
-    // a1.getValues(&minval1_all[6]);
-    // a1 = v1.getAtt("valid_max");  // root group
-    // a1.getValues(&maxval1_all[6]);
-
-    // I
     v1 = od_grp.getVar("i");
     a1 = v1.getAtt("valid_min");  // root group
     a1.getValues(&minval2_all[0]);
@@ -1771,15 +1761,11 @@ int bin_l1c(filehandle *l1file, l1str *l1rec, bin_str *binl1c, short **gdindex, 
         if (gd_row >= 2000) {
             tilt = 22;
             view = 1;
-            //           if(binl1c->verbose) cout<<"pix # "<<pix+1<<"pos tilt beyond L1C
-            //           grid"<<tilt<<"gd_row"<<gd_row<<endl;
             tilt = fill_tilt;
         }
         if (gd_row <= -1) {
             tilt = -22;
             view = 0;
-            //         if(binl1c->verbose)  cout<<"pix # "<<pix+1<<"neg tilt beyond L1C
-            //         grid"<<tilt<<"gd_row"<<gd_row<<endl;
             tilt = fill_tilt;
         }
 
@@ -1812,12 +1798,12 @@ int bin_l1c(filehandle *l1file, l1str *l1rec, bin_str *binl1c, short **gdindex, 
             binl1c->suna_3D[gd_row][gd_col][view] = binl1c->suna_3D[gd_row][gd_col][view] + l1rec->sola[pix];
             binl1c->sunz_3D[gd_row][gd_col][view] = binl1c->sunz_3D[gd_row][gd_col][view] + l1rec->solz[pix];
 
-            cose = cos((l1rec->senz[pix] + 180) * M_PI / 180);
-            cosu = cos((l1rec->solz[pix]) * M_PI / 180);
+            cose = cos((l1rec->senz[pix] + 180) * OEL_DEGRAD);
+            cosu = cos((l1rec->solz[pix]) * OEL_DEGRAD);
             term1 = cose * cosu;
             term2 = sqrt((1 - cose * cose)) * sqrt((1 - cosu * cosu));
-            term3 = cos((l1rec->sena[pix] + 180 - l1rec->sola[pix]) * M_PI / 180);
-            sca_pix = acos(term1 + term2 * term3) * 180 / M_PI;
+            term3 = cos((l1rec->sena[pix] + 180 - l1rec->sola[pix]) * OEL_DEGRAD);
+            sca_pix = acos(term1 + term2 * term3) * OEL_RADEG;
             binl1c->sca_3D[gd_row][gd_col][view] = binl1c->sca_3D[gd_row][gd_col][view] + sca_pix;
             rotangle = rot_angle(l1rec->senz[pix], l1rec->solz[pix], l1rec->sena[pix],
                                  l1rec->sola[pix]);  // in degrees
@@ -1829,11 +1815,6 @@ int bin_l1c(filehandle *l1file, l1str *l1rec, bin_str *binl1c, short **gdindex, 
         for (sb = 0; sb < nbands; sb++) {
            if (view != BAD_FLT && tilt != fill_tilt && gd_row >= 0 && gd_col >= 0 &&
                 gd_row <= binl1c->num_gridlines - 1 && gd_col <= binl1c->nbinx - 1 && l1rec->Lt[ibp] != binl1c->fillval2 && l1rec->Lt[ibp] >= minval2_all[0] && 10 * l1rec->Lt[ibp] <= maxval2_all[0]){
-/*
-             if (view != BAD_FLT && tilt != fill_tilt && gd_row >= 0 && gd_col >= 0 &&
-                gd_row <= binl1c->num_gridlines - 1 && gd_col <= binl1c->nbinx - 1 && l1rec->Lt[ibp] != binl1c->fillval2 && 10 * l1rec->Lt[ibp] >= minval2_all[0] &&
-                10 * l1rec->Lt[ibp] <= maxval2_all[0] && l1rec->senz[pix] != binl1c->fillval1 && l1rec->senz[pix] >= minval1_all[2]&& l1rec->senz[pix] <= maxval1_all[2]) {
-*/
                 binl1c->I_4D[gd_row][gd_col][view][sb] =
                     binl1c->I_4D[gd_row][gd_col][view][sb] + 10 * l1rec->Lt[ibp];    
                 binl1c->nrec_4D_band[gd_row][gd_col][view][sb] += 1;
@@ -1872,9 +1853,8 @@ int check_l1c_time(const char *l1b_file, const char *l1c_grid, bin_str *binl1c) 
     try {
         nc_l1cgrid = new NcFile(l1c_grid, NcFile::read);
     } catch (NcException &e) {
-        e.what();
-        cerr << "l1cgen l1c_pflag= 8:: Failure reading L1C grid: " + l1c_str << endl;
-        exit(1);
+        cerr << e.what() << "\n -E- l1cgen l1c_pflag= 8:: Failure reading L1C grid: " + l1c_str << endl;
+        exit(EXIT_FAILURE);
     }
 
     NcDim yd = nc_l1cgrid->getDim("bins_along_track");
@@ -1889,9 +1869,9 @@ int check_l1c_time(const char *l1b_file, const char *l1c_grid, bin_str *binl1c) 
     try {
         nc_l1b = new NcFile(l1b_file, NcFile::read);
     } catch (NcException &e) {
-        e.what();
-        cerr << "l1cgen l1c_pflag= 8:: Failure reading L1B or L1C-ANCfile: " + l1b_str << endl;
-        exit(1);
+        cerr << e.what() << "\n -E- l1cgen l1c_pflag= 8:: Failure reading L1B or L1C-ANCfile: " + l1b_str
+             << endl;
+        exit(EXIT_FAILURE);
     }
 
     // only if L1C ANC file
@@ -1907,10 +1887,16 @@ int check_l1c_time(const char *l1b_file, const char *l1c_grid, bin_str *binl1c) 
         if (num_gridlines != num_gridlines2) {
             cerr << "WARNING number of gridlines ARE NOT THE SAME IN L1C grid and ANC files"
                  << "L1C grid # " << num_gridlines << "ANC file # " << num_gridlines2 << endl;
-            //  exit(1);
         }
     } else {
-        yd = nc_l1b->getDim("number_of_scans");
+        yd = nc_l1b->getDim("scans");
+        if(yd.isNull()) {
+            yd = nc_l1b->getDim("number_of_scans");
+            if(yd.isNull()) {
+                cerr << "ERROR - could not read number of scans dimension" << endl;
+                exit(EXIT_FAILURE);
+            }
+        }
         nscans = yd.getSize();
     }
 
@@ -2010,8 +1996,6 @@ int open_l1c_grid(const char *ifile_l1c, bin_str *binl1c, float **lat_gd, float 
     std::string fname_out, pathstr, senstr, monstr, daystr, yearstr, prodstr, gdstr, swtstr, swtnum, extstr,
         granstr, timestr, azstr, missionstr, ofilestr;
 
-    //  if(binl1c->verbose)cout<<"Opening L1C
-    //  grid........................................................................."<<endl;
     string l1c_str(ifile_l1c);
 
     NcFile *nc_l1cgrid;
@@ -2019,8 +2003,7 @@ int open_l1c_grid(const char *ifile_l1c, bin_str *binl1c, float **lat_gd, float 
     try {
         nc_l1cgrid = new NcFile(ifile_l1c, NcFile::read);
     } catch (NcException &e) {
-        e.what();
-        cerr << "l1cgen :: Failure reading L1C grid: " + l1c_str << endl;
+        cerr << e.what() << "\n -E- l1cgen :: Failure reading L1C grid: " + l1c_str << endl;
         exit(1);
     }
     NcGroup geo_grp = nc_l1cgrid->getGroup("geolocation_data");
@@ -2061,22 +2044,22 @@ double search_calc_dotprod(bin_str *binl1c, float bvec[3], int32_t gridline) {
         exit(1);
     }
 
-    gnvec[0] = sin(binl1c->lon_gd[gridline][nbinx - 1] * M_PI / 180) *
-                    cos(binl1c->lat_gd[gridline][nbinx - 1] * M_PI / 180) *
-                    sin(binl1c->lat_gd[gridline][0] * M_PI / 180) -
-                sin(binl1c->lat_gd[gridline][nbinx - 1] * M_PI / 180) *
-                    sin(binl1c->lon_gd[gridline][0] * M_PI / 180) * cos(binl1c->lat_gd[gridline][0] * M_PI / 180);
-    gnvec[1] = sin(binl1c->lat_gd[gridline][nbinx - 1] * M_PI / 180) *
-                    cos(binl1c->lon_gd[gridline][0] * M_PI / 180) * cos(binl1c->lat_gd[gridline][0] * M_PI / 180) -
-                cos(binl1c->lon_gd[gridline][nbinx - 1] * M_PI / 180) *
-                    cos(binl1c->lat_gd[gridline][nbinx - 1] * M_PI / 180) *
-                    sin(binl1c->lat_gd[gridline][0] * M_PI / 180);
-    gnvec[2] = cos(binl1c->lon_gd[gridline][nbinx - 1] * M_PI / 180) *
-                    cos(binl1c->lat_gd[gridline][nbinx - 1] * M_PI / 180) *
-                    sin(binl1c->lon_gd[gridline][0] * M_PI / 180) * cos(binl1c->lat_gd[gridline][0] * M_PI / 180) -
-                sin(binl1c->lon_gd[gridline][nbinx - 1] * M_PI / 180) *
-                    cos(binl1c->lat_gd[gridline][nbinx - 1] * M_PI / 180) *
-                    cos(binl1c->lon_gd[gridline][0] * M_PI / 180) * cos(binl1c->lat_gd[gridline][0] * M_PI / 180);
+    gnvec[0] = sin(binl1c->lon_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
+                    cos(binl1c->lat_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
+                    sin(binl1c->lat_gd[gridline][0] * OEL_DEGRAD) -
+                sin(binl1c->lat_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
+                    sin(binl1c->lon_gd[gridline][0] * OEL_DEGRAD) * cos(binl1c->lat_gd[gridline][0] * OEL_DEGRAD);
+    gnvec[1] = sin(binl1c->lat_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
+                    cos(binl1c->lon_gd[gridline][0] * OEL_DEGRAD) * cos(binl1c->lat_gd[gridline][0] * OEL_DEGRAD) -
+                cos(binl1c->lon_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
+                    cos(binl1c->lat_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
+                    sin(binl1c->lat_gd[gridline][0] * OEL_DEGRAD);
+    gnvec[2] = cos(binl1c->lon_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
+                    cos(binl1c->lat_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
+                    sin(binl1c->lon_gd[gridline][0] * OEL_DEGRAD) * cos(binl1c->lat_gd[gridline][0] * OEL_DEGRAD) -
+                sin(binl1c->lon_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
+                    cos(binl1c->lat_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
+                    cos(binl1c->lon_gd[gridline][0] * OEL_DEGRAD) * cos(binl1c->lat_gd[gridline][0] * OEL_DEGRAD);
 
     // vector norm
     gnvm = sqrt(gnvec[0] * gnvec[0] + gnvec[1] * gnvec[1] + gnvec[2] * gnvec[2]);
@@ -2095,7 +2078,6 @@ double search_calc_dotprod(bin_str *binl1c, float bvec[3], int32_t gridline) {
     gnvec[1] = gnvec[1] / gnvm;
     gnvec[2] = gnvec[2] / gnvm;
 
-   // for each pixels
     // dot prod, orbital normaliz and transposed by pixel vector
     return gnvec[0] * bvec[0] + gnvec[1] * bvec[1] + gnvec[2] * bvec[2];
 }
@@ -2141,9 +2123,9 @@ int search_l1c_parallax(filehandle *l1file, float *lat_new, float *lon_new, bin_
             flag_out = 110;
             return flag_out;
         }
-        bvec[0] = cos(lon_new[pix] * M_PI / 180) * cos(lat_new[pix] * M_PI / 180);
-        bvec[1] = sin(lon_new[pix] * M_PI / 180) * cos(lat_new[pix] * M_PI / 180);
-        bvec[2] = sin(lat_new[pix] * M_PI / 180);
+        bvec[0] = cos(lon_new[pix] * OEL_DEGRAD) * cos(lat_new[pix] * OEL_DEGRAD);
+        bvec[1] = sin(lon_new[pix] * OEL_DEGRAD) * cos(lat_new[pix] * OEL_DEGRAD);
+        bvec[2] = sin(lat_new[pix] * OEL_DEGRAD);
 
         last_dotprod = search_calc_dotprod(binl1c, bvec, last_dotprod_index);
         if(last_dotprod < 0)
@@ -2208,10 +2190,10 @@ int search_l1c_parallax(filehandle *l1file, float *lat_new, float *lon_new, bin_
 
             for (int j = 0; j < nbinx; j++) {
                 gvec[0] =
-                    cos(binl1c->lon_gd[irow][j] * M_PI / 180) * cos(binl1c->lat_gd[irow][j] * M_PI / 180);
+                    cos(binl1c->lon_gd[irow][j] * OEL_DEGRAD) * cos(binl1c->lat_gd[irow][j] * OEL_DEGRAD);
                 gvec[1] =
-                    sin(binl1c->lon_gd[irow][j] * M_PI / 180) * cos(binl1c->lat_gd[irow][j] * M_PI / 180);
-                gvec[2] = sin(binl1c->lat_gd[irow][j] * M_PI / 180);
+                    sin(binl1c->lon_gd[irow][j] * OEL_DEGRAD) * cos(binl1c->lat_gd[irow][j] * OEL_DEGRAD);
+                gvec[2] = sin(binl1c->lat_gd[irow][j] * OEL_DEGRAD);
 
                 c1 = bvec[0] - gvec[0];
                 c2 = bvec[1] - gvec[1];
@@ -2263,68 +2245,6 @@ int search_l1c_parallax(filehandle *l1file, float *lat_new, float *lon_new, bin_
 
 }
 
-
-/*
-double search_calc_dotprod(bin_str *binl1c, float bvec[3], int32_t gridline) {
-    int32_t nbinx = binl1c->nbinx;
-    float gnvec[3];
-    float gnvm;
-
-    // normal vectors for L1C rows
-    if (binl1c->lat_gd[gridline][nbinx - 1] > 90 || binl1c->lat_gd[gridline][nbinx - 1] < -90 ||
-        binl1c->lon_gd[gridline][nbinx - 1] < -180 || binl1c->lon_gd[gridline][nbinx - 1] > 180) {
-        if (binl1c->verbose)
-            cout << "lat lon for L1C GRID out of the boundaries.." << endl;
-        exit(1);
-    }
-    if (binl1c->lat_gd[gridline][0] > 90 || binl1c->lat_gd[gridline][0] < -90 || binl1c->lon_gd[gridline][0] < -180 ||
-        binl1c->lon_gd[gridline][0] > 180) {
-        if (binl1c->verbose)
-            cout << "lat lon for L1C GRID out of the boundaries.." << endl;
-        exit(1);
-    }
-
-    gnvec[0] = sin(binl1c->lon_gd[gridline][nbinx - 1] * M_PI / 180) *
-                    cos(binl1c->lat_gd[gridline][nbinx - 1] * M_PI / 180) *
-                    sin(binl1c->lat_gd[gridline][0] * M_PI / 180) -
-                sin(binl1c->lat_gd[gridline][nbinx - 1] * M_PI / 180) *
-                    sin(binl1c->lon_gd[gridline][0] * M_PI / 180) * cos(binl1c->lat_gd[gridline][0] * M_PI / 180);
-    gnvec[1] = sin(binl1c->lat_gd[gridline][nbinx - 1] * M_PI / 180) *
-                    cos(binl1c->lon_gd[gridline][0] * M_PI / 180) * cos(binl1c->lat_gd[gridline][0] * M_PI / 180) -
-                cos(binl1c->lon_gd[gridline][nbinx - 1] * M_PI / 180) *
-                    cos(binl1c->lat_gd[gridline][nbinx - 1] * M_PI / 180) *
-                    sin(binl1c->lat_gd[gridline][0] * M_PI / 180);
-    gnvec[2] = cos(binl1c->lon_gd[gridline][nbinx - 1] * M_PI / 180) *
-                    cos(binl1c->lat_gd[gridline][nbinx - 1] * M_PI / 180) *
-                    sin(binl1c->lon_gd[gridline][0] * M_PI / 180) * cos(binl1c->lat_gd[gridline][0] * M_PI / 180) -
-                sin(binl1c->lon_gd[gridline][nbinx - 1] * M_PI / 180) *
-                    cos(binl1c->lat_gd[gridline][nbinx - 1] * M_PI / 180) *
-                    cos(binl1c->lon_gd[gridline][0] * M_PI / 180) * cos(binl1c->lat_gd[gridline][0] * M_PI / 180);
-
-    // vector norm
-    gnvm = sqrt(gnvec[0] * gnvec[0] + gnvec[1] * gnvec[1] + gnvec[2] * gnvec[2]);
-    if (isnan(gnvm) == 1) {
-        if (binl1c->verbose)
-            cout << "NAN value for gnvm.." << endl;
-        exit(1);
-    }
-    if (gnvm == 0) {
-        if (binl1c->verbose)
-            cout << "ERROR gnvm == 0--- WE CANT NORMALIZE..." << endl;
-        exit(1);
-    }
-    // normalization
-    gnvec[0] = gnvec[0] / gnvm;
-    gnvec[1] = gnvec[1] / gnvm;
-    gnvec[2] = gnvec[2] / gnvm;
-
-    // for each pixels
-    // dot prod, orbital normaliz and transposed by pixel vector
-    return gnvec[0] * bvec[0] + gnvec[1] * bvec[1] + gnvec[2] * bvec[2];
-}
-*/
-
-
 int search_l1c(filehandle *l1file, l1str *l1rec, bin_str *binl1c, short **gdindex) {
     int32_t num_gridlines, nbinx;
     float gvec[3], bvec[3];
@@ -2368,9 +2288,9 @@ int search_l1c(filehandle *l1file, l1str *l1rec, bin_str *binl1c, short **gdinde
             return flag_out;
         }
 
-        bvec[0] = cos(l1rec->lon[pix] * M_PI / 180) * cos(l1rec->lat[pix] * M_PI / 180);
-        bvec[1] = sin(l1rec->lon[pix] * M_PI / 180) * cos(l1rec->lat[pix] * M_PI / 180);
-        bvec[2] = sin(l1rec->lat[pix] * M_PI / 180);
+        bvec[0] = cos(l1rec->lon[pix] * OEL_DEGRAD) * cos(l1rec->lat[pix] * OEL_DEGRAD);
+        bvec[1] = sin(l1rec->lon[pix] * OEL_DEGRAD) * cos(l1rec->lat[pix] * OEL_DEGRAD);
+        bvec[2] = sin(l1rec->lat[pix] * OEL_DEGRAD);
 
         last_dotprod = search_calc_dotprod(binl1c, bvec, last_dotprod_index);
         if(last_dotprod < 0)
@@ -2436,10 +2356,10 @@ int search_l1c(filehandle *l1file, l1str *l1rec, bin_str *binl1c, short **gdinde
 
             for (int j = 0; j < nbinx; j++) {
                 gvec[0] =
-                    cos(binl1c->lon_gd[irow][j] * M_PI / 180) * cos(binl1c->lat_gd[irow][j] * M_PI / 180);
+                    cos(binl1c->lon_gd[irow][j] * OEL_DEGRAD) * cos(binl1c->lat_gd[irow][j] * OEL_DEGRAD);
                 gvec[1] =
-                    sin(binl1c->lon_gd[irow][j] * M_PI / 180) * cos(binl1c->lat_gd[irow][j] * M_PI / 180);
-                gvec[2] = sin(binl1c->lat_gd[irow][j] * M_PI / 180);
+                    sin(binl1c->lon_gd[irow][j] * OEL_DEGRAD) * cos(binl1c->lat_gd[irow][j] * OEL_DEGRAD);
+                gvec[2] = sin(binl1c->lat_gd[irow][j] * OEL_DEGRAD);
 
                 c1 = bvec[0] - gvec[0];
                 c2 = bvec[1] - gvec[1];
@@ -2496,7 +2416,7 @@ int search2_l1c(size_t ybins, size_t xbins, float lat, float lon, float **lat_gd
                 short *col) {
     int32_t num_gridlines, nbinx, ic;
     short gdrow = -1, gdcol = -1;
-    float pvec[3], gnvm, db, pdotgn_first, pdotgn_last;
+    float pvec[3], gnvm, db;
     float **gnvec = nullptr, **cnvec = nullptr, **dc = nullptr;
     int flag_out = -1;
     int32_t i;
@@ -2519,34 +2439,27 @@ int search2_l1c(size_t ybins, size_t xbins, float lat, float lon, float **lat_gd
         // normal vectors for L1C rows
         if (lat_gd[i][nbinx - 1] > 90 || lat_gd[i][nbinx - 1] < -90 || lon_gd[i][nbinx - 1] < -180 ||
             lon_gd[i][nbinx - 1] > 180) {
-            //   if(binl1c->verbose)cout<<"lat lon out of the boundaries.."<<endl;
             exit(1);
         }
         if (lat_gd[i][0] > 90 || lat_gd[i][0] < -90 || lon_gd[i][0] < -180 || lon_gd[i][0] > 180) {
-            // if(binl1c->verbose)cout<<"lat lon out of the boundaries.."<<endl;
             exit(1);
         }
         // compute normal vector for each rowgrid----
-        gnvec[0][i] = sin(lon_gd[i][nbinx - 1] * M_PI / 180) * cos(lat_gd[i][nbinx - 1] * M_PI / 180) *
-                          sin(lat_gd[i][0] * M_PI / 180) -
-                      sin(lat_gd[i][nbinx - 1] * M_PI / 180) * sin(lon_gd[i][0] * M_PI / 180) *
-                          cos(lat_gd[i][0] * M_PI / 180);
-        gnvec[1][i] = sin(lat_gd[i][nbinx - 1] * M_PI / 180) * cos(lon_gd[i][0] * M_PI / 180) *
-                          cos(lat_gd[i][0] * M_PI / 180) -
-                      cos(lon_gd[i][nbinx - 1] * M_PI / 180) * cos(lat_gd[i][nbinx - 1] * M_PI / 180) *
-                          sin(lat_gd[i][0] * M_PI / 180);
-        gnvec[2][i] = cos(lon_gd[i][nbinx - 1] * M_PI / 180) * cos(lat_gd[i][nbinx - 1] * M_PI / 180) *
-                          sin(lon_gd[i][0] * M_PI / 180) * cos(lat_gd[i][0] * M_PI / 180) -
-                      sin(lon_gd[i][nbinx - 1] * M_PI / 180) * cos(lat_gd[i][nbinx - 1] * M_PI / 180) *
-                          cos(lon_gd[i][0] * M_PI / 180) * cos(lat_gd[i][0] * M_PI / 180);
+        gnvec[0][i] = sin(lon_gd[i][nbinx - 1] * OEL_DEGRAD) * cos(lat_gd[i][nbinx - 1] * OEL_DEGRAD) *
+                          sin(lat_gd[i][0] * OEL_DEGRAD) -
+                      sin(lat_gd[i][nbinx - 1] * OEL_DEGRAD) * sin(lon_gd[i][0] * OEL_DEGRAD) *
+                          cos(lat_gd[i][0] * OEL_DEGRAD);
+        gnvec[1][i] = sin(lat_gd[i][nbinx - 1] * OEL_DEGRAD) * cos(lon_gd[i][0] * OEL_DEGRAD) *
+                          cos(lat_gd[i][0] * OEL_DEGRAD) -
+                      cos(lon_gd[i][nbinx - 1] * OEL_DEGRAD) * cos(lat_gd[i][nbinx - 1] * OEL_DEGRAD) *
+                          sin(lat_gd[i][0] * OEL_DEGRAD);
+        gnvec[2][i] = cos(lon_gd[i][nbinx - 1] * OEL_DEGRAD) * cos(lat_gd[i][nbinx - 1] * OEL_DEGRAD) *
+                          sin(lon_gd[i][0] * OEL_DEGRAD) * cos(lat_gd[i][0] * OEL_DEGRAD) -
+                      sin(lon_gd[i][nbinx - 1] * OEL_DEGRAD) * cos(lat_gd[i][nbinx - 1] * OEL_DEGRAD) *
+                          cos(lon_gd[i][0] * OEL_DEGRAD) * cos(lat_gd[i][0] * OEL_DEGRAD);
 
         gnvm = sqrt(gnvec[0][i] * gnvec[0][i] + gnvec[1][i] * gnvec[1][i] + gnvec[2][i] * gnvec[2][i]);
-        if (isnan(gnvm) == 1) {
-            //  if(binl1c->verbose)cout<<"NAN value for gnvm.."<<endl;
-            exit(1);
-        }
-        if (gnvm == 0) {
-            //  if(binl1c->verbose)cout<<"ERROR gnvm == 0--- WE CANT NORMALIZE..."<<endl;
+        if (isnan(gnvm) == 1 || gnvm == 0) {
             exit(1);
         }
         // normalization
@@ -2555,45 +2468,32 @@ int search2_l1c(size_t ybins, size_t xbins, float lat, float lon, float **lat_gd
         gnvec[2][i] = gnvec[2][i] / gnvm;
 
         // Compute normals to center columns
-        cnvec[0][i] = sin(lon_gd[i][ic] * M_PI / 180) * cos(lat_gd[i][ic] * M_PI / 180) * gnvec[2][i] -
-                      sin(lat_gd[i][ic] * M_PI / 180) * gnvec[1][i];
-        cnvec[1][i] = sin(lat_gd[i][ic] * M_PI / 180) * gnvec[0][i] -
-                      cos(lon_gd[i][ic] * M_PI / 180) * cos(lat_gd[i][ic] * M_PI / 180) * gnvec[2][i];
-        cnvec[2][i] = cos(lon_gd[i][ic] * M_PI / 180) * cos(lat_gd[i][ic] * M_PI / 180) * gnvec[1][i] -
-                      sin(lon_gd[i][ic] * M_PI / 180) * cos(lat_gd[i][ic] * M_PI / 180) * gnvec[0][i];
+        cnvec[0][i] = sin(lon_gd[i][ic] * OEL_DEGRAD) * cos(lat_gd[i][ic] * OEL_DEGRAD) * gnvec[2][i] -
+                      sin(lat_gd[i][ic] * OEL_DEGRAD) * gnvec[1][i];
+        cnvec[1][i] = sin(lat_gd[i][ic] * OEL_DEGRAD) * gnvec[0][i] -
+                      cos(lon_gd[i][ic] * OEL_DEGRAD) * cos(lat_gd[i][ic] * OEL_DEGRAD) * gnvec[2][i];
+        cnvec[2][i] = cos(lon_gd[i][ic] * OEL_DEGRAD) * cos(lat_gd[i][ic] * OEL_DEGRAD) * gnvec[1][i] -
+                      sin(lon_gd[i][ic] * OEL_DEGRAD) * cos(lat_gd[i][ic] * OEL_DEGRAD) * gnvec[0][i];
 
         //; Compute grid row nadir resolution
-        dc[0][i] = cos(lon_gd[i][ic + 1] * M_PI / 180) * cos(lat_gd[i][ic + 1] * M_PI / 180) -
-                   cos(lon_gd[i][ic] * M_PI / 180) * cos(lat_gd[i][ic] * M_PI / 180);
-        dc[1][i] = sin(lon_gd[i][ic + 1] * M_PI / 180) * cos(lat_gd[i][ic + 1] * M_PI / 180) -
-                   sin(lon_gd[i][ic] * M_PI / 180) * cos(lat_gd[i][ic] * M_PI / 180);
-        dc[2][i] = sin(lat_gd[i][ic + 1] * M_PI / 180) - sin(lat_gd[i][ic] * M_PI / 180);
+        dc[0][i] = cos(lon_gd[i][ic + 1] * OEL_DEGRAD) * cos(lat_gd[i][ic + 1] * OEL_DEGRAD) -
+                   cos(lon_gd[i][ic] * OEL_DEGRAD) * cos(lat_gd[i][ic] * OEL_DEGRAD);
+        dc[1][i] = sin(lon_gd[i][ic + 1] * OEL_DEGRAD) * cos(lat_gd[i][ic + 1] * OEL_DEGRAD) -
+                   sin(lon_gd[i][ic] * OEL_DEGRAD) * cos(lat_gd[i][ic] * OEL_DEGRAD);
+        dc[2][i] = sin(lat_gd[i][ic + 1] * OEL_DEGRAD) - sin(lat_gd[i][ic] * OEL_DEGRAD);
     }
 
     // dot product
-    //        for(pix=0;pix<num_pixels;pix++){
     for (i = 0; i < num_gridlines; i++) {
         if (lat > 90 || lat < -90 || lon < -180 || lon > 180) {
-            //   if(binl1c->verbose)cout<<"latitude longitude pixel out of the boundaries.."<<endl;
             exit(1);
         }
 
-        pvec[0] = cos(lon * M_PI / 180) * cos(lat * M_PI / 180);
-        pvec[1] = sin(lon * M_PI / 180) * cos(lat * M_PI / 180);
-        pvec[2] = sin(lat * M_PI / 180);
+        pvec[0] = cos(lon * OEL_DEGRAD) * cos(lat * OEL_DEGRAD);
+        pvec[1] = sin(lon * OEL_DEGRAD) * cos(lat * OEL_DEGRAD);
+        pvec[2] = sin(lat * OEL_DEGRAD);
 
         dotprod = pvec[0] * gnvec[0][i] + pvec[1] * gnvec[1][i] + pvec[2] * gnvec[2][i];
-
-        if (i == 0) {
-            pdotgn_first = dotprod;  // first gridline
-        }
-        if (i == num_gridlines - 1) {
-            pdotgn_last = dotprod;  // last line
-        }
-
-        if (pdotgn_first <= db && pdotgn_last > -db && gdrow < 0 && gdcol < 0) {
-            //  if(binl1c->verbose)    cout<<"this pix is inside the L1C grid.."<<endl;
-        }
 
         // check row for pixel j
         if (dotprod <= db && dotprod > -db && gdrow < 0) {
@@ -2635,12 +2535,12 @@ int search2_l1c(size_t ybins, size_t xbins, float lat, float lon, float **lat_gd
 double rot_angle(double senz, double solz, double sena, double suna) {
     double rotangle = double(BAD_FLT), term2;
     if (senz != BAD_FLT && solz != BAD_FLT && sena != BAD_FLT && suna != BAD_FLT) {
-        double cosunz = cos(solz * M_PI / 180.);
-        double cosenz = cos(senz * M_PI / 180.);
-        double term1 = -1 * cosunz + cosenz * cos(senz * M_PI / 180. + M_PI / 180.);
-        double cos2 = 0.5 * (cos(2 * senz * M_PI / 180.) + 1);
+        double cosunz = cos(solz * OEL_DEGRAD);
+        double cosenz = cos(senz * OEL_DEGRAD);
+        double term1 = -1 * cosunz + cosenz * cos(senz * OEL_DEGRAD + OEL_DEGRAD);
+        double cos2 = 0.5 * (cos(2 * senz * OEL_DEGRAD) + 1);
         double term3 =
-            sqrt(1 - cos(senz * M_PI / 180. + M_PI / 180.) * cos(senz * M_PI / 180. + M_PI / 180.));
+            sqrt(1 - cos(senz * OEL_DEGRAD + OEL_DEGRAD) * cos(senz * OEL_DEGRAD + OEL_DEGRAD));
 
         if ((sena - suna) < 2 * 180. && (sena - suna) > 180.)
             term2 = sqrt(1 - cos2) * term3;
@@ -2649,7 +2549,7 @@ double rot_angle(double senz, double solz, double sena, double suna) {
 
         double cos_alpha = term1 / term2;
 
-        rotangle = acos(cos_alpha) * 180. / M_PI;  // in degrees
+        rotangle = acos(cos_alpha) * OEL_RADEG;  // in degrees
     }
 
     return rotangle;

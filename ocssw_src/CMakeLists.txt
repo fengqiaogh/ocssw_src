@@ -31,15 +31,6 @@ list(APPEND CMAKE_MODULE_PATH
 
 #include(SetOcsswPolicy)
 
-file (GLOB VIIRS_LIBS ${CMAKE_CURRENT_SOURCE_DIR}/lib/libViirs*)
-list (LENGTH VIIRS_LIBS LIBS_LEN)
-if (${LIBS_LEN} EQUAL 4)
-    OPTION(BUILD_VIIRS_L1 "Build VIIRS L1 code" ON)
-else()
-    message ("[WARNING]: Did not find VIIRS libs")
-    OPTION(BUILD_VIIRS_L1 "Build VIIRS L1 code" OFF)
-endif()
-
 set(BUILD_SHARED_LIBS ON)
 
 # where to look for the external libraries
@@ -151,7 +142,7 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set(CMAKE_MACOSX_RPATH 1)
   set(CMAKE_INSTALL_RPATH "@executable_path/../lib;@executable_path/../opt/lib")
   set(CMAKE_C_FLAGS "-DMACINTOSH ${CMAKE_C_FLAGS}")
-  set(CMAKE_CXX_FLAGS "-DMACINTOSH ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS "-DMACINTOSH  -Wno-enum-constexpr-conversion ${CMAKE_CXX_FLAGS}")
   set(CMAKE_Fortran_FLAGS "-DMACINTOSH ${CMAKE_Fortran_FLAGS}")
   set(CMAKE_EXE_LINKER_FLAGS "-Wl,-flat_namespace ${CMAKE_EXE_LINKER_FLAGS}")
   set(CMAKE_SHARED_LINKER_FLAGS "-Wl,-flat_namespace ${CMAKE_SHARED_LINKER_FLAGS}")

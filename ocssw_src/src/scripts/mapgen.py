@@ -299,14 +299,13 @@ tiff:    Tagged Image File Format with georeference tags''')
                 
                 dirs_by_sensor = by_sensor(sensor)
                 sensor_dir = dirs_by_sensor['dir']
-                if 'subdir' in dirs_by_sensor:
-                    sensor_sub_dir = dirs_by_sensor['subdir']
-                    if sensor_sub_dir:
+                sensor_sub_dir = dirs_by_sensor.get('subdir')
+                if sensor_sub_dir:
+                    filename_l3mapgen_defaults = os.path.join(os.getenv('OCDATAROOT'),
+                                    sensor_dir, sensor_sub_dir, 'l3mapgen_defaults.par')
+                    if not os.path.exists(filename_l3mapgen_defaults):
                         filename_l3mapgen_defaults = os.path.join(os.getenv('OCDATAROOT'),
-                                        sensor_dir, sensor_sub_dir, 'l3mapgen_defaults.par')
-                        if not os.path.exists(filename_l3mapgen_defaults):
-                            filename_l3mapgen_defaults = os.path.join(os.getenv('OCDATAROOT'),
-                                        sensor_dir, 'l3mapgen_defaults.par')
+                                    sensor_dir, 'l3mapgen_defaults.par')
                 else: 
                     filename_l3mapgen_defaults = os.path.join(os.getenv('OCDATAROOT'),
                                     sensor_dir, 'l3mapgen_defaults.par')

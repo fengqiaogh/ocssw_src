@@ -49,16 +49,6 @@ const static struct {
     {B10, "B10"}
 };
 
-void resample_msi(opj_image_t* image, filehandle* file, int recnum, int srcRes, int destRes);
-int decodeMSI(filehandle *file, int32_t bandIdx, int32_t recnum);
-void interpGPSpos(l1str *l1rec, double* pos, int detector, int band);
-int inDetector (msi_t *data , float lat, float lon);
-void interpViewAngles(l1str* l1rec, int pixel, int scan, int band, float *senz, float *sena);
-
-void error_callback(const char *msg, void *client_data);
-void warning_callback(const char *msg, void *client_data);
-void info_callback(const char *msg, void *client_data);
-
 
 msiBandIdx str2enum (const char *str)
 {
@@ -72,47 +62,6 @@ msiBandIdx str2enum (const char *str)
      exit(EXIT_FAILURE);
 }
 
-int inDetector (msi_t *data , float lat, float lon) {
-    int detector = 0;
-    PJ_COORD c, c_out;
-
-    // set default z and t
-    c.xyzt.x = 0.0;
-    c.xyzt.t = HUGE_VAL;
-
-    c.xy.x = lon;
-    c.xy.y = lat;
-    c_out = proj_trans(data->pj, PJ_INV, c);
-    Point_t p(c_out.xy.x, c_out.xy.y);
-
-    for (detector = 0; detector < numDetectors; detector++){
-          if (boost::geometry::within(p, data->detectorFootprints[detector]))
-              break;
-    }
-    if (detector == numDetectors)
-        detector = -1;
-    
-    return detector;
-}
-
-void interpGPSpos(l1str* l1rec, double* pos, int detector, int band){
-    msi_t *data = (msi_t*) l1rec->l1file->private_data;
-    int i;
-    int nelem = data->num_gps;
-    // use GSL...why reinvent the wheel
-    double pixelTime = l1rec->scantime;
-    if (detector >= 0)
-        pixelTime += data->detectorDeltaTime[detector][band];
-           
-    for(i = 0; i< 3; i++) {
-        gsl_interp *interpolation = gsl_interp_alloc(gsl_interp_linear, nelem);
-        gsl_interp_init(interpolation, data->gpstime, data->position[i], nelem);
-        gsl_interp_accel *accelerator = gsl_interp_accel_alloc();
-        pos[i]= gsl_interp_eval(interpolation, data->gpstime, data->position[i], l1rec->scantime, accelerator);
-        gsl_interp_free(interpolation);
-        gsl_interp_accel_free (accelerator);
-    }
-}
 
 void interpViewAngles(msi_t* data, int pixel, int scan, int band, float *senz, float *sena) {
 
@@ -182,6 +131,8 @@ void info_callback(const char *msg, void *client_data) {
     (void)client_data;
     fprintf(stdout, "[INFO] %s", msg);
 }
+
+
 /************************************************/
 /*  function createPrivateData:                 */
 /*  create private data for Sentinel 2 MSI data */
@@ -197,6 +148,8 @@ msi_t* createPrivateData_msi(int numBands){
 
     // Allocate memory for storing upper left coordinates
     data->ULCoord = (int32_t*) malloc(2*sizeof(int32_t));
+
+    data->quantificationValue = 10000;
 
     return data;   
 }
@@ -434,44 +387,44 @@ int32_t readDatastripMeta_msi(filehandle *file) {
     return 1;
 }
 
-int32_t readDetectorFootprint_msi(filehandle *file, int band) {
-    xml_document rootNode;
-    xml_node dataNode;
-    xml_node polyNode;
+
+int32_t readL1cProductMeta_msi(filehandle *file) {
     msi_t *data = (msi_t*) file->private_data;
-    std::vector<std::string> detstrs;
-    std::vector<std::string> polypointstrs;
-    std::vector<std::string>::iterator sit;
-    const char *detectorName, *polygon;
-    if (!rootNode.load_file(data->detectorFootprintFiles[band])) {
+
+    // open the L1C metadata file
+    xml_document mtdMsiL1c;
+    if (!mtdMsiL1c.load_file(data->l1cProductMetadataFile)) {
+        fprintf(stderr, "-W- Unable to open L1C Metadata XML file %s\n", data->l1cProductMetadataFile);
         return 0;
     }
-    dataNode = rootNode.first_element_by_path("eop:Mask/eop:maskMembers/eop:MaskFeature");
-    while (dataNode) {
-        detectorName = dataNode.attribute("gml:id").value();
-        //detector_footprint-B05-03-0
-        boost::split(detstrs, detectorName, boost::is_any_of("-"));
-        int detidx = std::atoi(detstrs[2].c_str()) - 1;
-        polyNode = dataNode.first_element_by_path("eop:extentOf/gml:Polygon/gml:exterior/gml:LinearRing/gml:posList");
-        polygon = polyNode.first_child().value();
-        boost::split(polypointstrs, polygon, boost::is_any_of(" "));
-        std::string polyWKT = "POLYGON((";
-        int i = 1;
-        for(sit=polypointstrs.begin() ; sit < polypointstrs.end(); sit++,i++ ) {
-        // skip every third element
-            if(i % 3) 
-                polyWKT = polyWKT + *sit + " ";
-            else
-                polyWKT = polyWKT + ",";
-        }
-        polyWKT = polyWKT + "))";
-        boost::geometry::read_wkt(polyWKT, data->detectorFootprints[detidx]);
-        dataNode = dataNode.next_sibling("eop:MaskFeature");
+    // Assume these nodes are there, handle consequences later
+    xml_node root = mtdMsiL1c.child("n1:Level-1C_User_Product");
+    xml_node productImageCharacteristics =
+        root.child("n1:General_Info").child("Product_Image_Characteristics");
+
+    xml_node quantificationValueNode =  productImageCharacteristics.child("QUANTIFICATION_VALUE");
+    if (quantificationValueNode) {
+        data->quantificationValue = quantificationValueNode.text().as_float();
+    } else {
+        data->quantificationValue = 10'000;
     }
-    
+
+    // The fields of this list are named the same and just have an attribute that differs
+    string radiometricOffsetQuery;
+    xpath_node radiometricOffsetNode;
+
+    for(int i = 0; i < maxBands; i++) {
+        radiometricOffsetQuery =
+            "//Radiometric_Offset_List/RADIO_ADD_OFFSET[@band_id='" + to_string(i) + "']";
+        radiometricOffsetNode = mtdMsiL1c.select_node(radiometricOffsetQuery.c_str());
+        if (radiometricOffsetNode) {
+            data->radiometricOffset[i] = radiometricOffsetNode.node().text().as_float();
+        } else {
+            data->radiometricOffset[i] = 0;
+        }
+    }
     return 1;
 }
-
 
 /************************************************/
 /*  function: openl1_msi                       */
@@ -495,7 +448,7 @@ extern "C" int openl1_msi(filehandle *file){
 
     if(want_verbose)
         printf("Input file: MSI Level-1C %s\n", file->name);
-    
+
     metaNode = rootNode.first_element_by_path("xfdu:XFDU/metadataSection");
         
     // orbit direction
@@ -505,8 +458,6 @@ extern "C" int openl1_msi(filehandle *file){
 
     // Band image paths
     int nbandsImg = 0;
-    int nbandsDetFoot = 0;
-    int pickMe = 0;
     
     dataNode = rootNode.first_element_by_path("xfdu:XFDU/dataObjectSection/dataObject") ;
     string indir = file->name;
@@ -527,13 +478,14 @@ extern "C" int openl1_msi(filehandle *file){
         index = fileName.find("./");
         if(index != string::npos)
             fileName.erase(index, 2);
+
         if (strstr(dataName, "S2_Level-1C_Tile1_Metadata")){
             data->granuleMetadataFile = strdup(fileName.c_str());
         }
-        if (strstr(dataName, "S2_Level-1C_Datastrip1_Metadata")){
+        else if (strstr(dataName, "S2_Level-1C_Datastrip1_Metadata")){
             data->datastripMetadataFile = strdup(fileName.c_str());
         }
-        if (strstr(dataName, "IMG_DATA_Band") && !(strstr(dataName, "TCI"))) {
+        else if (strstr(dataName, "IMG_DATA_Band") && !(strstr(dataName, "TCI"))) {
             if (nbandsImg > maxBands) {
                 printf("%s, %d - E - Maximum number of radiance values (%d) reached\n",
                         __FILE__, __LINE__, maxBands);
@@ -547,43 +499,34 @@ extern "C" int openl1_msi(filehandle *file){
             }
             nbandsImg++;
         }
-        if (strstr(dataName, "DetectorFootprint")) {
-            if (nbandsDetFoot > maxBands) {
-                printf("%s, %d - E - Maximum number of radiance values (%d) reached\n",
-                        __FILE__, __LINE__, maxBands);
-                exit(EXIT_FAILURE);
-            }
-            data->detectorFootprintFiles[nbandsDetFoot] = strdup(fileName.c_str());
-            if (!data->detectorFootprintFiles[nbandsDetFoot]) {
-                printf("%s, %d - E - unable to set path for band %d\n",
-                        __FILE__, __LINE__, nbandsDetFoot);
-                exit(EXIT_FAILURE);
-            }
-            if (strstr(data->detectorFootprintFiles[nbandsDetFoot], "B07")) {
-                pickMe = nbandsDetFoot;
-            }
-            nbandsDetFoot++;    
+        else if (strstr(dataName, "S2_Level-1C_Product_Metadata")){
+            data->l1cProductMetadataFile = strdup(fileName.c_str());
         }
+
         dataNode = dataNode.next_sibling("dataObject");
     }
     
     /* Read tile metadata file */
-    if(!readTileMeta_msi(file))
+    if(!readTileMeta_msi(file)) {
         fprintf(stderr, "-E- %s line %d: unable read tile metadata file for MSI dataset %s\n",
             __FILE__,__LINE__,data->granuleMetadataFile);
-    
+        exit(EXIT_FAILURE);
+    }
+            
     /* Read datastrip metadata file */
-    if(!readDatastripMeta_msi(file))
+    if(!readDatastripMeta_msi(file)) {
         fprintf(stderr, "-E- %s line %d: unable read datastrip metadata file for MSI dataset %s\n",
             __FILE__,__LINE__,data->datastripMetadataFile);
+        exit(EXIT_FAILURE);
+    }
     
-    /* Read detector footprint file 
-     for simplicity, read just one for a 20m band
-     */
-    if(!readDetectorFootprint_msi(file, pickMe))
-        fprintf(stderr, "-E- %s line %d: unable read detector footprint file for MSI dataset %s\n",
-            __FILE__,__LINE__,data->detectorFootprintFiles[pickMe]);
-
+    /* Read L1C Product metadata file */
+    if(!readL1cProductMeta_msi(file)) {
+        fprintf(stderr, "-E- %s line %d: unable read L1C Product metadata file for MSI dataset %s\n",
+            __FILE__,__LINE__,data->l1cProductMetadataFile);
+        exit(EXIT_FAILURE);
+    }
+            
     strcpy(file->spatialResolution, "20 m");
     if(want_verbose){
 
@@ -630,186 +573,6 @@ extern "C" int readl1_msi_lonlat(filehandle *file, int recnum, l1str *l1rec)
     return 0;
 }
 
-/************************************************/
-/*  function: readl1_msi                       */
-/*  Read MSI l1c image data line by line        */
-/************************************************/
-extern "C" int readl1_msi(filehandle *file, int recnum, l1str *l1rec, int lonlat)
-{
-    int i, ip, ib, ipb;
-    msi_t* data = (msi_t*) file->private_data; 
-    int16_t year, doy;
-    float  sunpos[3];
-    double secondOfDay;
-    float sunDist;
-    char bandStrBuffer[4];
-    l1rec->scantime = data->scene_start_time + recnum * data->lineTimeDelta; //may want to to some math with recnum here
-
-    // Get lat lon 
-    if(readl1_msi_lonlat(file,recnum,l1rec)) {
-        fprintf(stderr,"-E- %s line %d: unable to allocate lat/lon data for MSI\n",
-            __FILE__,__LINE__);
-        exit(1);
-    }
-
-    // Set information about data
-    l1rec->npix = file->npix;
-    l1rec->l1file->sensorID = file->sensorID;
-    
-    unix2yds(l1rec->scantime, &year, &doy, &secondOfDay);
-
-    int32_t iyear, idoy, msec;
-    iyear = (int32_t) year;
-    idoy = (int32_t) doy;
-    msec = (int32_t) secondOfDay*1e3;
-    double esdist = esdist_(&iyear, &idoy, &msec);
-    double fsol = pow(1.0 / esdist, 2);
-
-    /*
-    *  if required for that record, set up the geom_per_band storage
-    */
-    if (!lonlat) {
-        if((l1_input->geom_per_band == 1 ) && ( l1rec->geom_per_band == NULL ) ) {
-            init_geom_per_band( l1rec );
-            gm_p_b = l1rec->geom_per_band; // store this address so that it can be later destroyed in close()
-        }
-    }
-    
-    l_sun_(&iyear, &idoy, &secondOfDay, sunpos, &sunDist); // get position vector for the sun
-
-    for (i=0; i < 3; i++) {
-        sunpos[i] *= 1.496e8; //convert to km for call to get_zenaz
-    }
-    // Assign viewing angles to l1rec struct
-    for (ib = 0; ib<maxBands; ib++) {
-        int len = strlen(data->jp2[ib])-7;
-        strncpy(bandStrBuffer, data->jp2[ib]+len, 3);
-        bandStrBuffer[3] = '\0';
-        int bandIdx = str2enum(bandStrBuffer);
-        if (bandIdx == B10)
-            continue;
-//        int detector = -1;
-        for (ip=0; ip<file->npix; ip++) {
-            // use boost.within to determine detector number
-            // but only need to do this once - per band differences not significant
-            if (ib == 0) {
-//                detector = inDetector (data , l1rec->lat[ip], l1rec->lon[ip]);
-
-                // interpolate GPS position vectors to scantime
-                //  If we can get more accurate times, we can use this
-                // interpGPSpos method for sensor angles
-                // NOTE: the solar angles are also affected by the incorrect scantime
-                //       but less egregiously so...
-
-//                interpGPSpos(l1rec,pos,detector,ib);
-
-//                for (i=0; i < 3; i++) {
-//                    epos[i]    = pos[i] * 1e-6; //values are in mm, convert to km
-//                }
-//                get_zenaz(epos, l1rec->lon[ip], l1rec->lat[ip], &l1rec->senz[ip], &l1rec->sena[ip]);
-
-                // Assign band independent solar angles to l1rec struct
-                get_zenaz(sunpos, l1rec->lon[ip], l1rec->lat[ip], &l1rec->solz[ip], &l1rec->sola[ip]);
-                if (!lonlat) {
-                    // interpolate tiePoint sensor view angles
-                    interpViewAngles(data, ip, recnum, ib, &l1rec->senz[ip], &l1rec->sena[ip]);
-                }
-            }
- 
-            // if getting only lonlat stuff, skip everything below and go to the next iteration
-            if (lonlat)
-                continue;
-          
-            if (l1_input->geom_per_band) {
-                int ipb = ip*file->nbands + bandIdx;
-
-                // re-interpolate GPS position vectors to per band scantime (see note above)
-//                interpGPSpos(l1rec,pos,detector,ib);
-//
-//                for (i=0; i < 3; i++)
-//                    epos[i]    = pos[i] * 1e-6; //values are in mm, convert to km
-//
-//                get_zenaz(epos, l1rec->lon[ip], l1rec->lat[ip], &l1rec->geom_per_band->senz[ipb], &l1rec->geom_per_band->sena[ipb]);
-                // interpolate tiePoint sensor view angles
-                interpViewAngles(data, ip, recnum, ib, &l1rec->geom_per_band->senz[ipb], &l1rec->geom_per_band->sena[ipb]);
-                // per band solar angles are just repetitions of the nominal values
-                l1rec->geom_per_band->solz[ipb] = l1rec->solz[ip];
-                l1rec->geom_per_band->sola[ipb] = l1rec->sola[ip];
-            }
-        }
-
-        // lonlat mode, only care about when ib = 0, which gets the sensor view angles
-        if (lonlat)
-            break;
-    }
-
-    // Calculate surface reflectance values for each band 
-    for(ib = 0; ib < maxBands; ib++) {        
-        int len = strlen(data->jp2[ib])-7;
-        strncpy(bandStrBuffer, data->jp2[ib]+len, 3);
-        bandStrBuffer[3] = '\0';
-        int bandIdx = str2enum(bandStrBuffer);
-        if (bandIdx == B10)
-            continue;
-
-        l1rec->Fo[bandIdx] = Fobar[bandIdx] * fsol;
-   
-        if(decodeMSI(file, bandIdx, recnum)!=0) {
-            printf("-E-: Error decoding MSI jp2 files.\n");
-            fprintf(stderr, "-E- %s line %d: Failed to read Lt, band %d, recnum %d\n",
-                    __FILE__,__LINE__, bandIdx, recnum );
-            exit(1);
-        }
-
-        for (ip=0; ip<file->npix; ip++) {
-            ipb = ip*file->nbands+bandIdx;
-            if(data->buf[ip] == 0) {
-                l1rec->Lt[ipb] = BAD_FLT;   
-                l1rec->navfail[ip] = 1;
-            } else{
-                // 10000 is the QUANTIFICATION_VALUE of MSI data to convert DN value to reflectance
-                // This value is listed in the MTD_MSIL1C.xml file, but we're just hardcoding it...bad?
-                float quant = 10000.;
-                float rToa = (float) (data->buf[ip] / quant);
-
-                l1rec->Lt[ipb] = (rToa * l1rec->Fo[bandIdx] * cos(l1rec->solz[ip]/RADEG)) / PI ;
-            }
-        }
-    }
-    
-    // Skip everything else if lonlat
-    // Surface reflectance should give a good start pixel for l1info
-    if (lonlat)
-        return 0;
-  
-    // Calculate rho_cirrus from cirrus band 10
-    if(decodeMSI(file, B10, recnum)!=0) {
-        fprintf(stderr, "-E- %s line %d: Failed to read cirrus band, recnum %d\n",
-                __FILE__,__LINE__, recnum );
-        exit(1);
-    }
-    for (ip=0;ip<file->npix; ip++) {
-        if(data->buf[ip] == 0)
-            l1rec->rho_cirrus[ip] = BAD_FLT;
-        else
-            l1rec->rho_cirrus[ip] = data->buf[ip] / (PI * 10000.0);
-    }
-
-    // Check lat and lon values
-    for (ip=0; ip<file->npix; ip++) {
-        l1rec->pixnum[ip] = ip;
-        if ( std::isnan(l1rec->lat[ip]) )
-            l1rec->lat[ip] = -999.0;
-        if ( std::isnan(l1rec->lon[ip]) )
-            l1rec->lon[ip] = -999.0;
-
-        if (l1rec->lon[ip] < -181.0 || l1rec->lon[ip] > 181.0 ||
-            l1rec->lat[ip] <  -91.0 || l1rec->lat[ip] >  91.0 )
-        l1rec->navfail[ip] = 1;
-
-    }
-    return 0;
-}
 
 uint32_t scale_recnum( int32_t bandIdx, int32_t recnum){
     switch(bandIdx) {
@@ -826,6 +589,8 @@ uint32_t scale_recnum( int32_t bandIdx, int32_t recnum){
             return recnum;
     }
 }
+
+
 /************************************************/
 /*  function: decodeMSI                         */
 /*  Decode jp2 data                             */
@@ -983,6 +748,165 @@ int decodeMSI(filehandle *file, int32_t bandIdx, int32_t recnum){
 
     return 0;
 };
+
+
+/************************************************/
+/*  function: readl1_msi                       */
+/*  Read MSI l1c image data line by line        */
+/************************************************/
+extern "C" int readl1_msi(filehandle *file, int recnum, l1str *l1rec, int lonlat)
+{
+    
+    // Get lat lon 
+    if(readl1_msi_lonlat(file,recnum,l1rec)) {
+        fprintf(stderr,"-E- %s line %d: unable to read lat/lon data for MSI\n",
+            __FILE__,__LINE__);
+        exit(EXIT_FAILURE); // Fail early, fail fast
+    }
+
+    int i, ip, ib, ipb;
+    msi_t* data = (msi_t*) file->private_data;
+    int16_t year, doy;
+    float  sunpos[3];
+    double secondOfDay;
+    float sunDist;
+    char bandStrBuffer[4];
+    l1rec->scantime =
+        data->scene_start_time + recnum * data->lineTimeDelta;  // may want to to some math with recnum here
+
+    // Set information about data
+    l1rec->npix = file->npix;
+    l1rec->l1file->sensorID = file->sensorID;
+    
+    unix2yds(l1rec->scantime, &year, &doy, &secondOfDay);
+
+    int32_t iyear, idoy, msec;
+    iyear = (int32_t) year;
+    idoy = (int32_t) doy;
+    msec = (int32_t) secondOfDay*1e3;
+    double esdist = esdist_(&iyear, &idoy, &msec);
+    double fsol = pow(1.0 / esdist, 2);
+
+    /*
+    *  if required for that record, set up the geom_per_band storage
+    */
+    if (!lonlat) {
+        if((l1_input->geom_per_band == 1 ) && ( l1rec->geom_per_band == NULL ) ) {
+            init_geom_per_band( l1rec );
+            gm_p_b = l1rec->geom_per_band; // store this address so that it can be later destroyed in close()
+        }
+    }
+    
+    l_sun_(&iyear, &idoy, &secondOfDay, sunpos, &sunDist); // get position vector for the sun
+
+    for (i=0; i < 3; i++) {
+        sunpos[i] *= 1.496e8; //convert to km for call to get_zenaz
+    }
+    // Assign viewing angles to l1rec struct
+    for (ib = 0; ib<maxBands; ib++) {
+        int len = strlen(data->jp2[ib])-7;
+        strncpy(bandStrBuffer, data->jp2[ib]+len, 3);
+        bandStrBuffer[3] = '\0';
+        int bandIdx = str2enum(bandStrBuffer);
+        if (bandIdx == B10)
+            continue;
+        for (ip=0; ip<file->npix; ip++) {
+            // use boost.within to determine detector number
+            // but only need to do this once - per band differences not significant
+            if (ib == 0) {
+                // Assign band independent solar angles to l1rec struct
+                get_zenaz(sunpos, l1rec->lon[ip], l1rec->lat[ip], &l1rec->solz[ip], &l1rec->sola[ip]);
+                if (!lonlat) {
+                    // interpolate tiePoint sensor view angles
+                    interpViewAngles(data, ip, recnum, ib, &l1rec->senz[ip], &l1rec->sena[ip]);
+                }
+            }
+ 
+            // if getting only lonlat stuff, skip everything below and go to the next iteration
+            if (lonlat)
+                continue;
+          
+            if (l1_input->geom_per_band) {
+                int ipb = ip*file->nbands + bandIdx;
+
+                // interpolate tiePoint sensor view angles
+                interpViewAngles(data, ip, recnum, ib, &l1rec->geom_per_band->senz[ipb],
+                                 &l1rec->geom_per_band->sena[ipb]);
+                // per band solar angles are just repetitions of the nominal values
+                l1rec->geom_per_band->solz[ipb] = l1rec->solz[ip];
+                l1rec->geom_per_band->sola[ipb] = l1rec->sola[ip];
+            }
+        }
+
+        // lonlat mode, only care about when ib = 0, which gets the sensor view angles
+        if (lonlat)
+            break;
+    }
+
+    // Calculate surface reflectance values for each band 
+    for(ib = 0; ib < maxBands; ib++) {        
+        int len = strlen(data->jp2[ib])-7;
+        strncpy(bandStrBuffer, data->jp2[ib]+len, 3);
+        bandStrBuffer[3] = '\0';
+        int bandIdx = str2enum(bandStrBuffer);
+        if (bandIdx == B10)
+            continue;
+        
+        l1rec->Fo[bandIdx] = Fobar[bandIdx] * fsol;
+   
+        if(decodeMSI(file, bandIdx, recnum)!=0) {
+            printf("-E-: Error decoding MSI jp2 files.\n");
+            fprintf(stderr, "-E- %s line %d: Failed to read Lt, band %d, recnum %d\n",
+                    __FILE__,__LINE__, bandIdx, recnum );
+            exit(1);
+        }
+
+        for (ip=0; ip<file->npix; ip++) {
+            ipb = ip*file->nbands+bandIdx;
+            if(data->buf[ip] == 0) {
+                l1rec->Lt[ipb] = BAD_FLT;   
+                l1rec->navfail[ip] = 1;
+            } else{
+                float rToa = (float) ((data->buf[ip] + data->radiometricOffset[ib]) / data->quantificationValue);
+
+                l1rec->Lt[ipb] = (rToa * l1rec->Fo[bandIdx] * cos(l1rec->solz[ip]/OEL_RADEG)) / OEL_PI ;
+            }
+        }
+    }
+    
+    // Skip everything else if lonlat
+    // Surface reflectance should give a good start pixel for l1info
+    if (lonlat)
+        return 0;
+  
+    // Calculate rho_cirrus from cirrus band 10
+    if(decodeMSI(file, B10, recnum)!=0) {
+        fprintf(stderr, "-E- %s line %d: Failed to read cirrus band, recnum %d\n",
+                __FILE__,__LINE__, recnum );
+        exit(1);
+    }
+    for (ip=0;ip<file->npix; ip++) {
+        if(data->buf[ip] == 0)
+            l1rec->rho_cirrus[ip] = BAD_FLT;
+        else
+            l1rec->rho_cirrus[ip] = data->buf[ip] / (OEL_PI * 10000.0);
+    }
+
+    // Check lat and lon values
+    for (ip=0; ip<file->npix; ip++) {
+        l1rec->pixnum[ip] = ip;
+        if ( std::isnan(l1rec->lat[ip]) )
+            l1rec->lat[ip] = -999.0;
+        if ( std::isnan(l1rec->lon[ip]) )
+            l1rec->lon[ip] = -999.0;
+
+        if (l1rec->lon[ip] < -181.0 || l1rec->lon[ip] > 181.0 ||
+            l1rec->lat[ip] <  -91.0 || l1rec->lat[ip] >  91.0 )
+        l1rec->navfail[ip] = 1;
+
+    }
+    return 0;
+}
 
 
 /************************************************/

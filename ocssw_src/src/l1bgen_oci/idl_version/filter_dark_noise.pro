@@ -17,7 +17,7 @@
     dm = median(dtmp)
     di = iqr(dtmp)
     kn = where(abs(dtmp - dm) gt rejfac*di)
-    dtmp[kn] = dfill
+    if (kn[0] ne -1) then dtmp[kn] = dfill
     dark[*,i,*] = dtmp
     
   endfor

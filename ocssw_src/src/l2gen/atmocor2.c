@@ -1,5 +1,6 @@
 #include "l12_proto.h"
 #include "atrem_corl1.h"
+#include "glint.h"
 
 /* --------------------------------------------------------------------------------------- */
 /* atmocor2() - atmospheric correction, converts Lt -> nLw                                 */
@@ -17,8 +18,8 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
     static int32_t aer_iter_max = 1;
     static int32_t aer_iter_min = 1;
 
-    static float pi = PI;
-    static float radeg = RADEG;
+    static float pi = OEL_PI;
+    static float radeg = OEL_RADEG;
     static float badval = BAD_FLT;
     static float badchl = BAD_FLT;
     static float p0 = STDPR;
@@ -46,6 +47,9 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
     static int32_t nwvis;
     static int32_t nwave;
     static float *wave;
+    static float *gc;
+    float glint_coef_q,glint_coef_u;
+    double nw;
     int32_t nWaveCovariance = 1;
 
     l1str *l1rec = l2rec->l1rec;
@@ -66,7 +70,6 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
     float senz = l1rec->senz [ip];
     float delphi = l1rec->delphi[ip];
     float ws = l1rec->ws [ip];
-    float gc = l1rec->glint_coef[ip];
 
     int32_t *aermodmin = &l2rec->aermodmin[ip];
     int32_t *aermodmax = &l2rec->aermodmax[ip];
@@ -94,7 +97,6 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
     float *dsensor=NULL, *dLr=NULL, *dtaua=NULL, *dtg_sol=NULL;
     float *dtg_sen=NULL, *dt_sol=NULL, *dt_sen=NULL, *dvc=NULL, *last_dtaua=NULL;
     float dLt;
-    int dvc_fail = 0;
 
     float last_dtaua_aer_l, *derv_taua_l, **derv_rhorc, *derv_rhow_l, *derv_rh;
 
@@ -134,6 +136,7 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
             printf("-E- : Error allocating memory to wave\n");
             exit(FATAL_ERROR);
         }
+        gc=(float *)malloc(nwave*sizeof(float));
         for (ib = 0; ib < nwave; ib++) {
             wave[ib] = l1file->fwave[ib];
         }
@@ -173,7 +176,6 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
         printf("Aerosol selection bands %d and %d\n", l1file->iwave[aer_s], l1file->iwave[aer_l]);
 
         switch (aer_opt) {
-            case AERWANGNIR:
             case AERRHNIR:
             case FIXANGSTROMNIR:
             case FIXMODPAIRNIR:
@@ -182,14 +184,12 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
                 aer_iter_max = input->aer_iter_max;
                 printf("NIR correction enabled.\n");
                 break;
-            case AERMUMM:
             case AERRHMUMM:
                 want_mumm = 1;
                 aer_iter_min = 3;
                 aer_iter_max = input->aer_iter_max;
                 printf("MUMM correction enabled.\n");
                 break;
-            case AERWANGSWIR:
             case AERRHSWIR:
                 want_nirLw = 1;
                 aer_iter_min = 1;
@@ -563,8 +563,15 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
     last_refl_nir = 100.;
     want_glintcorr = 0;
 
+    for (ib = 0; ib < nwave; ib++) {
+        gc[ib] = l1rec->glint_coef[ip];
+        if (input->glint_opt == 3) {
+            nw = get_nw(wave[ib]);
+            getglint_iqu(senz, solz, delphi, ws, 0., &gc[ib], &glint_coef_q, &glint_coef_u, nw);
+        }   
+    }
     /*  new glint_opt usage - a 2 will use the simple TLg from atmocor1 */
-    if (glint_opt == 1 && l1rec->glint_coef[ip] > glint_min) {
+    if ((glint_opt == 1 || glint_opt==3) && gc[aer_base] > glint_min) {
         iter_max = MAX(2, iter_max);
         iter_min = MAX(2, iter_min);
         want_glintcorr = 1;
@@ -573,7 +580,7 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
         want_glintcorr = 1;
     }
 
-    if (aer_opt == AERWANGSWIR || aer_opt == AERRHSWIR) {
+    if (aer_opt == AERRHSWIR) {
         tindx_shi(l2rec, ip, &tindx);
         if (tindx >= 1.05) {
             iter_max = 1;
@@ -638,8 +645,8 @@ NIRSWIR:
         /*  Compute and subtract glint radiance */
         if (want_glintcorr) {
 
-            if (glint_opt == 1)
-                glint_rad(iter, nwave, aer_s, aer_l, gc, airmass, mu0, Fo, taur, taua, tLw, TLg, uncertainty);
+            if (glint_opt == 1 || glint_opt==3)
+                glint_rad(iter, nwave, aer_s, aer_base, gc, airmass, mu0, Fo, taur, taua, tLw, TLg, uncertainty);
 
             for (ib = 0; ib < nwave; ib++) {
                 tLw[ib] -= TLg[ib];
@@ -910,7 +917,7 @@ NIRSWIR:
                         nWaveCovariance = nwave - ib;
                     for (iw = ib; iw < ib + nWaveCovariance; iw++) {
                         /* calculate cov(Rrs[ib],Rrs[iw])   */
-
+                        float cov = 0;
                         F1[0] = 1 / t_sol[ib] / t_sen[ib] / radref[ib];
                         for (ix1 = 1; ix1 <= nbands_ac; ix1++)
                             F1[ix1] = derv_rhorc[ib][ix1 - 1];
@@ -924,50 +931,61 @@ NIRSWIR:
                         F2[ix1] = derv_rh[iw];
                         F2[ix1 + 1] = derv_rhow_l[iw];
                         F2[ix1 + 2] = derv_taua_l[iw];
-
-                        COV[0][0] = corr_coef_rhot[ib * nwave + iw] * delta_Lt[ib] * radref[ib] *
-                                    delta_Lt[iw] * radref[iw];
+                        cov += F1[0] * F2[0] *
+                                       (corr_coef_rhot[ib * nwave + iw] * delta_Lt[ib] * radref[ib] *
+                                        delta_Lt[iw] * radref[iw]);
+                        // COV[0][0] = corr_coef_rhot[ib * nwave + iw] * delta_Lt[ib] * radref[ib] *
+                        //             delta_Lt[iw] * radref[iw];
                         for (i = 0; i < nbands_ac; i++) {
                             ix1 = acbands_index[i];
-                            COV[0][i + 1] =
-                                corr_nir[ib][i] * delta_Lt[ib] * radref[ib] * delta_Lt[ix1] * radref[ix1];
+                            cov += F1[0] * F2[i + 1] *  corr_nir[ib][i] * delta_Lt[ib] * radref[ib] * delta_Lt[ix1] * radref[ix1];
+                            // COV[0][i + 1] =
+                            //     corr_nir[ib][i] * delta_Lt[ib] * radref[ib] * delta_Lt[ix1] * radref[ix1];
                         }
-                        COV[0][nbands_ac + 1] = 0;
-                        COV[0][nbands_ac + 2] = 0;
-                        COV[0][nbands_ac + 3] = 0;
+                        // COV[0][nbands_ac + 1] = 0;
+                        // COV[0][nbands_ac + 2] = 0;
+                        // COV[0][nbands_ac + 3] = 0;
 
                         for (i = 0; i < nbands_ac; i++) {
                             ix2 = acbands_index[i];
 
-                            COV[i + 1][0] =
-                                corr_nir[iw][i] * delta_Lt[iw] * radref[iw] * delta_Lt[ix2] * radref[ix2];
+                            cov+=F1[i + 1] * F2[0] * corr_nir[iw][i] * delta_Lt[iw] * radref[iw] * delta_Lt[ix2] * radref[ix2];
+                            // COV[i + 1][0] =
+                            //     corr_nir[iw][i] * delta_Lt[iw] * radref[iw] * delta_Lt[ix2] * radref[ix2];
 
                             for (j = 0; j < nbands_ac; j++) {
                                 ix1 = acbands_index[j];
-                                COV[i + 1][j + 1] = corr_nir[ix2][j] * delta_Lt[ix2] * radref[ix2] *
+                                cov+=F1[i + 1] * F2[j + 1] * corr_nir[ix2][j] * delta_Lt[ix2] * radref[ix2] *
                                                     delta_Lt[ix1] * radref[ix1];
+                                // COV[i + 1][j + 1] = corr_nir[ix2][j] * delta_Lt[ix2] * radref[ix2] *
+                                //                     delta_Lt[ix1] * radref[ix1];
                             }
-                            COV[i + 1][nbands_ac + 1] = 0;
-                            COV[i + 1][nbands_ac + 2] = 0;
-                            COV[i + 1][nbands_ac + 3] = 0;
+                            // COV[i + 1][nbands_ac + 1] = 0;
+                            // COV[i + 1][nbands_ac + 2] = 0;
+                            // COV[i + 1][nbands_ac + 3] = 0;
                         }
 
-                        for (ix2 = 1; ix2 < 4; ix2++)
-                            for (ix1 = 0; ix1 < dim; ix1++)
-                                COV[nbands_ac + ix2][ix1] = 0;
+                        // for (ix2 = 1; ix2 < 4; ix2++)
+                        //     for (ix1 = 0; ix1 < dim; ix1++)
+                        //         COV[nbands_ac + ix2][ix1] = 0;
+                        cov+=F1[nbands_ac + 1] * F2[nbands_ac + 1] *     uncertainty->drh[ip] * uncertainty->drh[ip];  
+                        // COV[nbands_ac + 1][nbands_ac + 1] = pow(uncertainty->drh[ip], 2);
+                        cov+=F1[nbands_ac + 2] * F2[nbands_ac + 2] *  dtLw_nir[aer_l] * radref[aer_l] *dtLw_nir[aer_l] * radref[aer_l];
+                        // COV[nbands_ac + 2][nbands_ac + 2] = pow(dtLw_nir[aer_l] * radref[aer_l], 2);
+                        cov+=F1[nbands_ac + 3] * F2[nbands_ac + 3] * last_dtaua_aer_l * last_dtaua_aer_l;
+                        // COV[nbands_ac + 3][nbands_ac + 3] = pow(last_dtaua_aer_l, 2);
 
-                        COV[nbands_ac + 1][nbands_ac + 1] = pow(uncertainty->drh[ip], 2);
-                        COV[nbands_ac + 2][nbands_ac + 2] = pow(dtLw_nir[aer_l] * radref[aer_l], 2);
-                        COV[nbands_ac + 3][nbands_ac + 3] = pow(last_dtaua_aer_l, 2);
+                        // for (ix1 = 0; ix1 < dim; ix1++) {
+                        //     F1_temp[ix1] = 0.f;
+                        // }
 
-                        for (ix1 = 0; ix1 < dim; ix1++) {
-                            F1_temp[ix1] = 0.;
-                            for (ix2 = 0; ix2 < dim; ix2++)
-                                F1_temp[ix1] += F1[ix2] * COV[ix2][ix1];
-                        }
-                        covariance_matrix[ib * nwave + iw] = 0.;
-                        for (ix1 = 0; ix1 < dim; ix1++)
-                            covariance_matrix[ib * nwave + iw] += F1_temp[ix1] * F2[ix1];
+                        // for (ix2 = 0; ix2 < dim; ix2++)
+                        //     for (ix1 = 0; ix1 < dim; ix1++) {
+                        //         F1_temp[ix1] += F1[ix2] * COV[ix2][ix1];
+                        //     }
+                        covariance_matrix[ib * nwave + iw] = cov;
+                        // for (ix1 = 0; ix1 < dim; ix1++)
+                        //     covariance_matrix[ib * nwave + iw] += F1_temp[ix1] * F2[ix1];
 
                         covariance_matrix[ib * nwave + iw] *=
                             (brdf[ib] * brdf[iw] / (mu0 * mu0) / (fsol * fsol));
@@ -1033,7 +1051,7 @@ NIRSWIR:
         }
 
         /* If NIR/SWIR switching, do secondary test for turbidity and reset if needed */
-        if (iter == 1 && (aer_opt == AERWANGSWIR || aer_opt == AERRHSWIR)) {
+        if (iter == 1 && (aer_opt == AERRHSWIR)) {
             if (tindx >= 1.05 && status == 0) {
                 for (ib = 0; ib < nwvis; ib++) {
                     Rrs[ib] = nLw[ib] / Fobar[ib];
@@ -1181,13 +1199,11 @@ NIRSWIR:
 
     /* if there is no lower bounding for aerosol selection, the error can't be quantified */
     if (uncertainty) {
-        if (*aermodmin == *aermodmax || *aermodmin2 == *aermodmax2 || dvc_fail) {
+        if (*aermodmin == *aermodmax || (*aermodrat2!=BAD_FLT && *aermodmin2 == *aermodmax2)) {
             for (ib = 0; ib < nwave; ib++) {
                 Rrs_unc[ib] = BAD_FLT;
-                Rrs[ib] = BAD_FLT;
                 for (iw = 0; iw < nwave; iw++)
                     covariance_matrix[ib * nwave + iw] = BAD_FLT;
-                l2rec->chl[ip] = BAD_FLT;
             }
         } else {
             l2rec->chl_unc[ip] = *dchl;

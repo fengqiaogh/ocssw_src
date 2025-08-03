@@ -1568,7 +1568,7 @@ int readl1_modis(filehandle *l1file,
 
                     /* Normalize reflectance by solar zenith angle */
                     value = (SI_val - offset) * scale
-                        / cos(l1rec->solz[ip] / RADEG);
+                        / cos(l1rec->solz[ip] / OEL_RADEG);
 
                 /* populate l1rec->rho_cirrus */
                 l1rec->rho_cirrus[ip] = value;
@@ -1594,7 +1594,7 @@ int readl1_modis(filehandle *l1file,
                 if (SI_val < MIN_BAD_SI)
 
                     /* Convert from reflectance to radiance */
-                    value = (SI_val - offset) * scale * l1rec->Fo[irsb] / PI;
+                    value = (SI_val - offset) * scale * l1rec->Fo[irsb] / OEL_PI;
 
                     /* Flag any sentinel values */
                 else

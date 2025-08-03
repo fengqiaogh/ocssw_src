@@ -1,12 +1,10 @@
 #ifndef _GEOLOCATE_HAWKEYE_H_
 #define _GEOLOCATE_HAWKEYE_H_
 
+#include <genutils.h>
+
 typedef float quat_array[4];
 typedef float orb_array[3];
-
-double constexpr PI = 3.14159265358979323846;
-double constexpr RADEG = 180 / PI;
-double constexpr DTOR = PI / 180;
 
 float constexpr focal_length = 45.184;
 

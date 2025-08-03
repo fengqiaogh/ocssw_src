@@ -99,7 +99,7 @@ void Zphotic_lee(l2str *l2rec, l2prodstr *p, float Zp[]) {
         if (l1rec->mask[ip] || a490 <= 0.0 || bb490 <= 0.0) {
             l1rec->flags[ip] |= PRODFAIL;
         } else {
-            stheta = sin(l1rec->solz[ip] / RADEG);
+            stheta = sin(l1rec->solz[ip] / OEL_RADEG);
             ctheta = l1rec->csolz[ip];
             k1 = (c1[0] + c1[1] * sqrt(a490) + c1[2] * bb490)*(1 + alpha[0] * stheta);
             k2 = (c2[0] + c2[1]* (a490) + c2[2] * bb490)*(alpha[1] + alpha[2] * ctheta);

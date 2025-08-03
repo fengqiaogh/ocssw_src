@@ -62,6 +62,103 @@ const char* unix2udunits_c(double unixtime, int hasZ);
 double udunits2unix(const std::string& str);
 std::string unix2udunits(double unixtime, bool hasZ = true);
 
+/**
+ * @brief convert unix time to year, day, second
+ * @param unixTime UTC seconds since Jan 1, 1970
+ * @param year The year
+ * @param dayOfYear day of year (1 - 366)
+ * @param sec seconds of the day.  If an integer type is used, the seconds get truncated.
+ */
+template <typename Y, typename D, typename S>
+void unix2yds(double unixTime, Y &year, D &dayOfYear, S &sec) {
+    int16_t tmpYear, tmpDayOfYear;
+    double tmpSec;
+        
+    unix2yds(unixTime, &tmpYear, &tmpDayOfYear, &tmpSec);
+    year = tmpYear;
+    dayOfYear = tmpDayOfYear;
+    sec = tmpSec;
+}
+
+/**
+ * @brief convert unix time to year, day
+ * @param unixTime UTC seconds since Jan 1, 1970
+ * @param year The year
+ * @param dayOfYear day of year (1 - 366)
+ */
+template <typename Y, typename D>
+void unix2yds(double unixTime, Y &year, D &dayOfYear) {
+    int16_t tmpYear, tmpDayOfYear;
+    double tmpSec;
+        
+    unix2yds(unixTime, &tmpYear, &tmpDayOfYear, &tmpSec);
+    year = tmpYear;
+    dayOfYear = tmpDayOfYear;
+}
+
+/**
+ * @brief convert unix time to year, month, day, second
+ * @param unixTime UTC seconds since Jan 1, 1970
+ * @param year The year
+ * @param month month of the year (1 - 12)
+ * @param day day of month (1 - 31)
+ * @param sec seconds of the day.  If an integer type is used, the seconds get truncated.
+ */
+template <typename Y, typename M, typename D, typename S>
+void unix2ymds(double unixTime, Y &year, M &month, D &day, S &sec) {
+    int16_t tmpYear, tmpMonth, tmpDay;
+    double tmpSec;
+
+    unix2ymds(unixTime, &tmpYear, &tmpMonth, &tmpDay, &tmpSec);
+    year = tmpYear;
+    month = tmpMonth;
+    day = tmpDay;
+    sec = tmpSec;
+}
+
+/**
+ * @brief convert unix time to year, month, day
+ * @param unixTime UTC seconds since Jan 1, 1970
+ * @param year The year
+ * @param month month of the year (1 - 12)
+ * @param day day of month (1 - 31)
+ */
+template <typename Y, typename M, typename D>
+void unix2ymds(double unixTime, Y &year, M &month, D &day) {
+    int16_t tmpYear, tmpMonth, tmpDay;
+    double tmpSec;
+
+    unix2ymds(unixTime, &tmpYear, &tmpMonth, &tmpDay, &tmpSec);
+    year = tmpYear;
+    month = tmpMonth;
+    day = tmpDay;
+}
+
+/**
+ * @brief convert unix time to year, month, day, hour, minute, second
+ * @param unixTime UTC seconds since Jan 1, 1970
+ * @param year The year
+ * @param month month of the year (1 - 12)
+ * @param day day of month (1 - 31)
+ * @param hour hour of day (0 - 23)
+ * @param min minute of the hour (0 - 59)
+ * @param sec seconds of the minute.  If an integer type is used, the seconds get truncated.
+ */
+template <typename Y, typename M, typename D, typename H, typename MM, typename S>
+void unix2ymdhms(double unixTime, Y &year, M &month, D &day, H &hour, MM &min, S &sec){
+    int16_t tmpYear, tmpMonth, tmpDay, tmpHour, tmpMin;
+    double tmpSec;
+
+    unix2ymdhms(unixTime, &tmpYear, &tmpMonth, &tmpDay, &tmpHour, &tmpMin, &tmpSec);
+    year = tmpYear;
+    month = tmpMonth;
+    day = tmpDay;
+    hour = tmpHour;
+    min = tmpMin;
+    sec = tmpSec;
+}
+
+
 #endif
 
 #endif

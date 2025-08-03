@@ -17,6 +17,7 @@
 // V0.1, Feb 1, 2016
 
 #include <math.h>
+#include <genutils.h>
 
 int orb2lla(int nRecords, double orb[], double lon[], double lat[], double alt[]) {
     // Define constants
@@ -30,14 +31,14 @@ int orb2lla(int nRecords, double orb[], double lon[], double lat[], double alt[]
 
     for (i = 0; i < nRecords; i++) {
         // Compute longitude
-        lon[i] = (180.0 / M_PI) * atan2(orb[1 + i * 6], orb[0 + i * 6]);
+        lon[i] = (180.0 / OEL_PI) * atan2(orb[1 + i * 6], orb[0 + i * 6]);
 
         // Compute geodetic latitude 
         rad = sqrt(orb[0 + i * 6] * orb[0 + i * 6] + orb[1 + i * 6] * orb[1 + i * 6] + orb[2 + i * 6] * orb[2 + i * 6]);
         omf2p = (omf2 * rem + rad - rem) / rad;
         pxy = orb[0 + i * 6] * orb[0 + i * 6] + orb[1 + i * 6] * orb[1 + i * 6];
         temp = sqrt(orb[2 + i * 6] * orb[2 + i * 6] + omf2p * omf2p * pxy);
-        lat[i] = (180.0 / M_PI) * asin(orb[2 + i * 6] / temp);
+        lat[i] = (180.0 / OEL_PI) * asin(orb[2 + i * 6] / temp);
 
         // Compute altitude
         rl = re * (1.0 - f) / sqrt(1.0 - (2.0 - f) * f * pxy / (rad * rad));

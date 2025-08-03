@@ -72,6 +72,7 @@ int32_t rdsensorinfo(int32_t sensorID, int32_t evalmask, const char *pname,
     char *filedir;
     char filename[FILENAME_MAX];
     char prefix[FILENAME_MAX];
+    const char* sensorDir;
     const char* subsensorDir;
     char line[80];
     char name[80];
@@ -143,7 +144,14 @@ int32_t rdsensorinfo(int32_t sensorID, int32_t evalmask, const char *pname,
             strcat(prefix, "/eval/");
         else
             strcat(prefix, "/");
-        strcat(prefix, sensorId2SensorDir(sensorID));
+
+        sensorDir = sensorId2SensorDir(sensorID);
+        if (sensorDir)
+            strcat(prefix, sensorDir);
+        else {
+            printf("\n -E- Can't find sensor directory for ID %d\n", sensorID);
+            exit(EXIT_FAILURE);
+        }
         strcat(prefix, "/");
 
         fp = NULL;

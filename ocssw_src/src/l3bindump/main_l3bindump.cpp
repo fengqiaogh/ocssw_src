@@ -227,7 +227,7 @@ int main(int argc, char *argv[]) {
         input->lat = constrainLat(input->lat);
         input->lon = constrainLon(input->lon);
 
-        float radius_degrees = (input->radius / EARTH_RADIUS) * (180.0 / M_PI);
+        float radius_degrees = (input->radius / EARTH_RADIUS) * OEL_RADEG;
         if (radius_degrees > 180) {
 
             /* The entire globe has been selected. */

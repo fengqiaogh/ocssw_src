@@ -34,6 +34,9 @@ typedef struct input_struct {
     char sstssesfile [FILENAME_MAX];
     char sst4ssesfile[FILENAME_MAX];
     char sst3ssesfile[FILENAME_MAX];
+    char sstjsonfile[FILENAME_MAX];
+    char sst3jsonfile[FILENAME_MAX];
+    char sst4jsonfile[FILENAME_MAX];
     char gmpfile[FILENAME_MAX];
     char picfile[FILENAME_MAX];
     char owtfile[FILENAME_MAX];

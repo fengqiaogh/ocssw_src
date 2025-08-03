@@ -30,27 +30,25 @@
  *
  */
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <netcdf>
 #include <math.h>
 #include <string.h>
-#include <unistd.h>
+#include <algorithm>
 
-#include <sstream>
-#include <fstream>
-#include <iomanip>
-#include <dirent.h>
-#include <sys/stat.h>
-#include "nc4utils.h"
-#include "global_attrs.h"
-#include "l1bgen_oci.h"
-#include "allocate2d.h"
-#include "allocate3d.h"
-#include "allocate4d.h"
+#include <global_attrs.h>
+#include <allocate2d.h>
+#include <allocate3d.h>
+
 #include "corrections.hpp"
 #include "calibrations.hpp"
 #include "aggregate.hpp"
-#include <clo.h>
+#include "geolocate_oci.h"
+#include "corrections.hpp"
+#include "calibrations.hpp"
+#include "l1b_file.hpp"
+#include "processing_tracker.hpp"
+#include "l1b_options.hpp"
+#include "types.hpp"
 
 using namespace std;
 using namespace netCDF;
@@ -59,7 +57,22 @@ using namespace netCDF::exceptions;
 template <typename T>
 using matrix2D = boost::multi_array<T, 2>;
 
-#define VERSION "2.1"
+#define VERSION "2.3"
+#define CHUNK_CACHE_SIZE 256 * 1024 * 1024  // 256MiB of cache memory.
+#define CHUNK_CACHE_NELEMS 1033
+#define CHUNK_CACHE_PREEMPTION .75
+#define VARCHUNK_CACHE_SIZE 4 * 1024 * 1024  // 4Mib of cache memory.
+#define VARCHUNK_CACHE_NELEMS 1033
+#define VARCHUNK_CACHE_PREEMPTION .75
+#define CHUNKBANDS 40
+#define CHUNKPIXELS 2000
+#define CHUNKLINES 16
+#define EXP_DECAY_CONSTS 4
+
+// Macros defining the views OCI has. The metadata produced from l1agen_oci differs from the OAD for
+// l1bgen_oci
+#define MAIN_VIEW 1  // The view from which usable science data is derived
+#define DARK_VIEW 2  // Where dark data comes from
 
 //    Modification history:
 //  Programmer     Organization   Date     Ver   Description of change
@@ -105,137 +118,18 @@ vector<double> aggregateIrradiances(size_t numBands, size_t numWavelengths, vect
 int main(int argc, char *argv[]) {
     cout << "l1bgen_oci " << VERSION << " (" << __DATE__ << " " << __TIME__ << ")" << endl;
 
-    clo_optionList_t *optionList = clo_createList();
-    clo_addOption(optionList, "ifile", CLO_TYPE_IFILE, NULL, "Input L1A file");
-    clo_addOption(optionList, "ofile", CLO_TYPE_OFILE, NULL, "Output L1B file");
-    clo_addOption(optionList, "cal_lut", CLO_TYPE_IFILE, NULL, "CAL LUT file");
-    clo_addOption(optionList, "geo_lut", CLO_TYPE_IFILE, NULL, "GEO LUT file");
-    clo_addOption(optionList, "doi", CLO_TYPE_STRING, NULL, "Digital Object Identifier (DOI) string");
-    clo_addOption(optionList, "pversion", CLO_TYPE_STRING, "Unspecified", "processing version string");
-    clo_addOption(optionList, "demfile", CLO_TYPE_STRING, "$OCDATAROOT/common/gebco_ocssw_v2020.nc",
-                  "Digital elevation map file");
-    clo_addOption(optionList, "radiance", CLO_TYPE_BOOL, "false",
-                  "Generate radiances as opposed to reflectances");
-    clo_addOption(optionList, "disable_geo", CLO_TYPE_BOOL, "false", "Disable geolocation");
-    clo_addOption(optionList, "ephfile", CLO_TYPE_STRING, nullptr, "Definitive ephemeris file name");
-
-    string l1aFilename;
-    string l1bFilename;
-    string calibrationLutFilename;  // Calibration look-up table
-    string geolocationLutFilename;
-    string demFile;  // Digital Elevation Model
-    string digitalObjectId;
-    string processingVersion;
-    string ephFile;  // Definititive ephemeris file, used for geolocation
-
-    bool radianceGenerationEnabled;
-    bool disableGeolocation;
+    oel::L1bOptions options(argc, argv);
 
     if (argc == 1) {
-        clo_printUsage(optionList);
+        clo_printUsage(options.optionList);
         exit(EXIT_FAILURE);
     }
-    clo_readArgs(optionList, argc, argv);
-
-    // Grab the OPER LUTs
-    const string OCVARROOT = getenv("OCVARROOT");
-    const string CALDIR(OCVARROOT + "/oci/cal/OPER/");
-
-    vector<string> lutFiles;  // Look up tables
-
-    DIR *calibrationLutDir;
-    struct dirent *caldirptr;
-    if ((calibrationLutDir = opendir(CALDIR.c_str())) != NULL) {
-        while ((caldirptr = readdir(calibrationLutDir)) != NULL) {
-            lutFiles.push_back(string(caldirptr->d_name));
-        }
-        closedir(calibrationLutDir);
-    }
-
-    if (clo_isSet(optionList, "ifile")) {
-        l1aFilename = clo_getString(optionList, "ifile");
-    } else {
-        clo_printUsage(optionList);
-        exit(EXIT_FAILURE);
-    }
-    if (clo_isSet(optionList, "ofile")) {
-        l1bFilename = clo_getString(optionList, "ofile");
-    } else {
-        clo_printUsage(optionList);
-        exit(EXIT_FAILURE);
-    }
-    if (clo_isSet(optionList, "cal_lut")) {
-        calibrationLutFilename = clo_getString(optionList, "cal_lut");
-    } else {
-        for (const string &lut : lutFiles) {
-            if (lut.find("PACE_OCI_L1B_LUT") != std::string::npos) {
-                calibrationLutFilename = CALDIR;
-                calibrationLutFilename.append(lut);
-                break;
-            }
-        }
-    }
-    {
-        struct stat _;  // Just to fill a variable.
-        if (calibrationLutFilename.empty() || (stat(calibrationLutFilename.c_str(), &_) != 0)) {
-            cout << "Error: input CAL LUT file: " << calibrationLutFilename.c_str() << " does not exist\n";
-            exit(EXIT_FAILURE);
-        }
-        if (clo_isSet(optionList, "geo_lut")) {
-            geolocationLutFilename = clo_getString(optionList, "geo_lut");
-        } else {
-            for (const string &lut : lutFiles) {
-                if (lut.find("PACE_OCI_GEO_LUT") != std::string::npos) {
-                    geolocationLutFilename = CALDIR;
-                    geolocationLutFilename.append(lut);
-                    break;
-                }
-            }
-        }
-        if (geolocationLutFilename.empty() || (stat(geolocationLutFilename.c_str(), &_) != 0)) {
-            cout << "Error: input GEO LUT file: " << geolocationLutFilename.c_str() << " does not exist\n";
-            exit(EXIT_FAILURE);
-        }
-
-        char tmp_filename[FILENAME_MAX];
-        parse_file_name(clo_getString(optionList, "demfile"), tmp_filename);
-        demFile = tmp_filename;
-        if ((stat(demFile.c_str(), &_) != 0)) {
-            cout << "Error: DEM file: " << demFile.c_str() << " does not exist\n";
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    radianceGenerationEnabled = clo_getBool(optionList, "radiance");
-    if (clo_isSet(optionList, "doi")) {
-        digitalObjectId = clo_getString(optionList, "doi");
-        if (digitalObjectId == "None") {
-            digitalObjectId.clear();
-        }
-    }
-
-    if (clo_isSet(optionList, "ephfile")) {
-        ephFile = clo_getString(optionList, "ephfile");
-    }
-
-    disableGeolocation = clo_getBool(optionList, "disable_geo");
-
-    if (disableGeolocation && !radianceGenerationEnabled) {
-        cout << " -E- Cannot generate reflectances without geolocation";
-        exit(EXIT_FAILURE);
-    }
-
-    if (clo_isSet(optionList, "pversion")) {  // TODO spellcheck
-        processingVersion = clo_getString(optionList, "pversion");
-    }
-
-    free(optionList);
 
     // ********************************* //
     // *** Read calibration LUT file *** //
     // ********************************* //
     nc_set_chunk_cache(CHUNK_CACHE_SIZE, CHUNK_CACHE_NELEMS, CHUNK_CACHE_PREEMPTION);
-    NcFile *calLutFile = new NcFile(calibrationLutFilename, NcFile::read);
+    NcFile *calLutFile = new NcFile(options.calibrationLutFilename, NcFile::read);
 
     NcGroup calLutCommon, calLutBlue, calLutRed, calLutSwir;
     calLutCommon = calLutFile->getGroup("common");
@@ -252,7 +146,7 @@ int main(int argc, char *argv[]) {
 
     NcDim k2TimeDim = calLutFile->getDim("number_of_times");
     if (k2TimeDim.isNull()) {
-        cout << "Error: could not read number_of_times from " << calibrationLutFilename << "\n";
+        cout << "Error: could not read number_of_times from " << options.calibrationLutFilename << "\n";
         exit(EXIT_FAILURE);
     }
     size_t numK2Times = k2TimeDim.getSize();
@@ -277,40 +171,89 @@ int main(int argc, char *argv[]) {
     CalibrationLut swirCalLut = readOciCalLut(calLutFile, SWIR, calLutSwir, numSwirGainBands, 2);
 
     // Read hysterisis parameters
-    float hysterisisTimes[9][4];
-    float hysterisisAmplitude[9][4];
+    float hysterisisTimes[9][4];      // number of SWIR bands by number exponential functions
+    float hysterisisAmplitude[9][4];  // number of SWIR bands by number exponential functions
     calLutSwir.getVar("hyst_time_const").getVar(&hysterisisTimes[0][0]);
     calLutSwir.getVar("hyst_amplitude").getVar(&hysterisisAmplitude[0][0]);
 
     calLutFile->close();
     delete (calLutFile);
 
-    GeoLut geoLut;
+    NcFile *xtkLutFile;
+    size_t ncpix;  // number of influence pixels
+    size_t nbands;
+    size_t nxbands;
+    float ***cmat_in;  // input crosstalk influence coeff matrix
 
-    static Level1bFile outfile(l1bFilename);
+    if (options.enableCrosstalk) {
+        // Open and read data from Xtalk LUT file
+        xtkLutFile = new NcFile(options.xtalkLutFilename, NcFile::read);
+
+        ncpix = xtkLutFile->getDim("number_of_pixels").getSize();  // number of influence pixels
+        nbands = xtkLutFile->getDim("number_of_bands").getSize();
+        nxbands = xtkLutFile->getDim("number_of_xc_bands").getSize();
+
+        cmat_in =
+            allocate3d_float(ncpix, nxbands, nbands);  // blue band input crosstalk influence coeff matrix
+        xtkLutFile->getVar("blue_cross_coef").getVar(&cmat_in[0][0][0]);
+
+        xtkLutFile->close();
+        delete (xtkLutFile);
+    }
+
+    static Level1bFile outfile(options.l1bFilename);
     // Append call sequence to existing history
     string history = call_sequence(argc, argv);
 
     // Open and read data from L1Afile
-    NcFile *l1aFile = new NcFile(l1aFilename, NcFile::read);
+    NcFile *l1aFile = new NcFile(options.l1aFilename, NcFile::read);
     NcGroup l1aSpatSpecModes = l1aFile->getGroup("spatial_spectral_modes");
     NcGroup l1aSciData = l1aFile->getGroup("science_data");
+    size_t numSpatialZones = l1aFile->getDim("spatial_zones").getSize();
+    vector<short> dataTypes(numSpatialZones);
+    l1aSpatSpecModes.getVar("spatial_zone_data_type").getVar(dataTypes.data());
+
+    LocatingContext locatingContext;
+    switch (dataTypes.at(MAIN_VIEW)) {
+        case EARTH:
+        case NON_BASELINE_SPECTRAL_AGGREGATION:
+            cout << "Input was a normal science granule" << endl;
+            locatingContext = GEO;
+            break;
+
+        case SOLAR_DAILY_CALIBRATION:
+        case SOLAR_MONTHLY_CALIBRATION:
+            cout << "Input was a solar calibration granule" << endl;
+            locatingContext = HELIO;
+            break;
+
+        case LUNAR:
+            cout << "Input was a lunar calibration granule" << endl;
+            locatingContext = SELENO;
+            break;
+
+        default:
+            cout << "-W- Unknown locating context, assuming GEO" << endl;
+            locatingContext = GEO;
+            break;
+    }
 
     GeoData geoData;
+    oel::ProcessingTracker processingTracker;
 
-    geoData = geolocateOci(l1aFile, outfile, geolocationLutFilename, geoLut, l1bFilename, demFile,
-                           radianceGenerationEnabled, digitalObjectId, ephFile, disableGeolocation,
-                           processingVersion);
+    geoData = locateOci(l1aFile, outfile, options, locatingContext, processingTracker);
+
+    cout << "Preparing to calibrate file" << endl;
 
     CalibrationData redCalData{.color = RED}, blueCalData{.color = BLUE}, swirCalData{.color = SWIR};
 
     DarkData darkData;
 
-    vector<float> cosSolZens(geoData.numGoodScans * geoData.numCcdPix);  // Cosine of solar zeniths
+    vector<float> cosineSolarZeniths(geoData.solarZeniths.size());
 
-    if (!radianceGenerationEnabled) {
-        for (size_t i = 0; i < geoData.numGoodScans * geoData.numCcdPix; i++)
-            cosSolZens[i] = cos(geoData.solarZeniths[i] * M_PI / 180 / 100);
+    if (!options.radianceGenerationEnabled) {
+        transform(geoData.solarZeniths.begin(), geoData.solarZeniths.end(), cosineSolarZeniths.begin(),
+                  [](double zenith) { return cos(zenith * OEL_DEGRAD); });
     }
 
     // Get date
@@ -325,22 +268,12 @@ int main(int argc, char *argv[]) {
     blueCalData.numBandsL1a = l1aFile->getDim("blue_bands").getSize();
     redCalData.numBandsL1a = l1aFile->getDim("red_bands").getSize();
 
-    // Check for and fill in missing scan times
-    {
-        vector<short> scanQualityFlagsTmp(geoData.numGoodScans,
-                                          0);  // Why do we set flags if they're not used?
-        interpolateMissingScanTimes(
-            geoData.scanStartTimes,
-            scanQualityFlagsTmp);  // TODO : Delete; this is done by geolocation already
-    }
-
     // ******************************************** //
     // *** Get spatial and spectral aggregation *** //
     // ******************************************** //
     uint32_t numTaps = l1aFile->getDim("number_of_taps").getSize();
-    uint32_t numSpatialZones = l1aFile->getDim("spatial_zones").getSize();
+    // Number of spatial zones was obtained above for locating context, as were the data types
 
-    vector<int16_t> dataTypes(numSpatialZones);
     vector<int16_t> numLinesSpatZones(numSpatialZones);  // Number of lines per spatial zone
     vector<int16_t> spatialAgg(numSpatialZones);         // Spatial aggregation factors per zone
     vector<int16_t> blueSpecAgg(numTaps);                // Spectral aggregation mode for blue
@@ -353,13 +286,23 @@ int main(int argc, char *argv[]) {
     l1aSpatSpecModes.getVar("blue_spectral_mode").getVar(blueCalData.specAgg->data());
     l1aSpatSpecModes.getVar("red_spectral_mode").getVar(redCalData.specAgg->data());
 
+    bool foundSpatialAggregation = false;
     size_t spatialAggregationIndex;
-    for (size_t i = 0; i < numSpatialZones; i++) {
-        if (dataTypes[i] != NO_DATA && dataTypes[i] != DARK_CALIBRATION &&
-            dataTypes[i] != EXTERNAL_SNAPSHOP_TRIGGER) {
-            spatialAggregationIndex = i;
+    // spatialAggregationIndex is looking for the index that has EARTH datatype, and not DIAGNOSTIC datatype
+    // the latter always appears at a higher index value, so the loop looks for the lowest index that is
+    // has datatype not equal to NO_DATA, DARK_CALIBRATIOM or EXTERNAL_SNAPSHOP_TRIGGER.
+    // Presumably could simply look for index with datatype equal to EARTH instead.
+    for (spatialAggregationIndex = 0; spatialAggregationIndex < dataTypes.size(); spatialAggregationIndex++) {
+        int16_t dataType = dataTypes[spatialAggregationIndex];
+        if (dataType != NO_DATA && dataType != DARK_CALIBRATION && dataType != EXTERNAL_SNAPSHOP_TRIGGER) {
+            foundSpatialAggregation = true;
             break;
         }
+    }
+    if (!foundSpatialAggregation) {
+        cout << "-E- " << __FILE__ << ":" << __LINE__
+             << " - Could not find valid spatial aggregation type.\n";
+        exit(EXIT_FAILURE);
     }
 
     // *********************************************************** //
@@ -368,8 +311,6 @@ int main(int argc, char *argv[]) {
     vector<size_t> tapAggFactors(numTaps);  // A list of scalars, 0-16 inclusive
     size_t numTapBins[16];
 
-    // TODO: Function
-    // Blue bands
     if (aggregateBands(numTaps, tapAggFactors.data(), numTapBins, blueCalData.specAgg->data(),
                        blueCalData.numInsBands, blueCalData.numBands) == 2)
         cout << "All blue taps disabled" << endl;
@@ -385,15 +326,13 @@ int main(int argc, char *argv[]) {
     }
 
     if (blueCalData.numInsBands != blueCalData.numBandsL1a) {
-        cout << "Number of blue bands in file: " << l1aFilename.c_str()
+        cout << "Number of blue bands in file: " << options.l1aFilename.c_str()
              << " not consistent with spectral aggregation" << endl;
         l1aFile->close();
         return 1;
     } else if (blueCalData.numInsBands < 4)
-        cout << "No blue bands in file: " << l1aFilename.c_str() << endl;
+        cout << "No blue bands in file: " << options.l1aFilename.c_str() << endl;
 
-    // TODO: Function
-    // Red bands
     if (aggregateBands(numTaps, tapAggFactors.data(), numTapBins, redCalData.specAgg->data(),
                        redCalData.numInsBands, redCalData.numBands) == 2)
         cout << "All red taps disabled" << endl;
@@ -407,14 +346,19 @@ int main(int argc, char *argv[]) {
     }
 
     if (redCalData.numInsBands != redCalData.numBandsL1a) {
-        cout << "Number of red bands in file: " << l1aFilename.c_str()
+        cout << "Number of red bands in file: " << options.l1aFilename.c_str()
              << " not consistent with spectral aggregation" << endl;
         l1aFile->close();
         return 1;
     } else if (redCalData.numInsBands < 4)
-        cout << "No red bands in file: " << l1aFilename.c_str() << endl;
+        cout << "No red bands in file: " << options.l1aFilename.c_str() << endl;
 
     swirCalData.numBands = 9;
+
+    if (options.enableCrosstalk) { // Crosstalk correction is only needed for blue bands right now
+        blueCalData.enableCrosstalk = options.enableCrosstalk;
+        makeXtalkMat(spatialAgg[spatialAggregationIndex], blueCalData, cmat_in, ncpix, nxbands, nbands);
+    }
 
     // ********************************* //
     // *** Get dark collect location *** //
@@ -425,7 +369,7 @@ int main(int argc, char *argv[]) {
         }
     }
     if (darkData.darkZone == -1) {
-        cout << "No dark collect in file: " << l1aFilename.c_str() << endl;
+        cout << "No dark collect in file: " << options.l1aFilename.c_str() << endl;
         l1aFile->close();
         return 1;
     }
@@ -491,6 +435,25 @@ int main(int argc, char *argv[]) {
         interpTemps(l1aFile, numTemps, geoData.numGoodScans, geoData.earthViewTimes.data());
     uint16_t nBCalTemps = blueCalData.gains->dimensions[TEMP];  // Number of blue calibration temps
 
+    // allocate red quality flags
+    uint8_t **redQualityFlags = allocate2d_uchar(redCalData.numBands, geoData.numCcdPix);
+    uint8_t **redQualityFlagsHamStripe = allocate2d_uchar(redCalData.numBands, geoData.numCcdPix);
+
+    // set qual to zero
+    bzero(redQualityFlags[0], redCalData.numBands * geoData.numCcdPix);
+    bzero(redQualityFlagsHamStripe[0], redCalData.numBands * geoData.numCcdPix);
+
+    // set 10 deg pixels to HAM-B_striping, if normal science data
+    if (dataTypes.at(MAIN_VIEW) == EARTH) {
+        if (geoData.numCcdPix > 800) {
+            for (size_t band = 0; band < redCalData.numBands; band++) {
+                for (size_t pix = 680; pix < 800; pix++) {
+                    redQualityFlagsHamStripe[band][pix] = HAM_B_STRIPING;
+                }
+            }
+        }
+    }
+
     // Read dark collects from science data arrays
     vector<size_t> start(3), count(3);  // for use in vectorized netcdf calls
     start[0] = 0;
@@ -540,41 +503,36 @@ int main(int argc, char *argv[]) {
     filterDarkNoise(geoData.numGoodScans, swirCalData.numBands, numDarkSwirPix, swirCalData.fillValue,
                     swirPixDark);
 
-    // number of scans of dark data to average; will make this an input parameter
-    darkData.numScansAvg = 1;  // TODO: Initializein dark_data.hpp
-    // number of dark pixels to skip; will make this an input parameter
-    darkData.numPixSkip = 0;  // TODO: Initialize in dark_data.hpp
-
     // Calibrated data variables
-    float **swirDigiNum = allocate2d_float(swirCalData.numBands, geoData.numSwirPix);
+    vec2D<float> swirDigiNum(swirCalData.numBands, vector<float>(geoData.numSwirPix));
     float **swirCal = allocate2d_float(swirCalData.numBands, geoData.numSwirPix);
-    // Saturation arrays
-    uint8_t *swirSatFlags = new uint8_t[swirCalData.numBands];
     uint8_t **swirQualityFlags = allocate2d_uchar(swirCalData.numBands, geoData.numSwirPix);
     vector<double> sciScanAngles(geoData.numCcdPix);
     vector<double> swirScanAngles(geoData.numSwirPix);
-
-    uint32_t **swirSciData = (uint32_t **)allocate2d_int(swirCalData.numBands, geoData.numSwirPix);
-
     vector<double> swirDarkCorrections(swirCalData.numBands);
+    uint32_t **swirSciData = (uint32_t **)allocate2d_int(swirCalData.numBands, geoData.numSwirPix);
     int16_t swirAggFactor = 1;
-
-    float *swirTempCorrections = new float[swirCalData.numBands];
-    float **swirRvsCorrections = allocate2d_float(swirCalData.numBands, geoData.numSwirPix);
-    float **swirNonlinCorrections = allocate2d_float(swirCalData.numBands, geoData.numSwirPix);
-    float *hysterisisCorrection = new float[geoData.numSwirPix];
+    vector<double> swirTempCorrections(swirCalData.numBands);
+    vector<float> hysterisisCorrection(geoData.numSwirPix);
     int32_t *indx = new int32_t[geoData.numSwirPix];
-    
-    int scanLogDelta = 50;
+
+    double pprAngle =
+        (2 * OEL_PI) *
+        (geoData.mceTelem.pprOffset - geoData.geoLut.rtaNadir[geoData.mceTelem.mceBoardId % 2]) /
+        MAX_ENC_COUNT;
+    if (pprAngle > OEL_PI)
+        pprAngle -= 2 * OEL_PI;
 
     ///////////////
     // Main loop //
     ///////////////
-    
+
+    cout << "Calibrating" << endl;
+
     // Read, calibrate and write science data
-    for (size_t currScan = 0; currScan < geoData.numGoodScans; currScan++) {
-        if ((currScan % scanLogDelta) == 0)
-            cout << "Calibrating scan " << currScan << " of " << geoData.numGoodScans << endl;
+    for (size_t currScan = processingTracker.getStartingLine(); currScan < processingTracker.getEndingLine();
+         currScan++) {
+        processingTracker.update();
 
         // Check for valid mirror side
         if (!(geoData.hamSides[currScan] == 0 || geoData.hamSides[currScan] == 1)) {
@@ -583,19 +541,12 @@ int main(int argc, char *argv[]) {
         }
 
         //  Get scan angle
-        const size_t MAX_ENC_COUNT = 0x20000;
-        double pprAngle = (2 * PI) *
-                          (geoData.mceTelem.pprOffset - geoLut.rtaNadir[geoData.mceTelem.mceBoardId % 2]) /
-                          MAX_ENC_COUNT;
-        if (pprAngle > PI)
-            pprAngle -= 2 * PI;
-
         size_t pixelOffset = currScan * geoData.numCcdPix;
-        for(size_t pix = 0; pix < geoData.numCcdPix; pix++)
-            sciScanAngles[pix] = geoData.ccdScanAngles[pixelOffset + pix] * RADEG;
+        for (size_t pix = 0; pix < geoData.numCcdPix; pix++)
+            sciScanAngles[pix] = geoData.ccdScanAngles[pixelOffset + pix] * OEL_RADEG;
         pixelOffset = currScan * geoData.numSwirPix;
-        for(size_t pix = 0; pix < geoData.numSwirPix; pix++)
-            swirScanAngles[pix] = geoData.swirScanAngles[pixelOffset + pix] * RADEG;
+        for (size_t pix = 0; pix < geoData.numSwirPix; pix++)
+            swirScanAngles[pix] = geoData.swirScanAngles[pixelOffset + pix] * OEL_RADEG;
 
         start[0] = currScan;
         start[1] = 0;
@@ -614,7 +565,7 @@ int main(int argc, char *argv[]) {
 
             calibrate(blueCalData, geoData, darkData, l1aSciData, outfile, currScan, spatialAgg,
                       spatialAggregationIndex, numTaps, blueCalLut.dimensions[4], sciScanAngles, tempCoefs,
-                      calibrationTemps, cosSolZens, radianceGenerationEnabled);
+                      calibrationTemps, cosineSolarZeniths, options.radianceGenerationEnabled);
         }
 
         //  Red bands
@@ -623,7 +574,30 @@ int main(int argc, char *argv[]) {
 
             calibrate(redCalData, geoData, darkData, l1aSciData, outfile, currScan, spatialAgg,
                       spatialAggregationIndex, numTaps, redCalLut.dimensions[4], sciScanAngles, tempCoefs,
-                      calibrationTemps, cosSolZens, radianceGenerationEnabled);
+                      calibrationTemps, cosineSolarZeniths, options.radianceGenerationEnabled);
+        }
+
+        start[0] = 0;
+        start[1] = currScan;
+        start[2] = 0;
+
+        count[0] = redCalData.numBands;
+        count[1] = 1;
+        count[2] = geoData.numCcdPix;
+
+        // write red quality flag
+        try {
+            if (geoData.hamSides[currScan] == 1) {
+                outfile.observationData.getVar("qual_red")
+                    .putVar(start, count, &redQualityFlagsHamStripe[0][0]);
+            } else {
+                outfile.observationData.getVar("qual_red").putVar(start, count, &redQualityFlags[0][0]);
+            }
+        } catch (const exception &e) {
+            cout << "-E- " << __FILE__ << ":" << __LINE__ << " - Couldn't put red quality flags into L1B file"
+                 << endl;
+            cout << e.what() << endl;
+            exit(EXIT_FAILURE);
         }
 
         //  SWIR bands
@@ -640,38 +614,21 @@ int main(int argc, char *argv[]) {
         // Compute dark offset, correct data, and apply absolute and
         // temporal gain and temperature correction
 
-        for (size_t pix = 0; pix < geoData.numSwirPix * swirCalData.numBands; pix++) {
-            swirRvsCorrections[0][pix] = 0.0;
-            swirNonlinCorrections[0][pix] = 0.0;
-        }
-
         int darkCorrRetStat = getDarkCorrection(
             currScan, geoData.numGoodScans, geoData.hamSides, darkData.numScansAvg, darkData.numPixSkip, 1, 1,
             1, {swirAggFactor}, swirCalData.fillValue, numDarkSwirPix, swirPixDark, swirDarkCorrections);
 
         if (darkCorrRetStat != -1) {
-            (void)getTempCorrection(swirCalData.numBands, *swirCalData.gains, &tempCoefs[nBCalTemps],
-                                    &calibrationTemps[currScan][nBCalTemps], geoData.numGoodScans,
-                                    swirTempCorrections);
-
-            // Compute and apply RVS and linearity
-            (void)getRvsCorrection(swirCalData.numBands, geoData.numSwirPix, geoData.hamSides[currScan],
-                                   *swirCalData.gains, swirScanAngles.data(), swirRvsCorrections);
-
             // calc swirDigiNum
             for (size_t j = 0; j < swirCalData.numBands; j++) {
-                for(size_t pix=0; pix<geoData.numSwirPix; pix++) {
-                    if(swirSciData[j][pix] == swirCalData.fillValue) {
+                for (size_t pix = 0; pix < geoData.numSwirPix; pix++) {
+                    if (swirSciData[j][pix] == swirCalData.fillValue) {
                         swirDigiNum[j][pix] = BAD_FLT;
                     } else {
                         swirDigiNum[j][pix] = swirSciData[j][pix] - swirDarkCorrections[j];
                     }
                 }
             }
-
-            (void)getNonlinearityCorrection(swirCalData.numBands, geoData.numSwirPix,
-                                            swirCalLut.dimensions[4], *swirCalData.gains, swirDigiNum,
-                                            swirNonlinCorrections);
 
             // When there are more CCD pixels than SWIR, there are inconsistencies in geolocation.
             // This is fixed by resampling solar zeniths to the SWIR pixels.
@@ -683,30 +640,34 @@ int main(int argc, char *argv[]) {
                     if (j > 0 && j < geoData.numCcdPix) {
                         double w = (swirScanAngles[i] - sciScanAngles[j - 1]) -
                                    (sciScanAngles[j] - sciScanAngles[j - 1]);
-                        cosSolZensSwir[i] = cosSolZens[currScan * geoData.numCcdPix + j - 1] * (1 - w) +
-                                            cosSolZens[currScan * geoData.numCcdPix + j] * w;
+                        cosSolZensSwir[i] =
+                            cosineSolarZeniths[currScan * geoData.numCcdPix + j - 1] * (1 - w) +
+                            cosineSolarZeniths[currScan * geoData.numCcdPix + j] * w;
                     } else {
-                        cosSolZens[i] = cosSolZens[currScan * geoData.numCcdPix + j];
+                        cosineSolarZeniths[i] = cosineSolarZeniths[currScan * geoData.numCcdPix + j];
                     }
                 }
 
             } else {
-                copy(cosSolZens.begin() + currScan * geoData.numSwirPix,
-                     cosSolZens.begin() + (currScan + 1) * geoData.numSwirPix, cosSolZensSwir.begin());
+                copy(cosineSolarZeniths.begin() + currScan * geoData.numSwirPix,
+                     cosineSolarZeniths.begin() + (currScan + 1) * geoData.numSwirPix,
+                     cosSolZensSwir.begin());
             }
 
             // SWIR band loop
             for (size_t j = 0; j < swirCalData.numBands; j++) {
-                uint32_t goodcnt = 0;
+                uint32_t numGoodPixels = 0;
                 for (size_t k = 0; k < geoData.numSwirPix; k++) {
+                    bool notFill = swirSciData[j][k] != swirCalData.fillValue;
                     // radiance == true, do not check geoData.qualFlag bc it does not retrieve it
-                    if (radianceGenerationEnabled && swirSciData[j][k] != swirCalData.fillValue) {
-                        indx[goodcnt++] = k;
+                    if (options.radianceGenerationEnabled && notFill) {
+                        indx[numGoodPixels++] = k;
                     }
-                    // radiance == false, check quality flag for only "Off_Earth, Solar_eclipse, Terrain_bad" (0x7)
-                    else if (!radianceGenerationEnabled && swirSciData[j][k] != swirCalData.fillValue &&
+                    // radiance == false, check quality flag for only "Off_Earth, Solar_eclipse, Terrain_bad"
+                    // (0x7)
+                    else if (!options.radianceGenerationEnabled && notFill &&
                              (!(geoData.qualityFlag[currScan * geoData.numCcdPix + k] & 0x7))) {
-                        indx[goodcnt++] = k;
+                        indx[numGoodPixels++] = k;
                     } else {
                         // Handle fill value
                         swirDigiNum[j][k] = BAD_FLT;
@@ -715,32 +676,41 @@ int main(int argc, char *argv[]) {
                 }
 
                 // Hysteresis correction
-                float prior[4] = {0, 0, 0, 0};
-                float observation[4] = {0, 0, 0, 0};
-
+                float prior[EXP_DECAY_CONSTS] = {0, 0, 0, 0};
+                float observation[EXP_DECAY_CONSTS] = {0, 0, 0, 0};
                 hysterisisCorrection[0] = 0.0;
-                for (size_t k = 1; k < goodcnt; k++) {
+                array<float, EXP_DECAY_CONSTS> exponentialDecayConsts;
+                for (size_t k = 0; k < EXP_DECAY_CONSTS; k++) {
+                    exponentialDecayConsts[k] = exp(-1.0 / hysterisisTimes[j][k]);
+                }
+
+                for (size_t k = 1; k < numGoodPixels; k++) {
                     hysterisisCorrection[k] = 0.0;
-                    for (size_t l = 0; l < 4; l++) {
-                        double exponentialDecayConsts = exp(-1.0 / hysterisisTimes[j][l]);
-                        observation[l] = prior[l] * exponentialDecayConsts +
-                                         swirDigiNum[j][indx[k-1]] * hysterisisAmplitude[j][l];
+                    for (size_t l = 0; l < EXP_DECAY_CONSTS; l++) {
+                        observation[l] = prior[l] * exponentialDecayConsts[l] +
+                                         swirDigiNum[j][indx[k - 1]] * hysterisisAmplitude[j][l];
                         hysterisisCorrection[k] += observation[l];
                         prior[l] = observation[l];
                     }
                 }
 
-                for (size_t k = 0; k < goodcnt; k++) {
-                    swirCal[j][indx[k]] = swirTempCorrections[j] *
+                double tempCorrection = getTempCorrection(
+                    j, &tempCoefs[nBCalTemps], calibrationTemps[currScan], *swirCalData.gains, SWIR);
+                for (size_t k = 0; k < numGoodPixels; k++) {
+                    double rvsCorrection = getRvsCorrection(j, indx[k], geoData.hamSides[currScan],
+                                                            *swirCalData.gains, swirScanAngles[k]);
+                    double nonLinearityCorrection = getNonlinearityCorrection(
+                        j, indx[k], swirCalLut.dimensions[NL], swirCalData.gains->k5Coefs, swirDigiNum);
+                    swirCal[j][indx[k]] = tempCorrection *
                                           swirCalData.gains->k1K2[j][geoData.hamSides[currScan]] *
                                           (swirDigiNum[j][indx[k]] - hysterisisCorrection[k]);
 
-                    swirCal[j][indx[k]] *= swirNonlinCorrections[j][indx[k]] * swirRvsCorrections[j][indx[k]];
+                    swirCal[j][indx[k]] *= nonLinearityCorrection * rvsCorrection;
 
-                    if (!radianceGenerationEnabled) {
+                    if (!options.radianceGenerationEnabled) {
                         // NOTE: solz is short with scale of 0.01
                         if (geoData.solarZeniths[currScan * geoData.numCcdPix + indx[k]] < MAX_SOLZ)
-                            swirCal[j][indx[k]] *= M_PI * geoData.auCorrection /
+                            swirCal[j][indx[k]] *= OEL_PI * geoData.auCorrection /
                                                    (swirSolarIrradiance[j] * cosSolZensSwir[indx[k]]);
                         else
                             swirCal[j][indx[k]] = BAD_FLT;
@@ -754,12 +724,10 @@ int main(int argc, char *argv[]) {
         // Check for saturation
         for (size_t k = 0; k < geoData.numSwirPix; k++) {
             for (size_t j = 0; j < swirCalData.numBands; j++) {
-                swirSatFlags[j] = 0;
                 if (swirSciData[j][k] >= swirCalData.gains->saturationThresholds[j])
-                    swirSatFlags[j] = 1;
-            }
-            for (size_t j = 0; j < swirCalData.numBands; j++) {
-                swirQualityFlags[j][k] = swirSatFlags[j];  // TODO: move to loop above
+                    swirQualityFlags[j][k] = 1;
+                else
+                    swirQualityFlags[j][k] = 0;
             }
         }
 
@@ -772,7 +740,7 @@ int main(int argc, char *argv[]) {
         count[2] = geoData.numSwirPix;
 
         // Output to L1B file
-        if (!radianceGenerationEnabled) {
+        if (!options.radianceGenerationEnabled) {
             try {
                 outfile.observationData.getVar("rhot_SWIR").putVar(start, count, &swirCal[0][0]);
             } catch (const exception &e) {
@@ -804,6 +772,8 @@ int main(int argc, char *argv[]) {
 
     // End Main loop
 
+    cout << "Calibration finished, writing band info and granule metadata" << endl;
+
     // bgmat#bwave
     if (blueCalData.numInsBands >= 4)
         outfile.writeBandInfo(BLUE, blueWavelengths, *blueCalData.solIrrL1a, blueCalData.numBands,
@@ -816,13 +786,14 @@ int main(int argc, char *argv[]) {
                           swirCalData.gainAgg, swirCalData.gainAgg, swirCalLut.m12Coefs, swirCalLut.m13Coefs);
 
     outfile.writeGranuleMetadata(unix2isodate(geoData.unixTimeStart, 'G'),
-                                 unix2isodate(geoData.unixTimeEnd, 'G'), l1bFilename);
+                                 unix2isodate(geoData.unixTimeEnd, 'G'), options.l1bFilename);
 
-    set_global_attrs(outfile.l1bFile, history, digitalObjectId, processingVersion);
-    outfile.close();
+    set_global_attrs(outfile.l1bFile, history, options.digitalObjectId, options.processingVersion);
 
     l1aFile->close();
     delete (l1aFile);
+
+    cout << "Done" << endl;
 
     return 0;
 }

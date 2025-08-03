@@ -6,6 +6,7 @@
 #include <boost/geometry/geometries/polygon.hpp>
 #include <algorithm>
 #include <stack>
+#include "scaled_nc_var.hpp"
 namespace bg = boost::geometry;
 typedef bg::model::point<double, 2, bg::cs::spherical_equatorial<bg::degree>> Point_t;
 typedef bg::model::linestring<Point_t> Linestring_t;
@@ -21,20 +22,20 @@ Geospatialbounds::Geospatialbounds() {
 }
 
 std::string Geospatialbounds::get_day_night_flag(const netCDF::NcFile &nc_file) {
-    netCDF::NcVar solzen_nc;
-    for (const auto &name: possible_sozlen_names) {
-        solzen_nc = find_nc_variable_cpp(name, nc_file);
-        if (!solzen_nc.isNull()) break;
+    ScaledNcVar solzen_nc;
+    for (const auto &name : possible_sozlen_names) {
+        solzen_nc = find_nc_variable_cpp<const netCDF::NcFile, ScaledNcVar>(name, nc_file);
+        if (!solzen_nc.isNull())
+            break;
     }
     if (solzen_nc.isNull()) {
-        std::cerr << "--Error--: Could not find solar zenith angle to compute Day Night Flag" << std::endl;
-        exit(EXIT_FAILURE);
+        return "Undefined";
     }
     std::vector<float> solzen;
     allocate_var(solzen, solzen_nc);
     const float night_angle = 90.0f;
     std::stack<bool> state;
-    for (const auto &angle: solzen) {
+    for (const auto &angle : solzen) {
         if (angle > 180.0 || angle < -180 || std::isnan(angle) || !std::isfinite(angle))
             continue;
         bool flag = angle < night_angle;
@@ -44,6 +45,8 @@ std::string Geospatialbounds::get_day_night_flag(const netCDF::NcFile &nc_file) 
             return "Mixed";
         }
     }
+    // release memory
+    free_vector(solzen);
     if (state.empty()) {
         return "Undefined";
     } else {
@@ -55,24 +58,21 @@ std::string Geospatialbounds::get_day_night_flag(const netCDF::NcFile &nc_file) 
 }
 
 void Geospatialbounds::get_lat_lon(const netCDF::NcFile &nc_input) {
-    netCDF::NcVar latnc = find_nc_variable_cpp("latitude", nc_input);
-    netCDF::NcVar lonnc = find_nc_variable_cpp("longitude", nc_input);
+    netCDF::NcVar latnc;
+    netCDF::NcVar lonnc;
+    find_lat_lon<const netCDF::NcFile,netCDF::NcVar>(nc_input, latnc, lonnc);
     allocate_var(lat, latnc);
     allocate_var(lon, lonnc);
     std::vector<netCDF::NcDim> dims = latnc.getDims();
-    if (dims.size() != 2) {
-        std::cerr << "-Error- : Latitude array must be two-dimensional." << std::endl;
-    } else {
-        number_of_lines = dims.at(0).getSize();
-        pixels_per_line = dims.at(1).getSize();
-    }
+    number_of_lines = dims.at(0).getSize();
+    pixels_per_line = dims.at(1).getSize();
 }
 
 void Geospatialbounds::allocate_var(std::vector<float> &data, const netCDF::NcVar &var) {
     if (!var.isNull()) {
         std::vector<netCDF::NcDim> dims = var.getDims();
         size_t size = 1;
-        for (const auto &dim: dims) {
+        for (const auto &dim : dims) {
             size *= dim.getSize();
         }
         data.resize(size);
@@ -93,7 +93,7 @@ void Geospatialbounds::allocate_attr(std::vector<float> &data, const netCDF::NcA
 }
 
 Geospatialbounds::Geospatialbounds(const std::string &path)
-        : Geospatialbounds(netCDF::NcFile(path, netCDF::NcFile::read)) {
+    : Geospatialbounds(netCDF::NcFile(path, netCDF::NcFile::read)) {
 }
 
 Geospatialbounds::Geospatialbounds(const netCDF::NcFile &nc_input) : Geospatialbounds() {
@@ -112,7 +112,7 @@ Geospatialbounds::Geospatialbounds(const netCDF::NcFile &nc_input) : Geospatialb
     // search for gring lat/lon or polygon in global attributes
 
     const auto attrs = nc_input.getAtts();
-    for (const auto &_attr: attrs) {
+    for (const auto &_attr : attrs) {
         std::string attr_name = _attr.first;
         boost::algorithm::to_lower(attr_name);
         if (attr_name == "gringpointlatitude") {
@@ -142,15 +142,21 @@ Geospatialbounds::Geospatialbounds(const netCDF::NcFile &nc_input) : Geospatialb
     auto crs = find_nc_grp_attribute_cpp("geospatial_bounds_crs", nc_input);
     if (!crs.isNull()) {
         Polygon_t poly;
+
+        // get rid of 0 at end of string
+        if(geospatial_bounds_wkt.back() == 0)
+            geospatial_bounds_wkt.pop_back();
+
         boost::geometry::read_wkt(geospatial_bounds_wkt, poly);
         geospatial_bounds_wkt = "POLYGON((";
         double first_ini = true;
         double x_first, y_first;
+        double x, y;
         // getting the vertices back
         for (auto it = boost::begin(boost::geometry::exterior_ring(poly));
              it != boost::end(boost::geometry::exterior_ring(poly)); ++it) {
-            double x = bg::get<0>(*it);
-            double y = bg::get<1>(*it);
+            x = bg::get<0>(*it);
+            y = bg::get<1>(*it);
             if (first_ini) {
                 x_first = x;
                 y_first = y;
@@ -163,9 +169,14 @@ Geospatialbounds::Geospatialbounds(const netCDF::NcFile &nc_input) : Geospatialb
             // use the coordinates...
         }
         // Polygon must be closed though it does not affect dateline crossing
-        geospatial_bounds_wkt += std::to_string(y_first);
-        geospatial_bounds_wkt += " ";
-        geospatial_bounds_wkt += std::to_string(x_first);
+        if(x != x_first || y != y_first) {
+            geospatial_bounds_wkt += std::to_string(y_first);
+            geospatial_bounds_wkt += " ";
+            geospatial_bounds_wkt += std::to_string(x_first);
+        } else {
+            geospatial_bounds_wkt.pop_back();
+            geospatial_bounds_wkt.pop_back();
+        }
         geospatial_bounds_wkt += "))";
     }
     if (std::isnan(max_lon)) {
@@ -183,6 +194,11 @@ Geospatialbounds::Geospatialbounds(const netCDF::NcFile &nc_input) : Geospatialb
         if (!attr_time_coverage.isNull())
             attr_time_coverage.getValues(time_coverage_start);
     }
+    if (time_coverage_end.empty()) {
+        auto attr_time_coverage = find_nc_grp_attribute_cpp("time_coverage_end", nc_input);
+        if (!attr_time_coverage.isNull())
+            attr_time_coverage.getValues(time_coverage_end);
+    }
     if (day_night_flag.empty()) {
         auto attr_day_night_flag = find_nc_grp_attribute_cpp("day_night_flag", nc_input);
         if (!attr_day_night_flag.isNull())
@@ -190,13 +206,13 @@ Geospatialbounds::Geospatialbounds(const netCDF::NcFile &nc_input) : Geospatialb
         else
             day_night_flag = get_day_night_flag(nc_input);
     }
-    for (auto &sc_ln_attr: scan_line_vars) {
+    for (auto &sc_ln_attr : scan_line_vars) {
         std::string var_name = sc_ln_attr.first;
         auto &var_val = sc_ln_attr.second;
         netCDF::NcVar var = find_nc_variable_cpp(var_name, nc_input);
         allocate_var(var_val, var);
     }
-    for (const auto &sc_ln_attr: scan_line_vars) {
+    for (const auto &sc_ln_attr : scan_line_vars) {
         auto &var_val = sc_ln_attr.second;
         if (var_val.empty()) {
             get_lat_lon(nc_input);
@@ -272,13 +288,10 @@ void Geospatialbounds::calc_scan_line(const std::vector<float> &lat, const std::
 };
 
 std::pair<std::vector<float>, std::vector<float>> Geospatialbounds::calc_gring(
-        const std::vector<float> &slat, const std::vector<float> &elat, const std::vector<float> &clat,
-        const std::vector<float> &slon, const std::vector<float> &elon) {
+    const std::vector<float> &slat, const std::vector<float> &elat, const std::vector<float> &clat,
+    const std::vector<float> &slon, const std::vector<float> &elon) {
     const float geobox_bounds{20.0f};
-    std::vector<std::vector<float>> geobox{{},
-                                           {},
-                                           {},
-                                           {}};
+    std::vector<std::vector<float>> geobox{{}, {}, {}, {}};
     // find last valid scan
     size_t nscan = clat.size();
     // find first valid scan
@@ -321,7 +334,7 @@ std::pair<std::vector<float>, std::vector<float>> Geospatialbounds::calc_gring(
     std::vector<float> lat_gring;
     std::vector<float> lon_gring;
     lat_gring.push_back(geobox.at(1).at(0));
-    for (const auto &val: geobox.at(3)) {
+    for (const auto &val : geobox.at(3)) {
         lat_gring.push_back(val);
     }
     while (geobox.at(1).size() > 1) {
@@ -330,7 +343,7 @@ std::pair<std::vector<float>, std::vector<float>> Geospatialbounds::calc_gring(
     }
 
     lon_gring.push_back(geobox.at(0).at(0));
-    for (const auto &val: geobox.at(2)) {
+    for (const auto &val : geobox.at(2)) {
         lon_gring.push_back(val);
     }
     while (geobox.at(0).size() > 1) {
@@ -362,6 +375,9 @@ std::string Geospatialbounds::calc_gring(const std::pair<std::vector<float>, std
 const std::unordered_map<std::string, std::vector<float>> &Geospatialbounds::get_bounds() {
     if (scan_line_vars.at("elat").empty()) {
         calc_scan_line(lat, lon, number_of_lines, pixels_per_line, scan_line_vars);
+        // release memory
+        free_vector(lat);
+        free_vector(lon);
     }
     return scan_line_vars;
 }

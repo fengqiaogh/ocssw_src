@@ -25,7 +25,7 @@ using namespace std;
  */
 void calculateAndSetPolCor(l1str* &l1rec, int currPix, int index, vector<float> m12Coefs, vector<float> m13Coefs, float scanAngle) {
 
-    double alpha = l1rec->alpha[currPix] / RADEG;
+    double alpha = l1rec->alpha[currPix] / OEL_RADEG;
     double L_x = l1rec->Lt[index] / l1rec->tg_sol[index] / l1rec->tg_sen[index];
     double L_qp = l1rec->L_q[index] * cos(2 * alpha) + l1rec->L_u[index] * sin(2 * alpha);
     double L_up = l1rec->L_u[index] * cos(2 * alpha) - l1rec->L_q[index] * sin(2 * alpha);

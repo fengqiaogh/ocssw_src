@@ -22,7 +22,8 @@ int gha2000(int32_t iyr, double day, double &gha);
 
 int expandEnvVar(std::string *sValue);
 
-int orb_to_latlon(size_t ix_swt_ini,size_t ix_swt_end,size_t num_gridlines, int nbinx, double *orb_time_tot,orb_array2 *p, orb_array2 *v, double mgv1, double *tmgv1, double *tmgvf, float **lat_gd,float **lon_gd, float **alt,int FirsTerrain);
+int orb_to_latlon(size_t ix_swt_ini,size_t ix_swt_end,size_t num_gridlines, int nbinx, double *orb_time_tot,orb_array2 *p, orb_array2 *v, double mgv1, double *tmgv1, double *tmgvf, float **lat_gd,float **lon_gd, float **alt,int FirsTerrain, bool swathCrossesUtcDay);
 void cross_product_double2(double vector_a[], double vector_b[], double temp[]);
 double cross_product_norm_double2(double vector_a[], double vector_b[]);
+int interp_gap(size_t n_orb_rec, int *geogap,double *torb, double *latorb, double *lonorb);
 #endif  // _GEOLOCATE_HAWKEYE_H_

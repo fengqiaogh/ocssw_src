@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include "l12_parms.h"
 #include "passthebuck.h"
-#include "readL2scan.h"
+#include "l2_wrapper.h"
 
 
 #define  SHORTNAME   128

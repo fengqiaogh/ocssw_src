@@ -327,19 +327,19 @@ int32_t L1C::l1_cloud_correct(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
             for (size_t i = 0; i < num_ybin; i++) {
                 for (size_t j = 0; j < num_xbin; j++) {
                     // Rsurf is Earth radius at pixel positions
-                    Rsurf = Re / (sqrt(cos(l1clat[i][j] * M_PI / 180) * cos(l1clat[i][j] * M_PI / 180) +
-                                       radius_ratio * radius_ratio * sin(l1clat[i][j] * M_PI / 180) *
-                                           sin(l1clat[i][j] * M_PI / 180)));
-                    Xcorr = (l1cinput->cloud_height + Rsurf) * cos(l1clat[i][j] * M_PI / 180) *
-                            sin(l1clon[i][j] * M_PI / 180);  // lon speherical and geodetic should be equal
-                    Ycorr = (l1cinput->cloud_height + Rsurf) * sin(l1clat[i][j] * M_PI / 180);
-                    Zcorr = (l1cinput->cloud_height + Rsurf) * cos(l1clat[i][j] * M_PI / 180) *
-                            cos(l1clon[i][j] * M_PI / 180);
+                    Rsurf = Re / (sqrt(cos(l1clat[i][j] * OEL_PI / 180) * cos(l1clat[i][j] * OEL_PI / 180) +
+                                       radius_ratio * radius_ratio * sin(l1clat[i][j] * OEL_PI / 180) *
+                                           sin(l1clat[i][j] * OEL_PI / 180)));
+                    Xcorr = (l1cinput->cloud_height + Rsurf) * cos(l1clat[i][j] * OEL_PI / 180) *
+                            sin(l1clon[i][j] * OEL_PI / 180);  // lon speherical and geodetic should be equal
+                    Ycorr = (l1cinput->cloud_height + Rsurf) * sin(l1clat[i][j] * OEL_PI / 180);
+                    Zcorr = (l1cinput->cloud_height + Rsurf) * cos(l1clat[i][j] * OEL_PI / 180) *
+                            cos(l1clon[i][j] * OEL_PI / 180);
                     //     convert back to latitude and longitude
                     latcorr = atan(Ycorr / sqrt(Xcorr * Xcorr + Zcorr * Zcorr));
-                    lat_new[i][j] = atan(tan(latcorr) / radius_ratio * radius_ratio) * 180.0 / M_PI;
-                    lon_new[i][j] = atan2(Xcorr, Zcorr) * 180.0 / M_PI;
-                    lon_new[i][j] = atan2(Ycorr, Xcorr) * 180 / M_PI;
+                    lat_new[i][j] = atan(tan(latcorr) / radius_ratio * radius_ratio) * 180.0 / OEL_PI;
+                    lon_new[i][j] = atan2(Xcorr, Zcorr) * 180.0 / OEL_PI;
+                    lon_new[i][j] = atan2(Ycorr, Xcorr) * 180 / OEL_PI;
 
                     if(l1cinput->verbose) cout<<"l1cinput->cloud_height.."<<l1cinput->cloud_height<<"latnew.."<<lat_new[i][j]<<"lon_new.."<<lon_new[i][j]<<"l1clat.."<<l1clat[i][j]<<"l1clon.."<<l1clon[i][j]<<endl;
                 }
@@ -434,8 +434,24 @@ int32_t L1C::l1_cloud_correct(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
             }
 
             // DIMENSIONS
-            NcDim yd = nc_l12->getDim("number_of_scans");
-            NcDim xd = nc_l12->getDim("ccd_pixels");
+            NcDim yd = nc_l12->getDim("scans");
+            if(yd.isNull()) {
+                yd = nc_l12->getDim("number_of_scans");
+                if(yd.isNull()) {
+                    cerr << "ERROR - could not read number of scans dimension" << endl;
+                    exit(EXIT_FAILURE);
+                }
+            }
+
+            NcDim xd = nc_l12->getDim("pixels");
+            if(xd.isNull()) {
+                xd = nc_l12->getDim("ccd_pixels");
+                if(xd.isNull()) {
+                    cerr << "ERROR - could not read number of pixels dimension" << endl;
+                    exit(EXIT_FAILURE);
+                }
+            }
+
             num_scans = yd.getSize();
             num_pixels = xd.getSize();
 
@@ -497,20 +513,20 @@ int32_t L1C::l1_cloud_correct(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
                     temp = senapix[i][j] * scale_factor;
                     if (senzpix[i][j] * scale_factor >= senz_min &&
                         senzpix[i][j] * scale_factor <= senz_max && temp >= sena_min && temp <= sena_max) {
-                        dv = Hsat * cth[i][j] * tan(senzpix[i][j] * scale_factor * M_PI / 180) /
+                        dv = Hsat * cth[i][j] * tan(senzpix[i][j] * scale_factor * OEL_PI / 180) /
                              (Hsat - cth[i][j]);
-                        lat_new[i][j] = latpix[i][j] * M_PI / 180 - dv * cos(temp * M_PI / 180 + M_PI) / Re;
+                        lat_new[i][j] = latpix[i][j] * OEL_PI / 180 - dv * cos(temp * OEL_PI / 180 + OEL_PI) / Re;
                         lon_new[i][j] =
-                            lonpix[i][j] * M_PI / 180 -
-                            dv * sin((temp * M_PI / 180 + M_PI)) / (Re * cos(lat_new[i][j] * M_PI / 180));
-                        if (lon_new[i][j] * 180 / M_PI > 180) {
-                            lon_new[i][j] -= 2 * M_PI;
+                            lonpix[i][j] * OEL_PI / 180 -
+                            dv * sin((temp * OEL_PI / 180 + OEL_PI)) / (Re * cos(lat_new[i][j] * OEL_PI / 180));
+                        if (lon_new[i][j] * 180 / OEL_PI > 180) {
+                            lon_new[i][j] -= 2 * OEL_PI;
                         }
-                        if (lon_new[i][j] * 180 / M_PI < -180) {
-                            lon_new[i][j] += 2 * M_PI;
+                        if (lon_new[i][j] * 180 / OEL_PI < -180) {
+                            lon_new[i][j] += 2 * OEL_PI;
                         }
-                        lat_new[i][j] *= 180 / M_PI;
-                        lon_new[i][j] *= 180 / M_PI;
+                        lat_new[i][j] *= 180 / OEL_PI;
+                        lon_new[i][j] *= 180 / OEL_PI;
                     } else {
                         lat_new[i][j] = fillval_geo;
                         lon_new[i][j] = fillval_geo;
@@ -886,9 +902,10 @@ int32_t L1C::ect_swt(l1c_filehandle* l1cfile, int ix1, int ix2, double* tswt_tot
             lon2 = lonswt[i + 1];
             if(i<norbs - 2 && i>0)
             {
-            if(lat1==latswt[i-1] || lat2==latswt[i + 2])
-            scan_brack[0] = -1;
-            scan_brack[1] = -1;
+                if(lat1==latswt[i-1] || lat2==latswt[i + 2]) {
+                    scan_brack[0] = -1;
+                    scan_brack[1] = -1;
+                }
             }
             
             tindex = i;
@@ -906,9 +923,10 @@ int32_t L1C::ect_swt(l1c_filehandle* l1cfile, int ix1, int ix2, double* tswt_tot
             lon2 = lonswt[i];
             if(i<norbs - 2 && i>0)
             {          
-            if(lat2==latswt[i-1] || lat1==latswt[i + 2])
-            scan_brack[0] = -1;
-            scan_brack[1] = -1;
+                if(lat2==latswt[i-1] || lat1==latswt[i + 2]) {
+                    scan_brack[0] = -1;
+                    scan_brack[1] = -1;
+                }
             }
 
             tindex = i;
@@ -1228,6 +1246,8 @@ int32_t L1C::open_l1atol1c3(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
     int32_t nfiles = l1cfile->ifiles.size();
   
     int FirsTerrain=0;
+    double firstOrbTime;
+    bool swathCrossesUtcDay = false;
 
     for (int fi = 0; fi < nfiles; fi++) 
     {
@@ -1344,6 +1364,18 @@ int32_t L1C::open_l1atol1c3(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
         v1 = navGrp.getVar("orb_lon");
         v1.getVar(&orb_lon[0]);
 
+        if (fi == 0) { // Can't detect a UTC day transition on the first file
+            firstOrbTime = orb_time[0];
+        } else {
+            swathCrossesUtcDay = orb_time[0] < firstOrbTime;
+
+            if (swathCrossesUtcDay) {
+                for (size_t i = 0; i < number_orecords; i++) {
+                    orb_time[i] += SECONDS_IN_DAY;
+                }
+            }
+        }
+
         for (size_t hk = 0; hk < number_hkpack; hk++) {
             ubnum1 = (uint8_t)hkpackets[hk][0];  //-48;//48 is 0 ascii code
             ubnum2 = (uint8_t)hkpackets[hk][1];
@@ -1454,9 +1486,32 @@ int32_t L1C::open_l1atol1c3(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
             c++;
         }
 
+        int s = 0;
+        int geogap[2] = {-1, -1};
         for (short n = 0; n < n_ephem; n++) {
-            orb_time_tot[cc] = orb_time[n];
+            if (orb_time[n] < 0 && n > 0 && n <= n_ephem - 2) {
+                double itime = orb_time[n - 1] + (orb_time[n + 1] - orb_time[n - 1]) / 2;
+                orb_time_tot[cc] = itime;
+            } else
+                orb_time_tot[cc] = orb_time[n];
+
             orb_lon_tot[cc] = orb_lon[n];
+            if (n < n_ephem - 2) {
+                // cout<<orb_lat[n]<<"% "<<abs(100*(orb_lat[n+1]-orb_lat[n])/orb_lat[n])<<endl;
+                if (orb_lat[n] < -1 || orb_lat[n] > 1) {
+                    if (abs(100 * (orb_lat[n + 1] - orb_lat[n]) / orb_lat[n]) >= 100)  // clip it
+                    {
+                        if (s == 0) {
+                            geogap[0] = n;
+                            s++;
+                        } else
+                            geogap[1] = n + 1;
+                        //    cout<<"clip geogap ini "<<geogap[0]<<"lat "<<orb_lat[n]<<"clip geogap end
+                        //    "<<geogap[1]<<"lat "<<orb_lat[n+1]<<endl;
+                    }
+                }
+            }
+
             orb_lat_tot[cc] = orb_lat[n];
             orb_vel_tot[cc] = orb_vel[n];
             grn_vel_tot[cc] = grn_vel[n];
@@ -1554,6 +1609,17 @@ int32_t L1C::open_l1atol1c3(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
    if(l1cinput->verbose)cout<<"total number or orbital records #"<<cc-1<<endl;
    number_orecords_tot=cc-1; 
    l1cfile->norb_rec=number_orecords_tot;
+
+   // check if geo gap in HKTs
+   if (geogap[0] >= 0 && geogap[1] >= 0 && geogap[1] > geogap[0]) {
+       if (l1cinput->verbose)
+           cout << "interpolating wrong HKT geolocation!! one or more granules must be compromised due to "
+                   "bad orbitals!! "
+                << "gap ini index" << geogap[0] << "gap end index " << geogap[1] << endl;
+
+       //  interp_gap(number_orecords_tot,geogap,orb_time_tot,orb_lat_tot,orb_lon_tot);
+   }
+
     // determine ini/end time indexes for asc/desc passes
     for (size_t k = 0; k < number_orecords_tot - 1; k++) {
         if (orb_lat_tot[k + 1] > orb_lat_tot[k])
@@ -1678,13 +1744,12 @@ int32_t L1C::open_l1atol1c3(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
                     if(l1cinput->verbose)cout << "number of across bins L1C grid...#.." << l1cfile->nbinx << "l1cfile->n_views..."
                          << l1cfile->n_views << endl;
 
-                    lat_gd = allocate2d_float(num_gridlines, l1cfile->nbinx);
-                    lon_gd = allocate2d_float(num_gridlines, l1cfile->nbinx);
-                    alt = allocate2d_float(num_gridlines, l1cfile->nbinx);
-                   
-                    orb_to_latlon(ix1,ix4,num_gridlines, l1cfile->nbinx, orb_time_tot, posr_tot,
-                                  velr_tot, mgv1, tmgv1, tmgvf, lat_gd, lon_gd, alt,FirsTerrain);
-                
+                        lat_gd = allocate2d_float(num_gridlines, l1cfile->nbinx);
+                        lon_gd = allocate2d_float(num_gridlines, l1cfile->nbinx);
+                        alt = allocate2d_float(num_gridlines, l1cfile->nbinx);
+
+                        orb_to_latlon(ix1, ix4, num_gridlines, l1cfile->nbinx, orb_time_tot, posr_tot,
+                                      velr_tot, mgv1, tmgv1, tmgvf, lat_gd, lon_gd, alt, FirsTerrain, swathCrossesUtcDay);
 
                     if (tmgv1 != nullptr)
                         free (tmgv1);
@@ -1868,17 +1933,15 @@ int32_t L1C::open_l1atol1c3(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
                     lon_gd = allocate2d_float(num_gridlines, l1cfile->nbinx);
                     alt = allocate2d_float(num_gridlines, l1cfile->nbinx);
 
-                    if(status1==0){
-                           ix_ini=ix1;
-                           ix_end=ix2;
-                           }
-                    else if(status2==0){
-                           ix_ini=ix3;
-                           ix_end=ix4;
-                           }
-                    orb_to_latlon(ix_ini,ix_end,num_gridlines, l1cfile->nbinx, orb_time_tot, posr_tot,
-                                  velr_tot, mgv1, tmgv1_segment, tmgvf, lat_gd, lon_gd, alt,FirsTerrain);
-                
+                        if (status1 == 0) {
+                            ix_ini = ix1;
+                            ix_end = ix2;
+                        } else if (status2 == 0) {
+                            ix_ini = ix3;
+                            ix_end = ix4;
+                        }
+                        orb_to_latlon(ix_ini, ix_end, num_gridlines, l1cfile->nbinx, orb_time_tot, posr_tot,
+                                      velr_tot, mgv1, tmgv1_segment, tmgvf, lat_gd, lon_gd, alt, FirsTerrain, swathCrossesUtcDay);
 
                     if (tmgv1 != nullptr)
                         free (tmgv1);
@@ -2001,13 +2064,12 @@ int32_t L1C::open_l1atol1c3(L1C_input* l1cinput, l1c_filehandle* l1cfile) {
                 lon_gd = allocate2d_float(num_gridlines, l1cfile->nbinx);
                 alt = allocate2d_float(num_gridlines, l1cfile->nbinx);
 
-                orb_to_latlon(ix5,ix6,num_gridlines, l1cfile->nbinx, orb_time_tot, posr_tot,
-                              velr_tot, mgv2, tmgv2, tmgvf2, lat_gd, lon_gd, alt,FirsTerrain);
-           
-               
-                if (tmgv2 != nullptr)
-                    free (tmgv2);
-                tmgv2 = nullptr;
+                    orb_to_latlon(ix5, ix6, num_gridlines, l1cfile->nbinx, orb_time_tot, posr_tot, velr_tot,
+                                  mgv2, tmgv2, tmgvf2, lat_gd, lon_gd, alt, FirsTerrain, swathCrossesUtcDay);
+
+                    if (tmgv2 != nullptr)
+                        free(tmgv2);
+                    tmgv2 = nullptr;
 
                 l1cfile->num_gridlines = l1cfile->num_gridlines - 1;
 
@@ -2615,9 +2677,9 @@ int L1C::search_l1cgen(L1C_input* l1cinput, l1c_str* l1cstr, l1c_filehandle* l1c
     // big loop
     // dot product
     for (pix = 0; pix < num_pixels; pix++) {
-        bvec[0] = cos(l1cstr->lonpix[pix] * M_PI / 180) * cos(l1cstr->latpix[pix] * M_PI / 180);
-        bvec[1] = sin(l1cstr->lonpix[pix] * M_PI / 180) * cos(l1cstr->latpix[pix] * M_PI / 180);
-        bvec[2] = sin(l1cstr->latpix[pix] * M_PI / 180);
+        bvec[0] = cos(l1cstr->lonpix[pix] * OEL_PI / 180) * cos(l1cstr->latpix[pix] * OEL_PI / 180);
+        bvec[1] = sin(l1cstr->lonpix[pix] * OEL_PI / 180) * cos(l1cstr->latpix[pix] * OEL_PI / 180);
+        bvec[2] = sin(l1cstr->latpix[pix] * OEL_PI / 180);
 
         for (i = 0; i < num_gridlines; i++) {
             if (l1cstr->latpix[pix] > 90 || l1cstr->latpix[pix] < -90 || l1cstr->lonpix[pix] < -180 ||
@@ -2639,22 +2701,22 @@ int L1C::search_l1cgen(L1C_input* l1cinput, l1c_str* l1cstr, l1c_filehandle* l1c
                 exit(1);
             }
 
-            gnvec[0] = sin(l1cfile->lon_gd[i][nbinx - 1] * M_PI / 180) *
-                           cos(l1cfile->lat_gd[i][nbinx - 1] * M_PI / 180) *
-                           sin(l1cfile->lat_gd[i][0] * M_PI / 180) -
-                       sin(l1cfile->lat_gd[i][nbinx - 1] * M_PI / 180) *
-                           sin(l1cfile->lon_gd[i][0] * M_PI / 180) * cos(l1cfile->lat_gd[i][0] * M_PI / 180);
-            gnvec[1] = sin(l1cfile->lat_gd[i][nbinx - 1] * M_PI / 180) *
-                           cos(l1cfile->lon_gd[i][0] * M_PI / 180) * cos(l1cfile->lat_gd[i][0] * M_PI / 180) -
-                       cos(l1cfile->lon_gd[i][nbinx - 1] * M_PI / 180) *
-                           cos(l1cfile->lat_gd[i][nbinx - 1] * M_PI / 180) *
-                           sin(l1cfile->lat_gd[i][0] * M_PI / 180);
-            gnvec[2] = cos(l1cfile->lon_gd[i][nbinx - 1] * M_PI / 180) *
-                           cos(l1cfile->lat_gd[i][nbinx - 1] * M_PI / 180) *
-                           sin(l1cfile->lon_gd[i][0] * M_PI / 180) * cos(l1cfile->lat_gd[i][0] * M_PI / 180) -
-                       sin(l1cfile->lon_gd[i][nbinx - 1] * M_PI / 180) *
-                           cos(l1cfile->lat_gd[i][nbinx - 1] * M_PI / 180) *
-                           cos(l1cfile->lon_gd[i][0] * M_PI / 180) * cos(l1cfile->lat_gd[i][0] * M_PI / 180);
+            gnvec[0] = sin(l1cfile->lon_gd[i][nbinx - 1] * OEL_PI / 180) *
+                           cos(l1cfile->lat_gd[i][nbinx - 1] * OEL_PI / 180) *
+                           sin(l1cfile->lat_gd[i][0] * OEL_PI / 180) -
+                       sin(l1cfile->lat_gd[i][nbinx - 1] * OEL_PI / 180) *
+                           sin(l1cfile->lon_gd[i][0] * OEL_PI / 180) * cos(l1cfile->lat_gd[i][0] * OEL_PI / 180);
+            gnvec[1] = sin(l1cfile->lat_gd[i][nbinx - 1] * OEL_PI / 180) *
+                           cos(l1cfile->lon_gd[i][0] * OEL_PI / 180) * cos(l1cfile->lat_gd[i][0] * OEL_PI / 180) -
+                       cos(l1cfile->lon_gd[i][nbinx - 1] * OEL_PI / 180) *
+                           cos(l1cfile->lat_gd[i][nbinx - 1] * OEL_PI / 180) *
+                           sin(l1cfile->lat_gd[i][0] * OEL_PI / 180);
+            gnvec[2] = cos(l1cfile->lon_gd[i][nbinx - 1] * OEL_PI / 180) *
+                           cos(l1cfile->lat_gd[i][nbinx - 1] * OEL_PI / 180) *
+                           sin(l1cfile->lon_gd[i][0] * OEL_PI / 180) * cos(l1cfile->lat_gd[i][0] * OEL_PI / 180) -
+                       sin(l1cfile->lon_gd[i][nbinx - 1] * OEL_PI / 180) *
+                           cos(l1cfile->lat_gd[i][nbinx - 1] * OEL_PI / 180) *
+                           cos(l1cfile->lon_gd[i][0] * OEL_PI / 180) * cos(l1cfile->lat_gd[i][0] * OEL_PI / 180);
 
             // vector norm
             gnvm = sqrt(gnvec[0] * gnvec[0] + gnvec[1] * gnvec[1] + gnvec[2] * gnvec[2]);
@@ -2700,10 +2762,10 @@ int L1C::search_l1cgen(L1C_input* l1cinput, l1c_str* l1cstr, l1c_filehandle* l1c
 
             for (int j = 0; j < nbinx; j++) {
                 gvec[0] =
-                    cos(l1cfile->lon_gd[irow][j] * M_PI / 180) * cos(l1cfile->lat_gd[irow][j] * M_PI / 180);
+                    cos(l1cfile->lon_gd[irow][j] * OEL_PI / 180) * cos(l1cfile->lat_gd[irow][j] * OEL_PI / 180);
                 gvec[1] =
-                    sin(l1cfile->lon_gd[irow][j] * M_PI / 180) * cos(l1cfile->lat_gd[irow][j] * M_PI / 180);
-                gvec[2] = sin(l1cfile->lat_gd[irow][j] * M_PI / 180);
+                    sin(l1cfile->lon_gd[irow][j] * OEL_PI / 180) * cos(l1cfile->lat_gd[irow][j] * OEL_PI / 180);
+                gvec[2] = sin(l1cfile->lat_gd[irow][j] * OEL_PI / 180);
 
                 c1 = bvec[0] - gvec[0];
                 c2 = bvec[1] - gvec[1];

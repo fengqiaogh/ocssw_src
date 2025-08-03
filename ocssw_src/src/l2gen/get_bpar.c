@@ -120,7 +120,7 @@ int cacl_isleap(int year) {
 double calc_solz_t(l2str *l2rec, int ip, double soltime) {
     
     l1str *l1rec = l2rec->l1rec;
-    float lat_rad = l1rec->lat[ip] * M_PI/180.;  //latitude in radians
+    float lat_rad = l1rec->lat[ip] * OEL_PI/180.;  //latitude in radians
     
     float date_angle;       //date angle
     float year_len;         //number of days in a year
@@ -140,7 +140,7 @@ double calc_solz_t(l2str *l2rec, int ip, double soltime) {
     }
 
     //compute date angle for overpass
-    date_angle = 2.*M_PI * (day-1) / year_len;
+    date_angle = 2.*OEL_PI * (day-1) / year_len;
        
     //Compute solar declination angle
     soldecl =  0.006918 - 0.399912*cos(date_angle) + 0.070257*sin(date_angle)
@@ -159,7 +159,7 @@ double calc_solz_t(l2str *l2rec, int ip, double soltime) {
 void calc_solz_t_array(l2str *l2rec, int ip) {
     
     l1str *l1rec = l2rec->l1rec;
-    float lat_rad = l1rec->lat[ip] * M_PI/180.;  //latitude in radians
+    float lat_rad = l1rec->lat[ip] * OEL_PI/180.;  //latitude in radians
     
     int ix;
     float date_angle;       //date angle
@@ -181,7 +181,7 @@ void calc_solz_t_array(l2str *l2rec, int ip) {
     }
 
     //compute date angle for overpass
-    date_angle = 2.*M_PI * (day-1.) / year_len;
+    date_angle = 2.*OEL_PI * (day-1.) / year_len;
        
     //Compute solar declination angle
     soldecl =  0.006918 - 0.399912*cos(date_angle) + 0.070257*sin(date_angle)
@@ -195,7 +195,7 @@ void calc_solz_t_array(l2str *l2rec, int ip) {
     solTimeAngleStep = (0.0 - sunrise)/(timeStepNum) ;
     
     //What is the solar angle step in seconds, this is needed for daily PAR integration
-    solStepSec = (24.*60.*60.)*solTimeAngleStep/(2.*M_PI);
+    solStepSec = (24.*60.*60.)*solTimeAngleStep/(2.*OEL_PI);
     
     //Create an array of solar time angles from sunrise to midday
     solTimeArr[0] = 0.0;
@@ -281,7 +281,7 @@ double calc_benthic_ipar(l2str *l2rec, int ip, double z, double solza) {
 
         } else {
             //Compute diffuse attenuation coefficient using Lee et al (2005)
-            kdtot[ipb] = (1.0 + 0.005 * (solza*180./M_PI)) 
+            kdtot[ipb] = (1.0 + 0.005 * (solza*180./OEL_PI)) 
                         * l2rec->a[ipb] + 4.18 
                             * (1.0 - 0.52* exp(-10.18* l2rec->a[ipb]))
                                 * l2rec->bb[ipb];
@@ -462,7 +462,7 @@ void run_bpar(l2str *l2rec) {
             }
             
             if (input->bpar_validate_opt==1) {
-                solz_iparb =  l1rec->solz[ip] * M_PI/180;
+                solz_iparb =  l1rec->solz[ip] * OEL_PI/180;
             }
             
             iparb[ip]  = calc_benthic_ipar(l2rec, ip, depth, solz_iparb);

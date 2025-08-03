@@ -6,8 +6,8 @@ static float badval = BAD_FLT;
 
 void cdom_mannino(l2str *l2rec, int prodnum, float prod[]) {
     static int firstCall = 1;
-    static int ib1 = -1;
-    static int ib2 = -1;
+    static int ib443 = -1;
+    static int ibGreen = -1;
 
     static float b_ag412[] = {-2.784, -1.146, 1.008};
     static float b_sg275[] = {-3.325, 0.3, -0.252};
@@ -24,16 +24,15 @@ void cdom_mannino(l2str *l2rec, int prodnum, float prod[]) {
 
     if (firstCall) {
         firstCall = 0;
-        ib1 = bindex_get(443);
-        ib2 = bindex_get(545);
-        if (ib2 < 0) ib2 = bindex_get(550);
-        if (ib2 < 0) ib2 = bindex_get(555);
-        if (ib2 < 0) ib2 = bindex_get(560);
-        if (ib2 < 0) ib2 = bindex_get(565);
-        if (ib1 < 0 || ib2 < 0) {
-            printf("-E- %s line %d: required bands not available for Stramski POC\n",
+        ib443 = bindex_get(443);
+        ibGreen = bindex_get(545); // Green because this might not end up being 545
+        if (ibGreen < 0)
+            ibGreen = bindex_get_555(l1rec->l1file->sensorID);
+
+        if (ib443 < 0 || ibGreen < 0) {
+            printf("-E- %s line %d: required bands not available for CDOM\n",
                     __FILE__, __LINE__);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
     }
 
@@ -49,7 +48,7 @@ void cdom_mannino(l2str *l2rec, int prodnum, float prod[]) {
         break;
     default:
         printf("Error: %s : Unknown product specifier: %d\n", __FILE__, prodnum);
-        exit(1);
+        exit(EXIT_FAILURE);
         break;
     }
 
@@ -58,12 +57,12 @@ void cdom_mannino(l2str *l2rec, int prodnum, float prod[]) {
         prod[ip] = badval;
 
         Rrs = &l2rec->Rrs[ip * nbands];
-        Rrs1 = Rrs[ib1];
-        Rrs2 = Rrs[ib2];
+        Rrs1 = Rrs[ib443];
+        Rrs2 = Rrs[ibGreen];
 
         if (Rrs1 > 0.0 && Rrs2 > 0.0) {
 
-            Rrs2 = conv_rrs_to_555(Rrs2, wave[ib2], -99,NULL);
+            Rrs2 = conv_rrs_to_555(Rrs2, wave[ibGreen], -99,NULL);
 
             x1 = log(Rrs1);
             x2 = log(Rrs2);

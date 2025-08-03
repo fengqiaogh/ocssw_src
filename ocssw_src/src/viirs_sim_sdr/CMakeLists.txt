@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.12)
 
-set(LIBS l2)
+set(LIBS l2 genutils)
 
 add_executable(viirs_sim_sdr
   viirs_sim_sdr.c

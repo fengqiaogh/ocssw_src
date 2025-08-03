@@ -51,6 +51,7 @@ add_definitions(-D__DEC_MACHINE)
 target_link_libraries(l1agen_czcs
   czcs
   seawifs
+  genutils
 )
 
 target_link_libraries(l1amerge_czcs

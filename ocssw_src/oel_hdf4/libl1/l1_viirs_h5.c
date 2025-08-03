@@ -1635,7 +1635,7 @@ int readl1_viirs_h5(filehandle * file, int32_t dline, l1str * l1rec, int lonlat)
                             + ipix) * *(scale + ibnd + MAXBANDS * igran)
                             + *(offset + ibnd + MAXBANDS * igran))
                         * l1rec->Fo[ivswir] * f_corr
-                            * cos(l1rec->solz[ipix] / RADEG) / PI;
+                            * cos(l1rec->solz[ipix] / OEL_RADEG) / OEL_PI;
                     else if (btype[ibnd] == THERM)
                         *(l1rec->Ltir + NBANDSIR * ipix + itherm) = 0.1
                             * (*(scl_rad + ipix)
@@ -1719,7 +1719,7 @@ int readl1_viirs_h5(filehandle * file, int32_t dline, l1str * l1rec, int lonlat)
                 } else if (btype[ibnd] == VSWIR)
                     *(l1rec->Lt + nbands * ipix + ivswir) = rval * f_corr
                         * l1rec->Fo[ivswir]
-                        * cos(l1rec->solz[ipix] / RADEG) / PI;
+                        * cos(l1rec->solz[ipix] / OEL_RADEG) / OEL_PI;
                 else if (btype[ibnd] == THERM)
                     *(l1rec->Ltir + NBANDSIR * ipix + itherm) = 0.1 * rval
                         * f_corr;

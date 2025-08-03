@@ -39,7 +39,6 @@ The list of valid keywords follows:
    ```ofile (ofile) (alias=out) (default=output) = output bin file name```
 
    ```oformat (string) (default=netCDF4) = output file format```
-          hdf4:    output a HDF4 file
           netCDF4: output a netCDF4 file
           hdf5:    output a HDF5 file
    ```merged (ofile) = merged file name```

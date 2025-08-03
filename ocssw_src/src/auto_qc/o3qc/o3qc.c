@@ -206,7 +206,7 @@ int main(int argc, char *argv[]) {
     /*
      * ------- check command line arguments and set args  ------------------
      */
-    pi = acos(-1.);
+    pi = OEL_PI;
 
     strcpy(gridflag, "s");
     if ((check_usage(argc, argv)) != 0) pexit("insufficient args provided");

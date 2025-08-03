@@ -14,7 +14,7 @@ extern "C" {
 
 int closel1_safe(filehandle *file);
 int openl1_safe(filehandle *file);
-int readl1_safe(filehandle *file, int32_t recnum, l1str *l1rec);
+int readl1_safe(filehandle *file, int32_t recnum, l1str *l1rec, int lonlat);
 
 #ifdef __cplusplus
 }

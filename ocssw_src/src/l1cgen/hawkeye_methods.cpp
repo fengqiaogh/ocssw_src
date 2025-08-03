@@ -7,6 +7,7 @@
 #include <string.h>
 #include <string>
 #include "hawkeye_methods.h"
+#include "spline.h"
 #include <netcdf>
 #include "netcdf.h"
 #include <cstdio>
@@ -16,10 +17,86 @@
 #include <timeutils.h>
 #include <allocate2d.h>
 #include "l1c_latlongrid.h"
-#define RADEG 57.29577951
+#include <genutils.h>
+
 using namespace netCDF;
 using namespace netCDF::exceptions;
 using namespace std;
+
+int interp_gap(size_t n_orb_rec, int *geogap, double *torb, double *latorb, double *lonorb) {
+    std::vector<double> tgap, otime, olat, olon;
+    std::vector<double> lati, loni;
+
+    double latemp = 0., lontemp = 0.;
+    int ixgap = geogap[1] - geogap[0] + 1;
+
+    for (int i = 0; i <= geogap[0]; i++) {
+        otime.push_back(torb[i]);
+        latemp = latorb[i] + 90;  // monotonic increasing
+        olat.push_back(latemp);
+
+        if (lonorb[i] < 0.0) {
+            lontemp = lonorb[i] + 360;
+        } else
+            lontemp = lonorb[i];
+        olon.push_back(lontemp);
+    }
+
+    for (int i = geogap[1]; i < int(n_orb_rec); i++) {
+        otime.push_back(torb[i]);
+        latemp = latorb[i] + 90;  // monotonic increasing
+        olat.push_back(latemp);
+
+        if (lonorb[i] < 0.0) {
+            lontemp = lonorb[i] + 360;
+        } else
+            lontemp = lonorb[i];
+        olon.push_back(lontemp);
+    }
+
+    // time gap
+    for (int i = geogap[0]; i <= geogap[1]; i++) {
+        tgap.push_back(torb[i]);
+    }
+
+    // cout<<"tgap size must be equal to "<<tgap.size()<<"gap index length "<<ixgap<<endl;
+    // cout<<"n records "<<n_orb_rec<<"size vect without gap "<<otime.size()<<endl;
+
+    tk::spline s1, s2;
+    s1.set_boundary(tk::spline::second_deriv, 0.0, tk::spline::second_deriv, 0.0);
+    s2.set_boundary(tk::spline::second_deriv, 0.0, tk::spline::second_deriv, 0.0);
+
+    s1.set_points(otime, olat);
+    s2.set_points(otime, olon);
+    // prepare interpolator
+    for (int k = 0; k < ixgap; k++) {
+        latemp = s1(tgap[k]);
+        latemp -= 90;
+        lati.push_back(latemp);
+        lontemp = s2(tgap[k]);
+        if (lontemp > 180.)
+            lontemp -= 360;
+        loni.push_back(lontemp);
+    }
+
+    int s = 0;
+    for (int i = 0; i < (int)n_orb_rec; i++) {
+        if (i >= geogap[0] && i <= geogap[1]) {
+            latorb[i] = lati[s];
+            lonorb[i] = loni[s];
+            s++;
+        }
+    }
+
+    tgap.clear();
+    otime.clear();
+    olat.clear();
+    olon.clear();
+    lati.clear();
+    loni.clear();
+
+    return 0;
+}
 
 // function to calculate cross product of two vectors, 3 components each vector
 void cross_product_double2(double vector_a[], double vector_b[], double temp[]) {
@@ -40,7 +117,7 @@ double cross_product_norm_double2(double vector_a[], double vector_b[]) {
 
 int orb_to_latlon(size_t ix_swt_ini,size_t ix_swt_end,size_t num_gridlines, int nbinx, double *orb_time_tot,
                   orb_array2 *p, orb_array2 *v, double mgv1, double *tmgv1, double *tmgvf, float **lat_gd,
-                  float **lon_gd, float **alt,int FirsTerrain) {
+                  float **lon_gd, float **alt,int FirsTerrain, bool swathCrossesUtcDay) {
     double rl2, pos_norm, clatg2, fe = 1 / 298.257;
     double v1[3], v2[3], vecout[3], orbnorm[3], nvec, vi, toff;
     float Re = 6378.137;  // Re earth radius in km at equator
@@ -60,16 +137,9 @@ int orb_to_latlon(size_t ix_swt_ini,size_t ix_swt_end,size_t num_gridlines, int 
     orb_array2 *vel2 = new orb_array2[number_orecords_corr]();
     double* orb_time_tot2 = (double*)calloc(number_orecords_corr, sizeof(double));
     int cc=0;
-    int flag_twodays=0;
 
     for (size_t k=ix_swt_ini;k<=ix_swt_end;k++)
     {
-        if(orb_time_tot[k+1]<orb_time_tot[k])
-        {
-        flag_twodays=1;
-        }           
-        if(flag_twodays) orb_time_tot[k+1]+=24*3600; 
-           
     pos2[cc][0]=p[k][0];
     pos2[cc][1]=p[k][1];
     pos2[cc][2]=p[k][2];
@@ -131,12 +201,12 @@ int orb_to_latlon(size_t ix_swt_ini,size_t ix_swt_end,size_t num_gridlines, int 
             G[1] = v1[1] * cos(oangle) - orbnorm[1] * pos_norm * sin(oangle);
             G[2] = v1[2] * cos(oangle) - orbnorm[2] * pos_norm * sin(oangle);
 
-            glon = atan2(G[1], G[0]) * 180 / M_PI;
+            glon = atan2(G[1], G[0]) * 180 / OEL_PI;
             gnorm = sqrt(G[0] * G[0] + G[1] * G[1] + G[2] * G[2]);
             omf2p = (omf2 * rem + gnorm - rem) / gnorm;
             pxy = G[0] * G[0] + G[1] * G[1];
             temp = sqrt(G[2] * G[2] + omf2p * omf2p * pxy);
-            glat = asin(G[2] / temp) * 180 / M_PI;
+            glat = asin(G[2] / temp) * 180 / OEL_PI;
      
             lat_gd[i][j] = glat;
             lon_gd[i][j] = glon;    
@@ -147,7 +217,7 @@ int orb_to_latlon(size_t ix_swt_ini,size_t ix_swt_end,size_t num_gridlines, int 
 
     for (size_t i = 0; i < num_gridlines-1; i++)
     {
-    if(flag_twodays)
+    if(swathCrossesUtcDay)
     {
     tmgvf[i]-=24*3600;
     }
@@ -335,11 +405,11 @@ int j2000_to_ecr(int32_t iyr, int32_t idy, double sec, double ecmat[3][3]) {
     double gha, gham[3][3];
     gha2000(iyr, day, gha);
 
-    gham[0][0] = cos(gha / RADEG);
-    gham[1][1] = cos(gha / RADEG);
+    gham[0][0] = cos(gha / OEL_RADEG);
+    gham[1][1] = cos(gha / OEL_RADEG);
     gham[2][2] = 1;
-    gham[0][1] = sin(gha / RADEG);
-    gham[1][0] = -sin(gha / RADEG);
+    gham[0][1] = sin(gha / OEL_RADEG);
+    gham[1][0] = -sin(gha / OEL_RADEG);
 
     gham[0][2] = 0;
     gham[2][0] = 0;
@@ -384,9 +454,9 @@ int j2000_to_mod(int32_t iyr, int32_t idy, double sec, double j2mod[3][3]) {
     double t = jday(iyear, 1, iday) - (double)2451545.5 + sec / 86400;
     t /= 36525;
 
-    double zeta0 = t * (2306.2181 + 0.302 * t + 0.018 * t * t) / RADEG / 3600;
-    double thetap = t * (2004.3109 - 0.4266 * t - 0.04160 * t * t) / RADEG / 3600;
-    double xip = t * (2306.2181 + 1.095 * t + 0.018 * t * t) / RADEG / 3600;
+    double zeta0 = t * (2306.2181 + 0.302 * t + 0.018 * t * t) / OEL_RADEG / 3600;
+    double thetap = t * (2004.3109 - 0.4266 * t - 0.04160 * t * t) / OEL_RADEG / 3600;
+    double xip = t * (2306.2181 + 1.095 * t + 0.018 * t * t) / OEL_RADEG / 3600;
 
     j2mod[0][0] = -sin(zeta0) * sin(xip) + cos(zeta0) * cos(xip) * cos(thetap);
     j2mod[0][1] = -cos(zeta0) * sin(xip) - sin(zeta0) * cos(xip) * cos(thetap);
@@ -412,19 +482,19 @@ int get_nut(int32_t iyr, int32_t idy, double xnut[3][3]) {
     ephparms(t, xls, gs, xlm, omega);
     nutate(t, xls, gs, xlm, omega, dpsi, eps, epsm);
 
-    xnut[0][0] = cos(dpsi / RADEG);
-    xnut[1][0] = -sin(dpsi / RADEG) * cos(epsm / RADEG);
-    xnut[2][0] = -sin(dpsi / RADEG) * sin(epsm / RADEG);
-    xnut[0][1] = sin(dpsi / RADEG) * cos(eps / RADEG);
+    xnut[0][0] = cos(dpsi / OEL_RADEG);
+    xnut[1][0] = -sin(dpsi / OEL_RADEG) * cos(epsm / OEL_RADEG);
+    xnut[2][0] = -sin(dpsi / OEL_RADEG) * sin(epsm / OEL_RADEG);
+    xnut[0][1] = sin(dpsi / OEL_RADEG) * cos(eps / OEL_RADEG);
     xnut[1][1] =
-        cos(dpsi / RADEG) * cos(eps / RADEG) * cos(epsm / RADEG) + sin(eps / RADEG) * sin(epsm / RADEG);
+        cos(dpsi / OEL_RADEG) * cos(eps / OEL_RADEG) * cos(epsm / OEL_RADEG) + sin(eps / OEL_RADEG) * sin(epsm / OEL_RADEG);
     xnut[2][1] =
-        cos(dpsi / RADEG) * cos(eps / RADEG) * sin(epsm / RADEG) - sin(eps / RADEG) * cos(epsm / RADEG);
-    xnut[0][2] = sin(dpsi / RADEG) * sin(eps / RADEG);
+        cos(dpsi / OEL_RADEG) * cos(eps / OEL_RADEG) * sin(epsm / OEL_RADEG) - sin(eps / OEL_RADEG) * cos(epsm / OEL_RADEG);
+    xnut[0][2] = sin(dpsi / OEL_RADEG) * sin(eps / OEL_RADEG);
     xnut[1][2] =
-        cos(dpsi / RADEG) * sin(eps / RADEG) * cos(epsm / RADEG) - cos(eps / RADEG) * sin(epsm / RADEG);
+        cos(dpsi / OEL_RADEG) * sin(eps / OEL_RADEG) * cos(epsm / OEL_RADEG) - cos(eps / OEL_RADEG) * sin(epsm / OEL_RADEG);
     xnut[2][2] =
-        cos(dpsi / RADEG) * sin(eps / RADEG) * sin(epsm / RADEG) + cos(eps / RADEG) * cos(epsm / RADEG);
+        cos(dpsi / OEL_RADEG) * sin(eps / OEL_RADEG) * sin(epsm / OEL_RADEG) + cos(eps / OEL_RADEG) * cos(epsm / OEL_RADEG);
 
     return 0;
 }
@@ -471,14 +541,14 @@ int nutate(double t, double xls, double gs, double xlm, double omega, double &dp
     //  are included to 0.1 arcsecond.
 
     //  Nutation in Longitude
-    dpsi = -17.1996 * sin(omega / RADEG) + 0.2062 * sin(2. * omega / RADEG) - 1.3187 * sin(2. * xls / RADEG) +
-           0.1426 * sin(gs / RADEG) - 0.2274 * sin(2. * xlm / RADEG);
+    dpsi = -17.1996 * sin(omega / OEL_RADEG) + 0.2062 * sin(2. * omega / OEL_RADEG) - 1.3187 * sin(2. * xls / OEL_RADEG) +
+           0.1426 * sin(gs / OEL_RADEG) - 0.2274 * sin(2. * xlm / OEL_RADEG);
 
     //  Mean Obliquity of the Ecliptic
     epsm = (double)23.439291 - ((double)3.560e-7) * t;
 
     //  Nutation in Obliquity
-    double deps = 9.2025 * cos(omega / RADEG) + 0.5736 * cos(2. * xls / RADEG);
+    double deps = 9.2025 * cos(omega / OEL_RADEG) + 0.5736 * cos(2. * xls / OEL_RADEG);
 
     //  True Obliquity of the Ecliptic
     eps = epsm + deps / 3600;
@@ -562,7 +632,7 @@ int gha2000(int32_t iyr, double day, double &gha) {
     nutate(t, xls, gs, xlm, omega, dpsi, eps, epsm);
 
     //  Include apparent time correction and time-of-day
-    gha = gmst + dpsi * cos(eps / RADEG) + fday * 360;
+    gha = gmst + dpsi * cos(eps / OEL_RADEG) + fday * 360;
     gha = fmod(gha, (double)360);
 
     return 0;

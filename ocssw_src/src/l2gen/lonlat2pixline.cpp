@@ -2,7 +2,7 @@
 #include <cstdio>
 #include "lonlat2pixline.h"
 
-#include <readL2scan.h>
+#include <l2_wrapper.h>
 
 #include <string.h>
 #include <math.h>
@@ -160,9 +160,9 @@ int lonlat2pixline(lonlat2pixline_t *params) {
         if (cornerlat[0] < -90) cornerlat[0] = -89.99;
         if (cornerlat[1] > +90) cornerlat[1] = +89.99;
 
-        uvpix[0] = cos(params->SWlat / RADEG) * cos(params->SWlon / RADEG);
-        uvpix[1] = cos(params->SWlat / RADEG) * sin(params->SWlon / RADEG);
-        uvpix[2] = sin(params->SWlat / RADEG);
+        uvpix[0] = cos(params->SWlat / OEL_RADEG) * cos(params->SWlon / OEL_RADEG);
+        uvpix[1] = cos(params->SWlat / OEL_RADEG) * sin(params->SWlon / OEL_RADEG);
+        uvpix[2] = sin(params->SWlat / OEL_RADEG);
     } else {
         cornerlon[0] = params->SWlon;
         cornerlon[1] = params->NElon;
@@ -338,7 +338,6 @@ int lonlat2pixline(lonlat2pixline_t *params) {
             // close resources
             closeL2(&l2_str, 0);
             freeL2(&l2_str);
-            freeL2(NULL);
 
             status = 120;
             goto bail;
@@ -545,8 +544,8 @@ int lonlat2pixline(lonlat2pixline_t *params) {
         if (params->pix_srch && minPix != 2147483647 && maxPix != -1) {
 
             for (ipix = minPix; ipix <= maxPix; ipix++) {
-                lat = latArray[ipix] / RADEG;
-                lon = lonArray[ipix] / RADEG;
+                lat = latArray[ipix] / OEL_RADEG;
+                lon = lonArray[ipix] / OEL_RADEG;
 
                 uv[0] = cos(lat) * cos(lon);
                 uv[1] = cos(lat) * sin(lon);
@@ -557,8 +556,8 @@ int lonlat2pixline(lonlat2pixline_t *params) {
                     maxcos = dot;
                     pixsn = iscan;
                     pixpx = ipix;
-                    pixlon = lon * RADEG;
-                    pixlat = lat * RADEG;
+                    pixlon = lon * OEL_RADEG;
+                    pixlat = lat * OEL_RADEG;
                 }
             }
         } // if pix search
@@ -654,7 +653,6 @@ int lonlat2pixline(lonlat2pixline_t *params) {
     } else if (type == FT_L2HDF || type == FT_L2NCDF || type == FT_L1BNCDF) {
         closeL2(&l2_str, 0);
         freeL2(&l2_str);
-        freeL2(NULL);
     } else {
         free_l1(l1rec);
         free(l1rec);

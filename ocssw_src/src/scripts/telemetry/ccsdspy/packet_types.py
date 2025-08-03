@@ -545,11 +545,14 @@ def _get_fields_csv_file(csv_file):
                         )
                     )
                 else:
+                    if "byte_order" not in row:
+                        row["byte_order"]="big"
                     fields.append(
                         PacketField(
                             name=row["name"],
                             data_type=row["data_type"],
                             bit_length=int(row["bit_length"]),
+                            byte_order=row["byte_order"],
                         )
                     )
             if "bit_offset" in headers:  # 4 col csv file provides bit offsets
@@ -570,12 +573,15 @@ def _get_fields_csv_file(csv_file):
                         )
                     )
                 else:
+                    if "byte_order" not in row:
+                        row["byte_order"]="big"
                     fields.append(
                         PacketField(
                             name=row["name"],
                             data_type=row["data_type"],
                             bit_length=int(row["bit_length"]),
                             bit_offset=int(row["bit_offset"]),
+                            byte_order=row["byte_order"],
                         )
                     )
 
@@ -630,7 +636,8 @@ def _load(file, fields, converters, decoder_name, include_primary_header=False):
         )
 
     field_arrays = _unexpand_field_arrays(field_arrays, expand_history)
-    field_arrays = _apply_converters(field_arrays, converters)
+    if len(converters)>0:
+        field_arrays = _apply_converters(field_arrays, converters)
 
     return field_arrays
 

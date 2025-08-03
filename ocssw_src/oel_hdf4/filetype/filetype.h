@@ -10,7 +10,6 @@ extern "C" {
 /* Use enum to give each input file format a unique number */
 typedef enum {
     FT_INVALID = -1,
-    FT_UNKNOWN,
     FT_AVIRIS,
     FT_CLASSAVHRR,
     FT_CZCSL1A,

@@ -15,7 +15,6 @@
 
 #include <netcdf>
 #include "gains.hpp"
-#include <boost/multi_array.hpp>
 #include "allocate2d.h"
 #include "allocate3d.h"
 #include "allocate4d.h"
@@ -23,40 +22,45 @@
 #include "l1b_file.hpp"
 #include "device.hpp"
 #include "geo_data.hpp"
+#include "types.hpp"
 
-// NOTE: we are comparing to the int val of solz (scale=0.01)
-#define MAX_SOLZ (88 * 100)
+// A solar zenith of 90 degrees indicates that we're on the terminator, 88 is just before
+constexpr float MAX_SOLZ = 88.0;
 
-struct CalibrationData {  // A collection of data specific to on CCD needed for calibration.
-
+/**
+ * @brief A collection of data specific to a CCD needed for calibration
+ */
+struct CalibrationData {
     // Inputs
     Device color;  // Which device (of RED, BLUE, SWIR) owns this data
     size_t numInsBands = 1;
     size_t numBands = 1;
     size_t numBandsL1a;
+    size_t ncpix;
     uint32_t fillValue;
-    // TODO: std container
-    uint16_t **sciData;  // Science data from L1A. Bands by pixels
-    float **insAgg;      // Instrument aggregation matrix. numInsBands by numBands
-    float **gainAgg;     // Gain aggregation matrix
+    bool enableCrosstalk = false;
+    vec2D<uint16_t> sciData;  // Science data from L1A. Bands by pixels
+    float **insAgg;           // Instrument aggregation matrix. numInsBands by numBands
+    float **gainAgg;          // Gain aggregation matrix
+    double ***cmat;           // Crosstalk coefficient matrix
     std::vector<int16_t> *specAgg;
     std::vector<double> *solIrrL1a;  // Aggregated solar irradiances for each L1A band
     Gains *gains;
     DarkData *darkData;
 
     // Outputs
-    float **calibratedData = nullptr;  // Bands by pixels
-    uint8_t *qualityFlags = nullptr;   // Bands by pixels
+    float *calibratedData = nullptr;  // Bands by pixels
+    uint8_t *qualityFlags = nullptr;  // Bands by pixels
 
     ~CalibrationData() {
         if (gainAgg)
             delete[] gainAgg;
         if (insAgg)
             delete[] insAgg;
-        if (sciData)
-            free2d_short((short**) sciData);
         if (calibratedData)
-            free2d_float(calibratedData);
+            delete[] calibratedData;
+        if (cmat)
+            delete[] cmat;
     }
 };
 
@@ -80,10 +84,8 @@ struct CalibrationLut {
         k4Coefs = allocate4d_float(numBands, numHamSides, mceDim, numRvsCoefs);  // An angle
         k5Coefs = allocate2d_double(numBands, numNonlinCoefs);
         saturationThresholds = new uint32_t[numBands];
-        m12Coefs =
-            allocate3d_float(numBands, numHamSides, numPolarizationCoefs);  // Polarization sensitivity
-        m13Coefs =
-            allocate3d_float(numBands, numHamSides, numPolarizationCoefs);  // Polarization sensitivity
+        m12Coefs = allocate3d_float(numBands, numHamSides, numPolarizationCoefs);  // Polarization sensitivity
+        m13Coefs = allocate3d_float(numBands, numHamSides, numPolarizationCoefs);  // Polarization sensitivity
 
         // Assign cal lut dimensions array
         dimensions[0] = numTimes;

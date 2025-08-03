@@ -8,6 +8,9 @@
 
 // circumference of the earth at the equator in meters
 #define EARTH_CIRCUMFERENCE 40075016.6856
+#define OEL_PI 3.14159265358979323846264338327950288 // Copy of the current C++ definition of Pi
+#define OEL_RADEG (180.0 / OEL_PI) // Radians to degrees using C++ definition of Pi
+#define OEL_DEGRAD (OEL_PI / 180.0) // Degrees to radians using C++ definition of Pi
 
 #ifdef __cplusplus
 extern "C" {
@@ -148,6 +151,12 @@ int32_t resolve2binRows(const char *resolve);
  */
 double resolve2resolution(const char *resolve);
 
+/**
+ * @brief chek if the file is url
+ * @param file input file
+ * @return 1, if it's an url. 0 if it's not
+ */
+int check_url(const char *file);
 
 #ifdef __cplusplus
 }

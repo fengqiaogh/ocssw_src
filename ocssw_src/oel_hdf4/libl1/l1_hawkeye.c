@@ -168,8 +168,6 @@ int openl1_hawkeye(filehandle *file) {
     char nc_search_string[10] = ""; // band_X
 
     // Open the netcdf4 input file
-    if(want_verbose)
-        printf("Opening Hawkeye L1A file\n");
     status = nc_open(file->name, NC_NOWRITE, &ncid_L1A);
     if (status != NC_NOERR) {
         fprintf(stderr, "-E- Error opening L1A file \"%s\": %s\n",
@@ -342,8 +340,6 @@ int openl1_hawkeye(filehandle *file) {
 
     // Setup geofile pointers
     if (file->geofile && file->geofile[0]) {
-        if (want_verbose)
-            printf("Opening Hawkeye GEO file\n");
         status = nc_open(file->geofile, NC_NOWRITE, &geoFileId);
         if (status != NC_NOERR) {
             fprintf(stderr, "-E- Error opening GEO file \"%s\": %s\n",
@@ -714,11 +710,9 @@ int readl1_hawkeye(filehandle *file, int32_t oline, l1str *l1rec) {
  */
 int closel1_hawkeye(filehandle *file) {
 
-    printf("Closing hawkeye L1A file\n");
     TRY_NC(__FILE__, __LINE__, nc_close(file->sd_id));
 
     if (file->geofile && file->geofile[0]) {
-        printf("Closing Hawkeye GEO file\n");
         TRY_NC(__FILE__, __LINE__, nc_close(geoFileId));
 
         // Free memory

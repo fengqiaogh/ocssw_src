@@ -1,3 +1,7 @@
+/**
+ * @file l3bin.cpp
+ * @brief Creates a Level 3 bin file from one or more input Level 3 bin files.
+ **/
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
@@ -14,26 +18,38 @@
 
 #include <hdf.h>
 #include <mfhdf.h>
+#include <string>
+#include <fstream>
 
 using namespace std;
 
 #define MAXNFILES 256
 
-#define BYTE    unsigned char
+#define BYTE unsigned char
 
 #define BINCHECK -1
-#define L3BIN_CACHE_SIZE 8 * 1024  // 8 kb of cache memory. 
+#define L3BIN_CACHE_SIZE 8 * 1024  // 8 kb of cache memory.
 #define L3BIN_CACHE_NELEMS 512
 #define L3BIN_CACHE_PREEMPTION .75
 #define VERSION "5.14"
 
 static instr input;
 
-#define EXIT_STATUS(func,status,...) {int status = func; if(status!=NC_NOERR) {printf("--Error--: %s returned non-zero exit code. \n",#func); printf(__VA_ARGS__); exit(EXIT_FAILURE);} }
+#define EXIT_STATUS(func, status, ...)                                      \
+    {                                                                       \
+        int status = func;                                                  \
+        if (status != NC_NOERR) {                                           \
+            printf("--Error--: %s returned non-zero exit code. \n", #func); \
+            printf(__VA_ARGS__);                                            \
+            exit(EXIT_FAILURE);                                             \
+        }                                                                   \
+    }
 
 int main(int argc, char **argv) {
     intn i;
-    EXIT_STATUS(nc_set_chunk_cache(L3BIN_CACHE_SIZE, L3BIN_CACHE_NELEMS, L3BIN_CACHE_PREEMPTION),status,"Setting cache size failed. See %s, line %d\n. The program ran on %s at %s. Exiting.",__FILE__,__LINE__, __DATE__, __TIME__);
+    EXIT_STATUS(nc_set_chunk_cache(L3BIN_CACHE_SIZE, L3BIN_CACHE_NELEMS, L3BIN_CACHE_PREEMPTION), status,
+                "Setting cache size failed. See %s, line %d\n. The program ran on %s at %s. Exiting.",
+                __FILE__, __LINE__, __DATE__, __TIME__);
     int retval = 0;
     int status;
     int32_t irow;
@@ -67,15 +83,28 @@ int main(int argc, char **argv) {
     float wgt;
     float *sort_array[MAXNVDATA];
 
-    char buf[FILENAME_MAX];
+    string buff;
+    char genbuf[FILENAME_MAX];  // for when a string use just won't work
     char filename_L3[FILENAME_MAX];
 
+    /**
+     * @brief input buffer for sum and sum-squared data
+     **/
     float *in_sum_buf[MAXNVDATA - 2];
+    /**
+     * @brief @brief outut buffer for sum and sum-squared data
+     **/
     float *out_sum_buf[MAXNVDATA - 2];
-    uint8 * in_qual_buf[MAXNFILES + 1], *uint8_buf;
+    uint8 *in_qual_buf[MAXNFILES + 1], *uint8_buf;
     char ptime[17];
-    char proc_con[2048];
+    /**
+     * @brief string containing the command and command line options
+     **/
+    string proc_con;
 
+    /**
+     * @brief catch all float-32 variable, temporarily holds the sum data
+     **/
     float f32;
 
     float minlon;
@@ -88,7 +117,8 @@ int main(int argc, char **argv) {
     time_t tnow;
     struct tm *tmnow;
 
-    FILE *fp, *fp_L3;
+    fstream fstr;
+    FILE *fp_L3, *fp;
 
     void insertion_sort(float a[], int length);
 
@@ -102,22 +132,19 @@ int main(int argc, char **argv) {
 
     get_time(ptime);
 
-
-    strcpy(proc_con, argv[0]);
+    proc_con = argv[0];
     for (i = 1; i < argc; i++) {
-        strcat(proc_con, " ");
-        strcat(proc_con, argv[i]);
+        proc_con.append(" ");
+        proc_con.append(argv[i]);
     }
 
     if (input.loneast <= input.lonwest) {
-        printf("loneast: %f must be greater than lonwest: %f.\n",
-                input.loneast, input.lonwest);
+        printf("loneast: %f must be greater than lonwest: %f.\n", input.loneast, input.lonwest);
         exit(-1);
     }
 
     if (input.latnorth <= input.latsouth) {
-        printf("latnorth: %f must be greater than latsouth: %f.\n",
-                input.latnorth, input.latsouth);
+        printf("latnorth: %f must be greater than latsouth: %f.\n", input.latnorth, input.latsouth);
         exit(-1);
     }
 
@@ -127,7 +154,6 @@ int main(int argc, char **argv) {
     minlat = input.latsouth;
     maxlat = input.latnorth;
 
-
     /* Determine number of input files */
     /* ------------------------------- */
     nfiles = 0;
@@ -136,11 +162,11 @@ int main(int argc, char **argv) {
     bool isHDF5 = false;
     bool isCDF4 = false;
 
-    Hdf::hdf_bin * input_binfile[MAXNFILES];
+    Hdf::hdf_bin *input_binfile[MAXNFILES];
 
     /* Single HDF input */
     /* ---------------- */
-    if (Hishdf(input.infile) == TRUE || H5Fis_hdf5(input.infile) == TRUE) {
+    if (check_url(input.infile) || Hishdf(input.infile) == TRUE || H5Fis_hdf5(input.infile) == TRUE) {
         printf("Single input file\n");
         nfiles = 1;
 
@@ -149,7 +175,7 @@ int main(int argc, char **argv) {
             input_binfile[0] = new Hdf::hdf4_bin;
         }
 
-        if (H5Fis_hdf5(input.infile) == TRUE) {
+        if (check_url(input.infile) || H5Fis_hdf5(input.infile) == TRUE) {
             int ncid;
             char nam_buf[256];
             bzero(nam_buf, 256);
@@ -163,18 +189,17 @@ int main(int argc, char **argv) {
                     status = nc_get_att(ncid, NC_GLOBAL, "mission", nam_buf);
 
                 if ((status == NC_NOERR) &&
-                        ((strcmp(nam_buf, "SAC-D Aquarius") == 0) ||
-                        (strcmp(nam_buf, "SMAP") == 0))) {
+                    ((strcmp(nam_buf, "SAC-D Aquarius") == 0) || (strcmp(nam_buf, "SMAP") == 0))) {
                     nc_close(ncid);
                     isHDF5 = true;
                     input_binfile[0] = new Hdf::hdf5_bin;
                 } else {
                     isCDF4 = true;
                     nc_get_att(ncid, NC_GLOBAL, "title", nam_buf);
-                            
+
                     char *output = NULL;
-                    output = strstr(nam_buf,"Level-3 Binned Data");
-                    if(!output) {
+                    output = strstr(nam_buf, "Level-3 Binned Data");
+                    if (!output) {
                         printf("Input file must be a Level-3 file. Please verify and retry\n");
                         exit(EXIT_FAILURE);
                     }
@@ -188,43 +213,49 @@ int main(int argc, char **argv) {
         nprod[0] = input_binfile[0]->nprod();
     } else {
         // Work with a list of files
-        fp = fopen(input.infile, "r");
-        if (fp == NULL) {
+        fstr.open(input.infile, ios::in);
+        if (fstr.fail()) {
             printf("Input listing file: \"%s\" not found.\n", input.infile);
             return -1;
         }
-        while (fgets(buf, 256, fp) != NULL) {
+        while (getline(fstr, buff)) {
             // Verify that the file (in this list of files) does indeed exist
-            parse_file_name(buf, filename_L3);
-            fp_L3 = fopen(filename_L3, "r");
-            if (fp_L3 == NULL) {
-                printf("Input file: \"%s\" not found.\n", filename_L3);
-                return -1;
+            if (!check_url(buff.c_str())) {
+                parse_file_name(buff.c_str(), filename_L3);
+                fp_L3 = fopen(filename_L3, "r");
+                if (fp_L3 == NULL) {
+                    printf("Input file: \"%s\" not found.\n", filename_L3);
+                    return -1;
+                }
+                fclose(fp_L3);
             }
-            fclose(fp_L3);
             // Increment count of files (in this list of files)
             nfiles++;
         }
-        fclose(fp);
+        fstr.close();
         printf("%d input files\n", nfiles);
-
 
         /* Open L3 input files */
         /* ------------------- */
-        fp = fopen(input.infile, "r");
+        fstr.open(input.infile, ios::in);
+        if (fstr.fail()) {
+            printf("E: %s, %d, Input file list: \"%s\" not found.\n", __FILE__, __LINE__, input.infile);
+            return -1;
+        }
+        size_t index;
         for (ifile = 0; ifile < nfiles; ifile++) {
-            fgets(buf, 256, fp);
-            buf[strcspn(buf, "\n")] = 0;
-            buf[strlen(buf)] = 0;
-            // buf[strlen(buf) - 1] = 0;
+            getline(fstr, buff);
 
+            if ((index = buff.find("\n")) != buff.npos) {
+                buff.replace(index, 1, "\0");
+            }
             if (ifile == 0) {
-                if (Hishdf(buf) == TRUE) {
+                if (Hishdf(buff.c_str()) == TRUE) {
                     isHDF4 = true;
-                } else if (H5Fis_hdf5(buf) == TRUE) {
+                } else if (check_url(buff.c_str()) || H5Fis_hdf5(buff.c_str()) == TRUE) {
                     int ncid;
                     char nam_buf[256];
-                    status = nc_open(buf, NC_NOWRITE, &ncid);
+                    status = nc_open(buff.c_str(), NC_NOWRITE, &ncid);
                     if (status != NC_NOERR) {
                         isHDF5 = true;
                     } else {
@@ -232,15 +263,14 @@ int main(int argc, char **argv) {
                         if (status != NC_NOERR)
                             status = nc_get_att(ncid, NC_GLOBAL, "mission", nam_buf);
                         if (status == NC_NOERR) {
-                            if ((strcmp(nam_buf, "SAC-D Aquarius") == 0) ||
-                                    (strcmp(nam_buf, "SMAP") == 0)) {
+                            if ((strcmp(nam_buf, "SAC-D Aquarius") == 0) || (strcmp(nam_buf, "SMAP") == 0)) {
                                 isHDF5 = true;
                             } else {
                                 isCDF4 = true;
                                 nc_get_att(ncid, NC_GLOBAL, "title", nam_buf);
                                 char *output = NULL;
-                                output = strstr(nam_buf,"Level-3 Binned Data");
-                                if(!output) {
+                                output = strstr(nam_buf, "Level-3 Binned Data");
+                                if (!output) {
                                     printf("Input files must be Level-3 files. Please verify and retry\n");
                                     exit(EXIT_FAILURE);
                                 }
@@ -249,39 +279,39 @@ int main(int argc, char **argv) {
                             isCDF4 = true;
                             nc_get_att(ncid, NC_GLOBAL, "title", nam_buf);
                             char *output = NULL;
-                            output = strstr(nam_buf,"Level-3 Binned Data");
-                            if(!output) {
+                            output = strstr(nam_buf, "Level-3 Binned Data");
+                            if (!output) {
                                 printf("Input files must be Level-3 files. Please verify and retry\n");
                                 exit(EXIT_FAILURE);
                             }
                         }
                         nc_close(ncid);
                     }
+                } else {
+                    printf("%s, %d: E- Unable to open file: %s\n", __FILE__, __LINE__, buff.c_str());
+                    exit(EXIT_FAILURE);
                 }
             }
-            if (isHDF4) 
+            if (isHDF4)
                 input_binfile[ifile] = new Hdf::hdf4_bin;
             else if (isHDF5)
                 input_binfile[ifile] = new Hdf::hdf5_bin;
             else if (isCDF4)
                 input_binfile[ifile] = new Hdf::cdf4_bin;
 
-            printf("%d %s\n", ifile, buf);
-            input_binfile[ifile]->open(buf);
+            printf("%d %s\n", ifile, buff.c_str());
+            input_binfile[ifile]->open(buff.c_str());
             nprod[ifile] = input_binfile[ifile]->nprod();
 
-            //printf("open status: %d\n", status);
-
         } /* ifile loop */
-
-        fclose(fp);
+        fstr.close();
     }
 
     nrows = input_binfile[0]->nrows;
 
-    if(input.resolve[0] != '\0') {
+    if (input.resolve[0] != '\0') {
         int32_t out_nrows = resolve2binRows(input.resolve);
-        if(out_nrows <= 0) {
+        if (out_nrows <= 0) {
             printf("-E- unknown resolve param = %s\n", input.resolve);
             exit(EXIT_FAILURE);
         }
@@ -291,11 +321,7 @@ int main(int argc, char **argv) {
         reduce_fac = input.reduce_fac;
     }
 
-    if (reduce_fac != 1 &&
-            reduce_fac != 2 &&
-            reduce_fac != 4 &&
-            reduce_fac != 8 &&
-            reduce_fac != 16) {
+    if (reduce_fac != 1 && reduce_fac != 2 && reduce_fac != 4 && reduce_fac != 8 && reduce_fac != 16) {
         printf("Reduction factor must be power of 2 less than 16\n");
         exit(EXIT_FAILURE);
     }
@@ -303,17 +329,16 @@ int main(int argc, char **argv) {
     /* Generate output product list from 1st input file if DEFAULT */
     /* ----------------------------------------------------------- */
     if (strcmp(input.out_parm, ":DEFAULT:") == 0) {
-
         // Read input file product list
         input_binfile[0]->query(input.out_parm);
 
-        //    printf("out_parm: %s\n", &input.out_parm[1]);
     } else {
-        strcpy(buf, &input.out_parm[1]);
-        buf[strlen(buf) - 1] = 0;
-        for (i = 0; i < (intn) strlen(buf); i++)
-            if (buf[i] == ':') buf[i] = ',';
-        strcpy(input.out_parm, buf);
+        size_t ix;
+        buff = input.out_parm;
+        while ((ix = buff.find(":")) != buff.npos) {
+            buff.replace(ix, 1, ",");
+        }
+        strcpy(input.out_parm, buff.c_str());
     }
 
     /* Determine active products */
@@ -321,8 +346,7 @@ int main(int argc, char **argv) {
     for (ifile = 0; ifile < nfiles; ifile++) {
         int status = input_binfile[ifile]->read(input.out_parm);
         if (status == -1) {
-            printf("Not all output products found in input file %d\n",
-                    ifile);
+            printf("Not all output products found in input file %d\n", ifile);
             exit(-1);
         }
     }
@@ -334,63 +358,42 @@ int main(int argc, char **argv) {
             int tmpNumProducts = input_binfile[ifile]->n_active_prod;
             int i;
             for (i = 0; i < tmpNumProducts; i++)
-                if (strcmp(input.composite_prod,
-                        input_binfile[0]->getActiveProdName(i)) == 0) break;
+                if (strcmp(input.composite_prod, input_binfile[0]->getActiveProdName(i)) == 0)
+                    break;
 
             composite_prod_index[ifile] = i;
 
             if (i == tmpNumProducts) {
-                printf("Composite product: \"%s\" not found in L3 dataset %d\n",
-                        input.composite_prod, ifile);
+                printf("Composite product: \"%s\" not found in L3 dataset %d\n", input.composite_prod, ifile);
                 exit(-1);
             }
         }
     }
-
-#if 0
-    /* Check whether NDVI product exists in L3 inputfiles */
-    /* -------------------------------------------------- */
-    if (input.composite_prod[0] != 0) {
-        for (ifile = 0; ifile < nfiles; ifile++) {
-            int tmpNumProducts = input_binfile[ifile]->n_active_prod;
-            int i;
-            for (i = 0; i < tmpNumProducts; i++)
-                if (strcmp("ndvi",
-                        input_binfile[0]->getActiveProdName(i)) == 0) break;
-
-            if (i == tmpNumProducts) {
-                printf("NDVI product not found in L3 dataset %d\n", ifile);
-                exit(-1);
-            }
-        }
-    }
-#endif
 
     /* Create output file */
     /* ------------------ */
     Hdf::hdf_bin *output_binfile;
 
     if (getFileFormatName(input.oformat) == NULL) {
-        if (isHDF4) strcpy(input.oformat, "HDF4");
-        if (isHDF5) strcpy(input.oformat, "HDF5");
-        if (isCDF4) strcpy(input.oformat, "netCDF4");
+        if (isHDF4)
+            strcpy(input.oformat, "netCDF4");
+        if (isHDF5)
+            strcpy(input.oformat, "HDF5");
+        if (isCDF4)
+            strcpy(input.oformat, "netCDF4");
     } else {
         // normalize the oformat name
         strcpy(input.oformat, getFileFormatName(input.oformat));
     }
 
-    strcpy(buf, input.ofile);
+    buff = input.ofile;
 
-    if (strcmp(input.oformat, "HDF4") == 0) {
-        output_binfile = new Hdf::hdf4_bin;
-        if (input.noext == 0) {
-            output_binfile->hasNoext = false;
-            strcat(buf, ".main");
-        } else {
-            output_binfile->hasNoext = true;
-        }
+    if (buff.empty()) {
+        cout << "no output file specified" << endl;
+        exit(1);
+    }
 
-    } else if (strcmp(input.oformat, "HDF5") == 0) {
+    if (strcmp(input.oformat, "HDF5") == 0) {
         output_binfile = new Hdf::hdf5_bin;
     } else if (strcmp(input.oformat, "netCDF4") == 0) {
         output_binfile = new Hdf::cdf4_bin;
@@ -398,18 +401,16 @@ int main(int argc, char **argv) {
     }
 
     int tmpNumProducts = input_binfile[0]->n_active_prod;
-    char* tmpProductNames[tmpNumProducts];
+    char *tmpProductNames[tmpNumProducts];
     for (int i = 0; i < tmpNumProducts; i++) {
-        tmpProductNames[i] = (char*) input_binfile[0]->getActiveProdName(i);
+        tmpProductNames[i] = (char *)input_binfile[0]->getActiveProdName(i);
     }
-
 
     output_binfile->setProductList(tmpNumProducts, tmpProductNames);
     if (input_binfile[0]->has_qual()) {
         output_binfile->hasQual = true;
     }
-    output_binfile->create(buf, nrows / reduce_fac);
-
+    output_binfile->create(buff.c_str(), nrows / reduce_fac);
 
     /* Allocate I/O buffers */
     /* -------------------- */
@@ -419,34 +420,30 @@ int main(int argc, char **argv) {
     activeProdId = 0;
     for (iprod = 0; iprod < nprod[0]; iprod++) {
         if (input_binfile[0]->active_data_prod[iprod] == true) {
-            in_sum_buf[activeProdId] = (float *) calloc(ncols, 2 * sizeof (float));
-            out_sum_buf[activeProdId] = (float *) calloc(ncols_out, 2 * sizeof (float));
+            in_sum_buf[activeProdId] = (float *)calloc(ncols, 2 * sizeof(float));
+            out_sum_buf[activeProdId] = (float *)calloc(ncols_out, 2 * sizeof(float));
 
             if (input.composite_prod[0] != 0) {
-                if (strcmp(input.composite_prod,
-                        input_binfile[0]->getProdName(iprod)) == 0)
+                if (strcmp(input.composite_prod, input_binfile[0]->getProdName(iprod)) == 0)
                     composite_outprod_index = activeProdId;
             }
             activeProdId++;
         }
     } /* iprod loop */
 
-
     /* Allocate quality buffer */
     /* ----------------------- */
     for (ifile = 0; ifile < nfiles; ifile++) {
-        in_qual_buf[ifile] = (uint8 *) calloc(ncols, sizeof (uint8));
+        in_qual_buf[ifile] = (uint8 *)calloc(ncols, sizeof(uint8));
     }
-    in_qual_buf[nfiles] = (uint8 *) calloc(ncols, sizeof (uint8));
+    in_qual_buf[nfiles] = (uint8 *)calloc(ncols, sizeof(uint8));
 
-    uint8_buf = (uint8 *) calloc(ncols, sizeof (uint8));
-
+    uint8_buf = (uint8 *)calloc(ncols, sizeof(uint8));
 
     /* ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ */
     /* For each scan ... (Main Loop) */
     /* ----------------------------- */
     for (irow = 0; irow < nrows; irow++) {
-
         if ((irow % 500) == 0) {
             time(&tnow);
             tmnow = localtime(&tnow);
@@ -463,21 +460,18 @@ int main(int argc, char **argv) {
 
         double ratio = 1.0;
         if (reduce_fac > 1)
-            ratio = 1.0 * input_binfile[0]->get_numbin(irow) /
-            output_binfile->get_numbin(irow / reduce_fac);
-
+            ratio = 1.0 * input_binfile[0]->get_numbin(irow) / output_binfile->get_numbin(irow / reduce_fac);
 
         // If median allocate and initialize storage
         if (input.median) {
             for (activeProdId = 0; activeProdId < input_binfile[0]->n_active_prod; activeProdId++) {
                 if (input_binfile[0]->active_data_prod[activeProdId] == true) {
-                    sort_array[activeProdId] =
-                            (float *) calloc(nfiles*numbin, sizeof (float));
-                    for (int64_t i = 0; i < nfiles * numbin; i++) sort_array[activeProdId][i] = -999;
+                    sort_array[activeProdId] = (float *)calloc(nfiles * numbin, sizeof(float));
+                    for (int64_t i = 0; i < nfiles * numbin; i++)
+                        sort_array[activeProdId][i] = -999;
                 }
             }
         }
-
 
         /* Clear output binlist, sum and quality buffers */
         /* --------------------------------------------- */
@@ -486,7 +480,7 @@ int main(int argc, char **argv) {
 
             output_binfile->clear_binlist();
             for (activeProdId = 0; activeProdId < input_binfile[0]->n_active_prod; activeProdId++) {
-                memset(&out_sum_buf[activeProdId][0], 0, ncols_out * 2 * sizeof (float));
+                memset(&out_sum_buf[activeProdId][0], 0, ncols_out * 2 * sizeof(float));
             } /* iprod loop */
 
             memset(in_qual_buf[nfiles], 255, ncols);
@@ -522,24 +516,24 @@ int main(int argc, char **argv) {
                     int32_t ext_qual = ext;
                     for (int32_t i = 0; i < reduce_fac; i++) {
                         switch (i) {
-                        case 0:
-                            input_binfile[ifile]->readQual(uint8_buf, ext_qual, list_ptr);
-                            break;
-                        default:
-                            input_binfile[ifile]->readBinIndex(irow + i);
-                            ext_qual = input_binfile[ifile]->get_ext();
-                            if (ext_qual != 0) {
-                                nread = input_binfile[ifile]->readBinList(ext_qual);
-                                input_binfile[ifile]->readQual(uint8_buf, ext_qual);
-                            }
-                        } // switch
+                            case 0:
+                                input_binfile[ifile]->readQual(uint8_buf, ext_qual, list_ptr);
+                                break;
+                            default:
+                                input_binfile[ifile]->readBinIndex(irow + i);
+                                ext_qual = input_binfile[ifile]->get_ext();
+                                if (ext_qual != 0) {
+                                    nread = input_binfile[ifile]->readBinList(ext_qual);
+                                    input_binfile[ifile]->readQual(uint8_buf, ext_qual);
+                                }
+                        }  // switch
 
                         // Update in_qual_buf for (irow+i)
                         if (ext_qual != 0) {
                             int64_t basebin = input_binfile[0]->get_basebin(irow + i);
 
                             double ratio = 1.0 * input_binfile[0]->get_numbin(irow + i) /
-                                    output_binfile->get_numbin(irow / reduce_fac);
+                                           output_binfile->get_numbin(irow / reduce_fac);
 
                             for (kbin = 0; kbin < ext_qual; kbin++) {
                                 bin_num = input_binfile[ifile]->get_bin_num(kbin);
@@ -547,18 +541,17 @@ int main(int argc, char **argv) {
                                 if (offset < 0) {
                                     cout << "bin_num - basebin is negative for ifile: " << ifile;
                                     cout << " irow: " << irow << " kbin: " << kbin << endl;
-                                    cout << "bin_num: " << bin_num << "  basebin: " << basebin
-                                            << endl;
+                                    cout << "bin_num: " << bin_num << "  basebin: " << basebin << endl;
                                     exit(1);
                                 }
 
-                                int32_t j = reduce_fac * (int32_t) ((offset / ratio) + 0.0);
+                                int32_t j = reduce_fac * (int32_t)((offset / ratio) + 0.0);
                                 if ((j < ncols) && (in_qual_buf[ifile][j] > uint8_buf[kbin])) {
                                     in_qual_buf[ifile][j] = uint8_buf[kbin];
                                 }
                             }
-                        } // ext_qual != 0
-                    } // i (reduce_fac) loop
+                        }  // ext_qual != 0
+                    }  // i (reduce_fac) loop
 
                     // Reset to current row if reduce_fac != 1
                     if (reduce_fac != 1) {
@@ -566,16 +559,15 @@ int main(int argc, char **argv) {
                         nread = input_binfile[ifile]->readBinList(ext, list_ptr);
                     }
 
-                } // if ( (irow % reduce_fac) == 0)
-            } // if ( input_binfile[ifile]->has_qual())
+                }  // if ( (irow % reduce_fac) == 0)
+            }  // if ( input_binfile[ifile]->has_qual())
         } /* ifile loop */
-
 
         /* Find best quality */
         /* ----------------- */
         for (kbin = 0; kbin < ncols; kbin++) {
             for (ifile = 0; ifile < nfiles; ifile++) {
-                int32_t j = reduce_fac * (int32_t) ((kbin / ratio) + 0.0);
+                int32_t j = reduce_fac * (int32_t)((kbin / ratio) + 0.0);
                 if (j < ncols) {
                     if (in_qual_buf[ifile][j] < in_qual_buf[nfiles][j])
                         in_qual_buf[nfiles][j] = in_qual_buf[ifile][j];
@@ -586,7 +578,6 @@ int main(int argc, char **argv) {
         /* For each file ... */
         /* ----------------- */
         for (ifile = 0; ifile < nfiles; ifile++) {
-
             int64_t beg = input_binfile[ifile]->get_beg();
             int ext = input_binfile[ifile]->get_ext();
 
@@ -597,11 +588,8 @@ int main(int argc, char **argv) {
 
                 /* Determine lon kbin limits */
                 /* ------------------------- */
-                offmin =
-                        (int32_t) ((minlon + 180) * (numbin / 360.0) + 0.5);
-                offmax =
-                        (int32_t) ((maxlon + 180) * (numbin / 360.0) + 0.5);
-
+                offmin = (int32_t)((minlon + 180) * (numbin / 360.0) + 0.5);
+                offmax = (int32_t)((maxlon + 180) * (numbin / 360.0) + 0.5);
 
                 /* Get data values (sum, sum_sq) for each filled bin in row */
                 /* -------------------------------------------------------- */
@@ -609,28 +597,22 @@ int main(int argc, char **argv) {
                 activeProdId = 0;
                 for (iprod = 0; iprod < nprod[ifile]; iprod++) {
                     if (input_binfile[ifile]->active_data_prod[iprod] == true) {
-
-                        input_binfile[ifile]->readSums(&in_sum_buf[activeProdId][0],
-                                nbins_to_read, iprod);
+                        input_binfile[ifile]->readSums(&in_sum_buf[activeProdId][0], nbins_to_read, iprod);
                         activeProdId++;
                     }
                 } /* iprod loop */
                 if (isHDF5 || isCDF4)
                     input_binfile[ifile]->setDataPtr(nbins_to_read);
-                //	row_write = 1;
-
 
                 /* Skip row if not between minlat & maxlat */
                 lat = ((irow + 0.5) / nrows) * 180.0 - 90.0;
                 if (lat < minlat || lat > maxlat) {
-                    // row_write = 0;
                     continue;
                 }
 
                 /* Fill output buffers with input bin data */
                 /* --------------------------------------- */
                 for (kbin = 0; kbin < ext; kbin++) {
-
                     /* Store bin number */
                     /* ---------------- */
                     bin_num = input_binfile[ifile]->get_bin_num(kbin);
@@ -652,7 +634,7 @@ int main(int argc, char **argv) {
 
                     /* Skip if not good enough */
                     /* ----------------------- */
-                    int32_t j = reduce_fac * (int32_t) ((offset / ratio) + 0.0);
+                    int32_t j = reduce_fac * (int32_t)((offset / ratio) + 0.0);
                     if (j < ncols) {
                         if (in_qual_buf[ifile][j] > in_qual_buf[nfiles][j])
                             continue;
@@ -660,19 +642,16 @@ int main(int argc, char **argv) {
 
                     // Assign output offset & bin number
                     if (reduce_fac > 1) {
-                        offset_out = (int64_t) ((offset / ratio) + 0.0);
-                        //	    if ( offset_out == ncols_out)
-                        // offset_out = ncols_out - 1;
-                        bin_num_out =
-                                offset_out + output_binfile->get_basebin(irow / reduce_fac);
+                        offset_out = (int64_t)((offset / ratio) + 0.0);
+                        bin_num_out = offset_out + output_binfile->get_basebin(irow / reduce_fac);
                     } else {
                         offset_out = offset;
                         bin_num_out = bin_num;
                     }
 
                     if (offset_out >= ncols_out) {
-                        printf("Bad write to BINLIST: %d %d %d %ld\n",
-                                ifile, irow, ncols_out, (long int) offset_out);
+                        printf("Bad write to BINLIST: %d %d %d %ld\n", ifile, irow, ncols_out,
+                               (long int)offset_out);
                         exit(1);
                     }
 
@@ -704,9 +683,13 @@ int main(int argc, char **argv) {
                         if (output_binfile->get_nobs(offset_out) != 0) {
                             f32 = in_sum_buf[composite_prod_index[ifile]][2 * kbin] / weights;
                             if (strcmp(input.composite_scheme, "max") == 0) {
-                                if (f32 < (out_sum_buf[composite_outprod_index][2 * offset_out] / output_binfile->get_weights(offset_out))) continue;
+                                if (f32 < (out_sum_buf[composite_outprod_index][2 * offset_out] /
+                                           output_binfile->get_weights(offset_out)))
+                                    continue;
                             } else {
-                                if (f32 > (out_sum_buf[composite_outprod_index][2 * offset_out] / output_binfile->get_weights(offset_out))) continue;
+                                if (f32 > (out_sum_buf[composite_outprod_index][2 * offset_out] /
+                                           output_binfile->get_weights(offset_out)))
+                                    continue;
                             }
                         }
                         nobs = input_binfile[ifile]->get_nobs(kbin);
@@ -723,7 +706,7 @@ int main(int argc, char **argv) {
                             wgt = weights;
                             f32 = in_sum_buf[activeProdId][2 * kbin];
                             out_sum_buf[activeProdId][2 * offset_out] += f32 / wgt;
-                            out_sum_buf[activeProdId][2 * offset_out + 1] += (f32 / wgt)*(f32 / wgt);
+                            out_sum_buf[activeProdId][2 * offset_out + 1] += (f32 / wgt) * (f32 / wgt);
                         } else if (input.median) {
                             wgt = weights;
                             f32 = in_sum_buf[activeProdId][2 * kbin];
@@ -750,12 +733,11 @@ int main(int argc, char **argv) {
 
         } /* ifile loop */
 
-
         // Compute median
         if (row_write && input.median) {
             for (kbin = 0; kbin < numbin; kbin++) {
                 for (activeProdId = 0; activeProdId < input_binfile[0]->n_active_prod; activeProdId++) {
-                    float *sort_buf = (float *) calloc(nfiles, sizeof (float));
+                    float *sort_buf = (float *)calloc(nfiles, sizeof(float));
                     int nsort = 0;
                     for (ifile = 0; ifile < nfiles; ifile++) {
                         f32 = sort_array[activeProdId][nfiles * kbin + ifile];
@@ -776,22 +758,18 @@ int main(int argc, char **argv) {
         /* Write output vdatas */
         /* ------------------- */
         if (row_write && (irow % reduce_fac) == reduce_fac - 1) {
-
             n_write = 0;
             for (kbin = 0; kbin <= max_out_kbin; kbin++) {
-
                 int64_t bin_num = output_binfile->get_bin_num(kbin);
                 if (bin_num != 0) {
-
                     /* Loop over data products */
                     /* ----------------------- */
                     for (activeProdId = 0; activeProdId < input_binfile[0]->n_active_prod; activeProdId++) {
-
                         /* Remove "blank" bin records */
                         /* -------------------------- */
                         if (n_write != kbin)
                             memcpy(&out_sum_buf[activeProdId][2 * n_write],
-                                &out_sum_buf[activeProdId][2 * kbin], 8);
+                                   &out_sum_buf[activeProdId][2 * kbin], 8);
                     } /* iprod loop */
 
                     /* Remove "blank" bin records */
@@ -813,16 +791,13 @@ int main(int argc, char **argv) {
                 activeProdId = 0;
                 for (iprod = 0; iprod < nprod[0]; iprod++) {
                     if (input_binfile[0]->active_data_prod[iprod] == true) {
-
-                        input_binfile[0]->get_prodname(iprod, buf);
-                        output_binfile->writeSums(&out_sum_buf[activeProdId][0], n_write, buf);
+                        input_binfile[0]->get_prodname(iprod, genbuf);
+                        output_binfile->writeSums(&out_sum_buf[activeProdId][0], n_write, genbuf);
                         activeProdId++;
                     }
                 }
-                if (strcmp(input.oformat, "HDF5") == 0 ||
-                        strcmp(input.oformat, "netCDF4") == 0)
+                if (strcmp(input.oformat, "HDF5") == 0 || strcmp(input.oformat, "netCDF4") == 0)
                     output_binfile->incNumRec(n_write);
-                //	if ( isHDF5 || isCDF4) output_binfile->incNumRec( n_write);
             }
 
             /* Write to Quality Vdata */
@@ -834,13 +809,12 @@ int main(int argc, char **argv) {
             else
                 nbin = input_binfile[0]->get_numbin(irow - (reduce_fac / 2));
 
-            offmin =
-                    (int32_t) ((minlon + 180) * (nbin / 360.0) + 0.5);
-            offmax =
-                    (int32_t) ((maxlon + 180) * (nbin / 360.0) + 0.5);
+            offmin = (int32_t)((minlon + 180) * (nbin / 360.0) + 0.5);
+            offmax = (int32_t)((maxlon + 180) * (nbin / 360.0) + 0.5);
 
             for (kbin = 0; kbin < ncols; kbin++) {
-                if (kbin < offmin || kbin > offmax) continue;
+                if (kbin < offmin || kbin > offmax)
+                    continue;
                 if (in_qual_buf[nfiles][kbin] != 255) {
                     in_qual_buf[nfiles][i++] = in_qual_buf[nfiles][kbin];
                 }
@@ -848,15 +822,14 @@ int main(int argc, char **argv) {
 
             if (input_binfile[0]->has_qual()) {
                 if ((i - n_write) > 2) {
-                    cout << "Problem with Quality write: irow: " << irow << " i: " <<
-                            i << " n_write: " << n_write << " " << max_out_kbin << endl;
+                    cout << "Problem with Quality write: irow: " << irow << " i: " << i
+                         << " n_write: " << n_write << " " << max_out_kbin << endl;
                     exit(1);
                 }
 
                 output_binfile->writeQual(in_qual_buf[nfiles], n_write);
-            } // has_qual() == true
+            }  // has_qual() == true
         } /* row_write = 1 */
-
 
         // if median free storage arrays
         if (input.median) {
@@ -879,9 +852,7 @@ int main(int argc, char **argv) {
         free(out_sum_buf[activeProdId]);
     } /* iprod loop */
 
-
-    if(output_binfile->n_data_records > 0) {
-    
+    if (output_binfile->n_data_records > 0) {
         // Copy metadata from input to output binfile
         output_binfile->copymeta(nfiles, &input_binfile[0]);
         int sensorID = sensorName2SensorId(output_binfile->meta_l3b.sensor_name);
@@ -894,8 +865,7 @@ int main(int argc, char **argv) {
             }
         }
 
-        strcpy(buf, input.ofile);
-        strcpy(output_binfile->meta_l3b.product_name, buf);
+        strcpy(output_binfile->meta_l3b.product_name, input.ofile);
         strcpy(output_binfile->meta_l3b.pversion, input.pversion);
         strcpy(output_binfile->meta_l3b.soft_name, "L3BIN");
         strcpy(output_binfile->meta_l3b.soft_ver, VERSION);
@@ -907,10 +877,10 @@ int main(int argc, char **argv) {
             strcpy(output_binfile->meta_l3b.ptime, ydhmsf(tnow, 'L'));
         }
         strcpy(output_binfile->meta_l3b.ptime, ptime);
-        strcpy(output_binfile->meta_l3b.proc_con, proc_con);
+        strcpy(output_binfile->meta_l3b.proc_con, proc_con.c_str());
         strcpy(output_binfile->meta_l3b.input_parms, input.parms);
 
-        if(strlen(input.doi)) {
+        if (strlen(input.doi)) {
             strcpy(output_binfile->meta_l3b.doi, input.doi);
         } else {
             strcpy(output_binfile->meta_l3b.doi, "");
@@ -921,14 +891,18 @@ int main(int argc, char **argv) {
             strcpy(output_binfile->meta_l3b.infiles, basename(input.infile));
 
         } else {
-
             fp = fopen(input.infile, "r");
+            fstr.open(input.infile, ios::in);
+            if (fstr.fail()) {
+                printf("E: %s, %d, Input list file: \"%s\" not found.\n", __FILE__, __LINE__, input.infile);
+                return -1;
+            }
             buf2[0] = 0;
             for (ifile = 0; ifile < nfiles; ifile++) {
-                fgets(buf, 256, fp);
-                buf[strlen(buf) - 1] = 0;
+                getline(fstr, buff);
 
-                strcat(buf2, basename(buf));
+                // strcat(buf2, basename(buff.c_str()));
+                strcat(buf2, basename(const_cast<char *>(buff.c_str())));
                 strcat(buf2, ",");
             } /* ifile loop */
             fclose(fp);
@@ -939,26 +913,24 @@ int main(int argc, char **argv) {
         retval = 110;
         printf("No valid data was binned\n");
     }
-    
-    
+
     for (ifile = 0; ifile < nfiles; ifile++) {
         input_binfile[ifile]->close();
         delete input_binfile[ifile];
     }
-    
+
     output_binfile->close();
     delete output_binfile;
 
-    if(retval == 110) {
+    if (retval == 110) {
         string cmd = "rm -f ";
         cmd += input.ofile;
         system(cmd.c_str());
     }
-    
+
     printf("Done\n");
     return retval;
 }
-
 
 /* Copyright (c) 2009 the authors listed at the following URL, and/or
 the authors of referenced articles or incorporated external code:
@@ -986,7 +958,13 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 Retrieved from: http://en.literateprograms.org/Insertion_sort_(C)?oldid=15530
  */
 
-/* Sort an array of integers */
+/**
+ * @brief sort an array of floats
+ * @param[in,out] a array to be sorted
+ * @param[in] length length of array
+ *
+ * @ref https://literateprograms.org/insertion_sort__c_.html
+ */
 void insertion_sort(float a[], int length) {
     int i;
     for (i = 0; i < length; i++) {
@@ -995,11 +973,10 @@ void insertion_sort(float a[], int length) {
         float v = a[i];
 
         for (j = i - 1; j >= 0; j--) {
-            if (a[j] <= v) break;
+            if (a[j] <= v)
+                break;
             a[j + 1] = a[j];
         }
         a[j + 1] = v;
-
     }
 }
-

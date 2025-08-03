@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python3.8
 
 # l1info for SpexOne L1B. Returns the following information:
 #   1. Start Date and Time

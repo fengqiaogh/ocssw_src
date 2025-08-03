@@ -20,7 +20,6 @@ extern "C" {
     int openl1_msi(filehandle *file);
     int readl1_msi(filehandle *file, int recnum, l1str *l1rec, int lonlat);
     int closel1_msi(filehandle *file);
-    int readl1_msi_lonlat(filehandle *file, int recnum, l1str *l1rec);
 
 #ifdef __cplusplus
 }

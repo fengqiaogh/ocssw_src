@@ -18,7 +18,7 @@ if (PYTHON)
     set(HAWKNAV     "${CMAKE_CURRENT_BINARY_DIR}/hawknav")
     set(IGRF        "${CMAKE_CURRENT_BINARY_DIR}/pyIGRF")
     set(PYVER       "--python $ENV{VIRTUAL_ENV}/bin/python")
-    set(SHEBANG     "--python-shebang=/usr/bin/env\\ python3")
+    set(SHEBANG     "--python-shebang=/usr/bin/env\\ python3.8")
 
     configure_file(${SETUP_PY_IN} ${SETUP_PY})
     file(MAKE_DIRECTORY ${HAWKNAV})

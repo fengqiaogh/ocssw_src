@@ -11,7 +11,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include "l2binmatch_input.h"
-#include <readL2scan.h>
+#include <l2_wrapper.h>
 #include <L3File.h>
 #include "calfile_utils.h"
 #include <setupflags.h>
@@ -164,7 +164,7 @@ int main(int argc, char* argv[]) {
 
     //Setup flag mask
     strcpy(buf, l2_str.flagnames);
-    setupflags(buf, input->flaguse, &flagusemask, &required_mask, &status,l2_str.l2_bits);
+    setupflags(buf, input->flaguse, &flagusemask, &required_mask, &status);
     if (status < 0) {
         printf("-E- %s: Error reading L2 flags %s.\n", argv[0], input->ifile[0]);
         exit(EXIT_FAILURE);

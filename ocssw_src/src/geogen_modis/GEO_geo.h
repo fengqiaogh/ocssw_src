@@ -69,6 +69,9 @@
     #define H_PGS_DEM
     #include "PGS_DEM.h"
 #endif
+#define splint genutils_splint // There's already a splint used in this code
+#include <genutils.h> // For pi definitions
+#undef splint // Removes a conflict with the similarly-named function in genutils
 
 /*********************************************************
 #defines
@@ -169,9 +172,9 @@ enum { SHALLOW_OCEAN, DRYLAND, COAST, SHALLOW_INLAND, EPHEMERAL, DEEP_INLAND,
 #define MAX_TERRAIN_HEIGHT 9600.0
 
 /*	Mathematical constants (that should have been in ANSI math.h)	*/
-#define PGS_PI 3.14159265358979323846
-#define RAD2DEG (180.0/PGS_PI)
-#define DEG2RAD (PGS_PI/180.0)
+#define PGS_PI OEL_PI
+#define RAD2DEG OEL_RADEG
+#define DEG2RAD OEL_DEGRAD
 #define MAX_UINT16_VAL (0xFFFF)
 
 /*  End of definitions */

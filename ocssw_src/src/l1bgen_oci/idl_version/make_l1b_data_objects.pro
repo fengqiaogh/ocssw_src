@@ -29,7 +29,7 @@
     lparm = "Reflectance"
     vmax = [1.3, 1.3, 1.3]
   endelse
-  dimnames = ['number_of_scans','pixels','SWIR_pixels','blue_bands','red_bands','SWIR_bands']
+  dimnames = ['number_of_scans','ccd_pixels','SWIR_pixels','blue_bands','red_bands','SWIR_bands']
   dimsizes = [nscn, ncps, nsps, nbbs, nrbs, nswb]
 
   dimids = intarr(6)

@@ -16,11 +16,14 @@ add_library (netcdfutils
   cdl_utils.cpp
   createNCDF.c
   global_attrs.cpp
-  scaledNcVar.cpp
+  scaled_nc_var.cpp
+  scaled_nc_group.cpp
+  scaled_nc_file.cpp
+  geo_region.cpp
 )
 
 add_executable(scaledNcVarTest
-  scaledNcVarTest.cpp
+  scaled_nc_test.cpp
 )
 
 target_link_libraries(scaledNcVarTest netcdfutils ${LIBS})

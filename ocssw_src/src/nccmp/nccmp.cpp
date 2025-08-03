@@ -3269,6 +3269,9 @@ int compareGroup(nccmpopts* opts, int ncid1, int ncid2) {
 
 int
 main(int argc, char** argv) {
+    /* Change chunk cache. */
+    nc_set_chunk_cache(1024 * 1024 * 128, 2003, 0.75f); // 128MB
+    
     int status;
     nccmpopts opts;
 

@@ -12,11 +12,11 @@ import subprocess
 import multiprocessing as mp
 
 machineInfo = [
-        # RHEL 8
+        # RHEL 8, use poseidon
         {
-           "name" : "linux_64", 
-           "login" : "-p 10022 gs616-container103",
-           "initStr" : "source .bash_profile",
+           "name" : "linux_64",
+           "login" : "poseidon",
+           "initStr" : "source .bash_profile; source setup-linux_64.sh",
            "exitStr" : ""
         },
         # Ubuntu 20.04
@@ -25,13 +25,6 @@ machineInfo = [
             "login" : "analysis701",
             "initStr" : "source .profile",
             "exitStr" : ""
-        },
-        # macOS intel
-        {
-            "name" : "macosx_intel", 
-            "login" : "seadas4",
-            "initStr" : "source .bash_profile",
-            "exitStr" : " && fix_mac_rpath.py"
         },
         # macOS arm64
         {
@@ -49,34 +42,37 @@ machineInfo = [
         },
 ]
 
-firstRunStr = " && cd \$OCSSWROOT/.. && if [ ! -d ocssw ]; then mkdir ocssw; fi && if [ ! -d ocssw/share ]; then mkdir ocssw/share; fi && if [ ! -d ocssw/testdata ]; then mkdir ocssw/testdata; fi && if [ ! -d ocssw/var ]; then mkdir ocssw/var; fi && if [ ! -d ocssw/opt ]; then mkdir ocssw/opt; fi   && if [ ! -d polarimetry ]; then mkdir polarimetry; fi"
+firstRunStr = " && cd \$OCSSWROOT/.. && mkdir -p ocssw polarimetry && mkdir -p ocssw/share ocssw/testdata ocssw/var ocssw/opt"
 saveOcsswStr = " && rm -rf saveOcssw && mkdir saveOcssw && cd ocssw && mv share testdata var ../saveOcssw"
 restoreOcsswStr = " && rm -rf share/modis && mv ../saveOcssw/share ../saveOcssw/testdata ../saveOcssw/var ."
 saveOptStr = " && mv opt ../saveOcssw"
 restoreOptStr = " && mv ../saveOcssw/opt ."
-getOcsswStr = " && cd \$OCSSWROOT/.. && rm -rf ocssw && git clone https://oceandata.sci.gsfc.nasa.gov/rcs/obpg/ocssw.git && cd ocssw && source OCSSW_bash.env"
+getOcsswStr = " && cd \$OCSSWROOT/.. && rm -rf ocssw && git clone git@git.smce.nasa.gov:oel/ocssw.git && cd ocssw && source OCSSW_bash.env"
 getSubmodulesStr = " && git submodule init && git submodule update"
 buildOptStr = " && ./get_lib3_src.sh && cd opt/src && ./BuildIt.py && cd ../.."
 buildOcsswStr = " && mkdir build && cd build && cmake .. -DBUILD_ALL=1 && make -j 20 install"
-getViirsStr = " && cd \$OCSSWROOT/.. && rm -rf viirs_l1 && git clone https://oceandata.sci.gsfc.nasa.gov/rcs/viirs/viirs_l1.git && cd viirs_l1"
+getViirsStr = " && cd \$OCSSWROOT/.. && rm -rf viirs_l1 && git clone git@git.smce.nasa.gov:oel/viirs_l1.git && cd viirs_l1"
 buildViirsStr = " && mkdir build && cd build && cmake .. && make -j 20 install"
-getFocsStr = " && cd \$OCSSWROOT/.. && rm -rf focs && git clone https://oceandata.sci.gsfc.nasa.gov/rcs/obpg/focs.git && cd focs"
+getFocsStr = " && cd \$OCSSWROOT/.. && rm -rf focs && git clone git@git.smce.nasa.gov:oel/focs.git && cd focs"
 buildFocsStr = " && mkdir build && cd build && cmake .. && make -j 20 install"
-getDtdbStr = " && cd \$OCSSWROOT/.. && rm -rf dtdb && git clone https://oceandata.sci.gsfc.nasa.gov/rcs/aerosol/dtdb.git && cd dtdb"
-buildDtdbStr = " && mkdir build && cd build && cmake .. && make -j 20 install"
 
-getHarp2Str = " && cd \$OCSSWROOT/../polarimetry && rm -rf harp && git clone https://oceandata.sci.gsfc.nasa.gov/rcs/polarimetry/harp.git && cd harp"
+getHarp2Str = " && cd \$OCSSWROOT/../polarimetry && rm -rf harp && git clone git@git.smce.nasa.gov:oel/polarimetry/harp.git && cd harp"
 buildHarp2HippStr = " && cd hipp && mkdir build && cd build && cmake .. && make install && cd .."
 
-getL1bcgen_spexoneStr = " && cd \$OCSSWROOT/../polarimetry && rm -rf spex && git clone https://oceandata.sci.gsfc.nasa.gov/rcs/polarimetry/spex.git && cd spex"
-buildL1bcgen_spexoneStr = " && mkdir build && cd build && cmake .. -DCMAKE_EXE_LINKER_FLAGS=\\\"-Wl,-rpath,\\\\\$ORIGIN/../opt/lib -L\$LIB3_DIR/lib -lnetcdf_c++4 -lnetcdf -lhdf5 -llapack -lblas\\\" -DCMAKE_PREFIX_PATH=\$LIB3_DIR -DL1BC_ONLY=1 -DCMAKE_BUILD_TYPE=Release && make -j 20 && cp spexone \$OCSSWROOT/bin/l1bcgen_spexone"
+getL1bcgen_spexoneStr = " && cd \$OCSSWROOT/../polarimetry && rm -rf spex && git clone git@git.smce.nasa.gov:oel/polarimetry/spex.git && cd spex"
+buildL1bcgen_spexoneStr = " && mkdir build && cd build && cmake .. -DCMAKE_EXE_LINKER_FLAGS=\\\"-Wl,-rpath,\\\\\$ORIGIN/../opt/lib -L\$LIB3_DIR/lib -lnetcdf-cxx4 -lnetcdf -lhdf5 -llapack -lblas\\\" -DCMAKE_PREFIX_PATH=\$LIB3_DIR -DL1BC_ONLY=1 -DCMAKE_BUILD_TYPE=Release && make -j 20 && cp spexone \$OCSSWROOT/bin/l1bcgen_spexone"
 
-getFastmapolStr = " && cd \$OCSSWROOT/../polarimetry && rm -rf fastmapol && git clone https://oceandata.sci.gsfc.nasa.gov/rcs/polarimetry/fastmapol.git && cd fastmapol"
+getFastmapolStr = " && cd \$OCSSWROOT/../polarimetry && rm -rf fastmapol && git clone git@git.smce.nasa.gov:oel/polarimetry/fastmapol.git && cd fastmapol"
 buildFastmapolStr = " && mkdir build && cd build && cmake .. && make install"
 
-getUaaStr = " && cd \$OCSSWROOT/../sat && rm -rf unified_dtdb_aerosol && git clone https://oceandata.sci.gsfc.nasa.gov/rcs/sat/unified_dtdb_aerosol.git && cd unified_dtdb_aerosol"
+getUaaStr = " && cd \$OCSSWROOT/../sat && rm -rf unified_dtdb_aerosol && git clone git@git.smce.nasa.gov:oel/sat/unified_dtdb_aerosol.git && cd unified_dtdb_aerosol"
 buildUaaStr = " && mkdir build && cd build && cmake .. && make install"
 
+getRemotapStr = " && cd \$OCSSWROOT/../polarimetry && rm -rf remotap && git clone git@git.smce.nasa.gov:oel/polarimetry/remotap.git && cd remotap"
+buildRemotapStr = " && mkdir build && cd build && cmake .. && make install"
+
+getGpcStr = " && cd \$OCSSWROOT/../polarimetry && rm -rf gpc && git clone git@git.smce.nasa.gov:oel/polarimetry/gpc.git && cd gpc"
+buildGpcStr = " && mkdir build && cd build && cmake .. && make -j 20 install"
 
 def doIt(cmd, logFilename):
     logFile = open(logFilename, "w")
@@ -92,7 +88,7 @@ def run():
     parser.add_argument("-t", "--tag", default=None,
                         help="git tag or branch that you want to build")
     parser.add_argument("-a", "--arch", default=None,
-                        help="comma separated list of architectures that you want to build (linux_64,linux_hpc,odps,macosx_intel,macosx_arm64)")
+                        help="comma separated list of architectures that you want to build (linux_64,linux_hpc,odps,macosx_arm64)")
     parser.add_argument("--build_opt", default=False, action="store_true", 
                         help="build opt (lib3) first")
 
@@ -145,25 +141,26 @@ def run():
 
         # build FOCS
         # temporary exclusion for the tensor flow on macs
-        if (info["name"] != "macosx_intel") and (info["name"] != "macosx_arm64"):
+        if info["name"] != "macosx_arm64":
             commandLine += getFocsStr
             if args.tag:
                 commandLine += " && git checkout " + args.tag
             commandLine += getSubmodulesStr
             commandLine += buildFocsStr
 
-        # build dtdb
-        commandLine += getDtdbStr
-        if args.tag:
-            commandLine += " && git checkout " + args.tag
-        commandLine += getSubmodulesStr
-        commandLine += buildDtdbStr
-
         # build OCSSW
         commandLine += " && cd \$OCSSWROOT"
         commandLine += buildOcsswStr
 
+        # get fasstmapol and build
+        commandLine += getFastmapolStr
+        if args.tag:
+            commandLine += " && git checkout " + args.tag
+        commandLine += buildFastmapolStr
+
+        #
         # for now only build for ODPS
+        #
         if info["name"] == "odps":
             # get harp2 and build hipp
             commandLine += getHarp2Str
@@ -171,17 +168,17 @@ def run():
                 commandLine += " && git checkout " + args.tag
             commandLine += buildHarp2HippStr
 
-            # get fasstmapol and build
-            commandLine += getFastmapolStr
-            if args.tag:
-                commandLine += " && git checkout " + args.tag
-            commandLine += buildFastmapolStr
-
             # get UAA and build
             commandLine += getUaaStr
             if args.tag:
                 commandLine += " && git checkout " + args.tag
             commandLine += buildUaaStr
+
+            # build GPC
+            commandLine += getGpcStr
+            if args.tag:
+                commandLine += " && git checkout " + args.tag
+            commandLine += buildGpcStr
 
         #
         # for now only build on poseidon 
@@ -193,6 +190,11 @@ def run():
                 commandLine += " && git checkout " + args.tag
             commandLine += buildL1bcgen_spexoneStr
 
+            # build remotap
+            commandLine += getRemotapStr
+            if args.tag:
+                commandLine += " && git checkout " + args.tag
+            commandLine += buildRemotapStr
 
         commandLine += info["exitStr"]
         commandLine += '"'

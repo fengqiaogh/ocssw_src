@@ -56,7 +56,7 @@ void polcor(l1str *l1rec, int32_t ip) {
     int iseq, ix1, ix2, ipx, irng, step[] = {1, 2, 3, 3, 2, 1};
     char ix, attrname[50];
     double sind = 0.0003104;
-    float rad_2_deg = 180. / acos(-1);
+    float rad_2_deg = OEL_RADEG;
     int get_wt(float, float *, int, float *, char *);
 
     if(l1rec->uncertainty) {
@@ -335,7 +335,7 @@ void polcor(l1str *l1rec, int32_t ip) {
 
         ipb = ip * nbands + ib;
         idet = (int32_t) rint(detnum / detfac[ib]);
-        alpha = l1rec->alpha[ip] / RADEG;
+        alpha = l1rec->alpha[ip] / OEL_RADEG;
         L_x = l1rec->Lt[ipb] / l1rec->tg_sol[ipb] / l1rec->tg_sen[ipb];
         if(l1rec->uncertainty) {
             delta_polcor[ipb]= 1/ l1rec->tg_sol[ipb] / l1rec->tg_sen[ipb];

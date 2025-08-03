@@ -44,7 +44,7 @@
 #define ATREM_O2   32
 #define ATREM_N2O  64
 
-#define RAD_DEG    57.29577951
+#define RAD_DEG    OEL_RADEG
 #define CONST1      2.7725887    // CONST1=4.0*ln(2)=2.7725887
 
 //typedef float t_array[NBANDS];

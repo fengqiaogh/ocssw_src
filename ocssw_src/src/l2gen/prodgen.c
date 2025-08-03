@@ -217,6 +217,9 @@ VOIDP prodgen(l2prodstr *p, l2str *l2rec) {
         }
         pbuf = p->rank == 3 ? extract_band_3d(l2rec->Rrs_unc, fbuf) : extract_band(l2rec->Rrs_unc, p, numBands);
         break;
+    case CAT_Rrs_raman:
+        pbuf = p->rank == 3 ? extract_band_3d(l2rec->Rrs_raman, fbuf) : extract_band(l2rec->Rrs_raman, p, numBands);
+        break;
     case CAT_Taua:
         pbuf = p->rank == 3 ? extract_band_3d(l2rec->taua, fbuf) : extract_band(l2rec->taua, p, numBands);
         break;
@@ -1246,7 +1249,7 @@ VOIDP prodgen(l2prodstr *p, l2str *l2rec) {
         pbuf = (VOIDP) fbuf;
         break;  
 
-    default:
+        default:
         fprintf(stderr, "-E- %s Line %d: Unknown product catalogue ID %d.\n",
                 __FILE__, __LINE__, p->cat_ix);
         exit(1);

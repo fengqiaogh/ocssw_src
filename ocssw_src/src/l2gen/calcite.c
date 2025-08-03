@@ -27,7 +27,6 @@
 #define BAD_CACO3 BAD_FLT
 
 static int32_t  caco3_msk = LAND | HIGLINT | CLOUD | HILT;
-static float pi = PI;
 static float bbstr = 1.628;
 static float caco3min = 1e-5;     // BCB - was 1.18e-5
 static float caco3hi   = 0.0005;  // BCB - was 0.003
@@ -136,7 +135,7 @@ float calcite_3b(l2str *l2rec, int32_t ip) {
         for (ib = 0; ib < nwave; ib++) {
             ipb = nwave * ip + ib;
             rhoaw[ib] = ((l2rec->l1rec->Lt[ipb] / l1rec->tg_sol[ipb] / l1rec->tg_sen[ipb] - l1rec->tLf[ipb]
-                    - l1rec->Lr[ipb]) / l1rec->t_o2[ipb] - l1rec->TLg[ipb]) * pi / l1rec->Fo[ib] / l1rec->csolz[ip];
+                    - l1rec->Lr[ipb]) / l1rec->t_o2[ipb] - l1rec->TLg[ipb]) * OEL_PI / l1rec->Fo[ib] / l1rec->csolz[ip];
         }
         for (i = 0; i < 3; i++) {
             rho[i] = rhoaw[bx[i]];
@@ -150,7 +149,7 @@ float calcite_3b(l2str *l2rec, int32_t ip) {
             ib = bx[i];
             ipb = nwave * ip + ib;
             rho[i] = ((l2rec->l1rec->Lt[ipb] / l1rec->tg_sol[ipb] / l1rec->tg_sen[ipb] - l1rec->tLf[ipb]
-                    - l1rec->Lr[ipb]) / l1rec->t_o2[ipb] - l1rec->TLg[ipb]) * pi / l1rec->Fo[ib] / l1rec->csolz[ip];
+                    - l1rec->Lr[ipb]) / l1rec->t_o2[ipb] - l1rec->TLg[ipb]) * OEL_PI / l1rec->Fo[ib] / l1rec->csolz[ip];
             if (rho[i] <= 0.0) status = 1;
         }
     }
@@ -287,7 +286,7 @@ float calcite_2b(l2str *l2rec, int32_t ip) {
             printf("Assuming PIC table is for 443nm and 555nm.\n");
             bandShift = 1;
             ib443 = bindex_get(443);
-            ib550 = bindex_get_555();
+            ib550 = bindex_get_555(l1file->sensorID);
             if (ib443 < 0 || ib550 < 0) {
                 printf("-E- %s line %d: required bands not available PIC\n",
                         __FILE__, __LINE__);

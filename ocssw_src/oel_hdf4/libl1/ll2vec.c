@@ -1,8 +1,6 @@
 #include <math.h>
 #include "l1.h"
 
-static float raddeg = 180. / PI;
-
 int ll2vec(float *ll, float *vec)
 /*******************************************************************
 
@@ -37,8 +35,8 @@ int ll2vec(float *ll, float *vec)
         *(vec + 2) = -999.;
         err = -1;
     } else {
-        latr = *ll / raddeg;
-        lonr = *(ll + 1) / raddeg;
+        latr = *ll / OEL_RADEG;
+        lonr = *(ll + 1) / OEL_RADEG;
         /*
          *  get the components
          */
@@ -91,8 +89,8 @@ int vec2ll(float *vec, float *ll)
         latr = asin(*(vec + 2) / vlen);
         lonr = atan2(*(vec + 1) / vlen, *vec / vlen);
 
-        *ll = latr * raddeg;
-        *(ll + 1) = lonr * raddeg;
+        *ll = latr * OEL_RADEG;
+        *(ll + 1) = lonr * OEL_RADEG;
         err = 0;
     }
     return err;

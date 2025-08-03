@@ -46,7 +46,6 @@ int openl1_spexone(filehandle * file) {
     int dimid, status;
     
     // Open the netcdf4 input file
-    printf("Opening SPEXOne L1B file\n");
     status = nc_open(file->name, NC_NOWRITE, &ncid_L1C);
     if (status != NC_NOERR) {
         fprintf(stderr, "-E- %s line %d: nc_open(%s) failed.\n",
@@ -231,7 +230,6 @@ int readl1_spexone(filehandle *file, int32_t line, l1str *l1rec) {
 int closel1_spexone(filehandle *file) {
     int status;
 
-    printf("Closing SPEXOne L1B file\n");
     status = nc_close(file->sd_id);
     check_err(status, __LINE__, __FILE__);
 

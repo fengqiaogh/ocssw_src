@@ -478,11 +478,11 @@ int j2000_to_ecr(int32_t iyr, int32_t idy, double sec, double ecmat[3][3]) {
   double gha, gham[3][3];
   gha2000(iyr, day, gha);
 
-  gham[0][0] = cos(gha / RADEG);
-  gham[1][1] = cos(gha / RADEG);
+  gham[0][0] = cos(gha / OEL_RADEG);
+  gham[1][1] = cos(gha / OEL_RADEG);
   gham[2][2] = 1;
-  gham[0][1] = sin(gha / RADEG);
-  gham[1][0] = -sin(gha / RADEG);
+  gham[0][1] = sin(gha / OEL_RADEG);
+  gham[1][0] = -sin(gha / OEL_RADEG);
 
   gham[0][2] = 0;
   gham[2][0] = 0;
@@ -527,9 +527,9 @@ int j2000_to_mod(int32_t iyr, int32_t idy, double sec, double j2mod[3][3]) {
   double t = jday(iyear, 1, iday) - (double)2451545.5 + sec / 86400;
   t /= 36525;
 
-  double zeta0 = t * (2306.2181 + 0.302 * t + 0.018 * t * t) / RADEG / 3600;
-  double thetap = t * (2004.3109 - 0.4266 * t - 0.04160 * t * t) / RADEG / 3600;
-  double xip = t * (2306.2181 + 1.095 * t + 0.018 * t * t) / RADEG / 3600;
+  double zeta0 = t * (2306.2181 + 0.302 * t + 0.018 * t * t) / OEL_RADEG / 3600;
+  double thetap = t * (2004.3109 - 0.4266 * t - 0.04160 * t * t) / OEL_RADEG / 3600;
+  double xip = t * (2306.2181 + 1.095 * t + 0.018 * t * t) / OEL_RADEG / 3600;
 
   j2mod[0][0] = -sin(zeta0) * sin(xip) + cos(zeta0) * cos(xip) * cos(thetap);
   j2mod[0][1] = -cos(zeta0) * sin(xip) - sin(zeta0) * cos(xip) * cos(thetap);
@@ -555,19 +555,19 @@ int get_nut(int32_t iyr, int32_t idy, double xnut[3][3]) {
   ephparms(t, xls, gs, xlm, omega);
   nutate(t, xls, gs, xlm, omega, dpsi, eps, epsm);
 
-  xnut[0][0] = cos(dpsi / RADEG);
-  xnut[1][0] = -sin(dpsi / RADEG) * cos(epsm / RADEG);
-  xnut[2][0] = -sin(dpsi / RADEG) * sin(epsm / RADEG);
-  xnut[0][1] = sin(dpsi / RADEG) * cos(eps / RADEG);
-  xnut[1][1] = cos(dpsi / RADEG) * cos(eps / RADEG) * cos(epsm / RADEG) +
-               sin(eps / RADEG) * sin(epsm / RADEG);
-  xnut[2][1] = cos(dpsi / RADEG) * cos(eps / RADEG) * sin(epsm / RADEG) -
-               sin(eps / RADEG) * cos(epsm / RADEG);
-  xnut[0][2] = sin(dpsi / RADEG) * sin(eps / RADEG);
-  xnut[1][2] = cos(dpsi / RADEG) * sin(eps / RADEG) * cos(epsm / RADEG) -
-               cos(eps / RADEG) * sin(epsm / RADEG);
-  xnut[2][2] = cos(dpsi / RADEG) * sin(eps / RADEG) * sin(epsm / RADEG) +
-               cos(eps / RADEG) * cos(epsm / RADEG);
+  xnut[0][0] = cos(dpsi / OEL_RADEG);
+  xnut[1][0] = -sin(dpsi / OEL_RADEG) * cos(epsm / OEL_RADEG);
+  xnut[2][0] = -sin(dpsi / OEL_RADEG) * sin(epsm / OEL_RADEG);
+  xnut[0][1] = sin(dpsi / OEL_RADEG) * cos(eps / OEL_RADEG);
+  xnut[1][1] = cos(dpsi / OEL_RADEG) * cos(eps / OEL_RADEG) * cos(epsm / OEL_RADEG) +
+               sin(eps / OEL_RADEG) * sin(epsm / OEL_RADEG);
+  xnut[2][1] = cos(dpsi / OEL_RADEG) * cos(eps / OEL_RADEG) * sin(epsm / OEL_RADEG) -
+               sin(eps / OEL_RADEG) * cos(epsm / OEL_RADEG);
+  xnut[0][2] = sin(dpsi / OEL_RADEG) * sin(eps / OEL_RADEG);
+  xnut[1][2] = cos(dpsi / OEL_RADEG) * sin(eps / OEL_RADEG) * cos(epsm / OEL_RADEG) -
+               cos(eps / OEL_RADEG) * sin(epsm / OEL_RADEG);
+  xnut[2][2] = cos(dpsi / OEL_RADEG) * sin(eps / OEL_RADEG) * sin(epsm / OEL_RADEG) +
+               cos(eps / OEL_RADEG) * cos(epsm / OEL_RADEG);
 
   return 0;
 }
@@ -614,15 +614,15 @@ int nutate(double t, double xls, double gs, double xlm, double omega,
   //  are included to 0.1 arcsecond.
 
   //  Nutation in Longitude
-  dpsi = -17.1996 * sin(omega / RADEG) + 0.2062 * sin(2. * omega / RADEG) -
-         1.3187 * sin(2. * xls / RADEG) + 0.1426 * sin(gs / RADEG) -
-         0.2274 * sin(2. * xlm / RADEG);
+  dpsi = -17.1996 * sin(omega / OEL_RADEG) + 0.2062 * sin(2. * omega / OEL_RADEG) -
+         1.3187 * sin(2. * xls / OEL_RADEG) + 0.1426 * sin(gs / OEL_RADEG) -
+         0.2274 * sin(2. * xlm / OEL_RADEG);
 
   //  Mean Obliquity of the Ecliptic
   epsm = (double)23.439291 - ((double)3.560e-7) * t;
 
   //  Nutation in Obliquity
-  double deps = 9.2025 * cos(omega / RADEG) + 0.5736 * cos(2. * xls / RADEG);
+  double deps = 9.2025 * cos(omega / OEL_RADEG) + 0.5736 * cos(2. * xls / OEL_RADEG);
 
   //  True Obliquity of the Ecliptic
   eps = epsm + deps / 3600;
@@ -708,7 +708,7 @@ int gha2000(int32_t iyr, double day, double &gha) {
   nutate(t, xls, gs, xlm, omega, dpsi, eps, epsm);
 
   //  Include apparent time correction and time-of-day
-  gha = gmst + dpsi * cos(eps / RADEG) + fday * 360;
+  gha = gmst + dpsi * cos(eps / OEL_RADEG) + fday * 360;
   gha = fmod(gha, (double)360);
 
   return 0;
@@ -735,12 +735,12 @@ int euler(float a[3], double xm[3][3]) {
 		}
 	}
 
-	double c1=cos(a[0]/RADEG);
-	double s1=sin(a[0]/RADEG);
-	double c2=cos(a[1]/RADEG);
-	double s2=sin(a[1]/RADEG);
-	double c3=cos(a[2]/RADEG);
-	double s3=sin(a[2]/RADEG);
+	double c1=cos(a[0]/OEL_RADEG);
+	double s1=sin(a[0]/OEL_RADEG);
+	double c2=cos(a[1]/OEL_RADEG);
+	double s2=sin(a[1]/OEL_RADEG);
+	double c3=cos(a[2]/OEL_RADEG);
+	double s3=sin(a[2]/OEL_RADEG);
 
 	// Convert individual rotations to matrices
 	xm1[0][0]=1.0;
@@ -799,7 +799,7 @@ int mtoq(double rm[3][3], double q[4]) {
                     pow(rm[1][2] - rm[2][1], 2)) /
                    4;
     phi = asin(sqrt(ssphi));
-    if (cphi < 0) phi = PI - phi;
+    if (cphi < 0) phi = OEL_PI - phi;
   }
 
   //  Compute Euler axis
@@ -976,7 +976,7 @@ int l_sun(size_t sdim, int32_t iyr, int32_t iday, double *sec,
     double day = iday + sec[i] / 86400;
     double gha;
     gha2000(iyr, day, gha);
-    double ghar = gha / RADEG;
+    double ghar = gha / OEL_RADEG;
 
     //  Transform Sun vector into geocentric rotating frame
     float temp0 = sunr[i][0] * cos(ghar) + sunr[i][1] * sin(ghar);
@@ -1031,18 +1031,18 @@ int sun2000(size_t sdim, int32_t iyr, int32_t idy, double *sec,
 
     //  Compute solar distance (AU)
     double rs =
-        1.00014 - 0.01671 * cos(gs / RADEG) - 0.00014 * cos(2. * gs / RADEG);
+        1.00014 - 0.01671 * cos(gs / OEL_RADEG) - 0.00014 * cos(2. * gs / OEL_RADEG);
 
     //  Compute Geometric Solar Longitude
-    double dls = (6893. - 4.6543463e-4 * t) * sin(gs / RADEG) +
-                 72. * sin(2. * gs / RADEG) - 7. * cos((gs - g5) / RADEG) +
-                 6. * sin((xlm - xls) / RADEG) +
-                 5. * sin((4. * gs - 8. * g4 + 3. * g5) / RADEG) -
-                 5. * cos((2. * gs - 2. * g2) / RADEG) -
-                 4. * sin((gs - g2) / RADEG) +
-                 4. * cos((4. * gs - 8. * g4 + 3. * g5) / RADEG) +
-                 3. * sin((2. * gs - 2. * g2) / RADEG) - 3. * sin(g5 / RADEG) -
-                 3. * sin((2. * gs - 2. * g5) / RADEG);
+    double dls = (6893. - 4.6543463e-4 * t) * sin(gs / OEL_RADEG) +
+                 72. * sin(2. * gs / OEL_RADEG) - 7. * cos((gs - g5) / OEL_RADEG) +
+                 6. * sin((xlm - xls) / OEL_RADEG) +
+                 5. * sin((4. * gs - 8. * g4 + 3. * g5) / OEL_RADEG) -
+                 5. * cos((2. * gs - 2. * g2) / OEL_RADEG) -
+                 4. * sin((gs - g2) / OEL_RADEG) +
+                 4. * cos((4. * gs - 8. * g4 + 3. * g5) / OEL_RADEG) +
+                 3. * sin((2. * gs - 2. * g2) / OEL_RADEG) - 3. * sin(g5 / OEL_RADEG) -
+                 3. * sin((2. * gs - 2. * g5) / OEL_RADEG);
 
     double xlsg = xls + dls / 3600;
 
@@ -1051,9 +1051,9 @@ int sun2000(size_t sdim, int32_t iyr, int32_t idy, double *sec,
     double xlsa = xlsg + dpsi - xk / rs;
 
     //   Compute unit Sun vector
-    sun[i][0] = cos(xlsa / RADEG);
-    sun[i][1] = sin(xlsa / RADEG) * cos(eps / RADEG);
-    sun[i][2] = sin(xlsa / RADEG) * sin(eps / RADEG);
+    sun[i][0] = cos(xlsa / OEL_RADEG);
+    sun[i][1] = sin(xlsa / OEL_RADEG) * cos(eps / OEL_RADEG);
+    sun[i][2] = sin(xlsa / OEL_RADEG) * sin(eps / OEL_RADEG);
   }  // i-loop
 
   return 0;
@@ -1245,8 +1245,8 @@ int uni_geonav(float pos[3], float vel[3], double smat[3][3], double coef[10],
       no[2] = up[0] * ea[1] - up[1] * ea[0];
 
       //  Compute geodetic latitude and longitude
-      xlat[i] = RADEG * asin(up[2]);	
-      xlon[i] = RADEG * atan2(up[1], up[0]);
+      xlat[i] = OEL_RADEG * asin(up[2]);	
+      xlon[i] = OEL_RADEG * atan2(up[1], up[0]);
       range[i] = (short)((d - 400) * 10);
 
       // Transform the pixel-to-spacecraft and Sun vectors into local frame
@@ -1260,18 +1260,18 @@ int uni_geonav(float pos[3], float vel[3], double smat[3][3], double coef[10],
       sl[2] = sunr[0] * up[0] + sunr[1] * up[1] + sunr[2] * up[2];
 
       //  Compute the solar zenith and azimuth
-      solz[i] = (short)(100 * RADEG *
+      solz[i] = (short)(100 * OEL_RADEG *
                         atan2(sqrt(sl[0] * sl[0] + sl[1] * sl[1]), sl[2]));
 
       // Check for zenith close to zero
-      if (solz[i] > 0.01) sola[i] = (short)(100 * RADEG * atan2(sl[0], sl[1]));
+      if (solz[i] > 0.01) sola[i] = (short)(100 * OEL_RADEG * atan2(sl[0], sl[1]));
 
       // Compute the sensor zenith and azimuth
-      senz[i] = (short)(100 * RADEG *
+      senz[i] = (short)(100 * OEL_RADEG *
                         atan2(sqrt(rl[0] * rl[0] + rl[1] * rl[1]), rl[2]));
 
       // Check for zenith close to zero
-      if (senz[i] > 0.01) sena[i] = (short)(100 * RADEG * atan2(rl[0], rl[1]));
+      if (senz[i] > 0.01) sena[i] = (short)(100 * OEL_RADEG * atan2(rl[0], rl[1]));
 
     }  // if on-earth
   }    // pixel loop
@@ -1376,12 +1376,12 @@ int mat2rpy(float pos[3], float vel[3], double smat[3][3], float rpy[3], double 
   gsl_permutation_free(perm);
 
   // Compute attitude angles
-  rpy[0] = RADEG * atan(-rm[2][1] / rm[2][2]);
+  rpy[0] = OEL_RADEG * atan(-rm[2][1] / rm[2][2]);
   // double cosp = sqrt(rm[2][1] * rm[2][1] + rm[2][2] * rm[2][2]);
   // if (rm[2][2] < 0) cosp *= -1;
-  // rpy[1] = RADEG * atan2(rm[2][0], cosp);
-  rpy[1] = RADEG * asin(rm[2][0]);
-  rpy[2] = RADEG * atan(-rm[1][0] / rm[0][0]);
+  // rpy[1] = OEL_RADEG * atan2(rm[2][0], cosp);
+  rpy[1] = OEL_RADEG * asin(rm[2][0]);
+  rpy[2] = OEL_RADEG * atan(-rm[1][0] / rm[0][0]);
 
   return 0;
 }

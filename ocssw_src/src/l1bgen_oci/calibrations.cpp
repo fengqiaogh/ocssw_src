@@ -16,6 +16,7 @@
 #include "geo_data.hpp"
 #include "aggregate.hpp"
 #include "device.hpp"
+#include "types.hpp"
 
 #include <stdexcept>
 #include <boost/accumulators/accumulators.hpp>
@@ -28,29 +29,50 @@ const double J2000 = 2451545;
 using namespace std;
 using namespace netCDF;
 
-template <typename T>
-using matrix2D = boost::multi_array<T, 2>;
-
 static vector<double> darkCorrections;
 static vec2D<float> digitalNumbers;
-static float **preAggCalData = nullptr;
+static float *preAggCalData = nullptr;  // Instrument bands by pixels
 static size_t mostInsBands;
-vector<double> tempCorrections;
-vec2D<double> k4;
-vec2D<double> k5;
-matrix2D<uint8_t> qualityFlags(boost::extents[0][0]);
+static matrix2D<uint8_t> qualityFlags(boost::extents[0][0]);
 
 template <typename T>
 bool matrixIsEmpty(boost::multi_array<T, 2> &matrix) {
     return matrix.shape()[0] == 0 || matrix.shape()[1] == 0;
 }
 
+/**
+ * @brief Reads scientific data from the L1A file for a specific scan.
+ *
+ * This function reads scientific data for a given scan from the L1A file and stores it in the CalibrationData
+ * structure. It assumes that calData.sciData is already initialized to the proper size.
+ *
+ * @param currScan The current scan number.
+ * @param calData The CalibrationData structure to store the read data.
+ * @param l1aSciData The NetCDF group containing the scientific data.
+ * @param numCcdPix The number of CCD pixels.
+ */
 void readSciData(const size_t &currScan, CalibrationData &calData, const NcGroup &l1aSciData,
                  const size_t &numCcdPix) {
     string color = determineColor(calData.color);
-    vector<size_t> start = {currScan, 0, 0};
-    vector<size_t> count = {1, calData.numInsBands, numCcdPix};
-    l1aSciData.getVar("sci_" + color).getVar(start, count, &calData.sciData[0][0]);
+
+    for (size_t band = 0; band < calData.numInsBands; ++band) {
+        vector<size_t> bandStart = {currScan, band, 0};
+        vector<size_t> bandCount = {1, 1, numCcdPix};
+        try {
+            l1aSciData.getVar("sci_" + color).getVar(bandStart, bandCount, calData.sciData[band].data());
+        } catch (const exceptions::NcException &e) {
+            cout << "-E- Could not read science data for scan " << currScan << ". Skipping... " << endl;
+            continue;
+        } catch (const std::exception &e) {
+            cout << "-E- Caught exception: " << e.what() << " for scan " << currScan << ". Skipping... "
+                 << endl;
+            continue;
+        } catch (...) {
+            cout << "-E- Caught unknown exception (possibly segmentation fault) for scan " << currScan
+                 << ". Skipping... " << endl;
+            continue;
+        }
+    }
 }
 
 void writeCalData(const Level1bFile &outfile, const CalibrationData &calData, const size_t &currScan,
@@ -63,18 +85,19 @@ void writeCalData(const Level1bFile &outfile, const CalibrationData &calData, co
     // Output to L1B file
     if (!radianceGenerationEnabled) {
         try {
-            outfile.observationData.getVar("rhot_" + color)
-                .putVar(start, count, &calData.calibratedData[0][0]);
+            outfile.observationData.getVar("rhot_" + color).putVar(start, count, &calData.calibratedData[0]);
         } catch (const exception &e) {
-            cout  << "-E- " << __FILE__ << ":" << __LINE__ << " - Couldn't put " << color << " rhot values into L1B file" << endl;
+            cout << "-E- " << __FILE__ << ":" << __LINE__ << " - Couldn't put " << color
+                 << " rhot values into L1B file" << endl;
             cout << e.what() << endl;
             exit(EXIT_FAILURE);
         }
     } else {
         try {
-            outfile.observationData.getVar("Lt_" + color).putVar(start, count, &calData.calibratedData[0][0]);
+            outfile.observationData.getVar("Lt_" + color).putVar(start, count, &calData.calibratedData[0]);
         } catch (const exception &e) {
-            cout  << "-E- " << __FILE__ << ":" << __LINE__ << " - Couldn't put " << color << " Lt values into L1B file" << endl;
+            cout << "-E- " << __FILE__ << ":" << __LINE__ << " - Couldn't put " << color
+                 << " Lt values into L1B file" << endl;
             cout << e.what() << endl;
             exit(EXIT_FAILURE);
         }
@@ -83,7 +106,8 @@ void writeCalData(const Level1bFile &outfile, const CalibrationData &calData, co
     try {
         outfile.observationData.getVar("qual_" + color).putVar(start, count, calData.qualityFlags);
     } catch (const exception &e) {
-        cout  << "-E- " << __FILE__ << ":" << __LINE__ << " - Couldn't put " << color << " quality flags into L1B file" << endl;
+        cout << "-E- " << __FILE__ << ":" << __LINE__ << " - Couldn't put " << color
+             << " quality flags into L1B file" << endl;
         cout << e.what() << endl;
         exit(EXIT_FAILURE);
     }
@@ -96,26 +120,30 @@ void calibrate(CalibrationData &calData, const GeoData &geoData, DarkData &darkD
                const vec2D<double> &temps, const vector<float> &cosSolZens,
                const bool radianceGenerationEnabled) {
     bool mostInsBandsChanged = false;  // Will probably only be true once or twice
+    vector<double> tempCorrection(calData.numInsBands);
 
     // Specific to each CalibrationData, so numInsBands and numCcdPix won't change
-    if (calData.sciData == nullptr)
-        calData.sciData = (uint16_t **)allocate2d_short(calData.numInsBands, geoData.numCcdPix);
+    if (calData.sciData.size() == 0)
+        calData.sciData = vector<vector<uint16_t>>(calData.numInsBands, vector<uint16_t>(geoData.numCcdPix));
     readSciData(currScan, calData, l1aSciData, geoData.numCcdPix);
     if (calData.calibratedData == nullptr)
-        calData.calibratedData = allocate2d_float(calData.numBands, geoData.numCcdPix);
+        calData.calibratedData = new float[calData.numInsBands * geoData.numCcdPix]();
+    else
+        memset(calData.calibratedData, 0, sizeof(float) * (calData.numInsBands * geoData.numCcdPix));
 
     // Setup for some variables used in this function
     if (mostInsBands < calData.numInsBands) {
         if (preAggCalData != nullptr)
-            free2d_float(preAggCalData);
+            delete preAggCalData;  // Should only happen once per run
         mostInsBands = calData.numInsBands;
         mostInsBandsChanged = true;
     }
 
+    size_t insBandsByPix = mostInsBands * geoData.numCcdPix;
     if (preAggCalData == nullptr)
-        preAggCalData = allocate2d_float(mostInsBands, geoData.numCcdPix);
+        preAggCalData = new float[insBandsByPix]();  // Obviate later need to 0 on sciData fill value
     else if (mostInsBandsChanged) {
-        preAggCalData = allocate2d_float(mostInsBands, geoData.numCcdPix);  // TODO: Free first
+        preAggCalData = new float[insBandsByPix]();  // Obviate later need to 0 on sciData fill value
     }
 
     // Compute dark offset, correct data, and apply absolute and
@@ -136,62 +164,73 @@ void calibrate(CalibrationData &calData, const GeoData &geoData, DarkData &darkD
     }
 
     if (darkCorrectionStatus != -1) {  // Found valid dark data
-        if (tempCorrections.size() == 0 || mostInsBandsChanged)
-            tempCorrections.resize(mostInsBands);
-        getTempCorrection(calData.numInsBands, referenceTemps, temps[currScan], *calData.gains,
-                          tempCorrections);
-
         for (size_t j = 0; j < calData.numInsBands; j++) {
+            // This is k3[j]
+            tempCorrection[j] = getTempCorrection(j, referenceTemps, temps[currScan], *calData.gains, CCD);
             for (size_t k = 0; k < geoData.numCcdPix; k++) {
                 // Handle fill value
                 if (calData.sciData[j][k] == calData.fillValue) {
                     digitalNumbers[j][k] = BAD_FLT;
-                    preAggCalData[j][k] = BAD_FLT;
                     continue;
                 }
 
                 // Need to save dn for linearity correction
                 digitalNumbers[j][k] = calData.sciData[j][k] - darkData.corrections[j];
-                preAggCalData[j][k] = tempCorrections[j] *
-                                      calData.gains->k1K2[j][geoData.hamSides[currScan]] *
-                                      digitalNumbers[j][k];
             }
         }
+
+        vec2D<double> xtalkCorrection;
+        xtalkCorrection.resize(calData.numInsBands, std::vector<double>());
+        for (auto &vec : xtalkCorrection)
+            vec.resize(geoData.numCcdPix, 0.0);
+
+        if (calData.color == BLUE && calData.enableCrosstalk) {
+            getXtalkCorrection(calData.numInsBands, geoData.numCcdPix, calData.ncpix, calData.cmat,
+                               digitalNumbers, xtalkCorrection);
+        }
+
+        for (size_t j = 0; j < calData.numInsBands; j++) {
+            for (size_t k = 0; k < geoData.numCcdPix; k++) {
+                size_t dataIndex = j * geoData.numCcdPix + k;
+
+                preAggCalData[dataIndex] = tempCorrection[j] *
+                                           calData.gains->k1K2[j][geoData.hamSides[currScan]] *
+                                           (digitalNumbers[j][k] - xtalkCorrection[j][k]);
+                // This is k4
+                double rvsCorrection =
+                    getRvsCorrection(j, k, geoData.hamSides[currScan], *calData.gains, sciScanAngles[k]);
+                // This is k5
+                double nonlinearityCorrection =
+                    getNonlinearityCorrection(j, k, numNonlinCoefs, calData.gains->k5Coefs, digitalNumbers);
+                preAggCalData[dataIndex] *= rvsCorrection * nonlinearityCorrection;
+            }
+        }
+
+        // Aggregate to L1B bands
+        // bcalb = transpose(bamat#transpose(bcal))
+        aggAndCalcRefls(currScan, calData.numBands, calData.numInsBands, geoData, preAggCalData,
+                        calData.calibratedData, calData.insAgg, radianceGenerationEnabled, *calData.solIrrL1a,
+                        cosSolZens.data());
+
+        // Check for saturation
+
+        if (matrixIsEmpty(qualityFlags) || mostInsBandsChanged) {
+            qualityFlags.resize(boost::extents[mostInsBands][geoData.numCcdPix]);
+        }
+
+        getQualityFlags(geoData.numCcdPix, calData.numBands, calData.numInsBands, digitalNumbers,
+                        calData.insAgg, calData.gains->saturationThresholds, qualityFlags);
+
     } else {
-        cout << "-E- Dark correction not found.\n";
-    }
-
-    // Compute and apply RVS and linearity corrections
-    if (k4.size() == 0 || mostInsBandsChanged)
-        k4 = vec2D<double>(mostInsBands, vector<double>(geoData.numCcdPix));
-    getRvsCorrection(calData.numInsBands, geoData.numCcdPix, geoData.hamSides[currScan], *calData.gains,
-                     sciScanAngles, k4);
-
-    if (k5.size() == 0 || mostInsBandsChanged)
-        k5 = vec2D<double>(mostInsBands, vector<double>(geoData.numCcdPix));
-    getNonlinearityCorrection(calData.numInsBands, geoData.numCcdPix, numNonlinCoefs, calData.gains->k5Coefs,
-                              digitalNumbers, k5);
-
-    for (size_t j = 0; j < calData.numInsBands; j++) {
-        for (size_t k = 0; k < geoData.numCcdPix; k++) {
-            if (preAggCalData[j][k] != BAD_FLT)
-                preAggCalData[j][k] *= k4[j][k] * k5[j][k];
+        cout << "-W- Dark correction not found, skipping calibration corrections\n";
+        for (size_t i = 0; i < geoData.numCcdPix; i++) {
+            for (size_t j = 0; j < calData.numBands; j++) {
+                size_t dataIndex = i * geoData.numCcdPix + j;
+                calData.calibratedData[dataIndex] = BAD_FLT;
+                qualityFlags[j][i] = 0;
+            }
         }
     }
-
-    // Aggregate to L1B bands
-    // bcalb = transpose(bamat#transpose(bcal))
-    aggToL1b(currScan, calData.numBands, calData.numInsBands, geoData, preAggCalData, calData.calibratedData,
-             calData.insAgg, radianceGenerationEnabled, *calData.solIrrL1a, cosSolZens.data());
-
-    // Check for saturation
-
-    if (matrixIsEmpty(qualityFlags) || mostInsBandsChanged) {
-        qualityFlags.resize(boost::extents[mostInsBands][geoData.numCcdPix]);
-    }
-
-    getQualityFlags(geoData.numCcdPix, calData.numBands, calData.numInsBands, digitalNumbers, calData.insAgg,
-                    calData.gains->saturationThresholds, qualityFlags);
 
     calData.qualityFlags = qualityFlags.data();
 
@@ -220,7 +259,7 @@ CalibrationLut readOciCalLut(const NcFile *calLUTfile, Device device, const NcGr
     uint32_t numRvsCoefs = calLUTfile->getDim("number_of_RVS_coefficients").getSize();
     uint32_t numNonlinearityCoefs = calLUTfile->getDim("number_of_nonlinearity_coefficients").getSize();
     uint32_t numPolarizationCoefs = calLUTfile->getDim("number_of_polarization_coefficients").getSize();
-    uint32_t numHamSides = 2;  // TODO: find  a better name
+    uint32_t numHamSides = 2;
     uint32_t numTimes = calLUTfile->getDim("number_of_times").getSize();
 
     CalibrationLut calLut(numBands, numHamSides, numTimes, numTemps, numTempCoeffs, mcedim, numRvsCoefs,
@@ -242,8 +281,8 @@ CalibrationLut readOciCalLut(const NcFile *calLUTfile, Device device, const NcGr
 Gains *makeOciGains(uint32_t numInsBands, uint32_t numBands, uint16_t year, uint32_t julianDay,
                     double scanTime, size_t numTimes, double *relGainFactors, int16_t boardId,
                     int16_t spatialAgg, int16_t *gainAgg, CalibrationLut &calLut, float **gainMat) {
-    Gains *gains = (Gains *)calloc(1, sizeof(Gains));
-    for (size_t i = 0; i < 6; i++)
+    Gains *gains = new Gains();
+    for (size_t i = 0; i < GAIN_DIMS_SIZE; i++)
         gains->dimensions[i] = calLut.dimensions[i];
 
     numTimes = gains->dimensions[T];
@@ -260,21 +299,21 @@ Gains *makeOciGains(uint32_t numInsBands, uint32_t numBands, uint16_t year, uint
     // Hyperspectral bands
     if (boardId == -1) {
         hyperspectral = true;
-        insAdjFactors = new int16_t[numInsBands];  // TODO: Find a better name
-        int ib = 0;
+        insAdjFactors = new int16_t[numInsBands];
+        int bandIndex = 0;
         for (size_t i = 0; i < 16; i++) {
-            if (gainAgg[i] <= 0) {
+            if (gainAgg[i] <= 0) {  // Prevent a divide by zero error
                 continue;
             }
 
-            uint32_t nb = 32 / gainAgg[i];
-            for (size_t j = 0; j < nb; j++) {
+            uint32_t numBands = 32 / gainAgg[i];
+            for (size_t j = 0; j < numBands; j++) {
                 if (spatialAgg * gainAgg[i] < 4)
-                    insAdjFactors[ib + j] = 4 / (spatialAgg * gainAgg[i]);
+                    insAdjFactors[bandIndex + j] = 4 / (spatialAgg * gainAgg[i]);
                 else
-                    insAdjFactors[ib + j] = 4 / 4;
+                    insAdjFactors[bandIndex + j] = 4 / 4;
             }
-            ib += nb;
+            bandIndex += numBands;
         }
     } else
         localBoardId = boardId % 2;

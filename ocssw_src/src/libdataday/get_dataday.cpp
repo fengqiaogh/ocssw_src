@@ -8,7 +8,7 @@
 #include <boost/geometry/geometries/point_xy.hpp>
 #include <boost/geometry/geometries/polygon.hpp>
 #include <boost/optional.hpp>
-#include <get_geospatial.hpp>
+
 #include <cstdlib>
 #include <iostream>
 #include <netcdf>
@@ -17,7 +17,9 @@
 #include "sensorInfo.h"
 #include "timeutils.h"
 #include "version.h"
-#define _PRINT_(...) if(ddvals::verbosity) printf(__VA_ARGS__)
+#define _PRINT_(...)       \
+    if (ddvals::verbosity) \
+    printf(__VA_ARGS__)
 
 namespace ddvals {
 boost::optional<float> equatorialCrossingTime;
@@ -35,12 +37,12 @@ typedef bg::model::linestring<Point_t> Linestring_t;
 typedef bg::model::polygon<Point_t> Polygon_t;
 typedef bg::model::multi_point<Point_t> MultiPoint_t;
 
-//void print(std::ostream& stream, const char* format) {
-//    if (!ddvals::verbosity)
-//        return;
-//    stream << format;
-//}
-// h
+// void print(std::ostream& stream, const char* format) {
+//     if (!ddvals::verbosity)
+//         return;
+//     stream << format;
+// }
+//  h
 /**
  * @brief
  * ttps://www.vertica.com/docs/11.0.x/HTML/Content/Authoring/AnalyzingData/Geospatial/Spatial_Definitions/WellknownTextWKT.htm
@@ -52,30 +54,6 @@ Polygon_t parse_wkr_polygon(const std::string& wkt_string) {
     return poly;
 }
 
-//template <typename T, typename... Targs>
-//void print(std::ostream& stream, const char* format, T&& value, Targs&&... fargs) {
-//    if (!ddvals::verbosity)
-//        return;
-//    for (; *format != '\0'; format++) {
-//        if (*format == '%') {
-//            stream << value;
-//            print(stream, format + 1, fargs...);
-//            return;
-//        }
-//        stream << *format;
-//    }
-//}
-//
-//void print(const char* format) {
-//    if (!ddvals::verbosity)
-//        return;
-//    cout << format;
-//}
-//
-//template <typename T, typename... Targs>
-//void print(const char* format, T&& value, Targs&&... fargs) {
-//    print(std::cout, format, value, fargs...);
-//}
 
 enum class DL { NOT_CROSSED, CROSSED, CROSSED_NORTH_POLE, CROSSED_SOUTH_POLE, CROSSED_IRREGULAR };
 
@@ -154,10 +132,9 @@ void get_datadays(time_t starttime,             /* (in)  swath start time
 
 void getEquatorCrossingTime(int32_t sensorID, bool dayNight, time_t starttime, float* equatorialCrossingTime,
                             int32_t* plusDay) {
-    if(std::abs(ddvals::deltaeqcross) > 1e-5)
-        *equatorialCrossingTime = 12.0 + ddvals::deltaeqcross/ 60.0;
-    else
-    {
+    if (std::abs(ddvals::deltaeqcross) > 1e-5)
+        *equatorialCrossingTime = 12.0 + ddvals::deltaeqcross / 60.0;
+    else {
         switch (sensorID) {
             case MERIS:
             case OLCIS3A:
@@ -207,7 +184,8 @@ void getEquatorCrossingTime(int32_t sensorID, bool dayNight, time_t starttime, f
                      */
                     double deg;
                     if (d < 3843) {
-                        deg = 7.7517951e-10 * d * d * d - 2.1692192e-06 * d * d + 0.0070669241 * d - 4.1300585;
+                        deg =
+                            7.7517951e-10 * d * d * d - 2.1692192e-06 * d * d + 0.0070669241 * d - 4.1300585;
                     } else {
                         /*
                          * This equation may need to be replaced with a polynomial
@@ -258,8 +236,7 @@ std::string dataday_to_isodate(int32_t dataday) {
     return isoDate;
 }
 
-int32_t get_plusday()
-{
+int32_t get_plusday() {
     return ddvals::plus_day;
 }
 
@@ -272,23 +249,27 @@ float get_equatorial_crossingTime() {
     }
 }
 
-std::pair<int32_t,int32_t> get_datadays(const std::string &filepath)
-{
-        std::pair<int32_t,int32_t> res;
-        try {
-            NcFile nc_input(filepath, NcFile::read);
-            res =  get_datadays(nc_input);
-            nc_input.close();
+std::pair<int32_t, int32_t> get_datadays(const std::string& filepath) {
+    std::pair<int32_t, int32_t> res;
+    try {
+        NcFile nc_input(filepath, NcFile::read);
+        res = get_datadays(nc_input);
+        nc_input.close();
 
-        } catch (NcException& e) {
-            e.what();
-            cerr << "\nFailure opening  input file: " + filepath + "\n" << endl;
-            printUsage(NC2_ERR);
-        }
-        return res;
+    } catch (NcException& e) {
+        e.what();
+        cerr << "\nFailure opening  input file: " + filepath + "\n" << endl;
+        printUsage(NC2_ERR);
+    }
+    return res;
 }
 
 std::pair<int32_t, int32_t> get_datadays(const NcFile& nc_input, float deltaeqcross, int night_flag) {
+    Geospatialbounds geo_bounds(nc_input);
+    return get_datadays(geo_bounds,deltaeqcross,night_flag);
+}
+
+std::pair<int32_t, int32_t> get_datadays(Geospatialbounds& geo_bounds, float deltaeqcross, int night_flag) {
     // double const earth_radius = 6371.229;
 
     // Define the dateline, north and south poles
@@ -307,29 +288,27 @@ std::pair<int32_t, int32_t> get_datadays(const NcFile& nc_input, float deltaeqcr
     int32_t sensorID;
     double sceneStartTime;
     // starting reading the file
-    
 
-        Geospatialbounds geo_bounds(nc_input);
-        maxEast = geo_bounds.get_max_lon();
-        maxWest = geo_bounds.get_min_lon();
-        sceneStartTimeISO = geo_bounds.get_time_coverage_start();
-        platform = geo_bounds.get_platform();
-        instrument = geo_bounds.get_instrument();
-        if (platform.empty())
-            std::cerr << "Warning: platform is not found" << std::endl;
-        if (instrument.empty())
-            std::cerr << "Warning: instrument is not found" << std::endl;
-        if (sceneStartTimeISO.empty()) {
-            std::cerr << "Error: start time is not found. Exiting" << std::endl;
-            exit(EXIT_FAILURE);
-        }
-        sensorID = instrumentPlatform2SensorId(instrument.c_str(), platform.c_str());
-        sceneStartTime = isodate2unix(sceneStartTimeISO.c_str());
-        std::string geospatial_bounds = geo_bounds.get_bounds_wkt();
-        gPolygon = parse_wkr_polygon(geospatial_bounds);
-        day_night_flag = geo_bounds.get_day_night_flag();
+    maxEast = geo_bounds.get_max_lon();
+    maxWest = geo_bounds.get_min_lon();
+    sceneStartTimeISO = geo_bounds.get_time_coverage_start();
+    platform = geo_bounds.get_platform();
+    instrument = geo_bounds.get_instrument();
+    if (platform.empty())
+        std::cerr << "Warning: platform is not found" << std::endl;
+    if (instrument.empty())
+        std::cerr << "Warning: instrument is not found" << std::endl;
+    if (sceneStartTimeISO.empty()) {
+        std::cerr << "Error: start time is not found. Exiting" << std::endl;
+        exit(EXIT_FAILURE);
+    }
+    sensorID = instrumentPlatform2SensorId(instrument.c_str(), platform.c_str());
+    sceneStartTime = isodate2unix(sceneStartTimeISO.c_str());
+    std::string geospatial_bounds = geo_bounds.get_bounds_wkt();
+    gPolygon = parse_wkr_polygon(geospatial_bounds);
+    day_night_flag = geo_bounds.get_day_night_flag();
     ddvals::deltaeqcross = deltaeqcross;
-    
+
     /// ending reading the file
     DL dateLineCrossed = DL::NOT_CROSSED;
     std::vector<Point_t> result;
@@ -368,7 +347,8 @@ std::pair<int32_t, int32_t> get_datadays(const NcFile& nc_input, float deltaeqcr
         _PRINT_("DataDay0=%s\n", startDataDay.substr(0, 10).c_str());
 
     } else {
-        _PRINT_("DataDay0=%s\nDataDay1=%s\n", startDataDay.substr(0, 10).c_str(), stopDataDay.substr(0, 10).c_str());
+        _PRINT_("DataDay0=%s\nDataDay1=%s\n", startDataDay.substr(0, 10).c_str(),
+                stopDataDay.substr(0, 10).c_str());
     }
     return {dataday0 + plusDay, dataday1 + plusDay};
 }

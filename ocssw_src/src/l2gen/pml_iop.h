@@ -11,10 +11,7 @@
 #define MAX_BANDS 16
 
 /* Functions */
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
-#define radians(degrees) ((degrees) * M_PI / 180.0)
-#define degrees(radians) ((radians) * 180.0 / M_PI)
+#define radians(degrees) ((degrees) * OEL_PI / 180.0)
+#define degrees(radians) ((radians) * OEL_RADEG)
 
 #endif

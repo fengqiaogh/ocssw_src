@@ -5,7 +5,7 @@
  *      Author: rhealy
  */
 #include <math.h>
-
+#include <genutils.h>
 
 double deg2rad(double deg);
 
@@ -26,10 +26,10 @@ double angular_distance(double lat1, double lon1, double lat2, double lon2) {
 /*::  This function converts decimal degrees to radians             :*/
 /*:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
 double deg2rad(double deg) {
-  return (deg * M_PI / 180);
+  return (deg * OEL_DEGRAD);
 }
 /* and the inverse */
 double rad2deg(double rad) {
-  return (rad * 180. / M_PI);
+  return (rad * OEL_RADEG);
 }
 

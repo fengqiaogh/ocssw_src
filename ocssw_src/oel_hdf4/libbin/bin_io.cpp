@@ -36,12 +36,8 @@ hdf_bin* openBinObject(const char* binFileName) {
 
     if (Hishdf(binFileName) == TRUE) {
         binFile = new hdf4_bin;
-    } else if (H5Fis_hdf5(binFileName) == TRUE) {
+    } else  {
         char nam_buf[80];
-
-        /* Turn off HDF5 warning/error handling - it's ugly stuff anyway */
-        H5Eset_auto(H5E_DEFAULT, NULL, NULL);
-
         if (nc_open(binFileName, NC_NOWRITE, &ncid) == NC_NOERR) {
             status = nc_get_att(ncid, NC_GLOBAL, "Mission", nam_buf);
             if (status == NC_NOERR) {

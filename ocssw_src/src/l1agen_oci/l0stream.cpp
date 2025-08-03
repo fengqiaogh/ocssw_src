@@ -36,8 +36,8 @@ L0Stream::L0Stream(vector<string> &l0FileNames) {
 L0Stream::~L0Stream() {
     for (auto l0File : l0Files) {
         l0File->fileStream->close();
-        delete(l0File->fileStream);
-        delete(l0File);
+        delete (l0File->fileStream);
+        delete (l0File);
     }
 }
 
@@ -78,6 +78,33 @@ size_t L0Stream::getFileSize(std::fstream &fileStream) {
 
 size_t L0Stream::getBytesLeft() {
     return CURR_L0_FILE->fileSize - CURR_L0_FILE->currPos;
+}
+
+void L0Stream::skip(size_t numBytes) {
+    fstream *currStream = CURR_L0_FILE->fileStream;
+    size_t bytesLeft = CURR_L0_FILE->bytesLeft;
+
+    if (bytesLeft <= numBytes) {
+        int numBytesAfterCarryover = numBytes - bytesLeft;
+        currStream->ignore(bytesLeft);  // skip bytes left of the current l0 file
+
+        idxCurrStream++;  // Switch streams
+
+        if (idxCurrStream >= l0Files.size())  // No more files to read
+            return;
+
+        currStream->ignore(numBytesAfterCarryover);  // skip remaining bytes after swapping streams
+        CURR_L0_FILE->currPos = CURR_L0_FILE->fileStream->tellg();
+        CURR_L0_FILE->bytesLeft = getBytesLeft();
+        return;
+    }
+
+    CURR_L0_FILE->fileStream->ignore(numBytes);
+    CURR_L0_FILE->currPos = CURR_L0_FILE->fileStream->tellg();
+    CURR_L0_FILE->bytesLeft = getBytesLeft();
+
+    if (CURR_L0_FILE->currPos == CURR_L0_FILE->fileSize)
+        idxCurrStream++;
 }
 
 void L0Stream::read(char *buffer, size_t numBytes) {

@@ -13,21 +13,22 @@ pro yds2timstr,iyr,idy,secd,timstr
 ;       timstr  sting    O      ASCII time string
 
 ; Convert year and day to year, month, day
-jddate,jday(iyr,1,idy),iyr,mn,idm
-cyr = string(iyr,format='(i4)')
+jddate,jday(iyr,1,idy),iy,mn,idm
+cyr = string(iy,format='(i4)')
 cmn = string(mn,format='(i02)')
 cdy = string(idm,format='(i02)')
 cdat2 = strjoin([cyr,cmn,cdy],'-')
 
 ; Convert seconds to hours, minutes, seconds
 sod2hms,secd,ih,mn,sec
+isec = fix(sec)
 chr = string(ih,format='(i02)')
 cmi = string(mn,format='(i02)')
-cis = string(sec,format='(f09.6)')
+cis = string(isec,format='(i02)')
 ctim2 = strjoin([chr,cmi,cis],':')
 
 ; Concatenate date and time strings
-timstr = strjoin([cdat2,'T',ctim2,'Z'])
+timstr = strjoin([cdat2,'T',ctim2])
 
 return
 end

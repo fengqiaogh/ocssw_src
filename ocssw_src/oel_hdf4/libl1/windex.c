@@ -54,15 +54,29 @@ int bindex_get(int32_t wave) {
 /* bindex_get_555() - retrieve direct access wavelength index of band nearest to 555nm      */
 
 /* ---------------------------------------------------------------------------------------- */
-int bindex_get_555(void) {
-    int ib = bindex_get(547); /* note: we want 547 for MODIS, not 555, hence the order */
+int bindex_get_555(int32_t sensorId) {
+    int bandIndex;
 
-    if (ib < 0) ib = bindex_get(550);
-    if (ib < 0) ib = bindex_get(555);
-    if (ib < 0) ib = bindex_get(560);
-    if (ib < 0) ib = bindex_get(565);
+     // MODIS and HICO use 547 in place of 555
+     // !!!!!!!!
+     // NOTE and a HUGE TODO!!!!
+     // OCI is in this list to keep things from changing in V3. Before the next reprocessing,
+     // remove OCI from this block !!!!!
+     // !!!!!!!!
+    if ((sensorId == MODISA || sensorId == MODIST || sensorId == HICO || sensorId == OCI))
+        return bindex_get(547);
 
-    return (ib);
+    int bands[] = {555, 550, 560, 565}; // More easily extendable than an if ladder
+    int sizeBands = sizeof(bands) / sizeof(bands[0]);
+
+    for (int i = 0; i < sizeBands; i++) {
+        bandIndex = bindex_get(bands[i]);
+        if (bandIndex >= 0) {
+            break;
+        }
+    }
+
+    return bandIndex;
 }
 
 

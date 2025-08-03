@@ -509,7 +509,7 @@ int set_cmp( l2str *l2rec, float **tdat, int32_t *nfloat, int32_t **i32dat,
             {
             rad = l1que.r[qln].Lt[ l1ix[ ibnd ] + nbnd_ref * ipx ];
             solz = l1que.r[qln].solz[ipx ];
-            out = rad * PI / ( cos( solz * PI / 180. ) * F0[ l1ix[ ibnd ] ] );
+            out = rad * OEL_PI / ( cos( solz * OEL_PI / 180. ) * F0[ l1ix[ ibnd ] ] );
             (*tdat)[ ipx + npix * ( ibnd + ncmp_bnd * iln ) ] = 
                chim_rad_corr[ibnd] * out;
             }
@@ -518,7 +518,7 @@ int set_cmp( l2str *l2rec, float **tdat, int32_t *nfloat, int32_t **i32dat,
             solz = l1que.r[qln].solz[ipx ];
             rad = l1que.r[qln].rho_cirrus[ipx];
             (*tdat)[ ipx + npix * ( ibnd + ncmp_bnd * iln ) ] =
-              chim_rad_corr[ibnd] * rad * cos( solz * PI / 180. );
+              chim_rad_corr[ibnd] * rad * cos( solz * OEL_PI / 180. );
             }
           else  /* for emissive */
             {

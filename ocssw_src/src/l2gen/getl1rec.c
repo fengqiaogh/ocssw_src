@@ -202,7 +202,7 @@ int getl1rec(int32_t iscan, int32_t dscan, l1str *l1rec) {
         if(l1rec->uncertainty){
             for(iq=0;iq<nq;iq++){
                 l1que.r[iq].uncertainty= (uncertainty_t*) malloc(sizeof (uncertainty_t));
-                if (alloc_uncertainty(nbands, l1rec->uncertainty->nbands_ac, npix,l1que.r[iq].uncertainty) != 0) {
+                if (alloc_uncertainty(nbands, input->nbands_ac, npix,l1que.r[iq].uncertainty) != 0) {
                     printf("-E- %s: Unable to allocate error record.\n",__FILE__);
                     exit(EXIT_FAILURE);
                 }

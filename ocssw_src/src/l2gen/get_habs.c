@@ -10,6 +10,8 @@
 #include "l12_proto.h"
 #include <sensorInfo.h>
 #include "mph_flags.h"
+#include "vegetation_indices.h" // Band averaging
+
 /*
  * Harmful Algal Bloom Indexes and related functions
  * for flagging products and cloud masking
@@ -83,77 +85,77 @@ void habs_meris_ci_corr(float rhos443, float rhos490, float rhos560,
 }
 
 void get_habs_ci(l2str *l2rec, l2prodstr *p, float ci[]) {
-
     int ib0, ib1, ib2, ib3, ib4, ib5, ib6, ib7, ib8;
     float wav0, wav1, wav2, wav3, wav4, wav5, wav6, wav7, wav8, fac;
     int nonci;
 
     int ip, ipb;
-    static productInfo_t* ci_product_info;
+    static productInfo_t *ci_product_info;
+    flags_habs = get_flags_habs(l2rec);
 
-    switch (l2rec->l1rec->l1file->sensorID) {
-    case MODISA:
-    case MODIST:
-        fac = 1.3;
-        break;
-    case OLCIS3A:
-    case OLCIS3B:        
-        // fac = 1.052;
-        fac = 1.0;
-        break;
-    default:
-        fac = 1.0;
-    }
-    switch (p->cat_ix) {
+    filehandle *l1file = l2rec->l1rec->l1file;
+    l1str *l1rec = l2rec->l1rec;
 
-    case CAT_CI_stumpf:
-    case CAT_CI_cyano:
-    case CAT_CI_noncyano:
-        // Cyanobacteria Index
-        // Wynne, Stumpf algorithm 2013
-        switch (l2rec->l1rec->l1file->sensorID) {
+    switch (l1file->sensorID) {
         case MODISA:
         case MODIST:
-            wav0 = 547;
-            wav1 = 667;
-            wav2 = 678;
-            wav3 = 748;
+            fac = 1.3;
+            break;
+        case OLCIS3A:
+        case OLCIS3B:
+            fac = 1.0;
             break;
         default:
-            wav0 = 620;
-            wav1 = 665;
-            wav2 = 681;
-            wav3 = 709;
-            wav4 = 443;
-            wav5 = 490;
-            wav6 = 560;
-            wav7 = 865;
-            wav8 = 885;
-            ib4 = bindex_get(wav4);
-            ib5 = bindex_get(wav5);
-            ib6 = bindex_get(wav6);
-            ib7 = bindex_get(wav7);
-            ib8 = bindex_get(wav8);
-        }
-        ib0 = bindex_get(wav0);
-        break;
+            fac = 1.0;
+    }
+    switch (p->cat_ix) {
+        case CAT_CI_stumpf:
+        case CAT_CI_cyano:
+        case CAT_CI_noncyano:
+            // Cyanobacteria Index
+            // Wynne, Stumpf algorithm 2013
+            switch (l1file->sensorID) {
+                case MODISA:
+                case MODIST:
+                    wav0 = 547;
+                    wav1 = 667;
+                    wav2 = 678;
+                    wav3 = 748;
+                    break;
+                default:
+                    wav0 = 620;
+                    wav1 = 665;
+                    wav2 = 681;
+                    wav3 = 709;
+                    wav4 = 443;
+                    wav5 = 490;
+                    wav6 = 560;
+                    wav7 = 865;
+                    wav8 = 885;
+                    ib4 = bindex_get(wav4);
+                    ib5 = bindex_get(wav5);
+                    ib6 = bindex_get(wav6);
+                    ib7 = bindex_get(wav7);
+                    ib8 = bindex_get(wav8);
+            }
+            ib0 = bindex_get(wav0);
+            break;
 
-    case CAT_MCI_stumpf:
-        if (l2rec->l1rec->l1file->sensorID != MERIS && 
-                l2rec->l1rec->l1file->sensorID != OLCIS3A && 
-                l2rec->l1rec->l1file->sensorID != OLCIS3B) {
-            printf("MCI not supported for this sensor (%s).\n",
-                    sensorId2SensorName(l2rec->l1rec->l1file->sensorID));
+        case CAT_MCI_stumpf:
+            if (l1file->sensorID != MERIS && l1file->sensorID != OLCIS3A &&
+                l1file->sensorID != OLCIS3B) {
+                printf("MCI not supported for this sensor (%s).\n",
+                       sensorId2SensorName(l2rec->l1rec->l1file->sensorID));
+                exit(EXIT_FAILURE);
+            }
+            wav1 = 681;
+            wav2 = 709;
+            wav3 = 754;
+            break;
+
+        default:
+            printf("HABS_CI: Hmm, something's really messed up.\n");
             exit(EXIT_FAILURE);
-        }
-        wav1 = 681;
-        wav2 = 709;
-        wav3 = 754;
-        break;
-
-    default:
-        printf("HABS_CI: Hmm, something's really messed up.\n");
-        exit(EXIT_FAILURE);
     }
 
     if (ci_product_info == NULL) {
@@ -170,77 +172,117 @@ void get_habs_ci(l2str *l2rec, l2prodstr *p, float ci[]) {
         exit(EXIT_FAILURE);
     }
 
-    for (ip = 0; ip < l2rec->l1rec->npix; ip++) {
-
-        ipb = l2rec->l1rec->l1file->nbands*ip;
+    for (ip = 0; ip < l1rec->npix; ip++) {
+        ipb = l1file->nbands * ip;
         //  check for near coastal and inland waters (height == 0 and depth < shallow_water_depth)
         //  and valid data for processing CI
-        if ((l2rec->l1rec->height[ip] == 0 && l2rec->l1rec->dem[ip] < -1 * input->shallow_water_depth) ||
-                (l2rec->l1rec->flags[ip] & mask) != 0 ||
-                l2rec->l1rec->rhos[ipb + ib1] <= 0.0 ||
-                l2rec->l1rec->rhos[ipb + ib2] <= 0.0 ||
-                l2rec->l1rec->rhos[ipb + ib3] <= 0.0) {
+        if ((l1rec->height[ip] == 0 && l1rec->dem[ip] < -1 * input->shallow_water_depth) ||
+            (l1rec->flags[ip] & mask) != 0 || l1rec->rhos[ipb + ib1] <= 0.0 ||
+            l1rec->rhos[ipb + ib2] <= 0.0 || l1rec->rhos[ipb + ib3] <= 0.0) {
             ci[ip] = BAD_FLT;
-            l2rec->l1rec->flags[ip] |= PRODFAIL;
+            l1rec->flags[ip] |= PRODFAIL;
         } else {
             switch (p->cat_ix) {
+                case CAT_CI_stumpf:
+                case CAT_CI_cyano:
+                case CAT_CI_noncyano: {
+                    const float wave_ratio = (wav2 - wav1) / (wav3 - wav1);
 
-            case CAT_CI_stumpf:
-            case CAT_CI_cyano:
-            case CAT_CI_noncyano:
-                ci[ip] = fac * ((l2rec->l1rec->rhos[ipb + ib3] - l2rec->l1rec->rhos[ipb + ib1])*(wav2 - wav1) / (wav3 - wav1)
-                        - (l2rec->l1rec->rhos[ipb + ib2] - l2rec->l1rec->rhos[ipb + ib1]));
-           
-                //following corrections currently only applicable for MERIS/OLCI
-                if (l2rec->l1rec->l1file->sensorID == MERIS || l2rec->l1rec->l1file->sensorID == OLCIS3A 
-                        || l2rec->l1rec->l1file->sensorID == OLCIS3B) {
+                    float band_665_rhos = 0;
+                    float band_681_rhos = 0;
+                    float band_709_rhos = 0;
 
-                    //turbidity correction based on ss620 and rhos560<rhos620 test
-                    if ((l2rec->l1rec->rhos[ipb + ib0] - l2rec->l1rec->rhos[ipb + ib6]
-                        + (l2rec->l1rec->rhos[ipb + ib6] - l2rec->l1rec->rhos[ipb + ib1]) * (wav0 - wav6) / (wav1 - wav6) > 0) 
-                        || l2rec->l1rec->rhos[ipb + ib6] < l2rec->l1rec->rhos[ipb + ib0]) {
-                            ci[ip] = 0;
+                    if (instrument_is_hyperspectral(l2rec->l1rec->l1file->nbands)) {
+                        // This algorithm is designed to work with bands that have some width larger than a
+                        // hyperspectral instrument would provide. We average a few bands from a hyperspectral
+                        // instrument to approximate the behavior of the kind of sensor for which this
+                        // algorithm was originally designed.
+
+                        /** @ref Ocean Color's RSR tables */
+                        const int band_665_fwhm = 10;  // Rounded from 9.987
+                        const int band_681_fwhm = 8;   // Rounded from 7.527
+                        const int band_709_fwhm = 10;  // Rounded from 10.013
+
+                        const int band_665_min = wav1 - (band_665_fwhm / 2);
+                        const int band_681_min = wav2 - (band_681_fwhm / 2);
+                        const int band_709_min = wav3 - (band_709_fwhm / 2);
+                        const int band_665_min_index = bindex_get(band_665_min);
+                        const int band_681_min_index = bindex_get(band_681_min);
+                        const int band_709_min_index = bindex_get(band_709_min);
+
+                        const float *band_665_rhos_ptr = &l1rec->rhos[ipb + band_665_min_index];
+                        const float *band_681_rhos_ptr = &l1rec->rhos[ipb + band_681_min_index];
+                        const float *band_709_rhos_ptr = &l1rec->rhos[ipb + band_709_min_index];
+
+                        band_665_rhos = average_rhos_values(band_665_rhos_ptr, band_665_fwhm);
+                        band_681_rhos = average_rhos_values(band_681_rhos_ptr, band_665_fwhm);
+                        band_709_rhos = average_rhos_values(band_709_rhos_ptr, band_665_fwhm);
+                    } else {
+                        band_665_rhos = l1rec->rhos[ipb + ib1];
+                        band_681_rhos = l1rec->rhos[ipb + ib2];
+                        band_709_rhos = l1rec->rhos[ipb + ib3];
                     }
 
-                    habs_meris_ci_corr(l2rec->l1rec->rhos[ipb + ib4], l2rec->l1rec->rhos[ipb + ib5],
-                                       l2rec->l1rec->rhos[ipb + ib6], l2rec->l1rec->rhos[ipb + ib0],
-                                       l2rec->l1rec->rhos[ipb + ib1], l2rec->l1rec->rhos[ipb + ib3],
-                                       l2rec->l1rec->rhos[ipb + ib7], l2rec->l1rec->rhos[ipb + ib8], &ci[ip]);
+                    ci[ip] = fac *
+                             ((band_709_rhos - band_665_rhos) * wave_ratio - (band_681_rhos - band_665_rhos));
 
-                    if (p->cat_ix == CAT_CI_cyano || p->cat_ix == CAT_CI_noncyano) {
-                        if (l2rec->l1rec->rhos[ipb + ib1]
-                                - l2rec->l1rec->rhos[ipb + ib0]
-                                + (l2rec->l1rec->rhos[ipb + ib0]
-                                - l2rec->l1rec->rhos[ipb + ib2])
-                                *(wav1 - wav0) / (wav2 - wav0) >= 0) {
-                            nonci = 0;
-                        } else {
-                            nonci = 1;
-                            // set HABS_NONCYANO - we may decide to set a CI threshold for tripping NONCYANO
-                            flags_habs[ip] |= HABS_NONCYANO;
+                    // following corrections currently only applicable for MERIS/OLCI
+                    if (l1rec->l1file->sensorID == MERIS ||
+                        l1rec->l1file->sensorID == OLCIS3A ||
+                        l1rec->l1file->sensorID == OLCIS3B) {
+                        // turbidity correction based on ss620 and rhos560<rhos620 test
+                        if ((l1rec->rhos[ipb + ib0] - l1rec->rhos[ipb + ib6] +
+                                 (l1rec->rhos[ipb + ib6] - l1rec->rhos[ipb + ib1]) *
+                                     (wav0 - wav6) / (wav1 - wav6) >
+                             0) ||
+                            l1rec->rhos[ipb + ib6] < l1rec->rhos[ipb + ib0]) {
+                            ci[ip] = 0;
                         }
 
-                        if (l2rec->l1rec->rhos[ipb + ib0] <= 0 && p->cat_ix == CAT_CI_noncyano) {
-                            ci[ip] = BAD_FLT;
-                            l2rec->l1rec->flags[ip] |= PRODFAIL;
-                        } else {
-                            // we may decide to NOT set CI to zero and just use flagging
-                            if (p->cat_ix == CAT_CI_noncyano) {
-                                if (nonci == 0) ci[ip] = 0;
+                        habs_meris_ci_corr(l1rec->rhos[ipb + ib4], l1rec->rhos[ipb + ib5],
+                                           l1rec->rhos[ipb + ib6], l1rec->rhos[ipb + ib0],
+                                           l1rec->rhos[ipb + ib1], l1rec->rhos[ipb + ib3],
+                                           l1rec->rhos[ipb + ib7], l1rec->rhos[ipb + ib8],
+                                           &ci[ip]);
+
+                        if (p->cat_ix == CAT_CI_cyano || p->cat_ix == CAT_CI_noncyano) {
+                            if (l1rec->rhos[ipb + ib1] - l1rec->rhos[ipb + ib0] +
+                                    (l1rec->rhos[ipb + ib0] - l1rec->rhos[ipb + ib2]) *
+                                        (wav1 - wav0) / (wav2 - wav0) >=
+                                0) {
+                                nonci = 0;
                             } else {
-                                if (nonci == 1) ci[ip] = 0;
+                                nonci = 1;
+                                // set HABS_NONCYANO - we may decide to set a CI threshold for tripping
+                                // NONCYANO
+                                flags_habs[ip] |= HABS_NONCYANO;
+                            }
+
+                            if (l1rec->rhos[ipb + ib0] <= 0 && p->cat_ix == CAT_CI_noncyano) {
+                                ci[ip] = BAD_FLT;
+                                l1rec->flags[ip] |= PRODFAIL;
+                            } else {
+                                // we may decide to NOT set CI to zero and just use flagging
+                                if (p->cat_ix == CAT_CI_noncyano) {
+                                    if (nonci == 0)
+                                        ci[ip] = 0;
+                                } else {
+                                    if (nonci == 1)
+                                        ci[ip] = 0;
+                                }
                             }
                         }
                     }
+                    break;
                 }
-                break;
-            case CAT_MCI_stumpf:
-                ci[ip] = fac * (l2rec->l1rec->rhos[ipb + ib2] - l2rec->l1rec->rhos[ipb + ib1]
-                        - (l2rec->l1rec->rhos[ipb + ib3] - l2rec->l1rec->rhos[ipb + ib1])*(wav2 - wav1) / (wav3 - wav1));
-                break;
-            default:
-                ci[ip] = BAD_FLT;
-                break;
+                case CAT_MCI_stumpf:
+                    ci[ip] = fac * (l1rec->rhos[ipb + ib2] - l1rec->rhos[ipb + ib1] -
+                                    (l1rec->rhos[ipb + ib3] - l1rec->rhos[ipb + ib1]) *
+                                        (wav2 - wav1) / (wav3 - wav1));
+                    break;
+                default:
+                    ci[ip] = BAD_FLT;
+                    break;
             }
 
             // set non-detect levels of CI to the minimum valid value in product.xml definition
@@ -250,18 +292,18 @@ void get_habs_ci(l2str *l2rec, l2prodstr *p, float ci[]) {
         }
     }
 
-    flags_habs = get_flags_habs(l2rec);
-    for (ip = 0; ip < l2rec->l1rec->npix; ip++) {
+    for (ip = 0; ip < l1rec->npix; ip++) {
         // only look at the first 5 bits
         if ((flags_habs[ip] & 0x1F) != 0) {
             ci[ip] = BAD_FLT;
-            l2rec->l1rec->flags[ip] |= PRODFAIL;
+            l1rec->flags[ip] |= PRODFAIL;
         }
     }
-    if (l2rec->l1rec->iscan == l2rec->l1rec->l1file->nscan) {
+    if (l1rec->iscan == l1rec->l1file->nscan) {
         freeProductInfo(ci_product_info);
     }
 }
+
 /*
  * Maximum Peak Height of chlorophyll for MERIS
  *
@@ -496,7 +538,8 @@ uint8_t* get_flags_habs_meris(l2str *l2rec) {
 
     if (l2rec->l1rec->l1file->sensorID != MERIS && 
             l2rec->l1rec->l1file->sensorID != OLCIS3A &&
-            l2rec->l1rec->l1file->sensorID != OLCIS3B) {
+            l2rec->l1rec->l1file->sensorID != OLCIS3B &&
+            l2rec->l1rec->l1file->sensorID != OCI) {
         printf("HABS flags not supported for this sensor (%s).\n",
                 sensorId2SensorName(l2rec->l1rec->l1file->sensorID));
         exit(EXIT_FAILURE);
@@ -696,6 +739,7 @@ uint8_t* get_flags_habs(l2str *l2rec) {
     case MERIS:
     case OLCIS3A:
     case OLCIS3B:
+    case OCI:
         return get_flags_habs_meris(l2rec);
         break;
     case MODISA:

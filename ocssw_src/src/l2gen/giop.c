@@ -110,7 +110,7 @@ static float *chisqr;
 static int16 max_npar;
 
 static int *siop_num;
-static int allocateRrsRaman = 0;
+//static int allocateRrsRaman = 0;
 
 void freeArray(void **a, int32_t m) {
     int i;
@@ -2242,6 +2242,7 @@ void run_giop(l2str *l2rec) {
     double *Rrs_f; /* modeled Rrs, per fit band */
     double *wts; /* weights, per fit band     */
     double *uRrs; 
+    float *Rrs_ram;  /* Raman correction.  Set to zero if not calculated */
 
     float Rrs1, Rrs2;
     /*uncertainties in Rrs1, Rrs2, and covariance*/
@@ -2500,20 +2501,6 @@ void run_giop(l2str *l2rec) {
             exit(1);
         }
 
-        /*Note: Calculation of Raman scattering contribution to Rrs is at present*/
-        /*only supported in l2gen. Where Raman Rrs is not calculated (i.e. l3gen smi)*/
-        /*set Rrs_raman to zeros */
-        if (l2rec->Rrs_raman == NULL) {
-
-            printf("\n");
-            printf("No Raman scattering correction applied to Rrs. \n");
-            printf("\n");
-
-            allocateRrsRaman = 1;
-            l2rec->Rrs_raman = (float*) allocateMemory(npix *
-                    l1rec->l1file->nbands * sizeof (float), "Rrs_ram");
-        }
-
     }
 
     if ((par = calloc(2 * nwave, sizeof (double))) == NULL) {
@@ -2557,11 +2544,6 @@ void run_giop(l2str *l2rec) {
         free(fit_par);
         free(siop_num);
         free(chisqr);
-        if (allocateRrsRaman) {
-            free(l2rec->Rrs_raman);
-            l2rec->Rrs_raman = (float*) allocateMemory(npix *
-                    l1rec->l1file->nbands * sizeof (float), "Rrs_ram");
-        }
 
         if ((iter = calloc(npix, sizeof (int16))) == NULL) {
             printf("-E- %s line %d : error allocating memory for GIOP.\n",
@@ -2717,6 +2699,11 @@ void run_giop(l2str *l2rec) {
                 __FILE__, __LINE__);
         exit(1);
     }
+    if ((Rrs_ram = calloc(nwave, sizeof (float))) == NULL) {
+        printf("-E- %s line %d : error allocating memory for GIOP.\n",
+                __FILE__, __LINE__);
+        exit(1);
+    }
     if ((wts = calloc(nwave, sizeof (double))) == NULL) {
         printf("-E- %s line %d : error allocating memory for GIOP.\n",
                 __FILE__, __LINE__);
@@ -2806,7 +2793,16 @@ void run_giop(l2str *l2rec) {
             g->bbw[iw] = bbw [g->bindx[iw]];
         }
 
-        //define GIOP Rrs and accsociated uncertainties 
+        // set Raman correction if calculated, else set to zero.
+
+        for (iw = 0; iw < nwave; iw++) {
+            if (l2rec->Rrs_raman[ipb2+iw] > BAD_FLT) 
+                Rrs_ram[iw] = l2rec->Rrs_raman[ipb2+iw]; 
+            else 
+                Rrs_ram[iw] = 0.0;
+        }
+
+        //define GIOP Rrs and associated uncertainties 
         for (iw = 0; iw < nwave; iw++) {
             g->Rrs_a[iw] = l2rec->Rrs[ipb2 + iw];
 
@@ -2994,8 +2990,8 @@ void run_giop(l2str *l2rec) {
             // update power-law exponent based on HAL band-ratio relationship
             i1 = windex(490.0, wave, nwave);
             i2 = windex(550.0, wave, nwave);
-            Rrs1 = l2rec->Rrs[ipb2 + i1] - l2rec->Rrs_raman[ipb2 + i1]; //CHECK IF RAMAN SHOULD BE HERE!!
-            Rrs2 = l2rec->Rrs[ipb2 + i2] - l2rec->Rrs_raman[ipb2 + i2];
+            Rrs1 = l2rec->Rrs[ipb2 + i1] - Rrs_ram[i1]; //CHECK IF RAMAN SHOULD BE HERE!!
+            Rrs2 = l2rec->Rrs[ipb2 + i2] - Rrs_ram[i2];
             uRrs1 = g->uRrs_a[i1];
             uRrs2 = g->uRrs_a[i2];
             covRrs1Rrs2 = 0.0;
@@ -3142,7 +3138,7 @@ void run_giop(l2str *l2rec) {
 
         for (iw = 0; iw < g->nwave; iw++) {
             ib = g->bindx[iw];
-            Rrs_a[iw] = l2rec->Rrs[ipb2 + ib] - l2rec->Rrs_raman[ipb2 + ib];
+            Rrs_a[iw] = l2rec->Rrs[ipb2 + ib] - Rrs_ram[ib];
             Rrs_b[iw] = rrs_above_to_below(Rrs_a[iw]);
             uRrs_b[iw] = rrs_above_to_below_unc(Rrs_a[iw],g->uRrs_a[iw]);
             
@@ -3277,7 +3273,7 @@ void run_giop(l2str *l2rec) {
         case SVDSIOP:
             giop_model_iterate(g, par, nwave, wave, aw, bbw, foq, aph1, adg1, bbp1, acdom1, anap1, bbph1, bbnap1, Rrs_f, NULL, NULL);
 
-            mRrs[ipb + ib] = rrs_below_to_above(Rrs_f[ib]) + l2rec->Rrs_raman[ipb2 + ib];
+            mRrs[ipb + ib] = rrs_below_to_above(Rrs_f[ib]) + Rrs_ram[ib];
 
             for (ib = 0; ib < nwave; ib++) {
 
@@ -3347,7 +3343,7 @@ void run_giop(l2str *l2rec) {
 
             for (ib = 0; ib < nwave; ib++) {
 
-                mRrs[ipb + ib] = rrs_below_to_above(Rrs_f[ib]) + l2rec->Rrs_raman[ipb2 + ib];
+                mRrs[ipb + ib] = rrs_below_to_above(Rrs_f[ib]) + Rrs_ram[ib];
 
                 if (isfinite(aph1[ib])) {
                     aph[ipb + ib] = aph1[ib];
@@ -3406,6 +3402,7 @@ void run_giop(l2str *l2rec) {
     free(Rrs_a);
     free(Rrs_b);
     free(Rrs_f);
+    free(Rrs_ram);
     free(wts);
     free(par);
     free(upar);

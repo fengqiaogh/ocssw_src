@@ -29,16 +29,14 @@ then
     export BRANCH_OEL_HDF4=$BASE_T_TAG
     export BRANCH_VIIRS_L1=$BASE_T_TAG
     export BRANCH_FOCS=$BASE_T_TAG
-    export BRANCH_DTDB=$BASE_T_TAG
     export BRANCH_POLARIMETRY=$BASE_T_TAG
     export BRANCH_UAA=$BASE_T_TAG
 else
     export BRANCH_OCSSW=develop
     export BRANCH_OEL_UTIL=develop
     export BRANCH_OEL_HDF4=develop
-    export BRANCH_VIIRS_L1=master
+    export BRANCH_VIIRS_L1=develop
     export BRANCH_FOCS=develop
-    export BRANCH_DTDB=master
     export BRANCH_POLARIMETRY=develop
     export BRANCH_UAA=develop
 fi
@@ -82,15 +80,6 @@ check_return "focs/oel_util checkout is bad"
 cd oel_hdf4 && git fetch && git checkout $BRANCH_OEL_HDF4 && if [[ $tag_type != "V" ]]; then git pull; fi && cd ..
 check_return "focs/oel_hdf4 checkout is bad"
 
-cd $TAGDIR/dtdb
-check_return "dtdb dir does not exist"
-git fetch && git checkout $BRANCH_DTDB && if [[ $tag_type != "V" ]]; then git pull; fi
-check_return "dtdb checkout is bad"
-cd oel_util && git fetch && git checkout $BRANCH_OEL_UTIL && if [[ $tag_type != "V" ]]; then git pull; fi && cd ..
-check_return "dtdb/oel_util checkout is bad"
-cd oel_hdf4 && git fetch && git checkout $BRANCH_OEL_HDF4 && if [[ $tag_type != "V" ]]; then git pull; fi && cd ..
-check_return "dtdb/oel_hdf4 checkout is bad"
-
 cd $TAGDIR/polarimetry/harp
 check_return "harp dir does not exist"
 git fetch && git checkout $BRANCH_POLARIMETRY && if [[ $tag_type != "V" ]]; then git pull; fi
@@ -106,15 +95,20 @@ check_return "spex dir does not exist"
 git fetch && git checkout $BRANCH_POLARIMETRY && if [[ $tag_type != "V" ]]; then git pull; fi
 check_return "spex checkout is bad"
 
-cd $TAGDIR/polarimetry/pex
-check_return "polarimetry pex dir does not exist"
-git fetch && git checkout $BRANCH_POLARIMETRY && if [[ $tag_type != "V" ]]; then git pull; fi
-check_return "polarimetry/pex checkout is bad"
-
 cd $TAGDIR/polarimetry/fastmapol
 check_return "polarimetry fastmapol dir does not exist"
 git fetch && git checkout $BRANCH_POLARIMETRY && if [[ $tag_type != "V" ]]; then git pull; fi
 check_return "fastmapol checkout is bad"
+
+cd $TAGDIR/polarimetry/remotap
+check_return "polarimetry remotap dir does not exist"
+git fetch && git checkout $BRANCH_POLARIMETRY && if [[ $tag_type != "V" ]]; then git pull; fi
+check_return "remotap checkout is bad"
+
+cd $TAGDIR/polarimetry/gpc
+check_return "GPC dir does not exist"
+git fetch && git checkout $BRANCH_POLARIMETRY && if [[ $tag_type != "V" ]]; then git pull; fi
+check_return "GPC checkout is bad"
 
 cd $TAGDIR/sat/unified_dtdb_aerosol
 check_return "UAA dir does not exist"
@@ -135,10 +129,6 @@ check_return "viirs_l1 is not clean"
 cd $TAGDIR/focs
 git status | grep "nothing to commit, working tree clean"
 check_return "focs is not clean"
-
-cd $TAGDIR/dtdb
-git status | grep "nothing to commit, working tree clean"
-check_return "dtdb is not clean"
 
 #
 # build viirs_l1
@@ -165,18 +155,6 @@ make -j 20 install
 check_return "focs make failed"
 
 #
-# build dtdb
-#
-cd $TAGDIR/dtdb
-rm -rf build
-mkdir build
-cd build
-cmake ..
-check_return "dtdb cmake failed"
-make -j 20 install
-check_return "dtdb make failed"
-
-#
 # build ocssw
 #
 cd $TAGDIR/ocssw
@@ -200,6 +178,18 @@ check_return "harp hipp cmake failed"
 # somehow a parallel make does not quite work (deleted -j 20)
 make install
 check_return "harp hipp make failed"
+
+#
+# build GPC
+#
+cd $TAGDIR/polarimetry/gpc
+rm -rf build
+mkdir build
+cd build
+cmake ..
+check_return "GPC cmake failed"
+make -j 20 install
+check_return "GPC make failed"
 
 #
 # build UAA
@@ -240,19 +230,19 @@ cd $TAGDIR/viirs_l1 &&        git tag $THETAG -a -m "$THEMESSAGE" && git push --
 check_return "viirs_l1 tag failed"
 cd $TAGDIR/focs &&            git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
 check_return "focs tag failed"
-cd $TAGDIR/dtdb &&            git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
-check_return "dtdb tag failed"
 
-cd $TAGDIR/polarimetry/harp &&   git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
+cd $TAGDIR/polarimetry/harp &&      git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
 check_return "harp tag failed"
-cd $TAGDIR/polarimetry/pyspex && git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
+cd $TAGDIR/polarimetry/pyspex &&    git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
 check_return "pyspex tag failed"
-cd $TAGDIR/polarimetry/spex &&   git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
+cd $TAGDIR/polarimetry/spex &&      git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
 check_return "spex tag failed"
-cd $TAGDIR/polarimetry/pex &&    git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
-check_return "polarimetry/pex tag failed"
-cd $TAGDIR/polarimetry/fastmapol &&    git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
+cd $TAGDIR/polarimetry/fastmapol && git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
 check_return "polarimetry/fastmapol tag failed"
+cd $TAGDIR/polarimetry/remotap &&   git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
+check_return "polarimetry/remotap tag failed"
+cd $TAGDIR/polarimetry/gpc &&       git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
+check_return "polarimetry/gpc tag failed"
 
 cd $TAGDIR/sat/unified_dtdb_aerosol && git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
 check_return "UAA tag failed"

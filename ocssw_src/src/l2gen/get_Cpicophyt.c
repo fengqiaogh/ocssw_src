@@ -49,8 +49,10 @@ void get_Cpicophyt(l2str *l2rec, l2prodstr *p, float *cell_abundance)
     static int *bindx;
     float *Rrs=l2rec->Rrs;
     static float *interp_rrs;
-    static float *wave;
+    static float *wave, *wave_valid, *Rrs_valid;
     static float *pcc_all;
+   
+    int  nbands_valid;
 
     if(firstcall){
         firstcall=0;
@@ -97,6 +99,8 @@ void get_Cpicophyt(l2str *l2rec, l2prodstr *p, float *cell_abundance)
         pca_table=(float32 *)malloc(nwave_pca*npc*sizeof(float32));
         pc=(double *)malloc(npc*sizeof(double));
         wave_pca=(int *)malloc(nwave_pca*sizeof(int));
+        wave_valid=(float *)malloc(nbands*sizeof(float));
+        Rrs_valid=(float *)malloc(nbands*sizeof(float));
         bindx=(int *)malloc(nwave_pca*sizeof(int));
         pcc_all=(float *)malloc(3*npix_malloc*sizeof(float));
 
@@ -196,24 +200,33 @@ void get_Cpicophyt(l2str *l2rec, l2prodstr *p, float *cell_abundance)
 
         ipb=ip*nbands;
 
+        nbands_valid=0;
+        for(i=0;i<nbands;i++){
+            if(Rrs[ipb+i]!=BAD_FLT){
+                wave_valid[nbands_valid]=wave[i];
+                Rrs_valid[nbands_valid]=Rrs[ipb+i];
+                nbands_valid++;
+            }
+        }
+
         cell_abundance[ip]=BAD_FLT;
         for(i=0;i<3;i++)
             pcc_all[ip*3+i]=BAD_FLT;
 
          //interpolate input Rrs to the pca wavelength
         for(i=0;i<nwave_pca;i++){
-            for(j=0;j<nbands;j++){
-                if(wave_pca[i]< wave[j])
+            for(j=0;j<nbands_valid;j++){
+                if(wave_pca[i]< wave_valid[j])
                     break;
             }
             if(j==0)
                 j+=1;
-            else if(j==nbands)
-                j=nbands-1;
+            else if(j==nbands_valid)
+                j=nbands_valid-1;
 
             //interpolate Rrs in pca wavelength using input Rrs at wavelengths j and j-1
 
-            interp_rrs[i]=Rrs[ipb+j-1]+(Rrs[ipb+j]-Rrs[ipb+j-1])*(wave_pca[i]-wave[j-1])/(wave[j]-wave[j-1]);
+            interp_rrs[i]=Rrs_valid[j-1]+(Rrs_valid[j]-Rrs_valid[j-1])*(wave_pca[i]-wave_valid[j-1])/(wave_valid[j]-wave_valid[j-1]);
         }
 
         rrs_standardize(interp_rrs,nwave_pca);

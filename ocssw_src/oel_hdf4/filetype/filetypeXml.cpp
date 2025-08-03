@@ -13,7 +13,6 @@
 #include <vector>
 #include <boost/foreach.hpp>
 
-#include <dfutils.h>
 #include <genutils.h>
 #include <sensorDefs.h>
 #include <timeutils.h>

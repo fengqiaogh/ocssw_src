@@ -12,4 +12,4 @@
  * @param glint_coef_u U stokes compoment
  */
 void getglint_iqu(float senz, float solz, float raz, float ws, float zero, float *glint_coef, float *glint_coef_q,
-             float *glint_coef_u);
+             float *glint_coef_u,double nw);

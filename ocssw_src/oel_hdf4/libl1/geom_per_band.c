@@ -68,7 +68,6 @@ int geom_per_band_deriv(l1str *l1rec)
  Wayne Robinson   10 Jan 2017      Original development
 
  -----------------------------------------------------------------------*/ {
-    static double radeg = RADEG;
     double temp;
     int32_t nbands, npix, ip, ib, ipb;
     geom_struc *geom = l1rec->geom_per_band;
@@ -88,15 +87,15 @@ int geom_per_band_deriv(l1str *l1rec)
                 geom->delphi[ipb] -= 360.0;
 
             /* frequently used trig relations */
-            geom->csolz[ipb] = cos(geom->solz[ipb] / radeg);
-            geom->csenz[ipb] = cos(geom->senz[ipb] / radeg);
+            geom->csolz[ipb] = cos(geom->solz[ipb] / OEL_RADEG);
+            geom->csenz[ipb] = cos(geom->senz[ipb] / OEL_RADEG);
 
             /* Scattering angle */
             temp = sqrt((1.0 - geom->csenz[ipb] * geom->csenz[ipb])*
                     (1.0 - geom->csolz[ipb] * geom->csolz[ipb]))
-                    * cos(geom->delphi[ipb] / radeg);
+                    * cos(geom->delphi[ipb] / OEL_RADEG);
             geom->scattang[ipb] = acos(MAX(-geom->csenz[ipb] * geom->csolz[ipb] +
-                    temp, -1.0)) * radeg;
+                    temp, -1.0)) * OEL_RADEG;
         }
     }
     return 0;

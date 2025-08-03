@@ -196,6 +196,8 @@ class SessionUtils:
             os.makedirs(dirpath)
 
         all_links = self.get_links(url, regex=regex)
+        remote_filenames = {os.path.basename(link['href']) for link in all_links}
+
         for link in all_links:
             f = os.path.basename(link['href'])
             filepath = os.path.join(dirpath, f)
@@ -207,6 +209,16 @@ class SessionUtils:
                     downloaded.append(filepath)
                 if self.verbose:
                     print('+ ' + f)
+
+        local_files = set(os.listdir(dirpath))
+        files_to_remove = local_files - remote_filenames
+
+        for filename in files_to_remove:
+            file_path = os.path.join(dirpath, filename)
+            if os.path.isfile(file_path):
+                if self.verbose:
+                    print(f"Removing outdated file: {file_path}")
+                os.remove(file_path)
 
         return downloaded
 

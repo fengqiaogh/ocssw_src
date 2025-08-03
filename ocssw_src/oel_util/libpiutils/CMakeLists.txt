@@ -8,7 +8,7 @@ list(APPEND LIBS ${PUGIXML_LIBRARIES})
 
 ADD_LIBRARY(piutils
   productInfo.cpp
-  sensorInfo.c
+  sensorInfo.cpp
   rdsensorinfo.c
   getGCMDKeywords.cpp
 )

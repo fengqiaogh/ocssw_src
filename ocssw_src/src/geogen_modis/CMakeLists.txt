@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.12)
 
+set(LIBS genutils)
+
 find_package(HDF4 REQUIRED)
 include_directories(${HDF4_INCLUDE_DIRS})
-set(LIBS ${HDF4_LIBRARIES})
+list(APPEND LIBS ${HDF4_LIBRARIES})
 
 find_package(SDST REQUIRED)
 include_directories(${SDST_INCLUDE_DIRS})

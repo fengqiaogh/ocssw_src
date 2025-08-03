@@ -1,3 +1,8 @@
+/**
+ * @file lib3merge.cpp
+ * @brief This tool merges multiple level-3 binned files into a single level-3 binned file.
+ * @authors J. Gales, S. Bailey, R. Healy
+ **/
 #include <stdio.h>
 #include <unistd.h>
 #include <math.h>
@@ -18,7 +23,7 @@
 
 #define MAXNFILES 128
 
-#define BYTE    unsigned char
+#define BYTE unsigned char
 
 #define BINCHECK -1
 
@@ -53,7 +58,6 @@ static instr input;
  J. Gales
  */
 
-
 int main(int argc, char **argv) {
     intn i;
 
@@ -84,16 +88,28 @@ int main(int argc, char **argv) {
 
     char buf[FILENAME_MAX];
 
+    /**
+     * @brief input buffer for sum and sum-squared data
+     **/
     float *in_sum_buf[MAXNVDATA - 2];
+    /**
+     * @brief output buffer for sum and sum-squared data
+     **/
     float *out_sum_buf[MAXNVDATA - 2];
 
     int status;
 
     char *ptime = ydhmsf(now(), 'G');
+    /**
+     * @brief string containing the command and command line options
+     **/
     char proc_con[2048];
 
     char prodname[MAXNVDATA - 2][FILENAME_MAX];
 
+    /**
+     * @brief catch all float-32 variable, temporarily holds the sum data 
+     **/
     float f32;
 
     float minlon;
@@ -121,6 +137,9 @@ int main(int argc, char **argv) {
     //    get_time(ptime);
 
     input.unit_wgt = 1;
+    /*
+     * @brief True if output file contains the union of input bins
+     **/
     bool case_u = input.union_bins;
 
     strcpy(proc_con, argv[0]);
@@ -130,14 +149,12 @@ int main(int argc, char **argv) {
     }
 
     if (input.loneast <= input.lonwest) {
-        printf("loneast: %f must be greater than lonwest: %f.\n", input.loneast,
-                input.lonwest);
+        printf("loneast: %f must be greater than lonwest: %f.\n", input.loneast, input.lonwest);
         exit(EXIT_FAILURE);
     }
 
     if (input.latnorth <= input.latsouth) {
-        printf("latnorth: %f must be greater than latsouth: %f.\n",
-                input.latnorth, input.latsouth);
+        printf("latnorth: %f must be greater than latsouth: %f.\n", input.latnorth, input.latsouth);
         exit(EXIT_FAILURE);
     }
 
@@ -155,7 +172,7 @@ int main(int argc, char **argv) {
     bool isHDF5 = false;
     bool isCDF4 = false;
 
-    Hdf::hdf_bin * input_binfile[MAXNFILES];
+    Hdf::hdf_bin *input_binfile[MAXNFILES];
 
     fp = fopen(input.infile, "r");
     if (fp == NULL) {
@@ -218,7 +235,6 @@ int main(int argc, char **argv) {
             ;
             tot_nprod++;
         }
-        //printf("open status: %d\n", status);
 
     } /* ifile loop */
 
@@ -232,7 +248,7 @@ int main(int argc, char **argv) {
 
     if (getFileFormatName(input.oformat) == NULL) {
         if (isHDF4)
-            strcpy(input.oformat, "HDF4");
+            strcpy(input.oformat, "netCDF4");
         if (isHDF5)
             strcpy(input.oformat, "HDF5");
         if (isCDF4)
@@ -241,20 +257,12 @@ int main(int argc, char **argv) {
 
     strcpy(buf, input.ofile);
 
-    if (strcmp(input.oformat, "HDF4") == 0) {
-        output_binfile = new Hdf::hdf4_bin;
-        output_binfile->hasNoext = false;
-        if (input.noext == 0)
-            strcat(buf, ".main");
-        else
-            output_binfile->hasNoext = true;
-    }
     if (strcmp(input.oformat, "HDF5") == 0)
         output_binfile = new Hdf::hdf5_bin;
     if (strcmp(input.oformat, "netCDF4") == 0)
         output_binfile = new Hdf::cdf4_bin;
 
-    char* tmpProdNames[tot_nprod];
+    char *tmpProdNames[tot_nprod];
     for (uint32_t i = 0; i < tot_nprod; i++) {
         tmpProdNames[i] = prodname[i];
     }
@@ -271,18 +279,17 @@ int main(int argc, char **argv) {
     ncols = 2 * nrows;
     ncols_out = 2 * nrows;
 
-    for (iprod = 0; iprod < (int) tot_nprod; iprod++) {
-        in_sum_buf[iprod] = (float *) calloc(ncols, 2 * sizeof (float));
-        out_sum_buf[iprod] = (float *) calloc(ncols_out, 2 * sizeof (float));
+    for (iprod = 0; iprod < (int)tot_nprod; iprod++) {
+        in_sum_buf[iprod] = (float *)calloc(ncols, 2 * sizeof(float));
+        out_sum_buf[iprod] = (float *)calloc(ncols_out, 2 * sizeof(float));
     } /* iprod loop */
 
-    nfiles_contribute = (uint8 *) calloc(ncols_out, sizeof (uint8));
+    nfiles_contribute = (uint8 *)calloc(ncols_out, sizeof(uint8));
 
     /* ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ */
     /* For each scan ... (Main Loop) */
     /* ----------------------------- */
     for (irow = 0; irow < nrows; irow++) {
-
         if ((irow % 500) == 0) {
             time(&tnow);
             tmnow = localtime(&tnow);
@@ -298,19 +305,19 @@ int main(int argc, char **argv) {
         row_write = 0;
 
         output_binfile->clear_binlist();
-        for (iprod = 0; iprod < (int32_t) tot_nprod; iprod++) {
-            memset(&out_sum_buf[iprod][0], 0, ncols_out * 2 * sizeof (float));
+        for (iprod = 0; iprod < (int32_t)tot_nprod; iprod++) {
+            memset(&out_sum_buf[iprod][0], 0, ncols_out * 2 * sizeof(float));
         } /* iprod loop */
 
         if (case_u) {
-            for (iprod = 0; iprod < (int32_t) tot_nprod; iprod++) {
+            for (iprod = 0; iprod < (int32_t)tot_nprod; iprod++) {
                 for (i = 0; i < ncols_out * 2; i++) {
                     out_sum_buf[iprod][i] = -32767.0;
                 }
             }
         }
 
-        memset(nfiles_contribute, 0, ncols_out * sizeof (uint8));
+        memset(nfiles_contribute, 0, ncols_out * sizeof(uint8));
 
         /* Get bin info */
         /* ------------ */
@@ -333,7 +340,6 @@ int main(int argc, char **argv) {
         /* For each file ... */
         /* ----------------- */
         for (ifile = 0; ifile < nfiles; ifile++) {
-
             int64_t beg = input_binfile[ifile]->get_beg();
             int ext = input_binfile[ifile]->get_ext();
 
@@ -344,20 +350,18 @@ int main(int argc, char **argv) {
 
                 /* Determine lon kbin limits */
                 /* ------------------------- */
-                offmin = (int32_t) ((minlon + 180) * (numbin / 360.0) + 0.5);
-                offmax = (int32_t) ((maxlon + 180) * (numbin / 360.0) + 0.5);
+                offmin = (int32_t)((minlon + 180) * (numbin / 360.0) + 0.5);
+                offmax = (int32_t)((maxlon + 180) * (numbin / 360.0) + 0.5);
 
                 /* Get data values (sum, sum_sq) for each filled bin in row */
                 /* -------------------------------------------------------- */
                 int nbins_to_read = ext;
                 for (iprod = 0; iprod < nprod[ifile]; iprod++) {
-                    input_binfile[ifile]->readSums(&in_sum_buf[iprod][0],
-                            nbins_to_read, iprod);
+                    input_binfile[ifile]->readSums(&in_sum_buf[iprod][0], nbins_to_read, iprod);
                 } /* iprod loop */
 
                 if (isHDF5 || isCDF4)
                     input_binfile[ifile]->setDataPtr(nbins_to_read);
-                //	row_write = 1;
 
                 /* Skip row if not between minlat & maxlat */
                 lat = ((irow + 0.5) / nrows) * 180.0 - 90.0;
@@ -369,7 +373,6 @@ int main(int argc, char **argv) {
                 /* Fill output buffers with input bin data */
                 /* --------------------------------------- */
                 for (kbin = 0; kbin < ext; kbin++) {
-
                     /* Store bin number */
                     /* ---------------- */
                     bin_num = input_binfile[ifile]->get_bin_num(kbin);
@@ -389,8 +392,7 @@ int main(int argc, char **argv) {
                     bin_num_out = bin_num;
 
                     if (offset_out >= ncols_out) {
-                        printf("Bad write to BINLIST: %d %d %d %d\n", ifile,
-                                irow, ncols_out, offset_out);
+                        printf("Bad write to BINLIST: %d %d %d %d\n", ifile, irow, ncols_out, offset_out);
                         exit(EXIT_FAILURE);
                     }
 
@@ -420,41 +422,31 @@ int main(int argc, char **argv) {
                         if (input.unit_wgt) {
                             wgt = weights;
                             f32 = in_sum_buf[iprod][2 * kbin];
-                            if (out_sum_buf[prod_offset[ifile] + iprod][2
-                                    * offset_out] == -32767.0) {
-                                out_sum_buf[prod_offset[ifile] + iprod][2
-                                        * offset_out] = f32 / wgt;
-                                out_sum_buf[prod_offset[ifile] + iprod][2
-                                        * offset_out + 1] = (f32 / wgt)
-                                        * (f32 / wgt);
+                            if (out_sum_buf[prod_offset[ifile] + iprod][2 * offset_out] == -32767.0) {
+                                out_sum_buf[prod_offset[ifile] + iprod][2 * offset_out] = f32 / wgt;
+                                out_sum_buf[prod_offset[ifile] + iprod][2 * offset_out + 1] =
+                                    (f32 / wgt) * (f32 / wgt);
                             } else {
-                                out_sum_buf[prod_offset[ifile] + iprod][2
-                                        * offset_out] += f32 / wgt;
-                                out_sum_buf[prod_offset[ifile] + iprod][2
-                                        * offset_out + 1] += (f32 / wgt)
-                                        * (f32 / wgt);
+                                out_sum_buf[prod_offset[ifile] + iprod][2 * offset_out] += f32 / wgt;
+                                out_sum_buf[prod_offset[ifile] + iprod][2 * offset_out + 1] +=
+                                    (f32 / wgt) * (f32 / wgt);
                             }
                         } else {
                             /* Add new sum to accumulated sum & sum2 */
                             /* ------------------------------------- */
+                            /* This else block is never excecuted, input.unit_wgt is hard-coded to 1 */
                             f32 = in_sum_buf[iprod][2 * kbin];
-                            if (out_sum_buf[prod_offset[ifile] + iprod][2
-                                    * offset_out] == -32767.0) {
-                                out_sum_buf[prod_offset[ifile] + iprod][2
-                                        * offset_out] = f32;
+                            if (out_sum_buf[prod_offset[ifile] + iprod][2 * offset_out] == -32767.0) {
+                                out_sum_buf[prod_offset[ifile] + iprod][2 * offset_out] = f32;
                             } else {
-                                out_sum_buf[prod_offset[ifile] + iprod][2
-                                        * offset_out] += f32;
+                                out_sum_buf[prod_offset[ifile] + iprod][2 * offset_out] += f32;
                             }
 
                             f32 = in_sum_buf[iprod][2 * kbin + 1];
-                            if (out_sum_buf[prod_offset[ifile] + iprod][2
-                                    * offset_out + 1] == -32767.0) {
-                                out_sum_buf[prod_offset[ifile] + iprod][2
-                                        * offset_out + 1] = f32;
+                            if (out_sum_buf[prod_offset[ifile] + iprod][2 * offset_out + 1] == -32767.0) {
+                                out_sum_buf[prod_offset[ifile] + iprod][2 * offset_out + 1] = f32;
                             } else {
-                                out_sum_buf[prod_offset[ifile] + iprod][2
-                                        * offset_out + 1] += f32;
+                                out_sum_buf[prod_offset[ifile] + iprod][2 * offset_out + 1] += f32;
                             }
                         } /* input.unit_wgt */
                     } /* product loop */
@@ -468,28 +460,22 @@ int main(int argc, char **argv) {
         /* Write output vdatas */
         /* ------------------- */
         if (row_write) {
-
             n_write = 0;
             for (kbin = 0; kbin < output_binfile->get_numbin(irow); kbin++) {
-
                 bin_num = output_binfile->get_bin_num(kbin);
 
                 if (bin_num != 0) {
-
                     // Skip rows where not all files contribute
-                    if ((nfiles_contribute[bin_num - basebin] != nfiles)
-                            and !case_u)
+                    if ((nfiles_contribute[bin_num - basebin] != nfiles) and !case_u)
                         continue;
 
                     /* Loop over data products */
                     /* ----------------------- */
-                    for (iprod = 0; iprod < (int32_t) tot_nprod; iprod++) {
-
+                    for (iprod = 0; iprod < (int32_t)tot_nprod; iprod++) {
                         /* Remove "blank" bin records */
                         /* -------------------------- */
                         if (n_write != kbin)
-                            memcpy(&out_sum_buf[iprod][2 * n_write],
-                                &out_sum_buf[iprod][2 * kbin], 8);
+                            memcpy(&out_sum_buf[iprod][2 * n_write], &out_sum_buf[iprod][2 * kbin], 8);
                     } /* iprod loop */
 
                     /* Remove "blank" bin records */
@@ -508,10 +494,9 @@ int main(int argc, char **argv) {
             if (n_write > 0) {
                 output_binfile->writeBinList(n_write);
 
-                for (iprod = 0; iprod < (int32_t) tot_nprod; iprod++) {
+                for (iprod = 0; iprod < (int32_t)tot_nprod; iprod++) {
                     strcpy(buf, prodname[iprod]);
-                    output_binfile->writeSums(&out_sum_buf[iprod][0], n_write,
-                            buf);
+                    output_binfile->writeSums(&out_sum_buf[iprod][0], n_write, buf);
                 }
                 if (isHDF5 || isCDF4)
                     output_binfile->incNumRec(n_write);
@@ -519,7 +504,7 @@ int main(int argc, char **argv) {
         }
         // if median free storage arrays
         if (input.median) {
-            for (iprod = 0; iprod < (int32_t) tot_nprod; iprod++) {
+            for (iprod = 0; iprod < (int32_t)tot_nprod; iprod++) {
                 free(sort_array[iprod]);
             }
         }
@@ -527,7 +512,7 @@ int main(int argc, char **argv) {
     } /* irow loop */
     /* ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ */
 
-    for (iprod = 0; iprod < (int32_t) tot_nprod; iprod++) {
+    for (iprod = 0; iprod < (int32_t)tot_nprod; iprod++) {
         free(in_sum_buf[iprod]);
         free(out_sum_buf[iprod]);
     } /* iprod loop */
@@ -579,12 +564,6 @@ int main(int argc, char **argv) {
     if (strcmp(input.oformat, "netCDF4") == 0) {
         ptime = unix2isodate(now(), 'G');
         strcpy(output_binfile->meta_l3b.ptime, ptime);
-        //        if (!input_binfile[0]->isCDF4){
-        //            int stimez = zulu2unix(output_binfile->meta_l3b.stime);
-        //            strcpy( output_binfile->meta_l3b.stime,unix2isodate(stimez,'G'));
-        //            int etimez = zulu2unix(output_binfile->meta_l3b.etime);
-        //            strcpy( output_binfile->meta_l3b.etime, unix2isodate(etimez,'G'));
-        //        }
     } else {
         strcpy(output_binfile->meta_l3b.ptime, ptime);
     }
@@ -595,4 +574,3 @@ int main(int argc, char **argv) {
 
     return 0;
 }
-

@@ -47,13 +47,15 @@ def main():
         99 : an error was encountered; no .anc parameter text file was created
         31 : no ancillary files currently exist corresponding to the start
              time and therefore no .anc parameter text file was created
-      1-30 : bitwise value indicating one or more files are not optimal:
+      1-127 : bitwise value indicating one or more files are not optimal:
 
              bit 0 set = missing one or more MET files
              bit 1 set = missing one or more OZONE files
              bit 2 set = no SST file found
              bit 3 set = no NO2 file found
              bit 4 set = no ICE file found
+             bit 5 set = no GEO file found
+             bit 6 set = no AER file found
 
     e.g. STATUS=11 indicates there are missing optimal MET, OZONE, and NO2 files
 

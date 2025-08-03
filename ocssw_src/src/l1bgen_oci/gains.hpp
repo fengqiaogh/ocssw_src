@@ -1,9 +1,8 @@
 #ifndef __L1B_GAINS__
 #define __L1B_GAINS__
-
+#include <stdint.h>
 #include <array>
-#include "vecxD.hpp"
-#include <cstdint>
+#include "types.hpp"
 
 enum GainDims {
     T,  // Time

@@ -4,6 +4,7 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <netcdf.h>
 
 // global L1 input pointer
 l1_input_t *l1_input;
@@ -197,6 +198,87 @@ void l1_add_options(clo_optionList_t* list) {
 }
 
 
+/**
+ * @brief   if gain or offset has only 1 value, propagate that same value to all other
+ *          bands/array
+ * @param varStr gain or offset
+ * @param numBands l1file->nbands
+ */
+void l1_propagateGainOffsetBands(const char *varStr, int32_t numBands) {
+
+   if (strcmp(varStr, "gain") == 0) {
+        for (int i = 1; i < numBands; i++) {
+            l1_input->gain[i] = l1_input->gain[0];
+        }
+   }
+
+   // "offset"
+   else {
+        for (int i = 1; i < numBands; i++) {
+            l1_input->offset[i] = l1_input->offset[0];
+        }
+   }
+}
+
+/**
+ * @brief Open the netcef and grab the 
+ * @param ncFileId  id of the netcdf that has been opened
+ * @param varStr "gain" or "offset"
+ * @param numBands
+ * @return 1 if issues exists and 0 if no issues
+ */
+int l1_getGainOffsetFromNcFile(int ncFileId, const char* varStr, int32_t numBands) {
+
+    int varId = -1;         // variable id in the NcFile
+    int dimId = -1;         // dimension id in the Ncfile to check for how large the var is 
+    size_t dimSize = -1;    // size of the dim.
+
+    // get the variable id so we can ask it for things
+    int error = nc_inq_varid(ncFileId, varStr, &varId);
+    
+    // variable exists
+    if (!error) {
+
+        // grab the variable's dimId to check its size
+        if (error = nc_inq_var(ncFileId, varId, NULL, NULL, NULL, &dimId, NULL)) {
+            printf("--WARNING--: Issue grabbing dimension id for %s variable. Skipping getting data from calfile.\n", varStr);
+            return 1;
+        }
+
+        // grab the dimensions size
+        if (error = nc_inq_dimlen(ncFileId, dimId, &dimSize)) {
+            printf("--WARNING--: Issue grabbing dimension size for %s variable. Skipping getting data from calfile.\n", varStr);
+            return 1;
+        }
+
+        // wrong size dimension, exit
+        if ((int)dimSize != numBands && (int)dimSize != 1) {
+            printf("-E- number of %s elements (%d) must be 1, or equal to number of bands (%d)\n", varStr, (int)dimSize, numBands);
+            exit(1);
+        }
+
+        // correct size, grab the data and put it in offset or gain based on the varStr input
+        if (error = nc_get_var_float(ncFileId, varId, strcmp(varStr, "gain") == 0 ? l1_input->gain : l1_input->offset)) {
+            printf("--WARNING--: Issue grabbing %s data. Skipping getting data from calfile.\n", varStr);
+            return 1;
+        }
+        
+        // if dimSize is only 1, then only the first index was filled. Propagate the first value so all of gain or
+        // offset array is filled the with the same value
+        if (dimSize == 1) {
+            l1_propagateGainOffsetBands(varStr, numBands);
+        }
+        return 0; 
+
+    }
+    // variable does not exist
+    else {
+        printf("WARNING: %s variable does not exist in calfile. Skipping variable.\n", varStr);
+        return 1;
+    }
+}
+
+
 void l1_read_default_files(clo_optionList_t *list, filehandle *l1file, const char *ifile) {
     const char *l1_defaults_prefix = "msl12";
 
@@ -265,6 +347,8 @@ void l1_load_options(clo_optionList_t *list, filehandle *l1file) {
 
     l1_input->xcal_opt = calloc_nbandsi32t(l1file->nbands, l1_input->xcal_opt, 0);
     l1_input->xcal_wave = calloc_nbandsf(l1file->nbands, l1_input->xcal_wave, -1.0);
+
+    // if gain or offset are not specified, the default will be 1 and 0 for all bands
     l1_input->gain = calloc_nbandsf(l1file->nbands, l1_input->gain, 1.0);
     l1_input->offset = calloc_nbandsf(l1file->nbands, l1_input->offset, 0.0);
 
@@ -280,10 +364,13 @@ void l1_load_options(clo_optionList_t *list, filehandle *l1file) {
 
     l1_input->rad_opt = clo_getInt(list, "rad_opt");
 
-    strVal = clo_getString(list, "calfile");
-    if(strVal && strVal[0]) {
-        parse_file_name(strVal, tmp_file);
-        strcpy(l1_input->calfile, tmp_file);
+    option = clo_findOption(list, "calfile");
+    if (clo_isOptionSet(option)) {
+        strVal = clo_getOptionString(option);
+        if(strVal && strVal[0]) {
+            parse_file_name(strVal, tmp_file);
+            strcpy(l1_input->calfile, tmp_file);
+        }
     }
 
     l1_input->geom_per_band = clo_getBool(list, "geom_per_band");
@@ -419,26 +506,103 @@ void l1_load_options(clo_optionList_t *list, filehandle *l1file) {
     }
     l1_input->cloud_mask_opt = clo_getInt(list, "cloud_mask_opt");
 
+    // Used to indicate if the program needs to read from the calfile.
+    // If CLO has gain and offset set, then skip reading gain or offset from the calfile.
+    int skipCalfileGain = 0;
+    int skipCalfileOffset = 0;
+
+    // This step will read whatever is set in gain of the parfile/command line by the user. If the
+    // user does not set gain, then the default of 1.0 will be used.
     option = clo_findOption(list, "gain");
     if (clo_isOptionSet(option)) {
         fArray = clo_getOptionFloats(option, &count);
-        if (count != l1file->nbands) {
-            printf("-E- number of gain elements (%d) must be equal to number of bands (%d)\n", count, l1file->nbands);
+        if (count != l1file->nbands && count != 1) {
+            printf("-E- number of gain elements (%d) must be 1, or equal to number of bands (%d)\n", count, l1file->nbands);
             exit(1);
         }
-        for (i = 0; i < count; i++)
-            l1_input->gain[i] = fArray[i];
+
+        // gain is defined for each band
+        if (count == l1file->nbands) {
+            for (i = 0; i < count; i++) {
+                l1_input->gain[i] = fArray[i];
+            }
+        }
+        // only 1 gain, propagate this to all of gain array
+        else {
+            char *tmpStr = clo_getOptionRawString(option);
+            if(!strcmp(tmpStr, "-1"))
+                l1_input->gain[0] = 1.0;
+            l1_propagateGainOffsetBands("gain", l1file->nbands);
+        }
+
+        // dont read calfile gain since the command line has it
+        skipCalfileGain = 1;
     }
+
 
     option = clo_findOption(list, "offset");
     if (clo_isOptionSet(option)) {
         fArray = clo_getOptionFloats(option, &count);
-        if (count != l1file->nbands) {
-            printf("-E- number of offset elements (%d) must be equal to nu,ber of bands (%d)\n", count, l1file->nbands);
+        if (count != l1file->nbands && count != 1) {
+            printf("-E- number of offset elements (%d) must be 1, or equal to number of bands (%d)\n", count, l1file->nbands);
             exit(1);
         }
-        for (i = 0; i < count; i++)
-            l1_input->offset[i] = fArray[i];
+        
+        // gain is defined for each band
+        if (count == l1file->nbands) {
+            for (i = 0; i < count; i++) {
+                l1_input->offset[i] = fArray[i];
+            }
+        }
+        // only 1 gain, propagate this to all of gain array
+        else {
+            char *tmpStr = clo_getOptionRawString(option);
+            if(!strcmp(tmpStr, "-1"))
+                l1_input->gain[0] = 0.0;
+            l1_propagateGainOffsetBands("offset", l1file->nbands);
+        }
+
+        // dont read calfile gain since the command line has it
+        skipCalfileOffset = 1;
+        
+    }
+
+    // check calfile and load gain and offset if at least 1 of them is not set in CLO
+    if (!skipCalfileGain || !skipCalfileOffset) {
+
+        if(l1_input->calfile[0]) {
+
+            int ncFileId = -1;      // netcdf file id needed to access variables
+
+            // Open file in read mode and save the file id. 
+            // Issue a warning if it cant be opened. Only a warning because the gain and offset are optional in it.
+            int error = nc_open(l1_input->calfile, NC_NOWRITE, &ncFileId);
+            if (error) {
+                printf("WARNING: Cannot open calfile: %s. Calfile ignored.\n", l1_input->calfile);
+            } else {
+
+                // Continue to getting gain and offset only if the file open successfully and
+                // if they do not need to be skipped. They are skipped if they are set in CLO
+                // or the command line.
+                char *str = "offset";
+                if(!skipCalfileGain) {
+                    if(!skipCalfileOffset) {
+                        str = "gain and offset";
+                    } else {
+                        str = "gain";
+                    }
+                }
+                printf("Loading %s from calfile: %s\n", str, l1_input->calfile);
+
+                if (!skipCalfileGain) {
+                    l1_getGainOffsetFromNcFile(ncFileId, "gain", l1file->nbands);
+                }
+                if (!skipCalfileOffset) {
+                    l1_getGainOffsetFromNcFile(ncFileId, "offset", l1file->nbands);
+                }
+
+            }
+        }
     }
 
     l1_input->spixl = clo_getInt(list, "spixl");

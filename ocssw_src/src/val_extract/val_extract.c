@@ -918,43 +918,6 @@ static uint32_t find_closest_index(double target_lat, double target_lon, uint32_
     return closest_i;
 }
 
-#if 0
-const long double pi = 3.14159265358979323846264338327950288419716939937510582097494459230781640628620899L;
-static double rad2deg(const double rad) {
-    return (180.0 * rad / (pi));
-}
-static double deg2rad(const double deg) {
-    return (pi * deg / 180.0);
-}
-static long double rad2degl(const long double rad) {
-    return (180.0 * rad / (pi));
-}
-static long double deg2radl(const long double deg) {
-    return (pi * deg / 180.0);
-}
-
-static uint32_t find_closest_index_polar(double target_lat, double target_lon, uint32_t length, double *lats, double *lons) {
-    double target_x = cos(deg2rad(target_lat)) * cos(deg2rad(target_lon));
-    double target_y = cos(deg2rad(target_lat)) * sin(deg2rad(target_lon));
-    double target_z = sin(deg2rad(target_lat));
-
-    uint32_t i = 0, closest_i = -1;
-    double best_diff = DBL_MAX;
-    for (;i<length;i++) {
-        double this_x = cos(deg2rad(lats[i])) * cos(deg2rad(lons[i]));
-        double this_y = cos(deg2rad(lats[i])) * sin(deg2rad(lons[i]));
-        double this_z = sin(deg2rad(lats[i]));
-
-        double diff = this_x * target_x + this_y * target_y + this_z * target_z;
-        if (diff > best_diff) {
-            closest_i = i;
-            best_diff = diff;
-        }
-    }
-    return closest_i;
-}
-#endif
-
 static nc_box *add_to_boxes(nc_box *boxes, unsigned *box_shift, int *box_i, int *box_max, int line_i, int start_pixel, int end_pixel) {
     if (*box_i == *box_max) {
         nc_box *new_boxes_ptr = realloc(boxes, sizeof(nc_box) * (1 << (++*box_shift)));

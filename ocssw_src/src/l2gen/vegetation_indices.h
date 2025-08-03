@@ -41,7 +41,7 @@ extern "C" {
  * @param size_t length An integer indicating the size of wavelengths
  * @return the average value of the values in rho_s_values
  */
-float average_rhos_values(float rhos_values[], size_t length);
+float average_rhos_values(const float rhos_values[], size_t length);
 
 /**
  * @brief Check pixel attributes for validity
@@ -51,7 +51,8 @@ float average_rhos_values(float rhos_values[], size_t length);
  * @param len_rhos_values Number of bands for which a rho_s value has been measured
  * @return true if there is something wrong with any of the given attributes, false otherwise
  */
-bool invalid_pixel(double pixel_elevation, double pixel_mask, double rhos_values[], int len_rhos_values);
+bool invalid_pixel(double pixel_elevation, double pixel_mask, const double rhos_values[],
+                   int len_rhos_values);
 
 /**
  * @short Clamp the value of a pixel between minval and maxval

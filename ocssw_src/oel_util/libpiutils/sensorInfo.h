@@ -12,7 +12,7 @@
 #include <stdint.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern "C" { 
 #endif
 
 
@@ -37,5 +37,14 @@ const char* instrumentPlatform2SensorName(const char* instrument, const char* pl
 }
 #endif
 
+#ifdef __cplusplus
+#include <string>
+
+int sensorName2SensorId(const std::string &sensorName);
+int instrumentPlatform2SensorId(const std::string &instrument, const std::string &platform);
+
+std::string instrumentPlatform2SensorName(const std::string &instrument, const std::string &platform);
+
+#endif
 
 #endif /* SENSOR_INFO_H_ */

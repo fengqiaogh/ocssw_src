@@ -475,7 +475,7 @@ void swim_func(double *initialParams, double *rrsTotal, int numParams,
                 * (invCosSolz + (duC * invCosSenz))));
 
         //Bottom contribution term
-        rrsBenthos = (benthicRefl[iw] / M_PI)
+        rrsBenthos = (benthicRefl[iw] / OEL_PI)
                 * exp(-1.0 * kappa * depth * (invCosSolz + (duB * invCosSenz)));
 
         rrsTotal[iw] = rrsColumn + rrsBenthos;
@@ -618,8 +618,8 @@ void run_swim(l2str *l2rec) {
         if (l1rec->mask[i] == 0) {
 
             /* Solar and Sensor Viewing Geometry */
-            double solzRad = (l1rec->solz[i] * M_PI) / 180.0; /*Convert to radians*/
-            double senzRad = (l1rec->senz[i] * M_PI) / 180.0; /*convert to radians*/
+            double solzRad = (l1rec->solz[i] * OEL_PI) / 180.0; /*Convert to radians*/
+            double senzRad = (l1rec->senz[i] * OEL_PI) / 180.0; /*convert to radians*/
             invCosSolz = 1.0 / cos(solzRad); /*Check rad or deg */
             invCosSenz = 1.0 / cos(senzRad); /*Check rad or deg */
 

@@ -73,7 +73,7 @@ int rd_sdr_scan(int iscn, ctl_struc *ctl, sdr_info_struc *sdr_info,
                 for (ipix = 0; ipix < in_rec->npix; ipix++) {
                     /*  remember to check for a bad value and note it */
                     rad = in_rec->l2_str.l2_data[ibnd][ipix];
-                    if ((rad == in_rec->l2_str.bv_unscaled[ibnd]) ||
+                    if ((rad == BAD_FLT) ||
                             (rad < -0.5)) {
                         *(in_rec->bnd_q[ibnd] + idet * in_rec->npix + ipix) = 2;
                         *(in_rec->bnd_lt[ibnd] + idet * in_rec->npix + ipix) = 0.;

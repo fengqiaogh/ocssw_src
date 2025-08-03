@@ -6,13 +6,93 @@ import logging
 import os.path
 import sys
 from io import BytesIO
+import re
 
 import pandas as pd
 from telemetry import ccsdspy
 from telemetry.PacketUtils import *
 
-__version__ = "1.1.0 (2024-05-20)"
+__version__ = "1.2.0 (2025-02-25)"
 
+import numpy as np
+
+def parse_conditional_equation(expr):
+    # expr = "b if c > 0 else d"
+
+    # Regular expression to extract the components
+    match = re.match(r"(.*) if (.+) else (.*)", expr)
+
+    if match:
+        true_val = match.group(1)
+        condition = match.group(2)
+        false_val = match.group(3)
+
+        # Constructing the np.where expression
+        np_expr = f"np.where({condition}, {true_val}, {false_val})"
+    else:
+        print("Invalid expression format")
+        np_expr = ""
+
+    return np_expr
+
+def assign_dict_values_to_array(data, indices):
+    array_size = len(indices)
+    arr = np.zeros(array_size, dtype=object)
+    for i, index in enumerate(indices):
+        arr[i] = data[index]['value']
+    return arr
+
+
+def add_derived_to_dict(dictList, conversions, mnemonic):
+    ind_dependee_tlm = [i for i,_ in enumerate(dictList) if _['var'] == mnemonic]
+    if len(ind_dependee_tlm)>0:
+        return dictList    # already converted
+    
+    # find corresponding conversion equation
+    try:
+        equation = conversions["equation"][conversions["mnemonic"]==mnemonic]._values[0]
+    except Exception as e:
+        print(e) 
+        return dictList  
+    variable_pattern = r'\b[a-zA-Z_][a-zA-Z0-9_.]*\b'
+    dependee_tlm = re.findall(variable_pattern, equation)
+    # drop key words found in equation
+    equation_words = ["if","else"]
+    dependee_tlm = list(set([s for s in dependee_tlm if s not in equation_words]))
+
+    for dependee in dependee_tlm:
+        if dependee=="mnemonic":
+            continue
+        ind_dependee_tlm = [i for i,_ in enumerate(dictList) if _['var'] == dependee] # find indices of matching 
+        if len(ind_dependee_tlm)<1:
+            dictList = add_derived_to_dict(dictList, conversions,dependee)
+    
+    for dependee in dependee_tlm:
+        ind_dependee_tlm = [i for i,_ in enumerate(dictList) if _['var'] == dependee] # find indices of matching 
+        if len(ind_dependee_tlm)<1:
+            continue
+        # assign values from dictList to each dependee
+        tmparr = assign_dict_values_to_array(dictList, ind_dependee_tlm)
+        exec(f"{dependee.replace('.','_')}=tmparr")
+    equation = re.sub(r'(?<!\d)\.(?!\d)', '_', equation)
+    try:
+        # equations in format of "b if c > 0 else d"
+        if equation.find("if")>0 and equation.find("else")>0:
+            equation = parse_conditional_equation(equation)
+
+        exec(f"{mnemonic.replace('.','_')} = {equation}")
+        for irec in range(0,len(ind_dependee_tlm)):
+            outdict = {}
+            outdict["filename"] = dictList[ind_dependee_tlm[irec]]["filename"]
+            outdict["time_val"] = dictList[ind_dependee_tlm[irec]]["time_val"]
+            outdict["var"] = mnemonic
+            outdict["value"] = eval(mnemonic.replace('.','_') )[irec]
+            outdict["alert_type"] = ""  # populated later
+            outdict["recorded"] = ""  # database ingest datetime
+            dictList.append(outdict)
+    except Exception as e:  
+        print(e)
+    return dictList
 
 def main():
     print("tlmgen_pace", __version__)
@@ -70,7 +150,15 @@ EXIT Status:
         logging.error(f"ERROR: The directory {pktDir} does not exist.")
         return 1
 
-    # read conversions
+    # read full list of interested mnemonics
+    mnemonicsfile = os.path.join(pktDir, "PACEtlmTrending.txt")
+    mnemonics_list = []
+    try:
+        mnemonics_list = np.loadtxt(mnemonicsfile, dtype=str)
+    except Exception as e:
+        print("Error reading list of PACE mnemonics.")
+
+    # read Linear conversions
     csvfile = os.path.join(pktDir, "LinearConverters.csv")
     if os.path.exists(csvfile):
         conversions = pd.read_csv(csvfile)
@@ -217,7 +305,21 @@ EXIT Status:
         # close input file
         ifile.close()
 
+        # compute derived telemetries
+        # read conversions based on equations and statements
+        csvfile = os.path.join(pktDir, "TemplateConverters.csv")
+        if os.path.exists(csvfile):
+            conversions = pd.read_csv(csvfile, skipinitialspace=True)
+
+        for iconv in range(0,len(conversions)):
+            if conversions['equation'][iconv].find('mnemonic')<0:
+                # not a telemetry from direct conversion, but a derived mnemonic
+                dictList = add_derived_to_dict(dictList, conversions, conversions['mnemonic'][iconv])        
+
         # write new dataframe
+        # output only converted telemetries in mnemonics list
+        if len(mnemonics_list)>0:
+            dictList = [d for d in dictList if d['var'] in mnemonics_list]
         if len(dictList) > 0:
             logging.info(f"Writing {len(dictList)} records from {fname} to {ofile}")
             df = pd.DataFrame(dictList)

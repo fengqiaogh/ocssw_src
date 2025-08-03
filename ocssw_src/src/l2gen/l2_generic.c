@@ -830,6 +830,7 @@ int openl2(filehandle *l2file) {
         PTB(SetChrGA(ds_id, "publisher_name", PUBLISHER_NAME));
         PTB(SetChrGA(ds_id, "publisher_url", PUBLISHER_URL));
         PTB(SetChrGA(ds_id, "publisher_email", PUBLISHER_EMAIL));
+        PTB(SetChrGA(ds_id, "geospatial_bounds_crs", "EPSG:4326"));
 
         //Some missions have DOIs
         if(strlen(input->doi) > 0) {

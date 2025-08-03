@@ -16,7 +16,7 @@ using namespace netCDF::exceptions;
 #include "genutils.h"
 #include "passthebuck.h"
 #include "sensorInfo.h"
-
+#include "l2_utils.hpp"
 // store the name of program we are running.
 static char mainProgramName[50];
 
@@ -25,21 +25,21 @@ int l2bin_init_options(clo_optionList_t* list, const char* prog, const char* ver
     clo_option_t* option;
 
     // set the min program name
-    strcpy(mainProgramName, prog);
+    strncpy(mainProgramName, prog, sizeof(mainProgramName) - 1);
 
-    sprintf(tmpStr, "Usage: %s argument-list\n\n", prog);
-    strcat(tmpStr, "  The argument-list is a set of keyword=value pairs. The arguments can\n");
-    strcat(tmpStr, "  be specified on the commandline, or put into a parameter file, or the\n");
-    strcat(tmpStr, "  two methods can be used together, with commandline over-riding.\n\n");
-    strcat(tmpStr, "  return value: 0=OK, 1=error, 110=north,south,east,west does not intersect\n");
-    strcat(tmpStr, "  file data.\n\n");
-    strcat(tmpStr, "The list of valid keywords follows:\n");
+    snprintf(tmpStr,sizeof(tmpStr), "Usage: %s argument-list\n\n", prog);
+    strncat(tmpStr, "  The argument-list is a set of keyword=value pairs. The arguments can\n", sizeof(tmpStr) - strlen(tmpStr) -1);
+    strncat(tmpStr, "  be specified on the commandline, or put into a parameter file, or the\n", sizeof(tmpStr) - strlen(tmpStr) -1);
+    strncat(tmpStr, "  two methods can be used together, with commandline over-riding.\n\n", sizeof(tmpStr) - strlen(tmpStr) -1);
+    strncat(tmpStr, "  return value: 0=OK, 1=error, 110=north,south,east,west does not intersect\n", sizeof(tmpStr) - strlen(tmpStr) -1);
+    strncat(tmpStr, "  file data.\n\n", sizeof(tmpStr) - strlen(tmpStr) -1);
+    strncat(tmpStr, "The list of valid keywords follows:\n", sizeof(tmpStr) - strlen(tmpStr) -1);
     clo_setHelpStr(tmpStr);
 
     // add the parfile alias for backward compatibility
     clo_addAlias(list, "par", "parfile");
 
-    strcpy(tmpStr, "input L2 file name");
+    strncpy(tmpStr, "input L2 file name", sizeof(tmpStr) - 1);
     option = clo_addOption(list, "ifile", CLO_TYPE_IFILE, NULL, tmpStr);
     clo_addOptionAlias(option, "infile");
 
@@ -63,25 +63,25 @@ int l2bin_init_options(clo_optionList_t* list, const char* prog, const char* ver
     clo_addOption(list, "lonwest", CLO_TYPE_FLOAT, "0", "western most longitude");
     clo_addOption(list, "minobs", CLO_TYPE_INT, "0", "required minimum number of observations");
 
-    strcpy(tmpStr, "equator crossing time delta in\n         minutes\n");
-    strcat(tmpStr, "         Caveat...if zero, the sensor default equator crossing time will be used\n");
-    strcat(tmpStr, "         This is not necessarily noon");
+    strncpy(tmpStr, "equator crossing time delta in\n         minutes\n", sizeof(tmpStr) - 1);
+    strncat(tmpStr, "         Caveat...if zero, the sensor default equator crossing time will be used\n", sizeof(tmpStr) - strlen(tmpStr) - 1);
+    strncat(tmpStr, "         This is not necessarily noon", sizeof(tmpStr) - strlen(tmpStr) - 1);
     clo_addOption(list, "delta_crossing_time", CLO_TYPE_FLOAT, "0.0", tmpStr);
 
-    strcpy(tmpStr, "bin resolution\n");
-    strcat(tmpStr, "         H: 0.5km\n");
-    strcat(tmpStr, "         Q: 250m\n");
-    strcat(tmpStr, "        HQ: 100m\n");
-    strcat(tmpStr, "        HH: 50m\n");
-    strcat(tmpStr, "         1: 1.1km\n");
-    strcat(tmpStr, "         2: 2.3km\n");
-    strcat(tmpStr, "         4: 4.6km\n");
-    strcat(tmpStr, "         9: 9.2km\n");
-    strcat(tmpStr, "        18: 18.5km\n");
-    strcat(tmpStr, "        36: 36km\n");
-    strcat(tmpStr, "        1D: 1 degree\n");
-    strcat(tmpStr, "        HD: 0.5 degree\n");
-    strcat(tmpStr, "        QD: 0.25 degree");
+    strncpy(tmpStr, "bin resolution\n", sizeof(tmpStr) - strlen(tmpStr) - 1);
+    strncat(tmpStr, "         H: 0.5km\n", sizeof(tmpStr) - strlen(tmpStr) - 1);
+    strncat(tmpStr, "         Q: 250m\n", sizeof(tmpStr) - strlen(tmpStr) - 1);
+    strncat(tmpStr, "        HQ: 100m\n", sizeof(tmpStr) - strlen(tmpStr) - 1);
+    strncat(tmpStr, "        HH: 50m\n", sizeof(tmpStr) - strlen(tmpStr) - 1);
+    strncat(tmpStr, "         1: 1.1km\n", sizeof(tmpStr) - strlen(tmpStr) - 1);
+    strncat(tmpStr, "         2: 2.3km\n", sizeof(tmpStr) - strlen(tmpStr) - 1);
+    strncat(tmpStr, "         4: 4.6km\n", sizeof(tmpStr) - strlen(tmpStr) - 1);
+    strncat(tmpStr, "         9: 9.2km\n", sizeof(tmpStr) - strlen(tmpStr) - 1);
+    strncat(tmpStr, "        18: 18.5km\n", sizeof(tmpStr) - strlen(tmpStr) - 1);
+    strncat(tmpStr, "        36: 36km\n", sizeof(tmpStr) - strlen(tmpStr) - 1);
+    strncat(tmpStr, "        1D: 1 degree\n", sizeof(tmpStr) - strlen(tmpStr) - 1);  
+    strncat(tmpStr, "        HD: 0.5 degree\n", sizeof(tmpStr) - strlen(tmpStr) - 1);
+    strncat(tmpStr, "        QD: 0.25 degree", sizeof(tmpStr) - strlen(tmpStr) - 1); 
     option = clo_addOption(list, "resolution", CLO_TYPE_STRING, "H", tmpStr);
     clo_addOptionAlias(option, "resolve");
     clo_addOption(list, "prodtype", CLO_TYPE_STRING, "day", "product type (Set to \"regional\" to bin all scans.)");
@@ -89,22 +89,22 @@ int l2bin_init_options(clo_optionList_t* list, const char* prog, const char* ver
 
     clo_addOption(list, "composite_scheme", CLO_TYPE_STRING, NULL, "composite scheme (min/max)");
     clo_addOption(list, "composite_prod", CLO_TYPE_STRING, NULL, "composite product fieldname");
-    strcpy(tmpStr, "flags masked [see /SENSOR/l2bin_defaults.par]");
+    strncpy(tmpStr, "flags masked [see /SENSOR/l2bin_defaults.par]", sizeof(tmpStr) - 1);
     clo_addOption(list, "flaguse", CLO_TYPE_STRING, DEF_FLAG, tmpStr);
 
-    strcpy(tmpStr, "l3bprod = bin products [default=all products]\n");
-    strcat(tmpStr, "        Set to \"ALL\" or \"all\" for all L2 products in 1st input file.\n");
-    strcat(tmpStr, "        Use ':' or ',' or ' ' as delimiters.\n");
-    strcat(tmpStr, "        Use ';' or '=' to delineate minimum values.");
+    strncpy(tmpStr, "l3bprod = bin products [default=all products]\n", sizeof(tmpStr) - 1);
+    strncat(tmpStr, "        Set to \"ALL\" or \"all\" for all L2 products in 1st input file.\n", sizeof(tmpStr) - strlen(tmpStr) - 1);
+    strncat(tmpStr, "        Use ',' or ' ' as delimiters between products.\n", sizeof(tmpStr) - strlen(tmpStr) - 1);
+    strncat(tmpStr, "        Use '=' and ':' to delineate min/max values. i.e. prod=min:max", sizeof(tmpStr) - strlen(tmpStr) - 1);
     clo_addOption(list, "l3bprod", CLO_TYPE_STRING, "ALL", tmpStr);
 
     clo_addOption(list, "area_weighting", CLO_TYPE_INT, "0", "Enable area weighting\n        0: off\n        1: pixel box\n        2: pixel bounding box\n        3: pixel polygon");
 
-    clo_addOption(list, "output_wavelengths", CLO_TYPE_STRING, "ALL", "comma separated list of\n        wavelengths for multi-wavelength products");
+    clo_addOption(list, "output_wavelengths", CLO_TYPE_STRING, "ALL", "comma separated list of\n        wavelengths for multi-wavelength products.\n        Usage - 'output_wavelengths=wave1=354:2200;wave2=870,1640'");
     clo_addOption(list, "doi", CLO_TYPE_STRING, NULL, "Digital Object Identifier (DOI) string");
-    strcpy(tmpStr,"comma separated list of output L3 product names.\n");
-    strcat(tmpStr, "        This option allows the user to specify the output product names which differ from the original l2 product names.\n");
-    strcat(tmpStr, "        Usage: original_l2_name:output_l3_name, i.e. oprodname=cloud_flag:cloud_fraction");   
+    strncpy(tmpStr,"comma separated list of output L3 product names.\n", sizeof(tmpStr) - 1);   
+    strncat(tmpStr, "        This option allows the user to specify the output product names which differ from the original l2 product names.\n", sizeof(tmpStr) - strlen(tmpStr) - 1);
+    strncat(tmpStr, "        Usage - 'original_l2_name:output_l3_name', i.e. 'oprodname=cloud_flag:cloud_fraction'", sizeof(tmpStr) - strlen(tmpStr) - 1);   
     clo_addOption(list, "oprodname", CLO_TYPE_STRING, NULL, tmpStr);
     clo_setVersion(version);
     return 0;
@@ -126,7 +126,7 @@ int l2bin_load_input(clo_optionList_t* list, instr *input) {
         if (option->dataType == CLO_TYPE_HELP)
             continue;
 
-        strcpy(keyword, option->key);
+        strncpy(keyword, option->key, sizeof(keyword) - 1);
 
         /* change keyword to lower case */
         tmp_str = keyword;
@@ -153,13 +153,13 @@ int l2bin_load_input(clo_optionList_t* list, instr *input) {
             if (clo_isOptionSet(option)) {
                 parm_str = clo_getOptionString(option);
                 parse_file_name(parm_str, tmp_file);
-                strcpy(input->ofile, tmp_file);
+                strncpy(input->ofile, tmp_file, sizeof(input->ofile) - 1);
             }
         } else if (strcmp(keyword, "fileuse") == 0) {
             if (clo_isOptionSet(option)) {
                 parm_str = clo_getOptionString(option);
                 parse_file_name(parm_str, tmp_file);
-                strcpy(input->fileuse, tmp_file);
+                strncpy(input->fileuse, tmp_file, sizeof(input->fileuse) - 1);
             }
         } else if (strcmp(keyword, "sday") == 0) {
             if (clo_isOptionSet(option))
@@ -172,7 +172,7 @@ int l2bin_load_input(clo_optionList_t* list, instr *input) {
         } else if (strcmp(keyword, "resolution") == 0) {
             parm_str = clo_getOptionString(option);
             parse_file_name(parm_str, tmp_file);
-            strcpy(input->resolve, tmp_file);
+            strncpy(input->resolve, tmp_file, sizeof(input->resolve) - 1);
 
         } else if (strcmp(keyword, "rowgroup") == 0) {
             input->rowgroup = clo_getOptionInt(option);
@@ -180,28 +180,28 @@ int l2bin_load_input(clo_optionList_t* list, instr *input) {
         } else if (strcmp(keyword, "flaguse") == 0) {
 	    string flags = clo_getOptionRawString(option);
 	    boost::replace_all(flags, "default", DEF_FLAG);
-	    strcpy(input->flaguse, flags.c_str());
+	    strncpy(input->flaguse, flags.c_str(), sizeof(input->flaguse) - 1);
 
         } else if (strcmp(keyword, "l3bprod") == 0) {
             parm_str = clo_getOptionRawString(option);
-            strcpy(input->l3bprod, parm_str);
+            strncpy(input->l3bprod, parm_str, sizeof(input->l3bprod) - 1);
 
         } else if (strcmp(keyword, "prodtype") == 0) {
             parm_str = clo_getOptionString(option);
-            strcpy(input->prodtype, parm_str);
+            strncpy(input->prodtype, parm_str, sizeof(input->prodtype) - 1);
 
         } else if (strcmp(keyword, "output_wavelengths") == 0) {
             parm_str = clo_getOptionRawString(option);
-            strcpy(input->output_wavelengths, parm_str);
+            strncpy(input->output_wavelengths, parm_str, sizeof(input->output_wavelengths) - 1);
 
         } else if (strcmp(keyword, "pversion") == 0) {
             parm_str = clo_getOptionString(option);
-            strcpy(input->pversion, parm_str);
+            strncpy(input->pversion, parm_str, sizeof(input->pversion) - 1);
 
         } else if (strcmp(keyword, "suite") == 0) {
             if (clo_isOptionSet(option)) {
                 parm_str = clo_getOptionString(option);
-                strcpy(input->suite, parm_str);
+                strncpy(input->suite, parm_str, sizeof(input->suite) - 1);
             }
         } else if (strcmp(keyword, "latsouth") == 0) {
             input->latsouth = clo_getOptionFloat(option);
@@ -243,25 +243,25 @@ int l2bin_load_input(clo_optionList_t* list, instr *input) {
             if (clo_isOptionSet(option)) {
                 parm_str = clo_getOptionString(option);
                 parse_file_name(parm_str, tmp_file);
-                strcpy(input->qual_prod, tmp_file);
+                strncpy(input->qual_prod, tmp_file, sizeof(input->qual_prod) - 1);
             }
 
         } else if(strcmp(keyword, "oprodname") == 0){
             if (clo_isOptionSet(option)) {
                 parm_str = clo_getOptionRawString(option);
-                strcpy(input->output_product_names, parm_str);
+                strncpy(input->output_product_names, parm_str, sizeof(input->output_product_names) - 1);
                 }
         } else if (strcmp(keyword, "composite_prod") == 0) {
             if (clo_isOptionSet(option)) {
                 parm_str = clo_getOptionString(option);
                 parse_file_name(parm_str, tmp_file);
-                strcpy(input->composite_prod, tmp_file);
+                strncpy(input->composite_prod, tmp_file, sizeof(input->composite_prod) - 1);
             }
         } else if (strcmp(keyword, "composite_scheme") == 0) {
             if (clo_isOptionSet(option)) {
                 parm_str = clo_getOptionString(option);
                 parse_file_name(parm_str, tmp_file);
-                strcpy(input->composite_scheme, tmp_file);
+                strncpy(input->composite_scheme, tmp_file, sizeof(input->composite_scheme) - 1);
             }
         } else if (strcmp(keyword, "area_weighting") == 0) {
             if (clo_isOptionSet(option)) {
@@ -271,7 +271,7 @@ int l2bin_load_input(clo_optionList_t* list, instr *input) {
             }
         } else if (strcmp(keyword, "doi") == 0) {
             if (clo_isOptionSet(option)) {
-                strcpy(input->doi, clo_getOptionString(option));
+                strncpy(input->doi, clo_getOptionString(option), sizeof(input->doi) - 1);
             }
         } else {
             printf("-E- Invalid argument \"%s\"\n", keyword);
@@ -293,11 +293,11 @@ int input_init(instr *input_str) {
     input_str->composite_prod[0] = '\0';
     input_str->composite_scheme[0] = '\0';
     input_str->output_product_names[0] = '\0';
-    strcpy(input_str->pversion, "Unspecified");
-    strcpy(input_str->prodtype, "day");
+    strncpy(input_str->pversion, "Unspecified", sizeof(input_str->pversion) - 1); 
+    strncpy(input_str->prodtype, "day", sizeof(input_str->prodtype) - 1);
 
-    strcpy(input_str->l3bprod, "ALL");
-    strcpy(input_str->output_wavelengths, "ALL");
+    strncpy(input_str->l3bprod, "ALL", sizeof(input_str->l3bprod) - 1);
+    strncpy(input_str->output_wavelengths, "ALL", sizeof(input_str->output_wavelengths) - 1);
 
     input_str->sday = 1970001;
     input_str->eday = 2038018;
@@ -323,7 +323,7 @@ int input_init(instr *input_str) {
 
     input_str->deflate = 0;
 
-    strcpy(input_str->suite, "");
+    strncpy(input_str->suite, "", sizeof(input_str->suite) - 1);
     
     input_str->area_weighting = 0;
     input_str->doi[0] = '\0';
@@ -353,7 +353,7 @@ int input_init(instr *input_str) {
 
 int l2bin_input(int argc, char **argv, instr *input, const char* prog, const char* version) {
 
-    char str_buf[4096];
+    char str_buf[4096 + 32]; // padding due to ofile, ifile sizes (4096)
 
     char *dataRoot;
     int sensorId;
@@ -387,7 +387,7 @@ int l2bin_input(int argc, char **argv, instr *input, const char* prog, const cha
     clo_readArgs(list, argc, argv);
 
     // get list of input files
-    strcpy(localIfile, clo_getString(list, "ifile"));
+    strncpy(localIfile, clo_getString(list, "ifile"), sizeof(localIfile) - 1);
     input->files = readFileList(localIfile);
     if (input->files.size() == 0) {
         printf("-E- No NetCDF input files found in %s.\n", localIfile);
@@ -397,7 +397,7 @@ int l2bin_input(int argc, char **argv, instr *input, const char* prog, const cha
     // see if suite param was set
     localSuite[0] = '\0';
     if (clo_isSet(list, "suite")) {
-        strcpy(localSuite, clo_getString(list, "suite"));
+        strncpy(localSuite, clo_getString(list, "suite"), sizeof(localSuite) - 1);
     } // suite option was set
 
     // find the sensor and sub-sensor ID for first input file
@@ -408,15 +408,13 @@ int l2bin_input(int argc, char **argv, instr *input, const char* prog, const cha
         nc_input.getAtt("platform").getValues(platform);
         nc_input.close();
     } catch (NcException const & e) {
-        printf("-E- L2 file %s does not have instrument/platform attributes.\n", input->files[0].c_str());
-        exit(EXIT_FAILURE);
+        printf("-Warning-: L2 file %s does not have instrument/platform attributes.\n", input->files[0].c_str());
     }
     sensorId = instrumentPlatform2SensorId(instrument.c_str(), platform.c_str());
     subsensorId = sensorId2SubsensorId(sensorId);
 
     if (sensorId == -1) {
-        printf("-E- Can not look up sensor ID for %s.\n", localIfile);
-        exit(EXIT_FAILURE);
+        printf("-Warning-: Can not look up sensor ID for %s.\n", localIfile);
     }
 
     if ((dataRoot = getenv("OCDATAROOT")) == NULL) {
@@ -425,7 +423,7 @@ int l2bin_input(int argc, char **argv, instr *input, const char* prog, const cha
     }
 
     // load l2bin program defaults
-    sprintf(str_buf, "%s/common/l2bin_defaults.par", dataRoot);
+    snprintf(str_buf, sizeof(str_buf), "%s/common/l2bin_defaults.par", dataRoot);
     if (access(str_buf, R_OK) != -1) {
         if (want_verbose)
             printf("Loading default parameters from %s\n", str_buf);
@@ -433,7 +431,7 @@ int l2bin_input(int argc, char **argv, instr *input, const char* prog, const cha
     }
 
     // sensor defaults
-    sprintf(str_buf, "%s/%s/l2bin_defaults.par", dataRoot, sensorId2SensorDir(sensorId));
+    snprintf(str_buf, sizeof(str_buf), "%s/%s/l2bin_defaults.par", dataRoot, sensorId2SensorDir(sensorId));
     if (access(str_buf, R_OK) != -1) {
         if (want_verbose)
             printf("Loading default parameters from %s\n", str_buf);
@@ -442,7 +440,7 @@ int l2bin_input(int argc, char **argv, instr *input, const char* prog, const cha
 
     // subsensor defaults
     if (subsensorId != -1) {
-        sprintf(str_buf, "%s/%s/%s/l2bin_defaults.par", dataRoot,
+        snprintf(str_buf, sizeof(str_buf), "%s/%s/%s/l2bin_defaults.par", dataRoot,
                 sensorId2SensorDir(sensorId), subsensorId2SubsensorDir(subsensorId));
         if (access(str_buf, R_OK) != -1) {
             if (want_verbose)
@@ -462,7 +460,7 @@ int l2bin_input(int argc, char **argv, instr *input, const char* prog, const cha
         int suiteLoaded = 0;
 
         // load common suite defaults
-        sprintf(str_buf, "%s/common/l2bin_defaults_%s.par", dataRoot, localSuite);
+        snprintf(str_buf, sizeof(str_buf), "%s/common/l2bin_defaults_%s.par", dataRoot, localSuite);
         if (access(str_buf, R_OK) != -1) {
             suiteLoaded = 1;
             if (want_verbose)
@@ -471,7 +469,7 @@ int l2bin_input(int argc, char **argv, instr *input, const char* prog, const cha
         }
 
         // sensor suite defaults
-        sprintf(str_buf, "%s/%s/l2bin_defaults_%s.par", dataRoot,
+        snprintf(str_buf, sizeof(str_buf), "%s/%s/l2bin_defaults_%s.par", dataRoot,
                 sensorId2SensorDir(sensorId), localSuite);
         if (access(str_buf, R_OK) != -1) {
             suiteLoaded = 1;
@@ -482,7 +480,7 @@ int l2bin_input(int argc, char **argv, instr *input, const char* prog, const cha
 
         // subsensor suite defaults
         if (subsensorId != -1) {
-            sprintf(str_buf, "%s/%s/%s/l2bin_defaults_%s.par", dataRoot,
+            snprintf(str_buf, sizeof(str_buf), "%s/%s/%s/l2bin_defaults_%s.par", dataRoot,
                     sensorId2SensorDir(sensorId), subsensorId2SubsensorDir(subsensorId),
                     localSuite);
             if (access(str_buf, R_OK) != -1) {
@@ -516,86 +514,86 @@ int l2bin_input(int argc, char **argv, instr *input, const char* prog, const cha
     /*                                                                  */
     /* Build string of parameters for metadata                          */
     /*                                                                  */
-    sprintf(str_buf, "infile = %s\n", input->infile);
-    strcat(input->parms, str_buf);
-    sprintf(str_buf, "ofile = %s\n", input->ofile);
-    strcat(input->parms, str_buf);
-    sprintf(str_buf, "fileuse = %s\n", input->fileuse);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "infile = %s\n", input->infile);
+    strncpy(input->parms, str_buf, sizeof(input->parms) - 1);
+    snprintf(str_buf, sizeof(str_buf), "ofile = %s\n", input->ofile);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
+    snprintf(str_buf, sizeof(str_buf), "fileuse = %s\n", input->fileuse);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "sday = %d\n", input->sday);
-    strcat(input->parms, str_buf);
-    sprintf(str_buf, "eday = %d\n", input->eday);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "sday = %d\n", input->sday);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
+    snprintf(str_buf, sizeof(str_buf), "eday = %d\n", input->eday);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "latnorth = %f\n", input->latnorth);
-    strcat(input->parms, str_buf);
-    sprintf(str_buf, "latsouth = %f\n", input->latsouth);
-    strcat(input->parms, str_buf);
-    sprintf(str_buf, "loneast = %f\n", input->loneast);
-    strcat(input->parms, str_buf);
-    sprintf(str_buf, "lonwest = %f\n", input->lonwest);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "latnorth = %f\n", input->latnorth);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
+    snprintf(str_buf, sizeof(str_buf), "latsouth = %f\n", input->latsouth);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
+    snprintf(str_buf, sizeof(str_buf), "loneast = %f\n", input->loneast);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
+    snprintf(str_buf, sizeof(str_buf), "lonwest = %f\n", input->lonwest);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "resolve = %s\n", input->resolve);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "resolve = %s\n", input->resolve);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "rowgroup = %d\n", input->rowgroup);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "rowgroup = %d\n", input->rowgroup);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "flaguse = %s\n", input->flaguse);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "flaguse = %s\n", input->flaguse);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "l3bprod = %s\n", input->l3bprod);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "l3bprod = %s\n", input->l3bprod);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "output_wavelengths = %s\n", input->output_wavelengths);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "output_wavelengths = %s\n", input->output_wavelengths);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "prodtype = %s\n", input->prodtype);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "prodtype = %s\n", input->prodtype);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "pversion = %s\n", input->pversion);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "pversion = %s\n", input->pversion);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "suite = %s\n", input->suite);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "suite = %s\n", input->suite);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "night = %d\n", input->night);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "night = %d\n", input->night);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "verbose = %d\n", input->verbose);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "verbose = %d\n", input->verbose);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "minobs = %d\n", input->minobs);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "minobs = %d\n", input->minobs);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "delta_crossing_time = %f\n", input->deltaeqcross);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "delta_crossing_time = %f\n", input->deltaeqcross);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "deflate = %d\n", input->deflate);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "deflate = %d\n", input->deflate);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "qual_prod = %s\n", input->qual_prod);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "qual_prod = %s\n", input->qual_prod);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "composite_prod = %s\n", input->composite_prod);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "composite_prod = %s\n", input->composite_prod);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "composite_scheme = %s\n", input->composite_scheme);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "composite_scheme = %s\n", input->composite_scheme);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "qual_max = %d\n", input->qual_max);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "qual_max = %d\n", input->qual_max);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "area_weighting = %d\n", input->area_weighting);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "area_weighting = %d\n", input->area_weighting);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "doi = %s\n", input->doi);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "doi = %s\n", input->doi);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
 
-    sprintf(str_buf, "oprodname = %s\n", input->output_product_names);
-    strcat(input->parms, str_buf);
+    snprintf(str_buf, sizeof(str_buf), "oprodname = %s\n", input->output_product_names);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
     
     clo_deleteList(list);
 

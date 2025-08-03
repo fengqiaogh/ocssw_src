@@ -17,7 +17,7 @@
 #include "l12_proto.h"
 
 void get_toa_refl(l2str *l2rec, int band, float rhot[]) {
-    static float pi = 3.141592654;
+    static float pi = OEL_PI;
 
     float mu0;
     int32_t ip, ipb;

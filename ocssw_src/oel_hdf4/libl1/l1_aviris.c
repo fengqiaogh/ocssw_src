@@ -660,7 +660,6 @@ int openl1_aviris(filehandle *file) {
     } else {
         strcpy(infile, data->imgfile);
     }
-    printf("Opening AVIRIS image file %s\n", infile);
 
     if ((data->av_fp = fopen(infile, "rb")) == NULL) {
         fprintf(stderr, "-E- %s line %d: unable to open %s\n",

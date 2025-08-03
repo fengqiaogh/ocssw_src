@@ -1,5 +1,15 @@
 
 # libl2 Changelog
+## Version 1.0.2
+Added wavelength subsetting options
+
+`output_wavelengths=Wavelength_Used_all=354:2200;Wavelength_Used_DTDB=870,1640;Wavelength_Used=480:670,354`
+
+
+This means that for `Wavelength_Used_all` wavelengths from 354 to 2200 will be selected, for `Wavelength_Used_DTDB` only 870 and 1640 will be selected, `Wavelength_Used` wavelength from 480 to 670 and 354 will be selected and `Wavelength_Used_UV` and `Wavelength_Used_UV1` (not shown here, but present in an L2 UAA file) will be defaulted to "ALL" wavelengths.
+
+## Version 1.0.1
+Library has been fully revamped
 
 ## <VERSION STILL IN LIMBO> - 2023-11-24
 
@@ -44,7 +54,7 @@
   * CMakeLists.txt
   * get_product_table.h
   * readL2scan.c
-  * readL2scan.h
+  * l2_wrapper.h
   * setupflags.c
   * setupflags.h
 

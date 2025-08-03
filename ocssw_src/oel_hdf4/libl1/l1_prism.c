@@ -271,7 +271,6 @@ int openl1_prism(filehandle *file) {
     infile = malloc((pos + strlen("_rdn_ort")) * sizeof (char));
     strcpy(infile, inbasename);
     strcat(infile, "_rdn_ort");
-    printf("Opening prism image file %s\n", infile);
 
     if ((data->av_fp = fopen(infile, "rb")) == NULL) {
         fprintf(stderr, "-E- %s line %d: unable to open %s\n",

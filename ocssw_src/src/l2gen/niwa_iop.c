@@ -26,8 +26,8 @@
 #include "niwa_iop.h"
 
 /* macros */
-#define radians(degrees) ((degrees) * M_PI / 180.0)
-#define degrees(radians) ((radians) * 180.0 / M_PI)
+#define radians(degrees) ((degrees) * OEL_PI / 180.0)
+#define degrees(radians) ((radians) * 180.0 / OEL_PI)
 
 /* constant sizes */
 #define LBANDS  8                               /* 8 bands in LUT */
@@ -147,8 +147,8 @@ static int setgeom(float sun_theta, float sen_theta, float dphi) {
     float th_s_ent, th_v_ent, dphi_ent;
 
 #if (VERB) 
-    printf("setgeom starting: [%f %f %f]\n", sun_theta * 180. / M_PI,
-            sen_theta * 180. / M_PI, dphi * 180. / M_PI);
+    printf("setgeom starting: [%f %f %f]\n", sun_theta * 180. / OEL_PI,
+            sen_theta * 180. / OEL_PI, dphi * 180. / OEL_PI);
 #endif
 
     /* Page in IOP table */
@@ -156,9 +156,9 @@ static int setgeom(float sun_theta, float sen_theta, float dphi) {
     th_s_ent = floor(interpol(th_s_ind, th_s_lev, sun_theta, TH_NS) + 0.5);
     th_v_ent = floor(interpol(th_v_ind, th_v_lev, sen_theta, TH_NS) + 0.5);
     if (dphi < 0.0)
-        dphi = dphi + M_PI * 2.0;
-    if (dphi > M_PI * 2.0)
-        dphi = dphi - M_PI * 2.0;
+        dphi = dphi + OEL_PI * 2.0;
+    if (dphi > OEL_PI * 2.0)
+        dphi = dphi - OEL_PI * 2.0;
     dphi_ent = floor(interpol(dphi_ind, dphi_lev, dphi, DPHI_NS) + 0.5);
 
     /* LUT index */
@@ -531,7 +531,7 @@ static int iop_model1(float Rrs[], int sensor_id, abs_res_t *result) {
 
     /* convert Rrs to rho */
     for (iw = 0; iw < VBANDS; iw++) {
-        rho[iw] = M_PI * Rrs[iw];
+        rho[iw] = OEL_PI * Rrs[iw];
     }
 
     /* initialise outputs */

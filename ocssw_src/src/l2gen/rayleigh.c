@@ -15,7 +15,15 @@ static ray_array *ray_for_i;
 static ray_array *ray_for_q;
 static ray_array *ray_for_u;
 
+static int isol_current[300];
+static int isen_current[300];
+static int isigma_current[300];
+static int recompute[300];
 
+
+float ray_temp_storage_i [300][2][NORDER][4];
+float ray_temp_storage_q [300][2][NORDER][4];
+float ray_temp_storage_u [300][2][NORDER][4];
 /* ----------------------------------------------------------------- */
 /* ray_press_wang() - Wang (2004) pressure correction                */
 
@@ -324,6 +332,13 @@ void rayleigh(l1str *l1rec, int32_t ip) {
             }
             read_rayleigh_lut(file, iw, pol_opt);
         }
+        // initialize recompute
+        for (int iwave = 0; iwave < nwave; iwave++) {
+            recompute[iwave] = 1;
+            isol_current[iwave] = -1;
+            isen_current[iwave] = -1;
+            isigma_current[iwave] = -1;
+        }
         firstCall = 0;
     }
 
@@ -355,8 +370,8 @@ void rayleigh(l1str *l1rec, int32_t ip) {
             ix = iw * gmult;
 
             for (m = 0; m < NORDER; m++) {
-                cosd_phi[m] = cos(r_phi[ix] * m / RADEG);
-                sind_phi[m] = sin(r_phi[ix] * m / RADEG);
+                cosd_phi[m] = cos(r_phi[ix] * m / OEL_RADEG);
+                sind_phi[m] = sin(r_phi[ix] * m / OEL_RADEG);
             }
 
             /* solar zenith indices */
@@ -383,8 +398,36 @@ void rayleigh(l1str *l1rec, int32_t ip) {
             q = (r_senz[ix] - ray_sen[isen1]) / (ray_sen[isen2] - ray_sen[isen1]);
             airmass = 1. / r_csolz[ix] + 1. / r_csenz[ix];
         }
+        // check if we need to recompute stored values:
+        if (isol1 != isol_current[iw])
+            recompute[iw] = 1;
+        if (isen1 != isen_current[iw])
+            recompute[iw] = 1;
+        if (isigma1 != isigma_current[iw])
+            recompute[iw] = 1;
+        if (recompute[iw]) {
+            recompute[iw] = 0;
+            isol_current[iw] = isol1;
+            isen_current[iw] = isen1;
+            isigma_current[iw] = isigma1;
+            for (iwind = 0; iwind <= 1; iwind++)
+                for (m = 0; m < NORDER; m++) {
+                    ray_temp_storage_i[iw][iwind][m][0] = ray_for_i[iw][isigma1 + iwind][isol1][m][isen1];
+                    ray_temp_storage_i[iw][iwind][m][1] = ray_for_i[iw][isigma1 + iwind][isol2][m][isen1];
+                    ray_temp_storage_i[iw][iwind][m][2] = ray_for_i[iw][isigma1 + iwind][isol1][m][isen2];
+                    ray_temp_storage_i[iw][iwind][m][3] = ray_for_i[iw][isigma1 + iwind][isol2][m][isen2];
 
+                    ray_temp_storage_q[iw][iwind][m][0] = ray_for_q[iw][isigma1 + iwind][isol1][m][isen1];
+                    ray_temp_storage_q[iw][iwind][m][1] = ray_for_q[iw][isigma1 + iwind][isol2][m][isen1];
+                    ray_temp_storage_q[iw][iwind][m][2] = ray_for_q[iw][isigma1 + iwind][isol1][m][isen2];
+                    ray_temp_storage_q[iw][iwind][m][3] = ray_for_q[iw][isigma1 + iwind][isol2][m][isen2];
 
+                    ray_temp_storage_u[iw][iwind][m][0] = ray_for_u[iw][isigma1 + iwind][isol1][m][isen1];
+                    ray_temp_storage_u[iw][iwind][m][1] = ray_for_u[iw][isigma1 + iwind][isol2][m][isen1];
+                    ray_temp_storage_u[iw][iwind][m][2] = ray_for_u[iw][isigma1 + iwind][isol1][m][isen2];
+                    ray_temp_storage_u[iw][iwind][m][3] = ray_for_u[iw][isigma1 + iwind][isol2][m][isen2];
+                }
+        }
         /* interpolate the Rayleigh coefficients for each windspeed */
 
         for (isigma = isigma1; isigma <= isigma2; isigma++) {
@@ -399,10 +442,10 @@ void rayleigh(l1str *l1rec, int32_t ip) {
 
             for (m = 0; m < NORDER; m++) {
 
-                f00 = ray_for_i[iw][isigma][isol1][m][isen1];
-                f10 = ray_for_i[iw][isigma][isol2][m][isen1];
-                f01 = ray_for_i[iw][isigma][isol1][m][isen2];
-                f11 = ray_for_i[iw][isigma][isol2][m][isen2];
+                f00 = ray_temp_storage_i[iw][iwind][m][0] ;
+                f10 = ray_temp_storage_i[iw][iwind][m][1];
+                f01 = ray_temp_storage_i[iw][iwind][m][2];
+                f11 = ray_temp_storage_i[iw][iwind][m][3];
 
                 ray_i_sig[iwind] = ray_i_sig[iwind] +
                         ((1. - p)*(1. - q) * f00 + p * q * f11 + p * (1. - q) * f10 + q * (1. - p) * f01) * cosd_phi[m];
@@ -415,10 +458,10 @@ void rayleigh(l1str *l1rec, int32_t ip) {
 
             for (m = 0; m < NORDER; m++) {
 
-                f00 = ray_for_q[iw][isigma][isol1][m][isen1];
-                f10 = ray_for_q[iw][isigma][isol2][m][isen1];
-                f01 = ray_for_q[iw][isigma][isol1][m][isen2];
-                f11 = ray_for_q[iw][isigma][isol2][m][isen2];
+                f00 = ray_temp_storage_q[iw][iwind][m][0];
+                f10 = ray_temp_storage_q[iw][iwind][m][1];
+                f01 = ray_temp_storage_q[iw][iwind][m][2];
+                f11 = ray_temp_storage_q[iw][iwind][m][3];
 
                 ray_q_sig[iwind] = ray_q_sig[iwind] +
                         ((1. - p)*(1. - q) * f00 + p * q * f11 + p * (1. - q) * f10 + q * (1. - p) * f01) * cosd_phi[m];
@@ -429,10 +472,10 @@ void rayleigh(l1str *l1rec, int32_t ip) {
 
             for (m = 0; m < NORDER; m++) {
 
-                f00 = ray_for_u[iw][isigma][isol1][m][isen1];
-                f10 = ray_for_u[iw][isigma][isol2][m][isen1];
-                f01 = ray_for_u[iw][isigma][isol1][m][isen2];
-                f11 = ray_for_u[iw][isigma][isol2][m][isen2];
+                f00 = ray_temp_storage_u[iw][iwind][m][0];
+                f10 = ray_temp_storage_u[iw][iwind][m][1];
+                f01 = ray_temp_storage_u[iw][iwind][m][2];
+                f11 = ray_temp_storage_u[iw][iwind][m][3];
 
                 ray_u_sig[iwind] = ray_u_sig[iwind] +
                         ((1. - p)*(1. - q) * f00 + p * q * f11 + p * (1. - q) * f10 + q * (1. - p) * f01) * sind_phi[m];

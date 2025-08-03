@@ -174,9 +174,9 @@ void run_pml(l2str *l2rec) {
     for (ip = 0; ip < l1rec->npix; ip++) {
 
         /* Get the angular information */
-        solz = (M_PI / 180.)*(l1rec->solz[ip]);
-        senz = (M_PI / 180.)*(l1rec->senz[ip]);
-        phi = (M_PI / 180.)*(l1rec->delphi[ip]);
+        solz = OEL_DEGRAD * (l1rec->solz[ip]);
+        senz = OEL_DEGRAD * (l1rec->senz[ip]);
+        phi = OEL_DEGRAD * (l1rec->delphi[ip]);
 
         /* clear static globals */
         for (ib = 0; ib < nbands; ib++) {
@@ -201,7 +201,7 @@ void run_pml(l2str *l2rec) {
             for (ib = 0; ib < nbands; ib++) {
                 Rrs[ib] = l2rec->Rrs[ipb + ib];
                 /* convert Rrs into rho_w for running of model */
-                rho_w[ib] = M_PI * Rrs[ib];
+                rho_w[ib] = OEL_PI * Rrs[ib];
             }
 
             /* run the model in here */

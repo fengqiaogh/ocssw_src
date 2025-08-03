@@ -34,7 +34,7 @@ int vir_xf_scan(float scn_in, int scn_in_typ, int scn_out_typ, float *scn_out)
 
 ----------------------------------------------------------------------------*/ {
     float sind = 0.0003104; /*  # radians / sample  */
-    float rad2deg = 180. / M_PI;
+    float rad2deg = OEL_RADEG;
     float theta_oop = 28.6 / rad2deg;
     int iret, idir, in_chain;
     float ua_smp, scan, theta_ham, aoi;

@@ -268,7 +268,7 @@ float calc_par(l2str *l2rec, int ip, int nbands, float *Lt, float taua, float an
 
     csolz = l1rec->csolz[ip];
     csenz = l1rec->csenz[ip];
-    cos2x = powf(cosf((l1rec->scattang[ip] * M_PI / 180.0)), 2.0);
+    cos2x = powf(cosf((l1rec->scattang[ip] * OEL_PI / 180.0)), 2.0);
 
     if (l1rec->scattang[ip] < 0.0 || l1rec->scattang[ip] > 180.0) {
         printf("Error: subroutine CalcPAR. computation failed.\n");
@@ -307,7 +307,7 @@ float calc_par(l2str *l2rec, int ip, int nbands, float *Lt, float taua, float an
     float Airmass = (1.f / csolz) + (1.f / csenz);
 
     for (band = 0; band < nbands; band++) {
-        r[band] = (M_PI * (Lt[band])) / (fo[band] * l1rec->fsol * csolz);
+        r[band] = (OEL_PI * (Lt[band])) / (fo[band] * l1rec->fsol * csolz);
         // Compute gaseous transmittance:
         transg = expf((-ko3[band] * dobson * Airmass));
         rp[band] = r[band] / transg;
@@ -516,7 +516,7 @@ float calc_par(l2str *l2rec, int ip, int nbands, float *Lt, float taua, float an
         intyear = year;
         intday = doy;
         sunangs_(&intyear, &intday, &tmstep, l1rec->lon + ip, l1rec->lat + ip, &sz, &sola);
-        cossz = cosf(sz * (float) M_PI / 180.0f);
+        cossz = cosf(sz * (float) OEL_PI / 180.0f);
         fcossz = (3.f / 7.f) * (1.0f + 2.0f * cossz);
 
         /***************************************************************************
@@ -734,7 +734,7 @@ float calc_par_impl_of_2023(l2str *l2rec, int ip, int nbands, float *Lt, float t
         size_t dims[] = {luts_data.tgdims.dimwavelength, luts_data.tgdims.dimair_mass,
                          luts_data.tgdims.dimwater_vapor_pressure, luts_data.tgdims.dimozone_concentration};
         for (size_t band = 0; band < nbands; band++) {
-            rho[band] = (M_PI * (Lt[band])) / (fo[band] * l1rec->fsol * csolz);
+            rho[band] = (OEL_PI * (Lt[band])) / (fo[band] * l1rec->fsol * csolz);
             if (rho[band] < 0.0 || rho[band] > 1.0) {
                 parb[ip] = BAD_FLT;
                 parc[ip] = BAD_FLT;
@@ -939,7 +939,7 @@ float calc_par_impl_of_2023(l2str *l2rec, int ip, int nbands, float *Lt, float t
         float Td[nbands];
         // float temp1[nbands], temp2[nbands], temp3[nbands];
         float As2[nbands];
-        float CosSZ = cos(sz * M_PI / 180.);
+        float CosSZ = cos(sz * OEL_PI / 180.);
         float albe_cld[nbands], cf, tau;
         getcldalbe(l1rec->cld_rad->taucld[ip], l1rec->cld_rad->cfcld[ip], CosSZ, t_range[it], t_range,
                    albe_cld, &tau, &cf, t_step, wl,

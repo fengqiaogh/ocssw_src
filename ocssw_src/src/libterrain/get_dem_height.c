@@ -5,7 +5,7 @@
 #include <genutils.h>
 #include "terrain.h"
 
-#define RADEG 57.29577951
+#define RADEG OEL_RADEG
 
 /*
   Exactly replicate the functionality of get_dem_height.f

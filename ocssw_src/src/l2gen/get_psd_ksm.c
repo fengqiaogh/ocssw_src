@@ -360,24 +360,24 @@ void calc_psd_ksm(float eta, float bbp_443, int ip, float *abundance_micro_ksm,
     if (xi == 4) {
         //V=integration(Dmin^Dmax) (PIE/6)D^3No(D/Do)^-xi dD =(PIE/6)NoDo^xi(Dmax/Dmin)
 
-        //V= (M_PI/6)No*Do^xi(Dmax/Dmin);
-        *volume_micro_ksm = (M_PI / 6) * No * pow(Do, 4)
+        //V= (OEL_PI/6)No*Do^xi(Dmax/Dmin);
+        *volume_micro_ksm = (OEL_PI / 6) * No * pow(Do, 4)
                 * log(micro_Dmax / micro_Dmin);
-        *volume_nano_ksm = (M_PI / 6) * No * pow(Do, 4)
+        *volume_nano_ksm = (OEL_PI / 6) * No * pow(Do, 4)
                 * log(nano_Dmax / nano_Dmin);
-        *volume_pico_ksm = (M_PI / 6) * No * pow(Do, 4)
+        *volume_pico_ksm = (OEL_PI / 6) * No * pow(Do, 4)
                 * log(pico_Dmax / pico_Dmin);
     }// Otherwise it is calculated as:
 
     else {
         //V=integration(Dmin^Dmax) (PIE/6)D^3No(D/Do)^-xi dD =(1/(4-xi))(PIE/6)NoDo^xi(Dmax^(4-xi)-Dmin^(4-xi))
-
-        //V= (1/(4-xi))(M_PI/6)No*Do^xi(Dmax^(4-xi)-Dmin^(4-xi));
-        *volume_micro_ksm = (1 / (4 - xi)) * (M_PI / 6) * No * pow(Do, xi)
+        double piOverSix = OEL_PI / 6;
+        //V= (1/(4-xi))(OEL_PI/6)No*Do^xi(Dmax^(4-xi)-Dmin^(4-xi));
+        *volume_micro_ksm = (1 / (4 - xi)) * piOverSix * No * pow(Do, xi)
                 * (pow(micro_Dmax, 4 - xi) - pow(micro_Dmin, 4 - xi));
-        *volume_nano_ksm = (1 / (4 - xi)) * (M_PI / 6) * No * pow(Do, xi)
+        *volume_nano_ksm = (1 / (4 - xi)) * piOverSix * No * pow(Do, xi)
                 * (pow(nano_Dmax, 4 - xi) - pow(nano_Dmin, 4 - xi));
-        *volume_pico_ksm = (1 / (4 - xi)) * (M_PI / 6) * No * pow(Do, xi)
+        *volume_pico_ksm = (1 / (4 - xi)) * piOverSix * No * pow(Do, xi)
                 * (pow(pico_Dmax, 4 - xi) - pow(pico_Dmin, 4 - xi));
     }
     /**********************************************************************************************************************************************************/

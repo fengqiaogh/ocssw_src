@@ -29,7 +29,7 @@ Modifications:
 #include "l2mapgen.h"
 #include "l2mapgen_input.h"
 #include <genutils.h>
-#include <readL2scan.h>
+#include <l2_wrapper.h>
 
 #include <stdio.h>
 #include <X11/X.h>
@@ -45,7 +45,6 @@ Modifications:
 
 
 #define ROOT2 1.4142135623730950488016887242096981
-#define PI 3.14159265358979323846
 #define BINBELOWTHRESH  110
 
 #define CALLOC(ptr,typ,num) {      \
@@ -92,8 +91,8 @@ int main(int argc, char *argv[]) {
     int32_t nfiles;
     int status;
     int32_t l2_flags;
-    byte quality;
-    byte goodpix;
+    uint8_t quality;
+    uint8_t goodpix;
     int prodidx = -1;
     int qualidx = -1;
     double latmax = -90.0;
@@ -125,7 +124,7 @@ int main(int argc, char *argv[]) {
     float slope = 1.0;
     float intercept = 0.0;
     int32_t prod_num = -1;
-    byte *rgb;
+    uint8_t *rgb;
     short *r, *g, *b;
 
     FILE *fp = NULL;
@@ -377,6 +376,7 @@ int main(int argc, char *argv[]) {
             nc_close(fid);
         }
     }
+    singleInputFile = 1;
     if (singleInputFile) {
         nfiles = 1;
         status = openL2(input.ifile, 0x0, &l2_str[0]);
@@ -432,9 +432,9 @@ int main(int argc, char *argv[]) {
         input.mask = 1;
     }
     strcpy(buf, l2_str[0].flagnames);
-    setupflags(buf, "HIGLINT", &mask_252, &required_mask, &status,l2_str[0].l2_bits);
-    setupflags(buf, "LAND", &mask_253, &required_mask, &status,l2_str[0].l2_bits);
-    setupflags(buf, input.flaguse, &all_masks, &required_mask, &status,l2_str[0].l2_bits);
+    setupflags(buf, "HIGLINT", &mask_252, &required_mask, &status);
+    setupflags(buf, "LAND", &mask_253, &required_mask, &status);
+    setupflags(buf, input.flaguse, &all_masks, &required_mask, &status);
 
     if ((all_masks & mask_252) != 0)
         mask_glint = 1;
@@ -463,10 +463,10 @@ int main(int argc, char *argv[]) {
         input.east = lonmax;
     }
 
-    nrad = input.north * PI / 180;
-    srad = input.south * PI / 180;
-    wrad = input.west * PI / 180;
-    erad = input.east * PI / 180;
+    nrad = input.north * OEL_DEGRAD;
+    srad = input.south * OEL_DEGRAD;
+    wrad = input.west * OEL_DEGRAD;
+    erad = input.east * OEL_DEGRAD;
 
     fprintf(stderr, "Mapping data to:\n N: %8.5f\n S: %8.5f\n W: %8.5f\n E: %8.5f\n",
             input.north, input.south, input.west, input.east);
@@ -497,7 +497,7 @@ int main(int argc, char *argv[]) {
     if (wrad < erad)
         height = rint((nrad - srad) * width / (erad - wrad));
     else
-        height = rint((nrad - srad) * width / (erad - wrad + 2 * PI));
+        height = rint((nrad - srad) * width / (erad - wrad + 2 * OEL_PI));
 
     numbins = width * height;
     scale = height / (nrad - srad);
@@ -507,7 +507,7 @@ int main(int argc, char *argv[]) {
     CALLOC(count, int, numbins);
     CALLOC(mean, unsigned char, numbins);
     CALLOC(mask, unsigned char, numbins);
-    CALLOC(rgb, byte, numbins * 3);
+    CALLOC(rgb, uint8_t, numbins * 3);
     /* Get the threshold percentage. */
     threshold = (double) input.threshold;
 
@@ -553,8 +553,9 @@ int main(int argc, char *argv[]) {
 
             /* Read swath record from L2 */
             /* ------------------------- */
-            status = readL2(&l2_str[k], k, i, -1, NULL);
-
+            status = readL2(&l2_str[k], k, i, prodidx, NULL);
+            if(qualidx!=-1)
+                status = readL2(&l2_str[k], k, i, qualidx, NULL); 
             /* For each pixel ... */
             for (j = 0; j < npix; j++) {
 
@@ -566,8 +567,8 @@ int main(int argc, char *argv[]) {
                 int out = 0; /* Number of pixel "corners"   */
                 /* that fall outside the image */
 
-                plat = l2_str[k].latitude[j] * PI / 180.0;
-                plon = l2_str[k].longitude[j] * PI / 180.0;
+                plat = l2_str[k].latitude[j] * OEL_PI / 180.0;
+                plon = l2_str[k].longitude[j] * OEL_PI / 180.0;
 
                 sinplat = sin(plat);
                 cosplat = cos(plat);
@@ -581,8 +582,8 @@ int main(int argc, char *argv[]) {
                     double phw; /* pixel half width */
 
 
-                    nlat = l2_str[k].latitude[j + 1] * PI / 180.0;
-                    nlon = l2_str[k].longitude[j + 1] * PI / 180.0;
+                    nlat = l2_str[k].latitude[j + 1] * OEL_PI / 180.0;
+                    nlon = l2_str[k].longitude[j + 1] * OEL_PI / 180.0;
 
                     cosnlat = cos(nlat);
 
@@ -622,7 +623,7 @@ int main(int argc, char *argv[]) {
                     sinaz[0] = sin(az);
                     cosaz[0] = cos(az);
                     for (ii = 1; ii < 8; ii++) {
-                        az += PI / 4;
+                        az += OEL_PI / 4;
                         sinaz[ii] = sin(az);
                         cosaz[ii] = cos(az);
                     }
@@ -647,9 +648,9 @@ int main(int argc, char *argv[]) {
                         if (lon >= wrad && lon > erad) {
                             corners[ii].x = (lon - wrad) * scale;
                         } else if (lon < wrad && lon <= erad) {
-                            corners[ii].x = (lon - wrad + 2 * PI) * scale;
+                            corners[ii].x = (lon - wrad + 2 * OEL_PI) * scale;
                         } else if (lon - erad < wrad - lon) {
-                            corners[ii].x = (lon - wrad + 2 * PI) * scale;
+                            corners[ii].x = (lon - wrad + 2 * OEL_PI) * scale;
                         } else {
                             corners[ii].x = (lon - wrad) * scale;
                         }
@@ -725,6 +726,7 @@ int main(int argc, char *argv[]) {
             if (i != 0 && i % progress == 0) fprintf(stderr, ".");
         }
         fprintf(stderr, "\n");
+        closeL2(&l2_str[k], k);
     }
     fprintf(stderr, "Finished Plate Carree projection mapping\n");
 
@@ -948,7 +950,7 @@ int main(int argc, char *argv[]) {
                 exit(EXIT_FAILURE);
             }
 
-            // need a colormap of shorts not bytes
+            // need a colormap of shorts not uint8_ts
             for (i = 0; i < 256; i++) {
                 rr[i] = r[i] << 8;
                 gg[i] = g[i] << 8;

@@ -81,7 +81,7 @@ class LutUtils:
         dirs = []
 
         # add instrument dir for MODIS utcpole.dat and leapsec.dat
-        if self.sensor['instrument'] == 'MODIS':
+        if self.sensor['instrument'].lower() == 'modis':
             dirs.append(self.sensor['dir'])
 
         # add unique sensor name

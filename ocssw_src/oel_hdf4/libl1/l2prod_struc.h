@@ -5,7 +5,7 @@
 
 #define MAX_DIM           3  /* Max number of dimensions for an SDS  */
 #define DIMNAMELEN       32  /* String length on dimension names     */
-#define UNITLEN          32  /* String length on unit names          */
+#define UNITLEN          64  /* String length on unit names          */
 #define TITLELEN        256  /* String length for long names         */
 
 #define PARAM_TYPE_NONE     0

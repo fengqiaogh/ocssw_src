@@ -15,7 +15,6 @@ add_subdirectory(libterrain)
 
 # Common progs
 add_subdirectory(l2gen)
-add_subdirectory(l2brsgen)
 add_subdirectory(l2bin)
 add_subdirectory(l3bin)
 add_subdirectory(l1aextract_modis)
@@ -36,7 +35,6 @@ add_subdirectory(l1cgen)
 add_subdirectory(ancgen)
 add_subdirectory(geo_eval)
 # MODIS-specific
-
 add_subdirectory(l1agen_modis)
 add_subdirectory(l1bgen_modist)
 add_subdirectory(l1bgen_modisa)
@@ -56,8 +54,6 @@ endif ()
 add_subdirectory(scripts)
 add_subdirectory(l1aqc_oci)
 
-#  add_subdirectory(smigen)
-#  add_subdirectory(smitoppm)
 add_subdirectory(aviris2oci)
 add_subdirectory(aviris2ncdf)
 add_subdirectory(prism2oci)

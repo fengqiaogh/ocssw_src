@@ -11,13 +11,18 @@
 #define __L1B_FILE_H__
 
 #include <netcdf>
-#include "vecxD.hpp"
 #include "device.hpp"
 
 #define NUM_BLUE_WAVELENGTHS 512
 #define NUM_RED_WAVELENGTHS 512
 #define NUM_CCD_WAVELENGTHS 512
 #define NUM_SWIR_WAVELENGTHS 9
+
+#define OFF_EARTH 1      // Geolocation quality flag field
+#define SOLAR_ECLIPSE 2  // Geolocation quality flag field
+#define TERRAIN_BAD 4    // Geolocation quality flag field
+
+#define HAM_B_STRIPING 2  // red quality flag bit for ghosting
 
 const float SWIR_BANDPASS[NUM_SWIR_WAVELENGTHS] = {45, 80, 30, 30, 15, 75, 75, 50, 75};
 
@@ -31,7 +36,7 @@ class Level1bFile {
     Level1bFile(std::string name);
     ~Level1bFile();
 
-    netCDF::NcFile *l1bFile;
+    netCDF::NcFile *l1bFile = nullptr;
     netCDF::NcGroup sensorBandParameters;
     netCDF::NcGroup scanLineAttributes;
     netCDF::NcGroup geolocationData;
@@ -42,7 +47,6 @@ class Level1bFile {
     /**
      * @brief Create a new NetCDF file for geolocation data
      *
-     * @param l1aFilename The name of the L1A file
      * @param numScans The number of scans in the L1A file
      * @param numBlueBands The number of blue bands
      * @param numRedBands The number of red bands
@@ -52,12 +56,13 @@ class Level1bFile {
      * @param pprOffset Pulse per revolution (PPR) offset of the rotating telescope assembly (RTA) in encoder
      * counts
      * @param radianceGenerationEnabled Boolean flag indicating if radiance generation is enabled
+     * @param locatingContext Indicator of which kind of location happened
      *
      * @return int Status code (0 for success, non-zero for error)
      */
-    int createFile(const char *l1aFilename, size_t numScans, size_t numBlueBands, size_t numRedBands,
-                   size_t numHyperSciPix, size_t numSwirPixels, size_t numSwirBands, int32_t *pprOffset,
-                   bool radianceGenerationEnabled);
+    int createFile(size_t numScans, size_t numBlueBands, size_t numRedBands, size_t numHyperSciPix,
+                   size_t numSwirPixels, size_t numSwirBands, int32_t *pprOffset,
+                   bool radianceGenerationEnabled, LocatingContext locatingContext, int deflateLevel);
 
     /**
      * @brief Parse dimension string and populate a vector with corresponding NetCDF dimensions
@@ -147,8 +152,6 @@ class Level1bFile {
                       const std::vector<double> &irradiances, const size_t numL1aBands,
                       const size_t numInsBands, float **gainAggMat, float **insAggMat, float ***m12Coefs,
                       float ***m13Coefs);
-
-    int close();
 };
 
 #endif

@@ -69,7 +69,7 @@ float seawater_betat(float sst, float sss) {
     a0 = 54.6746 - 0.603459 * T + 1.09987e-2 * T2 - 6.167e-5 * T3;
     b0 = 7.944e-2 + 1.6483e-2 * T - 5.3009e-4 * T2;
 
-    Ks = kw + a0 * S + b0 * pow(S, 1.5);
+    Ks = kw + a0 * S + b0 * S*sqrt(S);
 
     // calculate seawater isothermal compressibility from the secant bulk
 
@@ -116,7 +116,7 @@ float seawater_density(float sst, float sss) {
 
     // density for pure seawater
 
-    density_sw = density_w + ((a0 + a1 * T + a2 * T2 + a3 * T3 + a4 * T4) * S + (a5 + a6 * T + a7 * T2) * pow(S, 1.5) + a8 * S * S);
+    density_sw = density_w + ((a0 + a1 * T + a2 * T2 + a3 * T3 + a4 * T4) * S + (a5 + a6 * T + a7 * T2) * S*sqrt(S) + a8 * S * S);
 
     return (density_sw);
 }
@@ -220,13 +220,15 @@ float seawater_bb(float wave, float sst, float sss, double delta) {
     dfri = seawater_dnswdrho(n_sw);
 
     // volume scattering at 90 degree due to the density fluctuation
-
-    beta_df = PI * PI / 2 * (pow(wave * 1e-9, -4)) * Kbz * Tk * isocomp * dfri * dfri * (6 + 6 * delta) / (6 - 7 * delta);
+    float power_wave = 1/(wave * 1e-9);
+    power_wave*=power_wave;
+    power_wave*=power_wave;
+    beta_df = OEL_PI * OEL_PI / 2 * power_wave * Kbz * Tk * isocomp * dfri * dfri * (6 + 6 * delta) / (6 - 7 * delta);
 
     // volume scattering at 90 degree due to the concentration fluctuation
 
     flu_con = S * M0 * dnswds * dnswds / density_sw / (-dlnawds) / Na;
-    beta_cf = 2 * PI * PI * (pow(wave * 1e-9, -4)) * n_sw * n_sw * (flu_con)*(6 + 6 * delta) / (6 - 7 * delta);
+    beta_cf = 2 * OEL_PI * OEL_PI * power_wave * n_sw * n_sw * (flu_con)*(6 + 6 * delta) / (6 - 7 * delta);
 
     // total volume scattering at 90 degrees
 
@@ -234,7 +236,7 @@ float seawater_bb(float wave, float sst, float sss, double delta) {
 
     // total backscattering coefficient
 
-    bbsw = 8 * PI / 3 * beta90sw * (2 + delta) / (1 + delta) * 0.5;
+    bbsw = 8 * OEL_PI / 3 * beta90sw * (2 + delta) / (1 + delta) * 0.5;
 
     return (bbsw);
 }

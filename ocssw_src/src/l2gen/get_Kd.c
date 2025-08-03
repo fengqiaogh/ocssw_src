@@ -745,7 +745,7 @@ void nKd_lin(l2str *l2rec, int band, float *nKd) {
     const float n5 = 0.0094;
     const float n6 = 1.78;
     const float p = 1.14;
-    const float radCon = M_PI / 180.0; //degrees -> radians conversion
+    const float radCon = OEL_DEGRAD; //degrees -> radians conversion
 
     float m0, sasw, D0, f, lambda, Kd;
 

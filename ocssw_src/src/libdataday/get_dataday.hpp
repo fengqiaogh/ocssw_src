@@ -5,6 +5,8 @@
 #include <iostream>
 #include <netcdf>
 #include "get_dataday.h"
+#include <get_geospatial.hpp>
+std::pair<int32_t, int32_t> get_datadays( Geospatialbounds & geo_bounds, float deltaeqcross = 0.0f, int night_flag = 0) ;
 std::pair<int32_t, int32_t> get_datadays(const netCDF::NcFile& nc_input,float deltaeqcross = 0.0f, int night_flag = 0);
 int32_t get_plusday();
 #endif

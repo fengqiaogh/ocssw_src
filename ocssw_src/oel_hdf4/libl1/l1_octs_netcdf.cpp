@@ -87,8 +87,8 @@ static int CalcViewAngle_nc(float lon1, float lat1, float pos[3],
     float gvec[3], scvec[3], senl[3], sunl[3];
     int i, j;
 
-    rlon = lon1 * PI / 180.0;
-    rlat = lat1 * PI / 180.0;
+    rlon = lon1 * OEL_DEGRAD;
+    rlat = lat1 * OEL_DEGRAD;
 
     /* First, we must define the axes (in ECR space) of a
        pixel-local coordinate system, with the z-axis along
@@ -138,11 +138,11 @@ static int CalcViewAngle_nc(float lon1, float lat1, float pos[3],
     }
 
     /* Compute the solar zenith and azimuth */
-    solz1 = RADEG * atan(sqrt(sunl[0] * sunl[0] + sunl[1] * sunl[1]) / sunl[2]);
+    solz1 = OEL_RADEG * atan(sqrt(sunl[0] * sunl[0] + sunl[1] * sunl[1]) / sunl[2]);
     if (solz1 < 0.0) solz1 += 180.0;
 
     if (solz1 > 0.05) {
-        sola1 = RADEG * (atan2(sunl[0], sunl[1]));
+        sola1 = OEL_RADEG * (atan2(sunl[0], sunl[1]));
     } else {
         sola1 = 0.0;
     }
@@ -151,10 +151,10 @@ static int CalcViewAngle_nc(float lon1, float lat1, float pos[3],
     }
 
     /* Compute the sensor zenith and azimuth  */
-    senz1 = RADEG * atan(sqrt(senl[0] * senl[0] + senl[1] * senl[1]) / senl[2]);
+    senz1 = OEL_RADEG * atan(sqrt(senl[0] * senl[0] + senl[1] * senl[1]) / senl[2]);
     if (senz1 < 0.0) senz1 += 180.0;
     if (senz1 > 0.05) {
-        sena1 = RADEG * (atan2(senl[0], senl[1]));
+        sena1 = OEL_RADEG * (atan2(senl[0], senl[1]));
     } else {
         sena1 = 0.0;
     }
@@ -321,24 +321,24 @@ extern "C" void navigation_netcdf(NcFile &dataFile) {
 
     for (i = 0; i < scansPerScene; i++) {
         for (j = 0; j < ncol; j++) {
-            inlon[i * ncol + j] = inlon[i * ncol + j] / RADEG;
-            inlat[i * ncol + j] = inlat[i * ncol + j] / RADEG;
+            inlon[i * ncol + j] = inlon[i * ncol + j] / OEL_RADEG;
+            inlat[i * ncol + j] = inlat[i * ncol + j] / OEL_RADEG;
 
             x_ctl_ll[i * ncol + j] = cos(inlat[i * ncol + j]) * cos(inlon[i * ncol + j]);
             y_ctl_ll[i * ncol + j] = cos(inlat[i * ncol + j]) * sin(inlon[i * ncol + j]);
             z_ctl_ll[i * ncol + j] = sin(inlat[i * ncol + j]);
 
 
-            insola[i * ncol + j] = insola[i * ncol + j] / RADEG;
-            insolz[i * ncol + j] = insolz[i * ncol + j] / RADEG;
+            insola[i * ncol + j] = insola[i * ncol + j] / OEL_RADEG;
+            insolz[i * ncol + j] = insolz[i * ncol + j] / OEL_RADEG;
 
             x_ctl_sol[i * ncol + j] = cos(insolz[i * ncol + j]) * cos(insola[i * ncol + j]);
             y_ctl_sol[i * ncol + j] = cos(insolz[i * ncol + j]) * sin(insola[i * ncol + j]);
             z_ctl_sol[i * ncol + j] = sin(insolz[i * ncol + j]);
 
 
-            insena[i * ncol + j] = insena[i * ncol + j] / RADEG;
-            insenz[i * ncol + j] = insenz[i * ncol + j] / RADEG;
+            insena[i * ncol + j] = insena[i * ncol + j] / OEL_RADEG;
+            insenz[i * ncol + j] = insenz[i * ncol + j] / OEL_RADEG;
 
             x_ctl_sen[i * ncol + j] = cos(insenz[i * ncol + j]) * cos(insena[i * ncol + j]);
             y_ctl_sen[i * ncol + j] = cos(insenz[i * ncol + j]) * sin(insena[i * ncol + j]);
@@ -410,7 +410,7 @@ extern "C" void navigation_netcdf(NcFile &dataFile) {
                 splint(yctl, in2, spl_aux, nlat / linesPerScan, (float) j, (float *) &out2[j]);
 
             for (j = 0; j < nlat; j++) {
-                *(out_ptr[l][0] + j * npix + i) = atan2(out2[j], out1[j]) * RADEG;
+                *(out_ptr[l][0] + j * npix + i) = atan2(out2[j], out1[j]) * OEL_RADEG;
                 if (l >= 1 && *(out_ptr[l][0] + j * npix + i) < 0) {
                     *(out_ptr[l][0] + j * npix + i) += 360;
                 }
@@ -453,7 +453,7 @@ extern "C" void navigation_netcdf(NcFile &dataFile) {
                 splint(yctl, in1, spl_aux, nlat / linesPerScan, (float) j, (float *) &out1[j]);
 
             for (j = 0; j < nlat; j++) {
-                *(out_ptr[l][1] + j * npix + i) = asin(out1[j]) * RADEG;
+                *(out_ptr[l][1] + j * npix + i) = asin(out1[j]) * OEL_RADEG;
             }
         }
     }

@@ -132,8 +132,8 @@ float get_woasssclim(char *sssfile, float lon, float lat, int day) {
     } /* end 1-time grid set up */
 
     /* locate LL position within reference grid */
-    i = MAX(MIN((int) ((lon + 180.0 + dx / 2) / dx), WOASSSNX + 1), 0);
-    j = MAX(MIN((int) ((lat + 90.0 + dy / 2) / dy), WOASSSNY + 1), 0);
+    i = MAX(MIN((int) ((lon + 180.0 + dx / 2) / dx), WOASSSNX), 0);
+    j = MAX(MIN((int) ((lat + 90.0 + dy / 2) / dy), WOASSSNY), 0);
 
     /* compute longitude and latitude of that grid element */
     xx = i * dx - 180.0 - dx / 2;
@@ -328,8 +328,8 @@ float get_hycom_sss(char *sssfile, float lon, float lat, float *sss)
     }
 
     /* locate LL position within reference grid */
-    i = MAX(MIN((int) ((lon + 180.0 + dx / 2) / dx), nx + 1), 0);
-    j = MAX(MIN((int) ((lat + 90.0 + dy / 2) / dy), ny + 1), 0);
+    i = MAX(MIN((int) ((lon + 180.0 + dx / 2) / dx), nx), 0);
+    j = MAX(MIN((int) ((lat + 90.0 + dy / 2) / dy), ny), 0);
 
     /* compute longitude and latitude of that grid element */
     xx = i * dx - 180.0 - dx / 2;

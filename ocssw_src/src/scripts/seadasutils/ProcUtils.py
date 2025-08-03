@@ -4,19 +4,22 @@ SeaDAS library for commonly used functions within other python scripts
 
 """
 import hashlib
+import logging
 import os
-import sys
 import re
 import subprocess
-from tarfile import BLOCKSIZE
+import sys
 import time
-from datetime import datetime, timedelta, date
-import logging
+from datetime import date, datetime, timedelta
+from pathlib import Path
+from tarfile import BLOCKSIZE
+
 import requests
 from requests.adapters import HTTPAdapter
-from pathlib import Path
 
 from seadasutils.MetaUtils import readMetadata
+
+BLOCKSIZE = 65536
 
 
 #  ------------------ DANGER -------------------
@@ -36,7 +39,6 @@ from seadasutils.MetaUtils import readMetadata
 #
 
 DEFAULT_CHUNK_SIZE = 131072
-BLOCKSIZE = 65536
 
 # requests session object used to keep connections around
 obpgSession = None
@@ -73,7 +75,7 @@ def isRequestAuthFailure(req) :
 # See comment above
 def httpdl(server, request, localpath='.', outputfilename=None, ntries=5,
            uncompress=False, timeout=30., verbose=0, force_download=False,
-           chunk_size=DEFAULT_CHUNK_SIZE,timestamp=False):
+           chunk_size=DEFAULT_CHUNK_SIZE, timestamp=False):
 
     status = 0
     urlStr = 'https://' + server + request
@@ -92,7 +94,7 @@ def httpdl(server, request, localpath='.', outputfilename=None, ntries=5,
         else:
             rpath = Path(request.rstrip())
             if 'requested_files' in request:
-                rpath = Path(request.rstrip().split('?')[0]) 
+                rpath = Path(request.rstrip().split('?')[0])
             ofile = localpath / rpath.name
             if re.search(r'(?<=\?)(\w+)', ofile.name):
                 ofile = Path(ofile.name.split('?')[0])
@@ -134,7 +136,9 @@ def httpdl(server, request, localpath='.', outputfilename=None, ntries=5,
                             print("Skipping download of %s" % outputfilename)
 
             if download:
-                total_length = req.headers.get('content-length')
+                total_length = req.headers.get('Content-Length')
+                if total_length is None:
+                    total_length = len(req.content)
                 length_downloaded = 0
                 total_length = int(total_length)
                 if verbose >0:
@@ -163,7 +167,7 @@ def httpdl(server, request, localpath='.', outputfilename=None, ntries=5,
 
                 if verbose:
                     print("\n...Done")
-                    
+
                 if timestamp:
                     if 'Last-Modified' in req.headers:
                         last_modified = req.headers["Last-Modified"]
@@ -172,8 +176,6 @@ def httpdl(server, request, localpath='.', outputfilename=None, ntries=5,
                         file_path = os.path.join(localpath, os.path.basename(request))
                         if os.path.exists(file_path):
                             os.utime(file_path, (last_modified_timestamp, last_modified_timestamp))
-                        file_stat = os.stat(file_path)
-                        mod_time = datetime.fromtimestamp(file_stat.st_mtime)
 
     return status
 
@@ -214,6 +216,8 @@ def get_file_time(localFile):
         ftime = datetime.fromtimestamp(localFile.stat().st_mtime)
 
     return ftime
+
+#  ------------------ Start of non-duplicated code -------------------
 
 def cleanList(filename, parse=None):
     """
@@ -396,7 +400,7 @@ def check_sensor(inp_file):
               'Ocean Color and Temperature Scanner (OCTS)': 'octs',
               'OCTS': 'octs',
               'Ocean Scanning Multi-Spectral Imager (OSMI)': 'osmi',
-              'Ocean   Color   Monitor   OCM-2': 'ocm2', 
+              'Ocean   Color   Monitor   OCM-2': 'ocm2',
               'Second-generation Global Imager (SGLI)': 'sgli',
               'GOCI': 'goci', 'Hawkeye': 'hawkeye', 'hico': 'hico',
               'OCIS': 'ocis', 'OCI': 'oci','MERIS': 'meris','MOS': 'mos', 'TM': 'tm',

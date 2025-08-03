@@ -33,7 +33,7 @@
 #include <timeutils.h>
 #include "version.h"
 #include <stdbool.h>
-#include "gringHelper.h"
+#include <gring.h>
 #include "allocate2d.h"
 #include <string>
 
@@ -403,7 +403,7 @@ int main(int argc, char *argv[]) {
                     }
                     for (i = 0; i < (int)nscans; i++) {
                         if (solar_inst[i][0] >= -1 && solar_inst[i][0] <= 1) {
-                            float solar_inst_az = RADEG * atan2f(solar_inst[i][0], -solar_inst[i][2]);
+                            float solar_inst_az = OEL_RADEG * atan2f(solar_inst[i][0], -solar_inst[i][2]);
                             if (solar_inst_az >= 100.0 && solar_inst_az <= 110.0) {
                                 sun_in_sd = TRUE;
                                 break;
@@ -553,34 +553,33 @@ int main(int argc, char *argv[]) {
     iscan = sscan;
     line_nav_ok = 0;
 
-    // Before looping on scans, prepare to instantiate gringHelper
-    gringConfig_t *gringConfig = new gringConfig_t;
+    // Before looping on scans, prepare to instantiate Gring
+    Gring *gring_helper = new Gring();
     // Get scan direction for this sensor
-    // Most instruments scan to the left (so, use default scan_direction = -1); however, some exceptions scan to the right. 
-    // Set scan_direction = 1 for these exceptions.
+    // Most instruments scan to the left (so, use default scanDirection = -1); however, some exceptions scan to the right. 
+    // Set scanDirection = 1 for these exceptions.
     if (l1file->sensorID == CZCS || l1file->sensorID == OCI || l1file->sensorID == HARP2 || l1file->sensorID == SPEXONE) {
-        gringConfig->scan_direction = 1;
+        gring_helper->setScanDirection(1);
     } else {
-        gringConfig->scan_direction = -1;
+        gring_helper->setScanDirection(-1);
     }
     
     // set the number of lines between direction test
     if (strcmp(sensorId2InstrumentName(l1file->sensorID), "MODIS") == 0) {
-        gringConfig->direction_delta = 10;
+        gring_helper->setDirectionCheckInterval(10);
     } else if(strcmp(sensorId2InstrumentName(l1file->sensorID), "VIIRS") == 0) {
-        gringConfig->direction_delta = 16;
+        gring_helper->setDirectionCheckInterval(16);
     } else {
-        gringConfig->direction_delta = 5;
+        gring_helper->setDirectionCheckInterval(5);
     }    
     
     if (num_degrees < max_num_degrees) {
-        gringConfig->delta_degrees_lat = num_degrees;
+        gring_helper->setDeltaLat(num_degrees);
     } else {
-        gringConfig->delta_degrees_lat = max_num_degrees;
-        //printf("Setting delta_degrees_lat = %d\n", (int)gringConfig->delta_degrees_lat);
+        gring_helper->setDeltaLat(max_num_degrees);
+        //printf("Setting latPointDeltaDegrees = %d\n", (int)gring_helper->getLatPointDeltaDegrees());
     }
-    // instantiate a gringHelper
-    gringHelper *gring_helper = new gringHelper(gringConfig);
+    // instantiate a Gring
 
     // loop on scans
     while (iscan <= escan) {
@@ -804,7 +803,8 @@ int main(int argc, char *argv[]) {
         }
         
         // gring-related processing (per scan)
-        gring_helper->process_scan(l1rec, iscan, escan); 
+        gring_helper->processScan(l1rec->lat, l1rec->lon, l1rec->l1file->npix,
+                                  iscan, escan, l1rec->flags);
 
         if (iscan < escan - user_defined_increment) {
             iscan += user_defined_increment;
@@ -986,15 +986,15 @@ int main(int argc, char *argv[]) {
     /***************************************************************************************************
      *    Print gring info 
      ***************************************************************************************************/ 
-    int gring_geobox_cnt = gring_helper->get_geobox_cnt();
+    int gring_geobox_cnt = gring_helper->getGeoboxCount();
     if (gring_geobox_cnt > 1) {
         // Proceed to print gring info
-        // Prep for call to  gring_helper->get_geobox_cnt()   
+        // Prep for call to  gring_helper->getGeoboxCount()   
         std::string gring_lon_string;
         std::string gring_lat_string;
         std::string gring_seq_string;
-        // Call gring_helper->get_gring_strings
-        if (gring_helper->get_gring_strings(gring_lon_string, gring_lat_string, gring_seq_string) == SUCCESS) {
+        // Call gring_helper->getGringStrings
+        if (gring_helper->getGringStrings(gring_lon_string, gring_lat_string, gring_seq_string) == SUCCESS) {
             // fprintf gring-related strings
             fprintf(fp, "gringpointlongitude=%s\n",gring_lon_string.c_str());
             fprintf(fp, "gringpointlatitude=%s\n",gring_lat_string.c_str());
@@ -1010,7 +1010,6 @@ int main(int argc, char *argv[]) {
     
 
     /* free the dynamically allocated memory */
-    delete(gringConfig);
     delete(gring_helper);
 
     if (num_boxes > 0) {

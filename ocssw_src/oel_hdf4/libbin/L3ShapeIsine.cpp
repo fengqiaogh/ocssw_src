@@ -2,9 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-
-// this should not be necessary, but M_PI seems to not be defined in C99
-#define PI 3.141592653589793
+#include <genutils.h>
 
 namespace l3 {
 
@@ -15,7 +13,6 @@ namespace l3 {
  */
 L3ShapeIsine::L3ShapeIsine(int32_t numRows) : L3Shape(numRows) {
     int32_t i;
-    double radfac = PI / 180.0;
 
     oldRow = 0;
 
@@ -25,7 +22,7 @@ L3ShapeIsine::L3ShapeIsine(int32_t numRows) : L3Shape(numRows) {
 
     for (i = 0; i < totalRows; i++) {
         latBin[i] = (i + 0.5) * (180.0 / totalRows) - 90.0;
-        numBin[i] = (int32_t) (cos(latBin[i] * radfac) * (2.0 * totalRows) + 0.5);
+        numBin[i] = (int32_t) (cos(latBin[i] * OEL_DEGRAD) * (2.0 * totalRows) + 0.5);
     }
 
     baseBin[0] = 1;

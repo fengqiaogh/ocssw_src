@@ -36,7 +36,7 @@
 #include <libgen.h>
 #include <math.h>
 
-#include <readL2scan.h>
+#include <l2_wrapper.h>
 
 #include "l12_proto.h"
 #include <setupflags.h>
@@ -221,7 +221,7 @@ int main(int argc, char *argv[]) {
      */
     strcpy(l2_flags, l2_str.flagnames);
     l = strlen(l2_flags);
-    setupflags(l2_flags, input->flaguse, &flagusemask, &required_mask, &status,l2_str.l2_bits);
+    setupflags(l2_flags, input->flaguse, &flagusemask, &required_mask, &status);
     if (status < 0) {
         printf("-E- %s: Error setting up L2 flags.\n", argv[0]);
         exit(EXIT_FAILURE);
@@ -424,7 +424,7 @@ int main(int argc, char *argv[]) {
     }
 
     free(iptr);
-
+    closeL2(&l2_str,l2_str.fileindex);
     if (opened == 1) {
         if (calfile_close(ds_id) != 0) {
             printf("Trouble closing file %s\n", input->ofile[0]);

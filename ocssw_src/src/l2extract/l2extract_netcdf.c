@@ -87,7 +87,7 @@ int checkIfInProdlist(const char *productList, const char *name) {
  * @param shuffle - shuffle flag. it stores the first byte of all of a variable's values in the chunk
  * contiguously, followed by all the second bytes, and so on. If the values are not all wildly different, this
  * can make the data more easily compressible
- * @param nAttributes - number of attributs
+ * @param nAttributes - number of attributes
  * @param deflate - 	True to turn on deflation for this variable.
  * @param typeSize - type
  * @param numDims - number of dimensions
@@ -103,22 +103,25 @@ void setAttributes(const char *name, int groupIdRead, int groupIdWrite, int vari
     NCDIE(nc_inq_var_chunking(groupIdRead, variableRead, &chunkingStorage, chunkSizes));
     NCDIE(nc_inq_var_deflate(groupIdRead, variableRead, shuffle, deflate, deflateLevel));
 
+    int chunkSum = 0;
     for (i = 0; i < 3; i++) {
-        if (count[i] != 1 && count[i] < chunkSizes[i])
+        if (count[i] < chunkSizes[i])
             chunkSizes[i] = count[i];
+	chunkSum += chunkSizes[i];
     }
 
     NCDIE(nc_def_var(groupIdWrite, name, *xtype, *numDims, dimIds, variableWrite));
-    NCDIE(nc_def_var_chunking(groupIdWrite, *variableWrite, chunkingStorage, chunkSizes));
-    NCDIE(nc_def_var_deflate(groupIdWrite, *variableWrite, *shuffle, *deflate, *deflateLevel));
-
+    if (chunkSum > *numDims) {  /* don't chunk or compress trivial case */
+	    NCDIE(nc_def_var_chunking(groupIdWrite, *variableWrite, chunkingStorage, chunkSizes));
+	    NCDIE(nc_def_var_deflate(groupIdWrite, *variableWrite, *shuffle, *deflate, *deflateLevel));
+	}
     copyVariableAttributes(groupIdRead, variableRead, groupIdWrite, *variableWrite);
 
     NCDIE(nc_inq_type(groupIdRead, *xtype, NULL, typeSize));
 }
 
 /**
- * @brief copy a piece of a variable and all of it's attributes to another file
+ * @brief Copy a piece of a variable and all of its attributes to another file
  *
  * @param groupIdRead netCDF file or group to read
  * @param name name of the variable
@@ -182,8 +185,8 @@ void copyVariable(int groupIdRead, const char *name, size_t *start, size_t *coun
 
 /**
  * @brief
- * copy a piece of a variable  and all of it's attributes to another file. Slicing is performed along a
- * selected dimension defined by a set of indexes along the dimension
+ * Copy a piece of a variable and all of its attributes to another file.
+ * Slicing is performed along a selected dimension, defined by a set of indexes along the dimension.
  * @param groupIdRead netCDF file or group to read
  * @param name name of the variable
  * @param start location to start copying from
@@ -240,7 +243,7 @@ void copyVariableSelectedIndexes(int groupIdRead, const char *name, size_t *star
             arraySize = typeSize;
             if (dimensionIndexes >= numDims) {
                 printf(
-                    "Supplied dimensionIndexes execedes the number of dimensions "
+                    "Supplied dimensionIndexes exceeds the number of dimensions "
                     "%d, %d\n",
                     dimensionIndexes, numDims);
                 exit(EXIT_FAILURE);
@@ -278,7 +281,7 @@ void copyVariableSelectedIndexes(int groupIdRead, const char *name, size_t *star
 }
 
 /**
- * @brief extract a L2 netCDF file
+ * @brief Extract a L2 netCDF file
  *
  * @param infile input file name
  * @param outfile output file name
@@ -668,7 +671,7 @@ int extractNetCDF(const char *inFile, const char *outFile, int sPixel, int ePixe
 
     status = nc_create(outFile, NC_NETCDF4, &dsIdWrite);
     if (status != NC_NOERR) {
-        fprintf(stderr, "-E- %s line %d: Could not create NCDF4 file, %s .\n", __FILE__, __LINE__, outFile);
+        fprintf(stderr, "-E- %s line %d: Could not create netCDF4 file, %s .\n", __FILE__, __LINE__, outFile);
         exit(EXIT_FAILURE);
     }
 
@@ -876,7 +879,7 @@ int extractNetCDF(const char *inFile, const char *outFile, int sPixel, int ePixe
     // --------------------------------------------------------
     copyGlobalAttributes(dsIdRead, dsIdWrite);
 
-    // write modified global attrbutes
+    // write modified global attributes
     NCDIE(nc_put_att_float(dsIdWrite, NC_GLOBAL, "start_center_longitude", NC_FLOAT, 1, &startCenterLon));
     NCDIE(nc_put_att_float(dsIdWrite, NC_GLOBAL, "start_center_latitude", NC_FLOAT, 1, &startCenterLat));
     NCDIE(nc_put_att_float(dsIdWrite, NC_GLOBAL, "end_center_longitude", NC_FLOAT, 1, &endCenterLon));

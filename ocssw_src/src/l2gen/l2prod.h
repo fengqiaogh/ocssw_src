@@ -584,4 +584,6 @@ in product.xml...but not here?
 #define CAT_ppc_gpig                572
 #define CAT_flags_gpig              573
 
+#define CAT_Rrs_raman               574
+
 #endif

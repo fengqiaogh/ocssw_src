@@ -8,6 +8,7 @@ add_subdirectory("libgenutils")
 add_subdirectory("libtimeutils")
 add_subdirectory("libpiutils")
 add_subdirectory("libnetcdfutils")
+add_subdirectory("libgring")
 
 if(NOT ${CMAKE_PROJECT_NAME} MATCHES "VIIRS_L1")
     add_subdirectory("libcgal_interp")

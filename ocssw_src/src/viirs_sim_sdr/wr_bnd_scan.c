@@ -165,7 +165,7 @@ int wr_bnd_scan(int iscn, out_rec_struc *out_rec)
                     else if (*(out_rec->bnd_q[ibnd] + loc) == 2)
                         *(bnd_short + loc) = MISS_UINT16_FILL;
                     else {
-                        mu0 = cos(*(out_rec->solz + loc) / RADEG);
+                        mu0 = cos(*(out_rec->solz + loc) / OEL_RADEG);
                         tmpval2 = *(out_rec->bnd_lt[ibnd] + loc) * PI /
                                 (out_rec->f0[ibnd] * mu0);
                         tmpval = (tmpval2 - out_rec->refl_offset[ibnd])

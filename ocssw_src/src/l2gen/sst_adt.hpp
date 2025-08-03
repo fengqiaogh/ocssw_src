@@ -1,8 +1,6 @@
 #ifndef SST_ADT_HPP
 #define SST_ADT_HPP
 
-#include "boost/date_time/posix_time/posix_time.hpp"
-#include "boost/date_time/gregorian/gregorian.hpp"
 #include <boost/algorithm/string.hpp>
 #include <boost/unordered_map.hpp>
 #include <algorithm>

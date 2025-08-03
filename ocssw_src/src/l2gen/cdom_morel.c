@@ -61,7 +61,7 @@ void run_cdom_morel(l2str *l2rec) {
 
         if ((path = getenv("OCDATAROOT")) == NULL) {
             printf("OCDATAROOT environment variable is not defined.\n");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 
         // number of visible bands and specific band indices
@@ -69,14 +69,14 @@ void run_cdom_morel(l2str *l2rec) {
         ib412 = bindex_get(412);
         ib443 = bindex_get(443);
         ib490 = bindex_get(490);
-        ib555 = bindex_get(551);
-        ib555 = bindex_get(545);
-        if (ib555 < 0) ib555 = bindex_get(550);
-        if (ib555 < 0) ib555 = bindex_get(555);
-        if (ib555 < 0) ib555 = bindex_get(560);
+        ib555 = bindex_get_555(l1file->sensorID);
+        if (ib555 < 0)
+            ib555 = bindex_get(551);
+        if (ib555 < 0)
+            ib555 = bindex_get(545);
         if (ib412 < 0 || ib443 < 0 || ib490 < 0 || ib555 < 0) {
             printf("cdom_morel: incompatible sensor wavelengths for this algorithm\n");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 
         // read look-up table for band ratio to chl
@@ -86,7 +86,7 @@ void run_cdom_morel(l2str *l2rec) {
         fp = fopen(filename, "r");
         if (!fp) {
             printf("-E- %s line %d: error opening (%s) file", __FILE__, __LINE__, filename);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 
         printf("\nLoading Morel CDOM table from file %s\n", filename);
@@ -116,7 +116,7 @@ void run_cdom_morel(l2str *l2rec) {
                 }
                 if (i != nx) {
                     printf("-E- %s line %d: error reading (%s) file", __FILE__, __LINE__, filename);
-                    exit(1);
+                    exit(EXIT_FAILURE);
                 }
                 j++;
             }
@@ -132,7 +132,7 @@ void run_cdom_morel(l2str *l2rec) {
         fp = fopen(filename, "r");
         if (!fp) {
             printf("-E- %s line %d: error opening (%s) file", __FILE__, __LINE__, filename);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 
         printf("\nLoading Morel CDOM table from file %s\n", filename);
@@ -162,7 +162,7 @@ void run_cdom_morel(l2str *l2rec) {
                 }
                 if (i != nx) {
                     printf("-E- %s line %d: error reading (%s) filename", __FILE__, __LINE__, filename);
-                    exit(1);
+                    exit(EXIT_FAILURE);
                 }
                 j++;
             }
@@ -176,13 +176,13 @@ void run_cdom_morel(l2str *l2rec) {
         if ((chl = calloc(l1rec->npix, sizeof (float))) == NULL) {
             printf("-E- %s line %d : error allocating memory for Morel CDOM.\n",
                     __FILE__, __LINE__);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 
         if ((idx = calloc(l1rec->npix, sizeof (float))) == NULL) {
             printf("-E- %s line %d : error allocating memory for Morel CDOM.\n",
                     __FILE__, __LINE__);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 
         firstCall = 0;
@@ -191,7 +191,7 @@ void run_cdom_morel(l2str *l2rec) {
     if ((Q0 = calloc(l1file->nbands, sizeof (float))) == NULL) {
         printf("-E- %s line %d : error allocating memory for Q0 Morel CDOM.\n",
                 __FILE__, __LINE__);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     // table look-up and interpolation for CDOM index and chl
@@ -257,11 +257,8 @@ void run_cdom_morel(l2str *l2rec) {
 /* test if this line has been processed                                */
 
 /* ------------------------------------------------------------------- */
-int cdom_morel_ran(int recnum) {
-    if (recnum == LastRecNum)
-        return 1;
-    else
-        return 0;
+bool cdom_morel_ran(int recnum) {
+    return recnum == LastRecNum;
 }
 
 
@@ -326,37 +323,33 @@ void get_cdom_morel(l2str *l2rec, l2prodstr *p, float prod[]) {
         run_cdom_morel(l2rec);
 
     for (ip = 0; ip < l2rec->l1rec->npix; ip++) {
-
         switch (prodID) {
+            case CAT_iCDOM_morel:
+                prod[ip] = (float)idx[ip];
+                break;
 
-        case CAT_iCDOM_morel:
-            prod[ip] = (float) idx[ip];
-            break;
+            case CAT_chl_morel:
+                prod[ip] = (float)chl[ip];
+                break;
 
-        case CAT_chl_morel:
-            prod[ip] = (float) chl[ip];
-            break;
+            case CAT_adg_morel:
+                prod[ip] = adg_morel(chl[ip], idx[ip], l2rec->l1rec->l1file->fwave[ib]);
+                break;
 
-        case CAT_adg_morel:
-            prod[ip] = adg_morel(chl[ip], idx[ip], l2rec->l1rec->l1file->fwave[ib]);
-            break;
+            case CAT_pCDOM_morel:
+                prod[ip] = pcdom_morel(chl[ip], idx[ip]);
+                break;
 
-        case CAT_pCDOM_morel:
-            prod[ip] = pcdom_morel(chl[ip], idx[ip]);
-            break;
+            case CAT_chl_cdomcorr_morel:
+                prod[ip] = chl_cdomcorr_morel(l2rec->chl[ip], idx[ip]);
+                break;
 
-        case CAT_chl_cdomcorr_morel:
-            prod[ip] = chl_cdomcorr_morel(l2rec->chl[ip], idx[ip]);
-            break;
-
-        default:
-            printf("-E- %s line %d : erroneous product ID %d passed to CDOM morel.\n",
-                    __FILE__, __LINE__, prodID);
-            exit(1);
+            default:
+                printf("-E- %s line %d : erroneous product ID %d passed to CDOM morel.\n", __FILE__, __LINE__,
+                       prodID);
+                exit(EXIT_FAILURE);
         }
     }
 
     return;
 }
-
-

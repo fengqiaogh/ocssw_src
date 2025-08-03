@@ -254,7 +254,7 @@
 
 ; Geolocation data
   print,'Writing geolocation data'
-  ggid = ncdf_ncidinq(l1bid,'selenolocation_data')
+  ggid = ncdf_ncidinq(l1bid,'geolocation_data')
   write_ncdf_data_object, ggid, 'latitude', xlat
   write_ncdf_data_object, ggid, 'longitude', xlon
   write_ncdf_data_object, ggid, 'solar_zenith', solz

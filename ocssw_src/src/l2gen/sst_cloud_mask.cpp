@@ -94,7 +94,6 @@ namespace {
  * @param flags_sst - bit flags SST
  * @param qual_sst - quality flags (0-5)
  * @param treesum - the treesum array
- * @param scan_time - scan time
  * @param npix - number of pixels in line
  * @param n_q_size - queu size
  * @param fullscanpix - number of pixels for full scan
@@ -134,7 +133,6 @@ private:
     std::vector<int16_t> flags_sst;
     std::vector<int8_t> qual_sst;
     std::vector<float> treesum;
-    double scan_time;
     int16_t day;
     size_t npix;
     size_t n_q_size;
@@ -678,10 +676,9 @@ private:
                 const float lat = q_ref.lat[i_p];
                 const float mu = q_ref.csenz[i_p];
                 const float satzen = q_ref.senz[i_p];
-                const float Bt11 =
-                        cldmsk::bt_value(q_ref, i_p, NBANDSIR, ib11);
+                const float Bt11 = cldmsk::bt_value(q_ref, i_p, NBANDSIR, ib11);
                 const float dBT = cldmsk::bt_value(q_ref, i_p, NBANDSIR, ib37) -
-                                  Bt11;
+                                  cldmsk::bt_value(q_ref, i_p, NBANDSIR, ib12);
                 const float satzdir = 1;
                         // (q_ref.pixnum[i_p] < (int32_t)fullscanpix / 2) ? -1.0 : 1.0;
                 float *coeffptr =
@@ -727,7 +724,7 @@ private:
         // only VIIRS and ONLY SST
         const size_t day2 = day;
         const float xdoy = day2 + 284.0;
-        const float xrad = (360.0 / 365.0) * xdoy / RADEG;
+        const float xrad = (360.0 / 365.0) * xdoy / OEL_RADEG;
         const float subsolar = 23.45 * std::sin(xrad);
         const bool is_viirs =
                 sensor ==
@@ -1203,20 +1200,37 @@ private:
         if (desicion_tree == nullptr) {
             desicion_tree = new adt::Treenode();
             const std::string ocdata_root = envset::get_ocdata_root();
-            if (product_type == "SST3")
-                path_to_cloud_mask_config = ocdata_root + "/" + sensor + "/" +
-                                            platform +
-                                            "/cal/cloud_mask_sst3.json";
-            if (product_type == "SST")
-                path_to_cloud_mask_config = ocdata_root + "/" + sensor + "/" +
-                                            platform +
-                                            "/cal/cloud_mask_sst.json";
-            if (product_type == "SST4")
-                path_to_cloud_mask_config = ocdata_root + "/" + sensor + "/" +
-                                            platform +
-                                            "/cal/cloud_mask_sst4.json";
-            adt::build_tree(path_to_cloud_mask_config, desicion_tree,
-                            test_names);
+            if (product_type == "SST3") {
+                path_to_cloud_mask_config = input->sst3jsonfile;
+                if (path_to_cloud_mask_config.empty()) {
+                    path_to_cloud_mask_config =
+                        ocdata_root + "/" + sensor + "/" + platform + "/cal/cloud_mask_sst3.json";
+                    std::cout << "-W-: sst3jsonfile was not supplied. Defaulting to  "
+                              << path_to_cloud_mask_config << "\n";
+                }
+            }
+            if (product_type == "SST") {
+                path_to_cloud_mask_config = input->sstjsonfile;
+                if (path_to_cloud_mask_config.empty()) {
+                    path_to_cloud_mask_config =
+                        ocdata_root + "/" + sensor + "/" + platform + "/cal/cloud_mask_sst.json";
+                    std::cout << "-W-: sstjsonfile was not supplied. Defaulting to  "
+                              << path_to_cloud_mask_config << "\n";
+                }
+            }
+            if (product_type == "SST4") {
+                path_to_cloud_mask_config = input->sst4jsonfile;
+                if (path_to_cloud_mask_config.empty()) {
+                    path_to_cloud_mask_config =
+                        ocdata_root + "/" + sensor + "/" + platform + "/cal/cloud_mask_sst4.json";
+                    std::cout << "-W-: sst4jsonfile was not supplied. Defaulting to  "
+                              << path_to_cloud_mask_config << "\n";
+                }
+            }
+            char tmpFileName[FILENAME_MAX];
+            parse_file_name(path_to_cloud_mask_config.c_str(), tmpFileName);
+            path_to_cloud_mask_config = tmpFileName;
+            adt::build_tree(path_to_cloud_mask_config, desicion_tree, test_names);
         }
         for (const auto &test_name: test_names) {
             test_classifications[test_name] = parse_test_name(test_name);
@@ -1638,12 +1652,12 @@ private:
                         month - 1;
 
                 if (is_terra) {
-                    if (scan_time < cldmsk::scan_time_modis_t_day1) {
+                    if (scantime < cldmsk::scan_time_modis_t_day1) {
                         std::cout << "Applying electronic correction for MODIS "
                                      "TERRA, 2000 October 29"
                                   << std::endl;
                         elecor_terra = cldmsk::el_corr_modis_t_1;
-                    } else if (scan_time < cldmsk::scan_time_modis_t_day2) {
+                    } else if (scantime < cldmsk::scan_time_modis_t_day2) {
                         std::cout << "Applying electronic correction for MODIS "
                                      "TERRA, 2001 July 1"
                                   << std::endl;

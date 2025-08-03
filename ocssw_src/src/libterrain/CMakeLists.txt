@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
 
 
-set(LIBS netcdfutils)
+set(LIBS genutils netcdfutils)
 
 find_package(NetCDF REQUIRED)
 find_package(HDF4 REQUIRED)

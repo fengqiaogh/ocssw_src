@@ -35,11 +35,6 @@
 #define MAX(a,b)    (((a)>(b)) ? (a) : (b))
 #endif
 
-#ifndef PI
-#define PI  3.141592654
-#endif
-#define RADEG 57.29577951
-
 #define OFF            0
 #define ON             1
 #define NO             0
@@ -313,7 +308,7 @@ void l1_get_input_files(filehandle *l1file, char *input_files);
 
 void bindex_set(int32_t wave[], int nwave, int dwave_vswir);
 int bindex_get(int32_t wave);
-int bindex_get_555(void);
+int bindex_get_555(int32_t sensorId); // Some sensors want a band close to 555, and not 555 itself
 int windex(float wave, float twave[], int ntwave);
 int invbindx(int band, int32_t *bindx, int nbands);
 

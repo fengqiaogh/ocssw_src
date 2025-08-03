@@ -78,7 +78,7 @@ int main(int argc, char *argv[]) {
 
     int32_t pixelSub, scanSub;
 
-    char *version = "3.1";
+    char *version = "3.2";
 
     printf("This is version %s of %s (compiled on %s %s)\n", version, "l2extract", __DATE__, __TIME__);
 

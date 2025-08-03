@@ -90,8 +90,8 @@ group: sensor_band_parameters {
   	float SWIR_solar_irradiance(SWIR_bands) ;
   		SWIR_solar_irradiance:_FillValue = -32767.f ;
   		SWIR_solar_irradiance:long_name = "Mean extraterrestrial solar irradiance at 1 astronomical unit for the SWIR wavelengths" ;
-  		SWIR_solar_irradiance:valid_min = 7.f ;
-  		SWIR_solar_irradiance:valid_max = 95.f ;
+  		SWIR_solar_irradiance:valid_min = 0.f ;
+  		SWIR_solar_irradiance:valid_max = 2500.f ;
   		SWIR_solar_irradiance:units = "W m^-2 um^-1" ;
 //  	float blue_m12_coef(blue_bands, HAM_sides, polarization_coefficients) ;
 //  		blue_m12_coef:long_name = "Blue band M12/M11 polynomial coefficients" ;

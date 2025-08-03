@@ -20,22 +20,17 @@
 
 #define MAXAERMOD     100
 #define AERWHITE        0
-#define AERWANG        -1
+#define AERRH          -1
 #define AERRHNIR       -2
-#define AERWANGNIR     -3
 #define FIXMODPAIR     -4
 #define FIXMODPAIRNIR  -5
 #define FIXANGSTROM    -6
 #define FIXANGSTROMNIR -7
 #define FIXAOT         -8
-#define AERWANGSWIR    -9
-#define AERMUMM        -10
-#define AERRHSWIR      -14
-#define AERRH          -15
+#define AERRHSWIR      -9
 #define AERRHMUMM      -16
 #define AERRHMSEPS     -17
 #define AERRHSM        -18
-#define AERRHMSEPS_lin -19
 #define AERNULL        -99
 
 #define DEFAULT_CHL     0

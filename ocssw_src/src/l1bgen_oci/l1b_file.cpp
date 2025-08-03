@@ -22,16 +22,27 @@ using namespace std;
 using namespace netCDF;
 using namespace netCDF::exceptions;
 
-int Level1bFile::createFile(const char *l1aFilename, size_t numScans, size_t numBlueBands, size_t numRedBands,
-                            size_t numHyperSciPix, size_t numSwirPix, size_t numSwirBands, int32_t *pprOffset,
-                            bool radianceGenerationEnabled) {
+int DEFLATE_LEVEL = 5;
+
+int Level1bFile::createFile(size_t numScans, size_t numBlueBands, size_t numRedBands, size_t numHyperSciPix,
+                            size_t numSwirPix, size_t numSwirBands, int32_t *pprOffset,
+                            bool radianceGenerationEnabled, LocatingContext locatingContext,
+                            int deflateLevel) {
+
+    if (deflateLevel < 0 || 9 < deflateLevel) { // Should never happen; should be checked by L1bOptions
+        cerr << "Invalid deflate level: " << to_string(deflateLevel) << endl;
+        exit(EXIT_FAILURE);
+    }
+
+    DEFLATE_LEVEL = deflateLevel;
+
     // Put global dimensions
     map<string, size_t> dims;
-    if (numHyperSciPix == numSwirPix)
+    if (numHyperSciPix == numSwirPix) {
         dims = {{"scans", numScans},          {"pixels", numHyperSciPix},       {"red_bands", numRedBands},
                 {"blue_bands", numBlueBands}, {"SWIR_bands", numSwirBands},     {"vector_elements", 3},
                 {"quaternion_elements", 4},   {"polarization_coefficients", 3}, {"HAM_sides", 2}};
-    else
+    } else {
         dims = {{"scans", numScans},
                 {"ccd_pixels", numHyperSciPix},
                 {"SWIR_pixels", numSwirPix},
@@ -42,6 +53,8 @@ int Level1bFile::createFile(const char *l1aFilename, size_t numScans, size_t num
                 {"quaternion_elements", 4},
                 {"polarization_coefficients", 3},
                 {"HAM_sides", 2}};
+    }
+
     for (auto dim : dims) {
         try {
             ncDims[numDimensions++] = l1bFile->addDim(dim.first, dim.second);
@@ -145,15 +158,23 @@ int Level1bFile::createFile(const char *l1aFilename, size_t numScans, size_t num
         scansByPixels = {l1bFile->getDim("scans"), l1bFile->getDim("pixels")};
     else
         scansByPixels = {l1bFile->getDim("scans"), l1bFile->getDim("ccd_pixels")};
-    createField(geolocationData, "latitude", "Latitudes of pixel locations", NULL, "degrees_north", NULL,
-                fillDouble, "", "", -90.f, 90.f, 1.0, 0.0, NC_FLOAT, scansByPixels, "");
-    createField(geolocationData, "longitude", "Longitudes of pixel locations", NULL, "degrees_east", NULL,
-                fillDouble, "", "", -180.f, 180.f, 1.0, 0.0, NC_FLOAT, scansByPixels, "");
+
+    string latString = "Latitudes of pixel locations";
+    string lonString = "Longitudes of pixel locations";
+    if (locatingContext == SELENO) {
+        latString = "Selenographic latitudes of pixel locations";
+        lonString = "Selenographic longitudes of pixel locations";
+    }
+
+    createField(geolocationData, "latitude", latString.c_str(), NULL, "degrees_north", NULL, fillDouble, "",
+                "", -90.f, 90.f, 1.0, 0.0, NC_FLOAT, scansByPixels, "");
+    createField(geolocationData, "longitude", lonString.c_str(), NULL, "degrees_east", NULL, fillDouble, "",
+                "", -180.f, 180.f, 1.0, 0.0, NC_FLOAT, scansByPixels, "");
     createField(geolocationData, "height", "Terrain height at pixel locations", NULL, "meters", NULL,
                 fillDouble, "", "", static_cast<short>(-10000), static_cast<short>(10000), 1.0, 0.0, NC_SHORT,
                 scansByPixels, "longitude latitude");
-    createField(geolocationData, "watermask", "Watermask", NULL, "", "0 for land, 1 for water", BAD_UBYTE,
-                "", "", 0, 1, 1, 0, NC_UBYTE, scansByPixels, "longitude latitude");
+    createField(geolocationData, "watermask", "Watermask", NULL, "", "0 for land, 1 for water", BAD_UBYTE, "",
+                "", 0, 1, 1, 0, NC_UBYTE, scansByPixels, "longitude latitude");
     createField(geolocationData, "sensor_azimuth", "Sensor azimuth angle at pixel locations", NULL, "degrees",
                 NULL, fillDouble, "", "", -18000, 18000, 0.01, 0.f, NC_SHORT, scansByPixels,
                 "longitude latitude");
@@ -164,8 +185,24 @@ int Level1bFile::createFile(const char *l1aFilename, size_t numScans, size_t num
                 "longitude latitude");
     createField(geolocationData, "solar_zenith", "Solar zenith angle at pixel locations", NULL, "degrees",
                 NULL, fillDouble, "", "", 0, 18000, 0.01, 0.f, NC_SHORT, scansByPixels, "longitude latitude");
+
+    // Uncomment these and delete above when time comes to use floats in the output instead of shorts
+    // createField(geolocationData, "sensor_azimuth", "Sensor azimuth angle at pixel locations", NULL,
+    // "degrees",
+    //             NULL, fillDouble, "", "", -180, 180, 1.0, 0.f, NC_FLOAT, scansByPixels,
+    //             "longitude latitude");
+    // createField(geolocationData, "sensor_zenith", "Sensor zenith angle at pixel locations", NULL,
+    // "degrees",
+    //             NULL, fillDouble, "", "", 0, 180, 1.0, 0.f, NC_FLOAT, scansByPixels, "longitude latitude");
+    // createField(geolocationData, "solar_azimuth", "Solar azimuth angle at pixel locations", NULL,
+    // "degrees",
+    //             NULL, fillDouble, "", "", -180, 180, 1.0, 0.f, NC_FLOAT, scansByPixels,
+    //             "longitude latitude");
+    // createField(geolocationData, "solar_zenith", "Solar zenith angle at pixel locations", NULL, "degrees",
+    //             NULL, fillDouble, "", "", 0, 180, 1.0, 0.f, NC_FLOAT, scansByPixels, "longitude latitude");
+
     createField(geolocationData, "quality_flag", "Geolocation pixel quality flags", NULL, NULL, NULL,
-                BAD_UBYTE, "1UB, 2UB, 4UB, 8UB", "Off_Earth Solar_eclipse Terrain_bad 10_deg_scan_angle", 0, 0, 1.0, 0.0, NC_UBYTE,
+                BAD_UBYTE, "1UB, 2UB, 4UB", "Off_Earth Solar_eclipse Terrain_bad", 0, 0, 1.0, 0.0, NC_UBYTE,
                 scansByPixels, "longitude latitude");
 
     vector<NcDim> scansVsQuatElems{l1bFile->getDim("scans"), l1bFile->getDim("quaternion_elements")};
@@ -176,10 +213,10 @@ int Level1bFile::createFile(const char *l1aFilename, size_t numScans, size_t num
                 "degrees", NULL, fillDouble, "", "", -180.f, 180.f, 1.0, 0.0, NC_FLOAT, scansVsVecElems, "");
 
     double orbFill = -9999999.0;
-    createField(navigationData, "orb_pos", "Orbit position vectors at EV mid-times (ECR)", NULL, "meters",
-                NULL, orbFill, "", "", -7100000.f, 7100000.f, 1.0, 0.0, NC_FLOAT, scansVsVecElems, "");
+    createField(navigationData, "orb_pos", "Orbit position vectors at EV mid-times (ECR)", NULL, "kilometers",
+                NULL, orbFill, "", "", -7100.f, 7100.f, 1.0, 0.0, NC_FLOAT, scansVsVecElems, "");
     createField(navigationData, "orb_vel", "Orbit velocity vectors at EV mid-times (ECR)", NULL,
-                "meters/second", NULL, fillDouble, "", "", -7600.f, 7600.f, 1.0, 0.0, NC_FLOAT,
+                "kilometers/second", NULL, fillDouble, "", "", -7.6f, 7.6f, 1.0, 0.0, NC_FLOAT,
                 scansVsVecElems, "");
     createField(navigationData, "sun_ref", "Solar unit vectors in J2000 frame", NULL, NULL, NULL, fillDouble,
                 "", "", -1.f, 1.f, 1.0, 0.0, NC_FLOAT, scansVsVecElems, "");
@@ -233,8 +270,8 @@ int Level1bFile::createFile(const char *l1aFilename, size_t numScans, size_t num
     }
     createField(observationData, "qual_blue", "Blue Band Quality Flag", NULL, NULL, NULL, BAD_UBYTE, "1UB",
                 "saturation", 0, 0, 1.0, 0.0, NC_UBYTE, bluePicture, "longitude latitude");
-    createField(observationData, "qual_red", "Red Band Quality Flag", NULL, NULL, NULL, BAD_UBYTE, "1UB",
-                "saturation", 0, 0, 1.0, 0.0, NC_UBYTE, redPicture, "longitude latitude");
+    createField(observationData, "qual_red", "Red Band Quality Flag", NULL, NULL, NULL, BAD_UBYTE, "1UB, 2UB",
+                "saturation HAM-B_striping", 0, 0, 1.0, 0.0, NC_UBYTE, redPicture, "longitude latitude");
     createField(observationData, "qual_SWIR", "SWIR Band Quality Flag", NULL, NULL, NULL, BAD_UBYTE, "1UB",
                 "saturation", 0, 0, 1.0, 0.0, NC_UBYTE, swirPicture, "longitude latitude");
 
@@ -327,14 +364,13 @@ int Level1bFile::createField(NcGroup &parentGroup, const char *shortName, const 
     }
 
     /* vary chunck size based on dimensions */
-    int deflateLevel = 5;
     vector<size_t> chunkVec;
     if (parentGroupName == "geolocation_data" || parentGroupName == "observation_data") {
         if (dimVec.size() == 2)
             chunkVec = {512, 1272};  // 256 lines, all pixels(1272)
         if (dimVec.size() == 3)
             chunkVec = {40, 16, 1272};  // 40 bands, 16 lines, all pixels(1272)
-        nc_init_compress(parentId, varId, dimensionIds, dimVec.size(), chunkVec.data(), deflateLevel);
+        nc_init_compress(parentId, varId, dimensionIds, dimVec.size(), chunkVec.data(), DEFLATE_LEVEL);
     }
 
     /* Add a "long_name" attribute */
@@ -557,19 +593,9 @@ int Level1bFile::writeBandInfo(Device deviceType, const vector<float> &l1aWavele
     return EXIT_SUCCESS;
 }
 
-int Level1bFile::close() {
-    try {
-        l1bFile->close();
-    } catch (NcException &e) {
-        cout << e.what() << endl;
-        cerr << "Failure closing: " + fileName << endl;
-        exit(1);
-    }
-
-    return 0;
-}
-
 Level1bFile::Level1bFile() {
+    cout << "Level1bFile::Level1bFile() - Empty constructor will not work" << endl;
+    exit(EXIT_FAILURE);
 }
 
 Level1bFile::Level1bFile(string filename) {
@@ -578,4 +604,12 @@ Level1bFile::Level1bFile(string filename) {
 }
 
 Level1bFile::~Level1bFile() {
+    try {
+        l1bFile->close();
+    } catch (NcException &e) {
+        cout << e.what() << endl;
+        cerr << "Failure closing: " + fileName << endl;
+        exit(EXIT_FAILURE);
+    }
+    delete l1bFile;
 }

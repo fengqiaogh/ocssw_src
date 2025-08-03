@@ -102,7 +102,6 @@ int openl1_oci(filehandle * file) {
     int dimid, status;
     
     // Open the netcdf4 input file
-    printf("Opening OCI L1B file\n");
     status = nc_open(file->name, NC_NOWRITE, &ncid_L1B);
     if (status != NC_NOERR) {
         fprintf(stderr, "-E- %s line %d: nc_open(%s) failed.\n",
@@ -650,8 +649,8 @@ int readl1_oci(filehandle *file, int32_t line, l1str *l1rec, int lonlat) {
             } else {
                 l1rec->Lt[ipb] = Lt_blue[band][ip];
                 if (use_rhot) {
-                    //l1rec->Lt[ipb] *= Fobar[ib] * l1rec->fsol * cos(l1rec->solz[ip]/RADEG) / M_PI;
-                    l1rec->Lt[ipb] *= blue_solar_irradiance[band] * cos(l1rec->solz[ip]/RADEG) / earth_sun_distance_correction / M_PI / 10.0;
+                    //l1rec->Lt[ipb] *= Fobar[ib] * l1rec->fsol * cos(l1rec->solz[ip]/OEL_RADEG) / OEL_PI;
+                    l1rec->Lt[ipb] *= blue_solar_irradiance[band] * cos(l1rec->solz[ip]/OEL_RADEG) / earth_sun_distance_correction / OEL_PI / 10.0;
                 } else {
                     l1rec->Lt[ipb] /= 10.; // the input is in W/m2 ...
                 }
@@ -667,8 +666,8 @@ int readl1_oci(filehandle *file, int32_t line, l1str *l1rec, int lonlat) {
             } else {
                 l1rec->Lt[ipb] = Lt_red[band][ip];
                 if (use_rhot) {
-                    //l1rec->Lt[ipb] *= Fobar[ib] * l1rec->fsol * cos(l1rec->solz[ip]/RADEG) / M_PI;
-                    l1rec->Lt[ipb] *= red_solar_irradiance[band] * cos(l1rec->solz[ip]/RADEG) / earth_sun_distance_correction / M_PI / 10.0;
+                    //l1rec->Lt[ipb] *= Fobar[ib] * l1rec->fsol * cos(l1rec->solz[ip]/OEL_RADEG) / OEL_PI;
+                    l1rec->Lt[ipb] *= red_solar_irradiance[band] * cos(l1rec->solz[ip]/OEL_RADEG) / earth_sun_distance_correction / OEL_PI / 10.0;
                 } else {
                     l1rec->Lt[ipb] /= 10.; // the input is in W/m2 ...
                 }
@@ -701,8 +700,8 @@ int readl1_oci(filehandle *file, int32_t line, l1str *l1rec, int lonlat) {
             } else {
                 l1rec->Lt[ipb] = Lt_SWIR[band][ip];
                 if (use_rhot) {
-                    //l1rec->Lt[ipb] *= Fobar[ib] * l1rec->fsol * cos(l1rec->solz[ip]/RADEG) / M_PI;
-                    l1rec->Lt[ipb] *= SWIR_solar_irradiance[band] * cos(l1rec->solz[ip]/RADEG) / earth_sun_distance_correction / M_PI / 10.0;
+                    //l1rec->Lt[ipb] *= Fobar[ib] * l1rec->fsol * cos(l1rec->solz[ip]/OEL_RADEG) / OEL_PI;
+                    l1rec->Lt[ipb] *= SWIR_solar_irradiance[band] * cos(l1rec->solz[ip]/OEL_RADEG) / earth_sun_distance_correction / OEL_PI / 10.0;
                 } else {
                     l1rec->Lt[ipb] /= 10.; // the input is in W/m2 ...
                 }
@@ -740,7 +739,6 @@ int readl1_oci(filehandle *file, int32_t line, l1str *l1rec, int lonlat) {
 int closel1_oci(filehandle *file) {
     int status;
 
-    printf("Closing oci l1b file\n");
     status = nc_close(file->sd_id);
     check_err(status, __LINE__, __FILE__);
 

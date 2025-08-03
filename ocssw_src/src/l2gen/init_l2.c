@@ -39,6 +39,7 @@ void init_l2(l2str *l2rec, int32_t nbands) {
 
             l2rec->brdf[ipb] = BAD_FLT;
             l2rec->Rrs[ipb] = BAD_FLT;
+            l2rec->Rrs_raman[ipb] = BAD_FLT;
             l2rec->outband_correction[ipb] = 1.0;
             l2rec->a[ipb] = BAD_FLT;
             l2rec->bb[ipb] = BAD_FLT;

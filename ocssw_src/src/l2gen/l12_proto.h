@@ -144,8 +144,9 @@ void get_rhown_eval(char *fqfile, float Rrs[], float wave[], int32_t nir_s, int3
 void get_rho_mumm(l2str *l2rec, int32_t ip, int32_t iw, float *rhom);
 void get_rhown_mumm(l2str *l2rec, int32_t ip, int32_t nir_s, int32_t nir_l, float rhown[]);
 void glint_rad(int32_t num_iter, int32_t nband, int32_t nir_s, int32_t nir_l,
-        float glint_coef, float air_mass,
+        float *glint_coef, float air_mass,
         float mu0, float F0[], float taur[], float taua[], float La[], float TLg[], uncertainty_t *errstr);
+double get_nw (float fwave);
 
 float fresnel_coef(float mu, float n);
 float fresnel_sen(float senz, int return_tf);

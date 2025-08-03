@@ -1,0 +1,8 @@
+from distutils.core import setup
+
+setup(name='rechunk_safe',
+      version='${PACKAGE_VERSION}',
+      package_dir={ '': '${CMAKE_CURRENT_BINARY_DIR}' },
+      packages=['seadasutils'],
+      scripts=['$ENV{OCSSWROOT}/src/scripts/rechunk_safe.py']
+)

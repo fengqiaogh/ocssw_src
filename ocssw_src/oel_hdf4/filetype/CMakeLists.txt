@@ -12,7 +12,7 @@ find_package(NetCDF REQUIRED COMPONENTS CXX F77)
 include_directories(${NETCDF_INCLUDE_DIRS})
 list(APPEND LIBS ${NETCDF_LIBRARIES})
 
-list(APPEND LIBS piutils dfutils genutils)
+list(APPEND LIBS piutils genutils)
 
 list(APPEND LIBS meris)
 
@@ -20,7 +20,7 @@ list(APPEND LIBS h5io)
 
 list(APPEND LIBS bilio)
 
-add_library(filetype filetype.c filetypeXml.cpp)
+add_library(filetype filetype.cpp filetypeXml.cpp)
 target_link_libraries(filetype ${LIBS})
 target_include_directories(filetype PUBLIC ".")
 

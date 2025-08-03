@@ -41,3 +41,15 @@ add_test(
 l1bgen_oci par=${par_file} && \
 nccmp -mgdf -C 10 -G date_created,software_version $ENV{OCTEST_TOLERANCE} ${l1b_file} output/${l1b_file}"
 )
+
+# test case for solar cal data
+set(base_file "PACE_OCI_SOL.20250206T065825")
+set(l1b_file "${base_file}.L1B.nc")
+set(par_file "${base_file}.L1B.par")
+add_test(
+  NAME "l1bgen_oci-${l1b_file}"
+  WORKING_DIRECTORY ${dataDir}
+  COMMAND bash -c "set -o xtrace; \
+l1bgen_oci par=${par_file} && \
+nccmp -mgdf -C 10 -G date_created,software_version $ENV{OCTEST_TOLERANCE} ${l1b_file} output/${l1b_file}"
+)

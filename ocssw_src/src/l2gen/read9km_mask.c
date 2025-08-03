@@ -16,7 +16,8 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#define PI  3.141592653589793
+#include <genutils.h>
+#define PI OEL_PI
 
 
 static int32_t *numbin_xkm, *basebin_xkm, *numbin_9km, *basebin_9km;

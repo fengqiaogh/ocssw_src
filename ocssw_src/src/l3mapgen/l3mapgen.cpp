@@ -48,6 +48,9 @@ std::unordered_map<std::string, std::vector<int32_t>> wv3d_2d_name_to_3d_expansi
 std::unordered_map<std::string, std::string> wv3d_3d_name_to_2d_name;
 std::vector<std::string> output_products_with_3d;
 size_t wavelength_3d_size;
+bool numericalOrder(const std::string& a, const std::string& b) {
+                    return std::stoi(a) < std::stoi(b);
+    }
 }  // namespace wv3d
 
 const std::unordered_map<std::string, std::vector<int32_t>>& get_wv3d_2d_name_to_3d_expansion() {
@@ -962,17 +965,39 @@ void writeProj4File(L3File* l3File, char* projectionStr, vector<OutFile*> outFil
     lat0Str = " +lat_0=" + to_string(lat0);
 
     string lat1Str;
+    float lat1Val;
     if (clo_isSet(optionList, "lat_1")) {
-        lat1Str = " +lat_1=" + to_string(clo_getFloat(optionList, "lat_1"));
+        lat1Val = clo_getFloat(optionList, "lat_1");
     } else {
-        lat1Str = " +lat_1=" + to_string(metaData->south);
+        lat1Val = metaData->south;
     }
+
+    // check lat1 for -90 or 90
+    if((strcasecmp(projectionStr, "lambert") == 0)) {
+        if(lat1Val >= 90)
+            lat1Val = 89.999;
+        if(lat1Val <= -90)
+            lat1Val = -89.999;
+    }
+    lat1Str = " +lat_1=" + to_string(lat1Val);
+
     string lat2Str;
+    float lat2Val;
     if (clo_isSet(optionList, "lat_2")) {
-        lat2Str = " +lat_2=" + to_string(clo_getFloat(optionList, "lat_2"));
+        lat2Val = clo_getFloat(optionList, "lat_2");
     } else {
-        lat2Str = " +lat_2=" + to_string(metaData->north);
+        lat2Val = metaData->north;
     }
+
+    // check lat2 for -90 or 90
+    if((strcasecmp(projectionStr, "lambert") == 0)) {
+        if(lat2Val >= 90)
+            lat2Val = 89.999;
+        if(lat2Val <= -90)
+            lat2Val = -89.999;
+    }
+    lat2Str = " +lat_2=" + to_string(lat2Val);
+
     string aziStr;
     if (clo_isSet(optionList, "azimuth")) {
         aziStr = " +alpha=" + to_string(clo_getFloat(optionList, "azimuth"));
@@ -1890,9 +1915,10 @@ int main(int argc, char* argv[]) {
                         }
                         wv3d::wavelength_3d_list_separated.push_back(wave_length);
                     }
-                }
+                }                
                 std::sort(wv3d::wavelength_3d_list_separated.begin(),
-                          wv3d::wavelength_3d_list_separated.end());
+                          wv3d::wavelength_3d_list_separated.end(),
+                          wv3d::numericalOrder);
             }
             bool prod_3d_expand_found = false;
             for (size_t i = 0; i < wv3d::wavelength_3d_list_separated.size(); i++) {

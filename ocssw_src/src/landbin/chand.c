@@ -1,6 +1,7 @@
 #include <math.h>
+#include <genutils.h>
 
-#define fac 0.0174532925199  /* PI/180 */
+#define fac OEL_DEGRAD  /* PI/180 */
 
 void chand(float xphi, float xmuv, float xmus, float *xtau, float *rhoray, double *trup, double *trdown, int nbands, char *process) {
     /*

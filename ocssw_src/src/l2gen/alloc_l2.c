@@ -21,13 +21,6 @@ int alloc_l2(l1str *l1rec, l2str *l2rec) {
     int32_t nbands = l1rec->l1file->nbands;
     char *p;
 
-    // look in all ofile l2prod and the default l2prod
-    // to see if we need to turn on uncertainty processing
-    if(l1rec->uncertainty) {
-        printf("ERROR: %s:%d - Why is l1rec->uncertainty not NULL", __FILE__, __LINE__);
-        exit(1);
-    }
-
     if(input->proc_uncertainty){
         if(input->aer_opt!=AERRHMSEPS && input->aer_opt!=AERRHSM){
             printf("-E- %s line %d: Unable to calculate the uncertainty for aer_opt other than -17 or -18.\n", __FILE__, __LINE__);
@@ -35,8 +28,7 @@ int alloc_l2(l1str *l1rec, l2str *l2rec) {
         }
 
         l1rec->uncertainty= (uncertainty_t*) malloc(sizeof (uncertainty_t));
-        int32_t nbands_ac=bindex_get(input->aer_wave_long)-bindex_get(input->aer_wave_short)+1;
-        if (alloc_uncertainty(nbands, nbands_ac, npix, l1rec->uncertainty) != 0) {
+        if (alloc_uncertainty(nbands, input->nbands_ac, npix, l1rec->uncertainty) != 0) {
             printf("-E- %s line %d: Unable to allocate error record.\n", __FILE__, __LINE__);
             exit(FATAL_ERROR);
         }
@@ -44,7 +36,7 @@ int alloc_l2(l1str *l1rec, l2str *l2rec) {
 
     int32_t len = 5 * sizeof (int32_t) * npix
             + 7 * sizeof (float)*npix
-            + 9 * sizeof (float)*npix * nbands;
+            + 10 * sizeof (float)*npix * nbands;
 
     if(l1rec->uncertainty){
         len+=sizeof (float)*npix * nbands;   // for  Rrs_unc
@@ -105,6 +97,8 @@ int alloc_l2(l1str *l1rec, l2str *l2rec) {
     p += sizeof(float)*npix*nbands;
     l2rec->Rrs = (float *) p;
     p += sizeof(float)*npix*nbands;
+    l2rec->Rrs_raman = (float *) p;
+    p += sizeof(float)*npix*nbands;
     if(l1rec->uncertainty){
         l2rec->Rrs_unc = (float *) p;
         p += sizeof (float)*npix*nbands;
@@ -135,7 +129,6 @@ int alloc_l2(l1str *l1rec, l2str *l2rec) {
     // init to NULL
     l2rec->bindx = NULL;
     l2rec->sst = NULL;
-    l2rec->Rrs_raman = NULL;
     l2rec->tgrec = NULL;
 
     printf("Allocated %d bytes in L2 record.\n", (int) (p - l2rec->data));

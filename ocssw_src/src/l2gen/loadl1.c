@@ -34,14 +34,14 @@
 
 
 int loadl1(filehandle *l1file, l1str *l1rec) {
-    static double radeg = RADEG;
+    static double radeg = OEL_RADEG;
     static int32_t sensorID = -999;
     static float *aw;
     static float *bbw;
     int navfail_cnt = 0;
 
     int32_t ip, ipb, ib, iw, ix;
-    double esdist;
+    double esdist; // Earth to Sun distance in astronomical units
     int32_t nbands = l1rec->l1file->nbands;
 
     double *rvs;

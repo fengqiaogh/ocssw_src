@@ -49,7 +49,7 @@ Here are the steps needed to build using bash, cmake and make:
 1. Get a copy of the ocssw source git repository
 
   ```
-  git clone https://oceandata.sci.gsfc.nasa.gov/rcs/obpg/ocssw.git [optional target directory name]
+  git clone git@git.smce.nasa.gov:oel/ocssw.git [optional target directory name]
   cd ocssw
   git submodule init
   git submodule update
@@ -143,6 +143,20 @@ This can be done to update the data tree to the proper tag after a new git check
   cd $OCSSWROOT/build
   make update
   ```
+
+## Command Line Autocomplete
+
+We have auto complete definitions for many of the OCSSW programs.
+
+1. For bash
+```
+source $OCSSWROOT/src/scripts/autocomplete_bash.sh
+```
+
+2. For zsh
+```
+source $OCSSWROOT/src/scripts/autocomplete_zsh.sh
+```
 
 
 ## IDE setup

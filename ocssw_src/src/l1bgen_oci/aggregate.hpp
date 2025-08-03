@@ -76,15 +76,15 @@ void populateGainAggMatrix(float **gainAggMatrix, int16_t tapAggFactors[NUMBER_O
  * @param numBands Number of bands
  * @param numInsBands Number of bands to aggregate to
  * @param geoData Output of geolocation
- * @param cal Calibrated data
- * @param calb Agreggated calibrated data
+ * @param preAgg Pre-aggregated data. Instrument bands X pixels
+ * @param aggregated Agreggated & calibrated data. L1B bands X pixels
  * @param insAggMat Instrument aggregation matrix
  * @param radianceGen Indicates whether radiance generation is enabled
  * @param solIrrL1a Solar irradiances from L1A
  * @param cosSolZens Cosine of solar zeniths
  */
-void aggToL1b(size_t currScan, size_t numBands, size_t numInsBands, const GeoData &geoData, float **cal,
-              float **calb, float **insAggMat, bool radianceGen, std::vector<double> &solIrrL1a,
-              const float *cosSolZens);
+void aggAndCalcRefls(size_t currScan, size_t numBands, size_t numInsBands, const GeoData &geoData,
+                     float *preAgg, float *aggregated, float **insAggMat, bool radianceGen,
+                     std::vector<double> &solIrrL1a, const float *cosSolZens);
 
 #endif

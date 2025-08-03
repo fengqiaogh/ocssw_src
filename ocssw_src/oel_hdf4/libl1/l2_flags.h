@@ -41,6 +41,10 @@ extern "C" {
 #define PRODFAIL   1073741824
 #define SPARE7     2147483648
 
+// assign the georegion flag to one of the spare flags
+#define GEOREGION SPARE1
+
+
 static const char * const l2_flag_lname[L1_NFLAGS] = {"ATMFAIL",
     "LAND",
     "PRODWARN",
@@ -64,7 +68,7 @@ static const char * const l2_flag_lname[L1_NFLAGS] = {"ATMFAIL",
     "MODGLINT",
     "CHLWARN",
     "ATMWARN",
-    "SPARE",
+    "OPSHAL",
     "SEAICE",
     "NAVFAIL",
     "FILTER",

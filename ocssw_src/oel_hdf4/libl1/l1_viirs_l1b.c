@@ -10,7 +10,6 @@
 #include "nc4utils.h"
 #include <libnav.h>
 #include <float.h>
-#include "calibrate_viirs.h"
 #include <math.h>
 
 typedef unsigned short ushort;
@@ -496,15 +495,6 @@ int openl1_viirs_l1b(filehandle *l1file) {
     rdsensorinfo(l1file->sensorID, l1_input->evalmask,
             "Fobar", (void **) &Fobar);
 
-    /*----- Calibration LUT -----*/
-    if (l1_input->calfile[0]) {
-        double grantime = l1binfo.scan_start_time[0]; // granule start time
-        grantime -= leapseconds_since_1993(grantime); // convert TAI93 to "UTC93"
-        grantime += 1104537600.0; // convert "UTC93" to UTC (1958) (verify)
-        grantime *= 1000000.0; // convert to IET
-        load_fcal_lut(l1_input->calfile, (int64_t) grantime, &f_cal_corr);
-    }
-
     free(l1binfo.scan_start_time); // free memory allocated
     free(geoinfo.scan_start_time); //  by init_viirs_file()
     return SUCCESS;
@@ -670,7 +660,7 @@ int scale_l1bvals(l1str *l1rec) {
                 l1rec->rho_cirrus[ipix] = scale * (float) tmpval + offset;
 
                 /* Normalize reflectance by solar zenith angle */
-                l1rec->rho_cirrus[ipix] /= cos(l1rec->solz[ipix] / RADEG);
+                l1rec->rho_cirrus[ipix] /= cos(l1rec->solz[ipix] / OEL_RADEG);
 
                 /* Apply F-factor */
                 l1rec->rho_cirrus[ipix] *= f_corr;
@@ -702,7 +692,7 @@ int scale_l1bvals(l1str *l1rec) {
                 l1rec->Lt[ipb] = scale * (float) tmpval + offset;
 
                 /* convert from reflectance to radiance */
-                l1rec->Lt[ipb] *= l1rec->Fo[irsb] / PI;
+                l1rec->Lt[ipb] *= l1rec->Fo[irsb] / OEL_PI;
 
                 /* Apply F-factor */
                 l1rec->Lt[ipb] *= f_corr;

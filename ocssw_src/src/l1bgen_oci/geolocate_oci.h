@@ -29,36 +29,14 @@
 
 #include "l1b_file.hpp"
 #include "geo_data.hpp"
+#include <genutils.h>
+#include "types.hpp"
 #include <array>
+#include "l1b_options.hpp"
+#include "processing_tracker.hpp"
 
-// This struct helps shorten the parameter list for geolocatePixelsOci.
-struct GeoBox {
-    float westernmostLon;
-    float easternmostLon;
-    float southernmostLat;
-    float northernmostLat;
-
-    GeoBox() {
-        westernmostLon = +180;
-        easternmostLon = -180;
-        southernmostLat = +90;
-        northernmostLat = -90;
-    }
-};
-
-#define CPLUSPLUS11 201103L
-
-#if __cplusplus >= CPLUSPLUS11
-template <typename T>
-using vec3D = std::vector<std::vector<std::vector<T>>>;
-template <typename T>
-using vec2D = std::vector<std::vector<T>>;
-#else
-template <typename T>
-typedef std::vector<std::vector<std::vector<T>>> vec3D;
-template <typename T>
-typedef std::vector<std::vector<T>> vec2D;
-#endif
+double constexpr RADIANS_TO_ARCSECONDS = OEL_RADEG * 3600;
+const int constexpr MAX_ENC_COUNT = 0x20000;
 
 enum DataType {
     NO_DATA,
@@ -71,55 +49,18 @@ enum DataType {
     DIAGNOSTIC,
     EARTH_SPECTRAL,
     NO_PROCESSING,
-    EXTERNAL_SNAPSHOP_TRIGGER,  // Not a typo
-    INTERNAL_SNAPSHOP_TRIGGER,  // Not a typo
+    EXTERNAL_SNAPSHOP_TRIGGER,  // sic
+    INTERNAL_SNAPSHOP_TRIGGER,  // sic
     SPCA,
     LUNAR_STARE,
     NON_BASELINE_SPECTRAL_AGGREGATION
 };
 
-constexpr double PI = 3.14159265358979323846;
-double constexpr RADIANS_TO_ARCSECONDS = (180 / PI) * 3600;
-
 using namespace netCDF;
 using namespace netCDF::exceptions;
 
 typedef float quaternion[4];
-typedef float orbArray[3];
-
-double constexpr RADEG = 180 / PI;
-double constexpr DTOR = PI / 180;
-
-// Earth ellipsoid parameters
-double constexpr EARTH_RADIUS = 6378.137;   // Kilometers, at the equator
-double constexpr FLATTENING = 1 / 298.257;  // Describes how 'squished' the Earth is
-double constexpr ECCENTRICITY_SQUARED = (1 - FLATTENING) * (1 - FLATTENING);
-
-float constexpr FOCAL_LENGTH = 45.184;
-
-typedef struct {
-    double masterClock;  // OCI clock
-    double mceClock;
-
-    double craftToTilt[3][3];  // Spacecraft to tilt base transformation
-    double tiltAxis[3];        // In tilt reference frame
-    double tiltAngles[2];      // Tilt angles at either the aft or forward positions
-    double tiltHome;
-    double tiltToOciMech[3][3];    // Tilt platform to OCI mechanical transformation
-    double ociMechToOciOpt[3][3];  // OCI mechanical to optical transformation
-    double rtaAxis[3];  // Rotating telescope assembly (RTA) rotation axis in OCI optical reference frame
-    double hamAxis[3];  // HAM rotation axis in OCI optical reference frame
-    double hamAlongTrackAngles[2];
-    double hamCrossTrackAngles[2];
-    double rtaEncoderScale;  // RTA encoder conversion to arcseconds
-    double hamEncoderScale;  // HAM encoder conversion to arcseconds
-
-    int32_t rtaNadir[2];  // Pulse per revolution (PPR) offset from RTA nadir angle in encoder counts
-
-    double alongTrackPlanarity[5];   // The plane that intersects `acrossTrackPlanarity` at the spacecraft
-    double acrossTrackPlanarity[5];  // The plane that intersects `alongTrackPlanarity` at the spacecraft
-
-} GeoLut;  // A representation of a PACE_OCI_GEO_LUT file
+typedef std::array<float, 3> orbArray;
 
 /**
  * @brief Expands environment variables in a given string.
@@ -151,22 +92,14 @@ inline int expandEnvVar(std::string *sValue) {
 
 /**
  * @brief Geolocate an L1A file, producing an L1B file.
- * @param l1aFilename The filename of the L1A file to be geolocated
- * @param geoLutFilename The filename of the geo lut to be used
- * @param geoLUT A container of important values to geolocation
- * @param l1bFilename The filename to write to
- * @param demFilename The filename of the digital elevation model to be used
- * @param findRadiance Indicated whether the user wants rhot. If `true`, get rhot. If `false`, get Lt
- * @param digitalObjectId A unique identifier for this file
- * @param ephFile A definitive ephemeris file. If blank or null, regular geolocation occurs
- * @param disableGeolocation Disables geolocation, but still computes critical variables
- * @param programVersion The program version number to write to L1B
- * @return 1 if no earth view, 0 otherwise
+ * @param l1aFile The L1A file to be geolocated
+ * @param l1bFile The L1B file object to which geolocation data will be written
+ * @param locatingContext Indicator as to which kind of location will happen
+ * @param processingTracker A ProcessingTracker
+ * @return GeoData struct
  */
-GeoData geolocateOci(netCDF::NcFile *l1aFile, Level1bFile &l1bFile, std::string geoLutFilename,
-                     GeoLut &geoLUT, std::string l1bFilename, std::string demFilename, bool findRadiance,
-                     std::string digitalObjectId, const std::string ephFile, const bool disableGeolocation,
-                     std::string programVersion);
+GeoData locateOci(netCDF::NcFile *l1aFile, Level1bFile &l1bFile, const oel::L1bOptions &options,
+                  LocatingContext locatingContext, oel::ProcessingTracker &processingTracker);
 
 /**
  * @brief Read mechanism control electronics (MCE) Telemetry and compute related variables
@@ -183,7 +116,7 @@ GeoData geolocateOci(netCDF::NcFile *l1aFile, Level1bFile &l1bFile, std::string 
  *
  * @note This function populates the GeoLut structure with relevant data read from the L1A file.
  */
-MceTlm readMceTelemetry(netCDF::NcFile *l1aFile, GeoLut &geoLut, netCDF::NcGroup egrData);
+MceTlm readMceTelemetry(netCDF::NcFile *l1aFile, GeoData::GeoLut &geoLut, netCDF::NcGroup egrData);
 /**
  * @brief Determine Earth view pixels and time offsets from Pulse per revolution (PPR) using scan mode table
  * fields to determine pixel offset
@@ -229,9 +162,9 @@ int getEarthView(double comRotRate, int16_t *dataTypes, int16_t *spatialZoneLine
  * @note This function implements the algorithm described in "Use of OCI Telemetry to Determine Pixel
  * Line-of-Sight" by F. Patt, 2020-05-18
  */
-int getEarthViewVectors(const GeoData &geoData, const GeoLut &geoLut, const uint16_t numPixels,
+int getEarthViewVectors(GeoData &geoData, const GeoData::GeoLut &geoLut, const int device,
                         const double earthViewTimeOffset, const std::vector<double> &delt,
-                        const size_t scanNum, std::vector<std::array<float, 3>> &vectors, std::vector<double> &scanAngles);
+                        const size_t scanNum, std::vector<std::array<float, 3>> &vectors);
 
 /**
  * @brief Interpolate encoder data to pixel times and add to scan angles
@@ -243,7 +176,7 @@ int getEarthViewVectors(const GeoData &geoData, const GeoLut &geoLut, const uint
  * @param currScan Current scan number
  * @param thetaCorrections [out] Vector to store the calculated theta corrections
  */
-void getThetaCorrections(const size_t numPix, const GeoData &geoData, const GeoLut &geoLut,
+void getThetaCorrections(const size_t numPix, const GeoData &geoData, const GeoData::GeoLut &geoLut,
                          const std::vector<double> &timeOffsets, int mceSpinId, size_t currScan,
                          std::vector<double> &thetaCorrections);
 
@@ -329,8 +262,10 @@ int multiplyQuaternions(float q1[4], float q2[4], float result[4]);
  * @param posI Array of interpolated positions
  * @param velI Array of interpolated velocities
  */
-int interpolateOrbitVectors(size_t numOrbRec, size_t numScans, double *orbitTimes, orbArray *positions,
-                            orbArray *velocities, double *scanTimes, orbArray *posi, orbArray *veli);
+void interpolateOrbitVectors(size_t numOrbRec, size_t numScans, const std::vector<double> &orbitTimes,
+                             const std::vector<orbArray> &positions, const std::vector<orbArray> &velocities,
+                             const std::vector<double> &scanTimes, std::vector<orbArray> &posi,
+                             std::vector<orbArray> &veli);
 
 /**
  * @brief Interpolate quaternions to scan line times
@@ -404,9 +339,11 @@ int quaternionToMatrix(float quaternion[4], double rotationMatrix[3][3]);
  *
  * @param pos (I) ECR orbit position vector (km)
  * @param sOMat (I) describing sensor orientation matrix
+ * @param locatingContext the locating context
  * @param spCoef (O) describing scan path coefficients
  */
-int getEarthScanTrackCoefs(float pos[3], double sOMat[3][3], double spCoefs[10]);
+int getEllipsoidScanTrackCoefs(orbArray pos, double sOMat[3][3], LocatingContext locatingContext,
+                               double spCoefs[10]);
 
 /** @brief This subroutine performs navigation of a scanning sensor on the
  * surface of an ellipsoid based on an input orbit position vector and
@@ -427,37 +364,39 @@ int getEarthScanTrackCoefs(float pos[3], double sOMat[3][3], double spCoefs[10])
  * North toward East.  Flag values of 999. are returned for any pixels
  * whose scan angle is past the Earth's horizon.
  *
- * @param demFile (I) Digital Elevation Map file path
- * @param position (I) ECR orbit position vector in km at scan mid-time
- * @param velocity (I) ECR orbit velocity vector in km/sec
- * @param sensorOrientationMatrix (I) Sensor Orientation Matrix
- * @param scanPathCoefficients (I) Scan path coefficients
- * @param sunUnitVector (I) Sun unit vector in ECR
- * @param checkForEclipse (I) Boolean flag to check for eclipse conditions
- * @param earthToMoon (I) Vector from Earth's center to Moon's center
- * @param earthSunDistance (I) Distance between Earth and Sun in astronomical units
- * @param sensorViewVectors (I) Sensor view vectors
- * @param numPixels (I) Number of pixels to geolocate
- * @param deltaT (I) Change in time
- * @param qualityFlags (O) Quality flags for each pixel
- * @param currScan (I) Current scan number
- * @param disableGeolocation (I) Whether or not lat/lons will be produced
- * @param latitudes (O) Geodetic latitude of each pixel. Subject to `disableGeolocation`
- * @param longitudes (O) Geodetic longitude of each pixel Subject to `disableGeolocation`
- * @param solarAzimuths (O) Solar azimuths for each pixel
- * @param solarZeniths (O) Solar zeniths for each pixel
- * @param sensorAzimuths (O) Sensor azimuths for each pixel
- * @param sensorZeniths (O) Sensor zeniths for each pixel
- * @param terrainHeights (O) Terrain height for each pixel
- * @param geoBox (O) Geospatial lat/lon mins/maxes
+ * @param[in] demFile Digital Elevation Map file path
+ * @param[in] position ECR orbit position vector in km at scan mid-time
+ * @param[in] velocity ECR orbit velocity vector in km/sec
+ * @param[in] sensorOrientationMatrix Sensor Orientation Matrix
+ * @param[in] scanPathCoefs Scan path coefficients
+ * @param[in] locatingContext Indicates which celestial body is being observed (GEO, HELIO, SELENO, or NONE)
+ * @param[in] sunUnitVector Sun unit vector in ECR
+ * @param[in] checkForEclipse Boolean flag to check for eclipse conditions
+ * @param[in] earthToMoon Vector from Earth's center to Moon's center
+ * @param[in] earthSunDistance Distance between Earth and Sun in astronomical units
+ * @param[in] sensorViewVectors Sensor view vectors
+ * @param[in] numPixels Number of pixels to geolocate
+ * @param[in] deltaT Change in time
+ * @param[out] qualityFlags Quality flags for each pixel
+ * @param[in] currScan Current scan number
+ * @param[out] latitudes Geodetic latitude of each pixel
+ * @param[out] longitudes Geodetic longitude of each pixel
+ * @param[out] solarZeniths Solar zeniths for each pixel
+ * @param[out] solarAzimuths Solar azimuths for each pixel
+ * @param[out] sensorZeniths Sensor zeniths for each pixel
+ * @param[out] sensorAzimuths Sensor azimuths for each pixel
+ * @param[out] terrainHeights Terrain height for each pixel
+ * @param[out] geoBox Geospatial lat/lon mins/maxes
+ * @return int Status code
  */
-int geolocatePixelsOci(const char *demFile, float position[3], float velocity[3],
-                       double sensorOrientationMatrix[3][3], double scanPathCoefs[10], float sunUnitVector[3],
-                       bool checkForEclipse, orbArray earthToMoon, double earthSunDistance,
-                       std::vector<std::array<float, 3>> &sensorViewVectors, size_t numPixels, double *deltaT,
-                       std::vector<uint8_t> &qualityFlags, size_t currScan, float *latitudes,
-                       float *longitudes, short *solarZeniths, short *solarAzimuths, short *sensorZeniths,
-                       short *sensorAzimuths, short *terrainHeights, GeoBox& geoBox);
+int locatePixelsOci(const char *demFile, orbArray position, orbArray velocity,
+                    double sensorOrientationMatrix[3][3], double scanPathCoefs[10],
+                    LocatingContext locatingContext, orbArray sunUnitVector, bool checkForEclipse,
+                    orbArray earthToMoon, double earthSunDistance,
+                    std::vector<std::array<float, 3>> &sensorViewVectors, size_t numPixels, double *deltaT,
+                    std::vector<uint8_t> &qualityFlags, size_t currScan, float *latitudes, float *longitudes,
+                    float *solarZeniths, float *solarAzimuths, float *sensorZeniths, float *sensorAzimuths,
+                    short *terrainHeights);
 
 /**
  * @brief Calculate the attitude angles given the ECEF orbit vector and attiude matrix. Rotation order is
@@ -470,6 +409,6 @@ int geolocatePixelsOci(const char *demFile, float position[3], float velocity[3]
  * @param rpy (O) Attitude angles (roll, pitch, yaw)
  *
  */
-int getAttitudeAngles(float pos[3], float vel[3], double smat[3][3], float rpy[3]);
+int getAttitudeAngles(orbArray pos, orbArray vel, double smat[3][3], orbArray &rpy);
 
 #endif  // _GEOLOCATE_OCI_H_

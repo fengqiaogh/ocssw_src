@@ -96,6 +96,9 @@
         Don Shea         SAIC             3/20/09    moved function BinarySearch
                                                      so prototype not necessary
                                                      in ancproto.h
+        Arya Akmal       SSAI             3/10/25    Check in function anc_get_time
+                                                     if Start Day attribute exists
+                                                     else halt execution
 
 -----------------------------------------------------------------------------*/
 
@@ -1666,8 +1669,11 @@ int32_t anc_get_time(char *filename, double *s_jd, double *e_jd) {
     }
 
     /**** read global attribute "Start Day" */
-    if ((ret = rdancattr(sdfid, SDAY, (VOIDP *) & sday)) < 0)
-        return FAIL;
+    if ((ret = rdancattr(sdfid, SDAY, (VOIDP *) & sday)) < 0) {
+        printf("Execution halted %s:%d: 'Start Day' global attribute not found in %s\n",
+                    __FILE__, __LINE__, filename);
+        exit(EXIT_FAILURE);
+    }
     if (DFNT_INT16 != ret) {
         fprintf(stderr, "\nWARNING: Datatype of %s read from %s is not int16.  Processing from this point is unpredictable", SDAY, filename);
     }

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.12)
 
-set(LIBS hdf4utils)
+set(LIBS hdf4utils genutils)
 
 add_executable(landbin
   make_L3_v1.1.c

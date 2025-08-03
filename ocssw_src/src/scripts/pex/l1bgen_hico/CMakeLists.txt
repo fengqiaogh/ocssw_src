@@ -16,7 +16,7 @@ if (PYTHON)
     set(SETUP_PY    "${CMAKE_CURRENT_BINARY_DIR}/setup.py")
     set(MODULES     "${CMAKE_CURRENT_BINARY_DIR}/hico")
     set(PYVER       "--python $ENV{VIRTUAL_ENV}/bin/python")
-    set(SHEBANG     "--python-shebang=/usr/bin/env\\ python3")
+    set(SHEBANG     "--python-shebang=/usr/bin/env\\ python3.8")
 
     configure_file(${SETUP_PY_IN} ${SETUP_PY})
     file(MAKE_DIRECTORY ${MODULES})

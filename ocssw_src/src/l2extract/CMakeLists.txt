@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.12)
 add_executable(l2extract
   main_l2extract.c
   l2extract_netcdf.c
-  l2extract_input.c
+  l2extract_input.cpp
   l2extract_3d_wv.cpp
 )
 

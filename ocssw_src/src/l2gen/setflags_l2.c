@@ -77,7 +77,7 @@ void setflagbits_l2(l2str *l2rec, int32_t ipix) {
         if (isCoccolith(l2rec, ip))
             l1rec->flags[ip] |= COCCOLITH;
 
-        if (input->aer_opt != AERWANGSWIR && input->aer_opt != AERRHSWIR) {
+        if (input->aer_opt != AERRHSWIR) {
             if (isTurbid(l2rec, ip))
                 l1rec->flags[ip] |= TURBIDW;
         }
@@ -368,7 +368,7 @@ float aerindex(l2str *l2rec, int32_t ip) {
 
 
     /* cos of solz */
-    mu0 = cos(l2rec->l1rec->solz[ip] / RADEG);
+    mu0 = cos(l2rec->l1rec->solz[ip] / OEL_RADEG);
 
 
     /* bring water-leaving radiance at 510nm to the TOA */

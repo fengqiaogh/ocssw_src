@@ -412,7 +412,7 @@ int32_t anc_acq_lin_met(l1str *l1rec)
 {
     static int32_t firstcall = 0;
     static int32_t ntim_int; /* # needed times for interp arrays */
-    static float r2d = 57.29577951;
+    static float r2d = OEL_RADEG;
     static int32_t anc_id = -1;
     static gen_int_str *met_int, *met_tim;
 
@@ -559,11 +559,11 @@ int32_t anc_acq_lin_met(l1str *l1rec)
                                 sqrt((uwnd * uwnd * u_unc * u_unc + vwnd * vwnd * v_unc * v_unc) / ws_2);
                             l1rec->uncertainty->dwd[ilon] =
                                 sqrt(vwnd * vwnd * u_unc * u_unc + uwnd * uwnd * v_unc * v_unc) / ws_2;
-                            if (l1rec->uncertainty->dwd[ilon] > M_PI)
-                                l1rec->uncertainty->dwd[ilon] = M_PI;
+                            if (l1rec->uncertainty->dwd[ilon] > OEL_PI)
+                                l1rec->uncertainty->dwd[ilon] = OEL_PI;
                         } else {
                             l1rec->uncertainty->dws[ilon] = sqrt(0.5 * (u_unc * u_unc + v_unc * v_unc));
-                            l1rec->uncertainty->dwd[ilon] = M_PI;
+                            l1rec->uncertainty->dwd[ilon] = OEL_PI;
                         }
                         l1rec->uncertainty->dwd[ilon] *= r2d;
                     }
@@ -901,6 +901,9 @@ int32_t anc_acq_lin_prof(l1str *l1rec)
                         break;
                     case RHPROF:
                         l1rec->anc_add->prof_rh[loc] = val;
+                        // set l1rec->rh to level 4 (index 3, 925mb), if valid and no user defined relhumid was passed
+                        if ((input->relhumid != -2000) && (ilvl == 3) && (val != BAD_FLT))
+                            l1rec->rh[ilon] = val;
                         break;
                     case HPROF:
                         l1rec->anc_add->prof_height[loc] = val;
@@ -2677,7 +2680,7 @@ int anc_acq_lin(int32_t anc_class, l1str *l1rec)
     float *data;
     int iprm, xbox_st, ybox_st, nx, ny, t_interp, data1_ix, data2_ix, anc_f_stat;
     int npix, ipix, sto_st, sto_en;
-    static float r2d = 57.29577951;
+    static float r2d = OEL_RADEG;
     /*
      *  find places in the met_sto structure to look in
      */
@@ -2957,7 +2960,7 @@ int anc_acq_lin_olci(int anc_class, char *file, l1str *l1rec)
     static int32_t tie_epix, spix, epix, dpix;
     static size_t tie_nlin[2], tie_npix[2];
     static float *tie_data, *tie_met, *tie_oz;
-    static float r2d = 57.29577951;
+    static float r2d = OEL_RADEG;
     int32_t anc_field_per_parm[5] = {1, 2, 1, 1, 1};
     int32_t anc_class_n_ds[2] = {4, 1}, class_off, n_ds_prm, ptr_prm;
     int32_t n_field_per_parm, ifld, ipx, px_tie1, px_tie2;

@@ -1,7 +1,7 @@
 #include "l12_proto.h"
 #include "freearray.h"
 
-static float radeg = RADEG;
+static float radeg = OEL_RADEG;
 static float nw = 1.334;
 
 void foq_morel(int foqopt, l2str *l2rec, float wave[], int32_t nwave, float chl,
@@ -321,8 +321,8 @@ void foqint_morel(char *file, float wave[], int32_t nwave, float solz, float sen
     static float *senztab;
     static float *phitab;
     static float *lchltab;
-
-
+    static int   *indexes_wave;
+    static int orginal_nwave;
     float lchl;
     int i, j, k, l, m;
     int iw, js, kc, ln, ma;
@@ -459,9 +459,20 @@ void foqint_morel(char *file, float wave[], int32_t nwave, float solz, float sen
         for (kc = 0; kc < n_c; kc++)
             lchltab[kc] = log(chltab[kc]);
 
+        indexes_wave = (int*) calloc(nwave, sizeof (int));
+        for (iw = 0; iw < nwave; iw++) {
+           indexes_wave[iw] =  windex(wave[iw], wavetab, n_w);
+        }
+        orginal_nwave = nwave;
         firstCall = 0;
     }
-
+    if (nwave > orginal_nwave) {
+        indexes_wave = realloc(indexes_wave, sizeof(int) * nwave);
+        orginal_nwave = nwave;
+        for (iw = 0; iw < nwave; iw++) {
+            indexes_wave[iw] = windex(wave[iw], wavetab, n_w);
+        }
+    }
 
     lchl = log(MAX(chl, 0.01));
 
@@ -491,7 +502,7 @@ void foqint_morel(char *file, float wave[], int32_t nwave, float solz, float sen
 
         /* using nearest wavelength (tables are for MERIS bands) */
 
-        i = windex(wave[iw], wavetab, n_w);
+        i = indexes_wave[iw];
 
         brdf[iw] = 0.0;
 

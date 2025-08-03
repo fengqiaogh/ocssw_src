@@ -10,9 +10,9 @@
 #define HAVE_UNISTD_H 1
 /* #undef HAVE_WINDOWS_H */
 
-#define FOCS_MODULE_DIRECTORY      "/home/dshea/ocssw/lib/focs"
-#define FOCS_LOCALE_DIRECTORY      "/home/dshea/ocssw/share/lang"
-#define FOCS_MAN_DIRECTORY         "/home/dshea/ocssw/share/man"
+#define FOCS_MODULE_DIRECTORY      "/home/dshea/linux_64/ocssw/lib/focs"
+#define FOCS_LOCALE_DIRECTORY      "/home/dshea/linux_64/ocssw/share/lang"
+#define FOCS_MAN_DIRECTORY         "/home/dshea/linux_64/ocssw/share/man"
 #define FOCS_SHARED_LIBRARY_SUFFIX ".so"
 #define FOCS_DEV 1
 

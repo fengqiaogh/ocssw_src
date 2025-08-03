@@ -8,11 +8,7 @@
 #include <hdfi.h>
 #include "nc_gridutils.h"
 #include "terrain.h"
-
-
-#define PI  3.141592654
-#define RADEG 57.29577951
-
+#include <genutils.h>
 
 /** Number of tile (latitude) rows, adjustable for performance. */
 #define TILE_ROWS 120
@@ -121,7 +117,7 @@ void define_tile_geometry() {
 
         // number of columns varies with latitude
         latfrac = (double) irow / (nrows - 1);
-        ncols = (int) round(maxcols * sin(PI * latfrac));
+        ncols = (int) round(maxcols * sin(OEL_PI * latfrac));
         if (ncols == 0) ncols = 1;
         dem.ncols[irow] = ncols;
 
@@ -162,8 +158,8 @@ void define_tile_geometry() {
         // calculate longitude border for this row
         if (ncols == 1) lonborder = 0; // unless at poles
         else if (minlat < 0)
-            lonborder = latborder / cos(minlat / RADEG);
-        else lonborder = latborder / cos(maxlat / RADEG);
+            lonborder = latborder / cos(minlat / OEL_RADEG);
+        else lonborder = latborder / cos(maxlat / OEL_RADEG);
 
         /* for each column */
         for (icol = 0; icol < ncols; icol++) {
@@ -603,12 +599,7 @@ int get_nc_height(const char* demfile, float *xlon, float *xlat,
  
     /* Set step size in meters */
     if(ddist == 0.0)
-        ddist = step * REMM * 180.0 / (dem_grid->numLat * RADEG);
-
-    /* Skip if close to limb */
-    if (*senz > MAXSENZEN) {
-        return 0;
-    }
+        ddist = step * REMM * 180.0 / (dem_grid->numLat * OEL_RADEG);
 
     /* Load tile for this lat,lon */
     itile = load_tile(*xlat, *xlon);
@@ -627,13 +618,20 @@ int get_nc_height(const char* demfile, float *xlon, float *xlat,
         return 0;
     }
 
+    /* Skip if close to limb */
+    if (*senz > MAXSENZEN) {
+        status = interp_tilevalue(tile, *xlat, *xlon, &dem_hgt);
+        *height = (float) dem_hgt;
+        return status;
+    }
+
     /* Pre-compute trig functions */
-    tansnz = tan(*senz / RADEG);
-    sinsna = sin(*sena / RADEG);
-    cossna = cos(*sena / RADEG);
-    coslat = cos(*xlat / RADEG);
-    dlat = cossna * RADEG / REMM;
-    dlon = sinsna * RADEG / (REMM * coslat);
+    tansnz = tan(*senz / OEL_RADEG);
+    sinsna = sin(*sena / OEL_RADEG);
+    cossna = cos(*sena / OEL_RADEG);
+    coslat = cos(*xlat / OEL_RADEG);
+    dlat = cossna * OEL_RADEG / REMM;
+    dlon = sinsna * OEL_RADEG / (REMM * coslat);
     if(fabs(dlon) > 360.0)
         dlon = 0.0;
 
@@ -692,27 +690,27 @@ int get_nc_height(const char* demfile, float *xlon, float *xlat,
     /* (need to look at corrections for polar regions) */
     *xlat += (float) dist * dlat;
     *xlon += (float) dist * dlon;
-    *senz -= (float) dist * RADEG / REMM;
+    *senz -= (float) dist * OEL_RADEG / REMM;
     status = interp_tilevalue(tile, *xlat, *xlon, &dem_hgt);
     *height = (float) dem_hgt;
 
     /* Check for longitude transition over date line */
-    if (*xlon > 180.f) {
-        *xlon -= 360.f;
-    }
-    if (*xlon < -180.f) {
-        *xlon += 360.f;
+    if (*xlon > 180.0 || *xlon < -180.0) {
+        *xlon = fmodf(*xlon, 360.0);
+        if(*xlon > 180.0)
+            *xlon -= 360.0;
+        if(*xlon < -180.0)
+            *xlon += 360.f;
     }
 
     // if lat goes over the pole and back down
-    if(*xlat < -90.0) {
-        *xlat = -180.0 - *xlat;
-        if(*xlon > 0.0)
-            *xlon -= 180.0;
-        else
-            *xlon += 180.0;
-    } else if(*xlat > 90.0) {
-        *xlat = 180.0 - *xlat;
+    if(*xlat > 90.0 || *xlat < -90.0) {
+        *xlat = fmodf(*xlat, 180.0);
+        if(*xlat > 90.0)
+            *xlat = 180.0 - *xlat;
+        if(*xlat < -90.0)
+            *xlat = -180.0 - *xlat;
+
         if(*xlon > 0.0)
             *xlon -= 180.0;
         else

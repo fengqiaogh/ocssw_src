@@ -34,6 +34,12 @@ class L0Stream {
     void read(char *buffer, size_t num);
 
     /**
+     * @brief Read from the current steam and skip num of bytes
+     * @param numBytes bytes to skip
+     */
+    void skip(size_t numBytes);
+
+    /**
      * @brief Move the read/write head a number of bytes in a particular direction, switching streams as
      * necessary.
      * @param num The number of bytes to seek. May be negative, indicating a backwards seek.

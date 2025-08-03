@@ -29,6 +29,29 @@ static int lonId, latId;
 static float latFillValue = BAD_FLT;
 static float lonFillValue = BAD_FLT;
 
+
+/**
+ * Given a string, return pointer to the last word of the string
+ */
+char* getLastWord(char* str) {
+    char* token = NULL;
+    char *lastWord = NULL;
+
+    // split string into tabs, white space or line breaks to get all words
+    token = strtok(str, " \t\n");
+    while (token) {
+        lastWord = token;
+        token = strtok(NULL, " \t\n");
+    }
+
+    if (!lastWord) {
+        printf("--Error-- with nadir_view_time unit string.");
+        exit(1);
+    }
+    return lastWord;
+}
+
+
 /**
  * Open the OCI L1B file and perform some one-time tasks (as opposed to tasks that
  * are per scan), including:
@@ -45,7 +68,6 @@ int openl1_l1c(filehandle * file) {
     int dimid, status;
     
     // Open the netcdf4 input file
-    printf("Opening L1C file\n");
     status = nc_open(file->name, NC_NOWRITE, &ncid_L1C);
     if (status != NC_NOERR) {
         fprintf(stderr, "-E- %s line %d: nc_open(%s) failed.\n",
@@ -91,7 +113,9 @@ int openl1_l1c(filehandle * file) {
     } else {
         fprintf(stderr, "-E- Error finding bin_attributes.\n");
         exit(EXIT_FAILURE);
-    }  
+    } 
+
+    // grab the variable id for nadir_view_time
     int varid;
     double scan_timeFillValue = BAD_FLT;
     status = nc_inq_varid(groupid, "nadir_view_time", &varid);
@@ -99,31 +123,62 @@ int openl1_l1c(filehandle * file) {
         fprintf(stderr, "-E- Error finding nadir_view_time.\n");
         exit(EXIT_FAILURE);
     }  
+
+    // grab nadir_view_time fill value
     status = nc_inq_var_fill(groupid, varid, NULL, &scan_timeFillValue);
     check_err(status, __LINE__, __FILE__);
+
+    // grab unit string size of "unit" attribute so you can malloc the correct bucket size
+    size_t nadirTimeUnitStrLen = 0;
+    status = nc_inq_attlen(groupid, varid, "units", &nadirTimeUnitStrLen);
+    check_err(status, __LINE__, __FILE__);
+
+    // grab the units string from nadir_view_time and save it to a char[] so it can be parsed by strtok()
+    char nadirTimeUnitStr[nadirTimeUnitStrLen+1];
+    status = nc_get_att_text(groupid, varid, "units", nadirTimeUnitStr);
+    check_err(status, __LINE__, __FILE__);
+    nadirTimeUnitStr[nadirTimeUnitStrLen] = '\0';
+
+    // parse all white space until you get the last word, which is usually the date
+    char* dateStr = getLastWord(nadirTimeUnitStr);
+
+    // parse the unit attribute string to get the date from it. Should be in the format:
+    //  1. YYYY-MM-DD, or
+    //  2. YYYY-MM-DDTHH:MM:SSZ
+    int year, month, day;
+
+    // when parsing the date, there should be 3 assignments, anything less it is not a valid date string
+    int dateAssignments  = sscanf(dateStr, "%4d-%2d-%2d", &year, &month, &day);
+    if (dateAssignments == 3) {
+        file_start_day = ymds2unix(year, month, day, 0.0);
+    }
+    // else the units doesnt match the date format, read from time_coverage_start instead
+    else {
+
+        // get start time
+        size_t att_len;
+        status = nc_inq_attlen(ncid_L1C, NC_GLOBAL, "time_coverage_start", &att_len);
+        check_err(status, __LINE__, __FILE__);
+
+        // allocate required space before retrieving values 
+        char* time_str = (char *) malloc(att_len + 1); // + 1 for trailing null 
+
+        // get attribute values 
+        status = nc_get_att_text(ncid_L1C, NC_GLOBAL, "time_coverage_start", time_str);
+        check_err(status, __LINE__, __FILE__);
+        time_str[att_len] = '\0';
+
+        double start_time = isodate2unix(time_str);
+        int16_t syear, smon, sday;
+        double secs;
+        unix2ymds(start_time, &syear, &smon, &sday, &secs);
+        file_start_day = ymds2unix(syear, smon, sday, 0.0);
+        free(time_str);
+    }
+
+    // grab nadir_view_time data
     status = nc_get_var_double(groupid, varid, scan_time);
     check_err(status, __LINE__, __FILE__);    
-
-    // get start time
-    size_t att_len;
-    status = nc_inq_attlen(ncid_L1C, NC_GLOBAL, "time_coverage_start", &att_len);
-    check_err(status, __LINE__, __FILE__);
-
-    // allocate required space before retrieving values 
-    char* time_str = (char *) malloc(att_len + 1); // + 1 for trailing null 
-
-    // get attribute values 
-    status = nc_get_att_text(ncid_L1C, NC_GLOBAL, "time_coverage_start", time_str);
-    check_err(status, __LINE__, __FILE__);
-    time_str[att_len] = '\0';
-
-    double start_time = isodate2unix(time_str);
-    int16_t syear, smon, sday;
-    double secs;
-    unix2ymds(start_time, &syear, &smon, &sday, &secs);
-    file_start_day = ymds2unix(syear, smon, sday, 0.0);
-
-    free(time_str);
 
     for(int i=0; i<num_scans; i++) {
         if(scan_time[i] == scan_timeFillValue)
@@ -232,7 +287,6 @@ int readl1_l1c(filehandle *file, int32_t line, l1str *l1rec) {
 int closel1_l1c(filehandle *file) {
     int status;
 
-    printf("Closing L1C file\n");
     status = nc_close(file->sd_id);
     check_err(status, __LINE__, __FILE__);
 
@@ -243,8 +297,3 @@ int closel1_l1c(filehandle *file) {
 
     return (LIFE_IS_GOOD);
 }
-
-
-
-
-
