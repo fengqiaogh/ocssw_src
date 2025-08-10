@@ -33,7 +33,6 @@ static vector<double> darkCorrections;
 static vec2D<float> digitalNumbers;
 static float *preAggCalData = nullptr;  // Instrument bands by pixels
 static size_t mostInsBands;
-static matrix2D<uint8_t> qualityFlags(boost::extents[0][0]);
 
 template <typename T>
 bool matrixIsEmpty(boost::multi_array<T, 2> &matrix) {
@@ -76,8 +75,7 @@ void readSciData(const size_t &currScan, CalibrationData &calData, const NcGroup
 }
 
 void writeCalData(const Level1bFile &outfile, const CalibrationData &calData, const size_t &currScan,
-                  const size_t numCcdPix, bool radianceGenerationEnabled,
-                  const matrix2D<uint8_t> &qualityFlags) {
+                  const size_t numCcdPix, bool radianceGenerationEnabled) {
     string color = determineColor(calData.color);
     vector<size_t> start = {0, currScan, 0};
     vector<size_t> count = {calData.numBands, 1, numCcdPix};
@@ -213,13 +211,8 @@ void calibrate(CalibrationData &calData, const GeoData &geoData, DarkData &darkD
                         cosSolZens.data());
 
         // Check for saturation
-
-        if (matrixIsEmpty(qualityFlags) || mostInsBandsChanged) {
-            qualityFlags.resize(boost::extents[mostInsBands][geoData.numCcdPix]);
-        }
-
         getQualityFlags(geoData.numCcdPix, calData.numBands, calData.numInsBands, digitalNumbers,
-                        calData.insAgg, calData.gains->saturationThresholds, qualityFlags);
+                        calData.insAgg, calData.gains->saturationThresholds, calData.qualityFlags);
 
     } else {
         cout << "-W- Dark correction not found, skipping calibration corrections\n";
@@ -227,14 +220,12 @@ void calibrate(CalibrationData &calData, const GeoData &geoData, DarkData &darkD
             for (size_t j = 0; j < calData.numBands; j++) {
                 size_t dataIndex = i * geoData.numCcdPix + j;
                 calData.calibratedData[dataIndex] = BAD_FLT;
-                qualityFlags[j][i] = 0;
+                calData.qualityFlags[j * geoData.numCcdPix + i] = 0;
             }
         }
     }
 
-    calData.qualityFlags = qualityFlags.data();
-
-    writeCalData(outfile, calData, currScan, geoData.numCcdPix, radianceGenerationEnabled, qualityFlags);
+    writeCalData(outfile, calData, currScan, geoData.numCcdPix, radianceGenerationEnabled);
 }
 
 CalibrationLut readOciCalLut(const NcFile *calLUTfile, Device device, const NcGroup &lutGroup,

@@ -268,6 +268,10 @@ int main(int argc, char *argv[]) {
     blueCalData.numBandsL1a = l1aFile->getDim("blue_bands").getSize();
     redCalData.numBandsL1a = l1aFile->getDim("red_bands").getSize();
 
+    // allocate qualityFlags
+    blueCalData.qualityFlags = (uint8_t*) malloc(blueCalData.numBandsL1a * geoData.numCcdPix);
+    redCalData.qualityFlags = (uint8_t*) malloc(redCalData.numBandsL1a * geoData.numCcdPix);
+
     // ******************************************** //
     // *** Get spatial and spectral aggregation *** //
     // ******************************************** //
@@ -435,25 +439,6 @@ int main(int argc, char *argv[]) {
         interpTemps(l1aFile, numTemps, geoData.numGoodScans, geoData.earthViewTimes.data());
     uint16_t nBCalTemps = blueCalData.gains->dimensions[TEMP];  // Number of blue calibration temps
 
-    // allocate red quality flags
-    uint8_t **redQualityFlags = allocate2d_uchar(redCalData.numBands, geoData.numCcdPix);
-    uint8_t **redQualityFlagsHamStripe = allocate2d_uchar(redCalData.numBands, geoData.numCcdPix);
-
-    // set qual to zero
-    bzero(redQualityFlags[0], redCalData.numBands * geoData.numCcdPix);
-    bzero(redQualityFlagsHamStripe[0], redCalData.numBands * geoData.numCcdPix);
-
-    // set 10 deg pixels to HAM-B_striping, if normal science data
-    if (dataTypes.at(MAIN_VIEW) == EARTH) {
-        if (geoData.numCcdPix > 800) {
-            for (size_t band = 0; band < redCalData.numBands; band++) {
-                for (size_t pix = 680; pix < 800; pix++) {
-                    redQualityFlagsHamStripe[band][pix] = HAM_B_STRIPING;
-                }
-            }
-        }
-    }
-
     // Read dark collects from science data arrays
     vector<size_t> start(3), count(3);  // for use in vectorized netcdf calls
     start[0] = 0;
@@ -540,6 +525,25 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+        // initalize quality flags
+        bzero(blueCalData.qualityFlags, blueCalData.numBands * geoData.numCcdPix);
+        bzero(redCalData.qualityFlags, redCalData.numBands * geoData.numCcdPix);
+
+        // set 10 deg pixels to HAM-B_striping, if normal science data
+        if (dataTypes.at(MAIN_VIEW) == EARTH) {
+            if (geoData.numCcdPix > 800) {
+                if(geoData.hamSides[currScan]) {
+                    for (size_t band = 0; band < redCalData.numBands; band++) {
+                        uint8_t *ptr = redCalData.qualityFlags + band * geoData.numCcdPix + 680;
+                        for (size_t pix = 680; pix < 800; pix++) {
+                            *ptr = HAM_B_STRIPING;
+                            ptr++;
+                        }
+                    }
+                }
+            }
+        }
+
         //  Get scan angle
         size_t pixelOffset = currScan * geoData.numCcdPix;
         for (size_t pix = 0; pix < geoData.numCcdPix; pix++)
@@ -575,29 +579,6 @@ int main(int argc, char *argv[]) {
             calibrate(redCalData, geoData, darkData, l1aSciData, outfile, currScan, spatialAgg,
                       spatialAggregationIndex, numTaps, redCalLut.dimensions[4], sciScanAngles, tempCoefs,
                       calibrationTemps, cosineSolarZeniths, options.radianceGenerationEnabled);
-        }
-
-        start[0] = 0;
-        start[1] = currScan;
-        start[2] = 0;
-
-        count[0] = redCalData.numBands;
-        count[1] = 1;
-        count[2] = geoData.numCcdPix;
-
-        // write red quality flag
-        try {
-            if (geoData.hamSides[currScan] == 1) {
-                outfile.observationData.getVar("qual_red")
-                    .putVar(start, count, &redQualityFlagsHamStripe[0][0]);
-            } else {
-                outfile.observationData.getVar("qual_red").putVar(start, count, &redQualityFlags[0][0]);
-            }
-        } catch (const exception &e) {
-            cout << "-E- " << __FILE__ << ":" << __LINE__ << " - Couldn't put red quality flags into L1B file"
-                 << endl;
-            cout << e.what() << endl;
-            exit(EXIT_FAILURE);
         }
 
         //  SWIR bands

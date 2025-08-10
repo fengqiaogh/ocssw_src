@@ -22,7 +22,7 @@ machineInfo = [
         # Ubuntu 20.04
         {
             "name" : "odps", 
-            "login" : "analysis701",
+            "login" : "analysis705",
             "initStr" : "source .profile",
             "exitStr" : ""
         },

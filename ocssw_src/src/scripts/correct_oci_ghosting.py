@@ -252,16 +252,13 @@ Return value
     # Apply correction and write data back to file
     rhot_red1[:,0:nscans,str_start_pix:str_end_pix+1] = rhot_red1[:,0:nscans,str_start_pix:str_end_pix+1] - str_corr
     print('Writing corrected data to ',l1bfiles[0])
-    # Unset flag bit if set
-    qstr = np.byte(np.where(np.bitwise_and(qred,8), 8,0))
-    kstr = np.where(qstr == 8)[0]
 
     l1b_dataset = nc4.Dataset(l1bfiles[0], mode='a', format='NETCDF4')
     l1b_dataset['observation_data']['rhot_red'][:] = rhot_red1
 
-    if kstr.size == 0 :
-        qred = qred - qstr
-        l1b_dataset['observation_data']['qual_red'][:] = qred
+    # clear bit 1
+    qred[:,k1,str_start_pix:str_end_pix] = np.bitwise_and(qred[:,k1,str_start_pix:str_end_pix],253)
+    l1b_dataset['observation_data']['qual_red'][:] = qred
 
     setattr(l1b_dataset['observation_data'] , 'striping_corrected', 'yes')
 

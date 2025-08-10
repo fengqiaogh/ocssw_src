@@ -260,13 +260,13 @@ int Level1bFile::createFile(size_t numScans, size_t numBlueBands, size_t numRedB
     } else {
         createField(observationData, "rhot_blue", "Top of Atmosphere Blue Band Reflectance", NULL, NULL,
                     "rhot = Lt * Pi * earth_sun_distance_correction/(solar_irradiance * cos(solar_zenith))",
-                    BAD_FLT, "", "", 0.0f, 1.3f, 1.0, 0.0, NC_FLOAT, bluePicture, "longitude latitude");
+                    BAD_FLT, "", "", 0.0f, 3.0f, 1.0, 0.0, NC_FLOAT, bluePicture, "longitude latitude");
         createField(observationData, "rhot_red", "Top of Atmosphere Red Band Reflectance", NULL, NULL,
                     "rhot = Lt * Pi * earth_sun_distance_correction/(solar_irradiance * cos(solar_zenith))",
-                    fillDouble, "", "", 0.0f, 1.3f, 1.0, 0.0, NC_FLOAT, redPicture, "longitude latitude");
+                    fillDouble, "", "", 0.0f, 3.0f, 1.0, 0.0, NC_FLOAT, redPicture, "longitude latitude");
         createField(observationData, "rhot_SWIR", "Top of Atmosphere SWIR Band Reflectance", NULL, NULL,
                     "rhot = Lt * Pi * earth_sun_distance_correction/(solar_irradiance * cos(solar_zenith))",
-                    BAD_FLT, "", "", 0.0f, 1.3f, 1.0, 0.0, NC_FLOAT, swirPicture, "longitude latitude");
+                    BAD_FLT, "", "", 0.0f, 3.0f, 1.0, 0.0, NC_FLOAT, swirPicture, "longitude latitude");
     }
     createField(observationData, "qual_blue", "Blue Band Quality Flag", NULL, NULL, NULL, BAD_UBYTE, "1UB",
                 "saturation", 0, 0, 1.0, 0.0, NC_UBYTE, bluePicture, "longitude latitude");

@@ -174,23 +174,23 @@ void Gring::processScan(float *lat, float *lon, int32_t npix, size_t recnum, siz
         centerLats[geoboxCount] = scanBounds.center.lat;  // save the center lat also
         geoboxCount++;
 
-        updateExtremes(scanBounds);
     }
+
+    updateExtremes(scanBounds, lat, lon, npix); // Expecting scanBounds to be filled
 }
 
-void Gring::updateExtremes(const ScanBounds &scanBounds) {
-    const LatLonPoint &start = scanBounds.start;
-    const LatLonPoint &end = scanBounds.end;
+void Gring::updateExtremes(const ScanBounds scanBounds, const float *lats, const float *lons,
+                           size_t numPixels) {
 
-    if (start.lat > latitudeMax)
-        latitudeMax = start.lat;
-    if (start.lat < latitudeMin)
-        latitudeMin = start.lat;
-    if (end.lat > latitudeMax)
-        latitudeMax = end.lat;
-    if (end.lat < latitudeMin)
-        latitudeMin = end.lat;
+    // We don't mind the weirdness that comes at the poles
+    float scanMaxLat = *std::max_element(lats, lats + numPixels);
+    float scanMinLat = *std::min_element(lats, lats + numPixels);
+    latitudeMax = std::max(latitudeMax, scanMaxLat);
+    latitudeMin = std::min(latitudeMin, scanMinLat);
 
+    // Simple min/max on longitude will get weird at the 180 degree meridian, so we take the scan boundaries
+    const LatLonPoint start = scanBounds.start;
+    const LatLonPoint end = scanBounds.end;
     float lonMin360 = normalizeLonTo360Space(longitudeMin);
     float lonMax360 = normalizeLonTo360Space(longitudeMax);
     float startLon360 = normalizeLonTo360Space(start.lon);
@@ -551,14 +551,15 @@ std::string Gring::getWktString(std::string &latitudeCsv, std::string &longitude
 /**
  * @brief Produce a polygon string that lists the given latitudes and longitudes as lat/lon points
  * @return "POLYGON ((<lat, lon> ...))"
+ * 
+ * Note: if the string cannot be produced, return an empty string
  */
 std::string Gring::getWktString() {
     std::string longitudesCsv, latitudesCsv, sequence;
     int returnStatus = Gring::getGringStrings(longitudesCsv, latitudesCsv, sequence);
 
     if (returnStatus != EXIT_SUCCESS) {
-        std::runtime_error up("Unable to get Gring strings");
-        throw up;
+        return "";
     }
 
     return getWktString(latitudesCsv, longitudesCsv, sequence);

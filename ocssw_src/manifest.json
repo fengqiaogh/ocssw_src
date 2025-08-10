@@ -3410,16 +3410,16 @@
             "tag": "T2025.12"
         },
         "oel_util/libgring/gring.cpp": {
-            "checksum": "b756401017cb96474402f3ffd5ea7eb6f58e68d60eed3d9edc0c2b8decd4012f",
+            "checksum": "7541c0cb8435c675d833c7a73d32ed5ad6413d7c8bc4923462e004e0c4c4c42e",
             "mode": 33204,
-            "size": 22059,
-            "tag": "T2025.12"
+            "size": 22348,
+            "tag": "V2025.3"
         },
         "oel_util/libgring/gring.h": {
-            "checksum": "c58e48d65e7815c95b8f71d6b65baab6951108a2ca301f5ec8f46bfa37f9ab7a",
+            "checksum": "21d3e4c72817575703ea7955c94d821fa8d9db51201bba069e3bfc2754c7e21e",
             "mode": 33204,
-            "size": 3964,
-            "tag": "T2025.12"
+            "size": 4019,
+            "tag": "V2025.3"
         },
         "oel_util/libgring/test.cpp": {
             "checksum": "661908befb6535553c91ab8c3e8cac844fd379666300b60a7cd4985e770fc58b",
@@ -5954,10 +5954,10 @@
             "tag": "T2023.31"
         },
         "src/get_dataday/version.h": {
-            "checksum": "8a6759b811a1d2740a1003e59c1ae1dd52db220c9dfc76ba2b9478abdb487d2a",
+            "checksum": "6d683ef58ee31c506c06b224c0854af1b691a91cea5bbc9fc20afade2d1d6c01",
             "mode": 33204,
             "size": 97,
-            "tag": "V2025.2"
+            "tag": "V2025.3"
         },
         "src/get_product_info/CMakeLists.txt": {
             "checksum": "1c494edf9ce44363870094bfda3c300e3293a6a5f7a5a3f2634c010db4455952",
@@ -8588,10 +8588,10 @@
             "tag": "T2025.13"
         },
         "src/l1bgen_oci/calibrations.cpp": {
-            "checksum": "d89ef0c110e62b71f7163a9cc0d6e01a6314c2692b36444d99494b7fec619f3b",
+            "checksum": "c81e78c432777c1a20f3acc105aaf672b9bd60d44a699fbe58273660218dc584",
             "mode": 33204,
-            "size": 22985,
-            "tag": "T2025.13"
+            "size": 22681,
+            "tag": "V2025.3"
         },
         "src/l1bgen_oci/calibrations.hpp": {
             "checksum": "d4ef4f41278a629e79553ebad4f69d45403eb8c2fea24ef59df6e71080107632",
@@ -8600,16 +8600,16 @@
             "tag": "T2025.13"
         },
         "src/l1bgen_oci/corrections.cpp": {
-            "checksum": "c3c8c809a11677ffe6d25e24aa9f1ea931218f19c879786a6344d465ab930a1a",
+            "checksum": "a807e583b8accbc16ddde62ef3a64f0d5c12b7566a58c20270a98d7ece20e734",
             "mode": 33204,
-            "size": 15797,
-            "tag": "T2025.13"
+            "size": 15813,
+            "tag": "V2025.3"
         },
         "src/l1bgen_oci/corrections.hpp": {
-            "checksum": "b9afe72e29801854f0f0b59308bafb081c2c48583cd880f489b48dd76567e525",
+            "checksum": "185e8c8ac76c8849f81dff818f489aa37165ce8080ea5797986d8ca5a8df9222",
             "mode": 33204,
-            "size": 6249,
-            "tag": "T2025.13"
+            "size": 6226,
+            "tag": "V2025.3"
         },
         "src/l1bgen_oci/dark_data.cpp": {
             "checksum": "1988342f472efb33a29d7dc7c8a0a1f316fe0bcd12bd3693ea6812591a0633de",
@@ -9038,10 +9038,10 @@
             "tag": "T2025.6"
         },
         "src/l1bgen_oci/l1b_file.cpp": {
-            "checksum": "11a504ffe53d4a4d97be92722c2d79f0a1b24ef786368a780266bc06032b5a2b",
+            "checksum": "fecf3ee2e844bd7ff0e087e94db9f38cafb4897d8935eae0e4cef08d85391c18",
             "mode": 33204,
             "size": 29034,
-            "tag": "T2025.13"
+            "tag": "V2025.3"
         },
         "src/l1bgen_oci/l1b_file.hpp": {
             "checksum": "22c1836b323bd03f9f4925e8feda0c70da3e580c4b2acff038728c626658bcb2",
@@ -9062,10 +9062,10 @@
             "tag": "T2025.13"
         },
         "src/l1bgen_oci/l1bgen_oci.cpp": {
-            "checksum": "8e45771e0e1ac45f5b18d6ca20b9fccca632fbcefa0a83708e957dec3bf61e15",
+            "checksum": "b81b56eb61ea5173c98ebe134bc7a99237c0d31941dfac7188d995ac9f04572b",
             "mode": 33204,
-            "size": 36958,
-            "tag": "T2025.13"
+            "size": 36396,
+            "tag": "V2025.3"
         },
         "src/l1bgen_oci/processing_tracker.cpp": {
             "checksum": "45f2693a9aadb49383895637413f85096402b88ea57df18dcd7d535d6b99d98a",
@@ -10358,10 +10358,10 @@
             "tag": "T2025.12"
         },
         "src/l2gen/main_l2gen.cpp": {
-            "checksum": "76144c260d07b93b3e387a49633d524e4c0bfdc88e91d1b1a4664a792a9620b2",
+            "checksum": "5f8ec6366bf64cf05e3058be56e340a6ca84ac4f8a25e9f195fea66ab95708fa",
             "mode": 33204,
-            "size": 25574,
-            "tag": "T2025.13"
+            "size": 25616,
+            "tag": "V2025.3"
         },
         "src/l2gen/main_l3gen.cpp": {
             "checksum": "13cfb98738d9d7a1fda518eb86ddaf2a15f77f6696b12495daac4d73016b6037",
@@ -10892,10 +10892,10 @@
             "tag": "T2025.12"
         },
         "src/l2gen/version.h": {
-            "checksum": "b2838aef294caed75a7c135a693525fa2c220d80da5dbbc51efb6b2c5d50c705",
+            "checksum": "f09816bd32c1525fc5811b05c0b80c08312b1ff1d07a48b3ee9e962cf35bed75",
             "mode": 33204,
             "size": 98,
-            "tag": "V2025.2"
+            "tag": "V2025.3"
         },
         "src/l2gen/viirs_pxcvt.c": {
             "checksum": "29b9584f2fc565a321c40f8529e4294914f523739765f45d6f64a7cdd72bf1cd",
@@ -11138,10 +11138,10 @@
             "tag": "T2025.5"
         },
         "src/l3bindump/version.h": {
-            "checksum": "3c76275b30db8f3e0b81d3285701b27f9d8fa2d0592c2efa4a188db3ebde8a44",
+            "checksum": "09c623bc3b9cf9fd8a34eaa228305183df0ed5d04a44b3f8b314f3d46515b742",
             "mode": 33204,
             "size": 97,
-            "tag": "V2025.2"
+            "tag": "V2025.3"
         },
         "src/l3bstats/CMakeLists.txt": {
             "checksum": "a5b2f0b159db6dcf4b7435228193cfc96a4223f7124ba91b9777c61fac480ce3",
@@ -11252,10 +11252,10 @@
             "tag": "T2024.17"
         },
         "src/l3mapgen/version.h": {
-            "checksum": "1ede82c07ac1f230adb4057665186baede1c615bfb6a18c792b3bab23dcebf48",
+            "checksum": "f1a90e22f6bc3d59ca4c5885120d2d36518e24eb6cf3608ddfdb629636cdb249",
             "mode": 33204,
             "size": 97,
-            "tag": "V2025.2"
+            "tag": "V2025.3"
         },
         "src/landbin/CMakeLists.txt": {
             "checksum": "1ec6ada69943746ef72caea000df6abae4e14d6c929a752b43965910b015d0cc",
@@ -11942,10 +11942,10 @@
             "tag": "T2025.8"
         },
         "src/libdataday/version.h": {
-            "checksum": "6c8f2ead281d93c48ff5860ca01023dd3b8d44b70bc2e3bc85a4d29843b5918b",
+            "checksum": "b1de0fcf79ff468018f3788a48319d4247fe7d5f1e391473cac23df8c69ac32a",
             "mode": 33204,
             "size": 97,
-            "tag": "V2025.2"
+            "tag": "V2025.3"
         },
         "src/libimageutils/CMakeLists.txt": {
             "checksum": "c0d600784574da0e77fcc4d76b99677eb5cc925645f1259380ce17b6cbf7f870",
@@ -12812,10 +12812,10 @@
             "tag": "T2024.17"
         },
         "src/manifest/build_manifest_ocssw.py": {
-            "checksum": "27523a038260f3f80017dc49c7ccc6932e656e2004180b26d19ec1ebba92351c",
+            "checksum": "7b037695f0b36f7e5f40e0198593a48c6fff2cfd330ea2e0365bbf815c507213",
             "mode": 33277,
             "size": 8858,
-            "tag": "T2025.13"
+            "tag": "V2025.3"
         },
         "src/manifest/build_new_tag": {
             "checksum": "c4f3b1066421d4d14ec615213e59fa6eeae25054848add43799ddc7d84a04b59",
@@ -12848,10 +12848,10 @@
             "tag": "T2025.10"
         },
         "src/manifest/update_manifest_dirs": {
-            "checksum": "051be41af8791e8a098170ec8bd48e53c3e5cb3f431ff045e0a910c96fde7387",
+            "checksum": "feea8389bf52e14864e89310b1ebe21c9d9c2b979149343dae0c78208a7c48cb",
             "mode": 33277,
             "size": 7594,
-            "tag": "T2025.13"
+            "tag": "V2025.3"
         },
         "src/matchup_tools/CMakeLists.txt": {
             "checksum": "35b575ec82c052e6978f325f9ce7882734861fc82e09c04b7bc2cf6252b5f378",
@@ -13736,10 +13736,10 @@
             "tag": "initial"
         },
         "src/scripts/correct_oci_ghosting.py": {
-            "checksum": "36658494415db3cbeb3af950895f542ea466303622e3556f959b2ad5e2127303",
+            "checksum": "00c684c6938a40ed86329d88b106c83087a723e03d9da96121cf882c2143bb65",
             "mode": 33277,
-            "size": 9890,
-            "tag": "T2025.14"
+            "size": 9833,
+            "tag": "V2025.3"
         },
         "src/scripts/cyan_alaska_tiles.py": {
             "checksum": "1560cad0462396f6b1bec291d4568aa660a4e2818430d2c4674fb4757031c4a6",
@@ -15550,6 +15550,6 @@
     },
     "name": "ocssw_src",
     "tags": [
-        "V2025.2"
+        "V2025.3"
     ]
 }

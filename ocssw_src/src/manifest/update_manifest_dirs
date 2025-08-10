@@ -8,7 +8,7 @@ OCSSW_LINUX_MACHINE="poseidon"
 OCSSW_LINUX=${OCSSW_LINUX_MACHINE}:linux_64/ocssw
 
 # where to get the linux binaries for ODPS
-OCSSW_ODPS_MACHINE=analysis701
+OCSSW_ODPS_MACHINE=analysis705
 OCSSW_ODPS=${OCSSW_ODPS_MACHINE}:${OCSSW_DIR}
 
 # where to get the linux binaries for HPC (poseidon)

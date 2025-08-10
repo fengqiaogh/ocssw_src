@@ -106,7 +106,7 @@ class Gring {
 
     void convertIntArrayToCsv(std::string &myString, size_t *myArray, int array_length);
 
-    void updateExtremes(const ScanBounds &scanBounds);
+    void updateExtremes(const ScanBounds scanBounds, const float *lats, const float *lons, size_t numPixels);
 };
 
 #endif

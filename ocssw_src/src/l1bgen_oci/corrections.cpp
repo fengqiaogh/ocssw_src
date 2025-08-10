@@ -196,7 +196,7 @@ vector<float> qualityMatrix;
 size_t largestDim{0};
 void getQualityFlags(size_t numPix, size_t numBands, size_t numInsBands, vec2D<float> &digitalNumbers,
                      float **insAggMat, std::vector<uint32_t> &saturationThresholds,
-                     boost::multi_array<uint8_t, 2> &qualityFlags) {
+                     uint8_t *qualityFlags) {
     using namespace boost;
 
     if (largestDim < max(numInsBands * numPix, numBands * numPix)) {
@@ -225,7 +225,9 @@ void getQualityFlags(size_t numPix, size_t numBands, size_t numInsBands, vec2D<f
 
     for (size_t l1bBand = 0; l1bBand < numBands; l1bBand++) {
         for (size_t pix = 0; pix < numPix; pix++) {
-            qualityFlags[l1bBand][pix] = (qualityMatrix[l1bBand * numPix + pix] > 0) ? 1 : 0;
+            if(qualityMatrix[l1bBand * numPix + pix] > 0) {
+                qualityFlags[l1bBand * numPix + pix] |= 1;
+            }
         }
     }
 }

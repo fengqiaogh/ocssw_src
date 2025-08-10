@@ -504,7 +504,9 @@ int main(int argc, char *argv[]) {
         else
             dsId.fftype = DS_HDF;
         dsId.deflate = 0;
-        PTB(SetChrGA(dsId, "geospatial_bounds", wkt.data()));
+        if (wkt.length()) {
+            PTB(SetChrGA(dsId, "geospatial_bounds", wkt.data()));
+        }
         PTB(SetF32GA(dsId, "geospatial_lat_min", geospatialLatMin));
         PTB(SetF32GA(dsId, "geospatial_lat_max", geospatialLatMax));
         PTB(SetF32GA(dsId, "geospatial_lon_min", geospatialLonMin));

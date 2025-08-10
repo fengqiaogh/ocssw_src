@@ -98,7 +98,7 @@ double getNonlinearityCorrection(const size_t band, const size_t pixel, const ui
  */
 void getQualityFlags(size_t numPix, size_t numBands, size_t numInsBands, vec2D<float> &digitalNumbers,
                      float **insAggMat, std::vector<uint32_t> &saturationThresholds,
-                     boost::multi_array<uint8_t, 2> &qualityFlags);
+                     uint8_t *qualityFlags);
 
 /**
  * @brief Read the OCI cross-correlation matrix for a band and aggregate the coefficients for the instrument
