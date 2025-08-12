@@ -22,7 +22,6 @@ mkdir ocssw
 ```bash
 sudo apt install cmake gdb git gcc g++ gfortran tcsh bison flex zlib1g-dev libx11-dev pkg-config build-essential cmake libpthread-stubs0-dev unzip -y
 ```
-### MacOS ()
 ## 设置环境变量
 ```bash
 vim ~/.bashrc
@@ -42,12 +41,6 @@ cd ocssw/opt/src
 ./BuildIt.py
 ```
 
-## 修改两处源代码
-在以下两个文件中添加`#include <cstdint>`
-```bash
-$HOME/ocssw/ocssw_src/src/l1bgen_oci/gains.hpp
-$HOME/ocssw/ocssw_src/src/ancgen/copyvaratts.cpp
-```
 ## 编译ocssw_src
 ```bash
 cd ocssw/ocssw_src
@@ -66,6 +59,7 @@ make
 - Makefile Tools
 
 以上插件的作者均为Microsoft
+
 .vscode/launch.json配置
 ```json
 {
