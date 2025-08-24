@@ -362,10 +362,10 @@
             "tag": "R2022.0"
         },
         "oel_hdf4/filetype/filetype.cpp": {
-            "checksum": "f4a89a116c97ca0691addec5916f53296871e7233a3ff0da4ffbf3d3f318a944",
+            "checksum": "b42c5e35369977c6e0b24c92804b0e377e9a0adcb5f920ba13ec4bc9d3349fb7",
             "mode": 33204,
             "size": 54469,
-            "tag": "T2025.13"
+            "tag": "V2025.5"
         },
         "oel_hdf4/filetype/filetype.h": {
             "checksum": "157b35b199d42424378d5003e94a66acc28dbfacc3340b4ff0a0fa08a954ab1c",
@@ -1226,10 +1226,10 @@
             "tag": "R2022.0"
         },
         "oel_hdf4/libl1/l1_options.c": {
-            "checksum": "a29761c282fda78937926f12f0057b0502e8e1fce7fb2e09836a33aecf9924b7",
+            "checksum": "cbea03396fec80bced38ee5c7c0158bb5db821924e9fe45c69fb55875d6772ca",
             "mode": 33204,
-            "size": 32324,
-            "tag": "T2025.12"
+            "size": 32413,
+            "tag": "V2025.5"
         },
         "oel_hdf4/libl1/l1_prism.c": {
             "checksum": "916ef3db6613aedf815fcf938a773c1a877d5dd1b699d8e3a49a204463ae2896",
@@ -1244,10 +1244,10 @@
             "tag": "R2022.0"
         },
         "oel_hdf4/libl1/l1_safe.cpp": {
-            "checksum": "e1aaea29735fad00a72902e51c33df2d867865166f9798392db7ded8102cadb4",
+            "checksum": "6e6b388e543926d17e476e4f4e03c14c45838afc09596e0743288745c75c05f4",
             "mode": 33204,
-            "size": 30070,
-            "tag": "T2025.10"
+            "size": 30147,
+            "tag": "V2025.5"
         },
         "oel_hdf4/libl1/l1_safe.h": {
             "checksum": "f28c6b5f06a0f7949b5cc75b51161bc46eb57cda2cbaaad40e1bb660ed7b400a",
@@ -5954,10 +5954,10 @@
             "tag": "T2023.31"
         },
         "src/get_dataday/version.h": {
-            "checksum": "6d683ef58ee31c506c06b224c0854af1b691a91cea5bbc9fc20afade2d1d6c01",
+            "checksum": "9c9657bbdffb9e2ae45fe634280c88dc062e797e68122a67a94dedeca44ea44b",
             "mode": 33204,
             "size": 97,
-            "tag": "V2025.3"
+            "tag": "V2025.5"
         },
         "src/get_product_info/CMakeLists.txt": {
             "checksum": "1c494edf9ce44363870094bfda3c300e3293a6a5f7a5a3f2634c010db4455952",
@@ -7502,34 +7502,34 @@
             "tag": "T2025.5"
         },
         "src/l1agen_oci/l1afile_oci.cpp": {
-            "checksum": "27ea4207a3a1fccfba8c46cd64d2e56b0acf02635684c50232c44781d8774a0c",
+            "checksum": "7dbd4ca666883d3e2a79968e867379096d00d68c3732abf97bc281fb63bdd717",
             "mode": 33204,
-            "size": 130510,
-            "tag": "T2025.8"
+            "size": 128183,
+            "tag": "V2025.5"
         },
         "src/l1agen_oci/l1afile_oci.hpp": {
-            "checksum": "15d67d7796acd4fb130246d311a1fa52e4763cf229d75602e0922d5ae19a5cb1",
+            "checksum": "4e9134365393d8626ecb378c02e49bd6f6ad1e24b8ef82ef47833550b67e0428",
             "mode": 33204,
-            "size": 11392,
-            "tag": "T2025.8"
+            "size": 11528,
+            "tag": "V2025.5"
         },
         "src/l1agen_oci/l1afile_oci_manager.cpp": {
-            "checksum": "49217e93f9872ff1c071088e5c4d1f2dbe72e922cc6e4e95cac6a5ab0052bdd0",
+            "checksum": "e8601a4f7227f5be2dba05126db744534068870a63f5cbb69d4925f27af3ac67",
             "mode": 33204,
-            "size": 4242,
-            "tag": "T2025.8"
+            "size": 8132,
+            "tag": "V2025.5"
         },
         "src/l1agen_oci/l1afile_oci_manager.hpp": {
-            "checksum": "750d8f3ffa8f4b73ea4548615962806eed5d4b465b68a517138f093880504746",
+            "checksum": "08f85ec2d734afcbac85793790ee857794f0db593fa779ea8e6249dd5609ea50",
             "mode": 33204,
-            "size": 1962,
-            "tag": "T2025.8"
+            "size": 3822,
+            "tag": "V2025.5"
         },
         "src/l1agen_oci/l1agen_oci.cpp": {
-            "checksum": "48a0c13de7ca1b4febbf0a26a4376b2e3b6e74153218b6839d78ab4ca5781fd5",
+            "checksum": "a4496ee76bdbeb230a2c8bbbf2b4130a35b554818a07eeacd5cd36f1864eb33e",
             "mode": 33204,
-            "size": 60831,
-            "tag": "T2025.14"
+            "size": 66545,
+            "tag": "V2025.5"
         },
         "src/l1agen_oci/process_science_data.cpp": {
             "checksum": "44fc19807adc9d399cafb4e01bf771568ae5a4f1b7be25b92a92d0c51274cc9b",
@@ -8591,7 +8591,7 @@
             "checksum": "c81e78c432777c1a20f3acc105aaf672b9bd60d44a699fbe58273660218dc584",
             "mode": 33204,
             "size": 22681,
-            "tag": "V2025.3"
+            "tag": "V2025.5"
         },
         "src/l1bgen_oci/calibrations.hpp": {
             "checksum": "d4ef4f41278a629e79553ebad4f69d45403eb8c2fea24ef59df6e71080107632",
@@ -8603,13 +8603,13 @@
             "checksum": "a807e583b8accbc16ddde62ef3a64f0d5c12b7566a58c20270a98d7ece20e734",
             "mode": 33204,
             "size": 15813,
-            "tag": "V2025.3"
+            "tag": "V2025.5"
         },
         "src/l1bgen_oci/corrections.hpp": {
             "checksum": "185e8c8ac76c8849f81dff818f489aa37165ce8080ea5797986d8ca5a8df9222",
             "mode": 33204,
             "size": 6226,
-            "tag": "V2025.3"
+            "tag": "V2025.5"
         },
         "src/l1bgen_oci/dark_data.cpp": {
             "checksum": "1988342f472efb33a29d7dc7c8a0a1f316fe0bcd12bd3693ea6812591a0633de",
@@ -9041,7 +9041,7 @@
             "checksum": "fecf3ee2e844bd7ff0e087e94db9f38cafb4897d8935eae0e4cef08d85391c18",
             "mode": 33204,
             "size": 29034,
-            "tag": "V2025.3"
+            "tag": "V2025.5"
         },
         "src/l1bgen_oci/l1b_file.hpp": {
             "checksum": "22c1836b323bd03f9f4925e8feda0c70da3e580c4b2acff038728c626658bcb2",
@@ -9065,7 +9065,7 @@
             "checksum": "b81b56eb61ea5173c98ebe134bc7a99237c0d31941dfac7188d995ac9f04572b",
             "mode": 33204,
             "size": 36396,
-            "tag": "V2025.3"
+            "tag": "V2025.5"
         },
         "src/l1bgen_oci/processing_tracker.cpp": {
             "checksum": "45f2693a9aadb49383895637413f85096402b88ea57df18dcd7d535d6b99d98a",
@@ -10364,10 +10364,10 @@
             "tag": "V2025.3"
         },
         "src/l2gen/main_l3gen.cpp": {
-            "checksum": "13cfb98738d9d7a1fda518eb86ddaf2a15f77f6696b12495daac4d73016b6037",
+            "checksum": "75d7458ee242350ab0596f80f4c0aadff384b709ce87d805e05cb5c4bb05578e",
             "mode": 33204,
-            "size": 26606,
-            "tag": "T2025.8"
+            "size": 26618,
+            "tag": "V2025.5"
         },
         "src/l2gen/main_lonlat2pixline.c": {
             "checksum": "f98dc2f123287981b72852d6daad7762810a9542b6c9eca585d3334a19e5aac3",
@@ -10892,10 +10892,10 @@
             "tag": "T2025.12"
         },
         "src/l2gen/version.h": {
-            "checksum": "f09816bd32c1525fc5811b05c0b80c08312b1ff1d07a48b3ee9e962cf35bed75",
+            "checksum": "9db449846df50174ee4b0b7822fb02f94f4c6ac553f8ab9e944f2fe4a9c49cb3",
             "mode": 33204,
             "size": 98,
-            "tag": "V2025.3"
+            "tag": "V2025.5"
         },
         "src/l2gen/viirs_pxcvt.c": {
             "checksum": "29b9584f2fc565a321c40f8529e4294914f523739765f45d6f64a7cdd72bf1cd",
@@ -11138,10 +11138,10 @@
             "tag": "T2025.5"
         },
         "src/l3bindump/version.h": {
-            "checksum": "09c623bc3b9cf9fd8a34eaa228305183df0ed5d04a44b3f8b314f3d46515b742",
+            "checksum": "9ef71c41ce2ee20631ce3f54c4219224a2af73617bc4a8815d0a1d03437c8d21",
             "mode": 33204,
             "size": 97,
-            "tag": "V2025.3"
+            "tag": "V2025.5"
         },
         "src/l3bstats/CMakeLists.txt": {
             "checksum": "a5b2f0b159db6dcf4b7435228193cfc96a4223f7124ba91b9777c61fac480ce3",
@@ -11252,10 +11252,10 @@
             "tag": "T2024.17"
         },
         "src/l3mapgen/version.h": {
-            "checksum": "f1a90e22f6bc3d59ca4c5885120d2d36518e24eb6cf3608ddfdb629636cdb249",
+            "checksum": "24bd6355fb16d8273c5e98318e295d7f1cec39bb71f348f32c57d1da74b54d0e",
             "mode": 33204,
             "size": 97,
-            "tag": "V2025.3"
+            "tag": "V2025.5"
         },
         "src/landbin/CMakeLists.txt": {
             "checksum": "1ec6ada69943746ef72caea000df6abae4e14d6c929a752b43965910b015d0cc",
@@ -11942,10 +11942,10 @@
             "tag": "T2025.8"
         },
         "src/libdataday/version.h": {
-            "checksum": "b1de0fcf79ff468018f3788a48319d4247fe7d5f1e391473cac23df8c69ac32a",
+            "checksum": "fa048e6d112179d12321ca3cecf0a90dea50fda9a87e7397462a23043b603fd4",
             "mode": 33204,
             "size": 97,
-            "tag": "V2025.3"
+            "tag": "V2025.5"
         },
         "src/libimageutils/CMakeLists.txt": {
             "checksum": "c0d600784574da0e77fcc4d76b99677eb5cc925645f1259380ce17b6cbf7f870",
@@ -12062,16 +12062,16 @@
             "tag": "T2025.8"
         },
         "src/libl2/l2_utils.hpp": {
-            "checksum": "e97934fa7986715edc7cb4bafade65eac870cb85e07cb16b94caa6097aa7098a",
+            "checksum": "ba12c57b8269e7c6245d7268564789b7d40d3b1d068efe139fe44db00598bdd6",
             "mode": 33204,
-            "size": 6633,
-            "tag": "T2025.8"
+            "size": 7856,
+            "tag": "V2025.5"
         },
         "src/libl2/l2_variable.cpp": {
-            "checksum": "ff865339f7013946e74f3bea0dc657ecf73c42bfa19bca23a607179377dbac8a",
+            "checksum": "da200ff8cd82eb30a40d023c493e5282565f9921d77b30a05ac6c3d276152162",
             "mode": 33204,
-            "size": 19894,
-            "tag": "T2025.8"
+            "size": 20318,
+            "tag": "V2025.5"
         },
         "src/libl2/l2_variable.hpp": {
             "checksum": "7b1045d7b4ff57424beffdbe1badb9b85132654c65304c69e654fd98fabb0819",
@@ -12104,10 +12104,10 @@
             "tag": "T2025.12"
         },
         "src/libl2/test_code.cpp": {
-            "checksum": "49a5536bbb4f79398c3fae707988d3806cc00878070f9f47cc8c72c7f8c56af7",
+            "checksum": "932e18dd7ab822cef2be99cb4a2cf773e72f02039f81bfa7719c4f70218428d3",
             "mode": 33204,
-            "size": 1040,
-            "tag": "T2025.8"
+            "size": 525,
+            "tag": "V2025.5"
         },
         "src/libmap/CMakeLists.txt": {
             "checksum": "745b1c6f059aa2b9c98123cb30352bc81dadc6dda2a3ce5f07c33113bf43d94c",
@@ -13658,10 +13658,10 @@
             "tag": "initial"
         },
         "src/scripts/CMakeLists.txt": {
-            "checksum": "45286860780632105b5cd683b2a9b2f5ae524fe26e5e12d69a477a90e103d90e",
+            "checksum": "e49f1ce1cc0d334a7f84b0780299221480e6c1d7610e50002b45cdfb3d19c27b",
             "mode": 33204,
-            "size": 3525,
-            "tag": "T2025.10"
+            "size": 3613,
+            "tag": "V2025.5"
         },
         "src/scripts/MakeUnc.py": {
             "checksum": "20289b453c353138728cc1d1e09d0be784be2e22826f25eb8a9be264b73faf2e",
@@ -13736,10 +13736,10 @@
             "tag": "initial"
         },
         "src/scripts/correct_oci_ghosting.py": {
-            "checksum": "00c684c6938a40ed86329d88b106c83087a723e03d9da96121cf882c2143bb65",
+            "checksum": "43e40195f16b01f30c2957882e12deb4ce64e7bf7dff55dcafd8958f5286b496",
             "mode": 33277,
-            "size": 9833,
-            "tag": "V2025.3"
+            "size": 10133,
+            "tag": "V2025.5"
         },
         "src/scripts/cyan_alaska_tiles.py": {
             "checksum": "1560cad0462396f6b1bec291d4568aa660a4e2818430d2c4674fb4757031c4a6",
@@ -14130,6 +14130,12 @@
             "mode": 33277,
             "size": 2990,
             "tag": "initial"
+        },
+        "src/scripts/pace_hkt_check_limits.py": {
+            "checksum": "4cad1d62d443ab966f2f3e6392657aa507fa65dc0071ef6150da37bf53d26c0c",
+            "mode": 33204,
+            "size": 9028,
+            "tag": "V2025.5"
         },
         "src/scripts/pex/AnalyticNoise/CMakeLists.txt": {
             "checksum": "97cce0f43ac13303174bdf9cdbc6a0ae85b04b85ac492b40cc71e594d0102a3a",
@@ -15416,10 +15422,10 @@
             "tag": "T2024.16"
         },
         "test/l1bgen_oci/CDataList.txt": {
-            "checksum": "177aaf2209b65b13ff1ccdb728bd3a44eb26c4c77fae5dff24cadac9fc386c5b",
+            "checksum": "08c39930af948c97301e92129faea5dcda7ed346f9ea5a16cf2f5ccaa431cc10",
             "mode": 33204,
             "size": 1909,
-            "tag": "T2025.12"
+            "tag": "V2025.5"
         },
         "test/l1bgen_oci/CMakeLists.txt": {
             "checksum": "3dee2066704f1d3a997cc0cf6ff49c0e4b8a0deab74879b6574140eeba7f5275",
@@ -15464,10 +15470,10 @@
             "tag": "T2024.22"
         },
         "test/l2gen/CDataList.txt": {
-            "checksum": "3b256ed6223502a5431af648f553fea4fcf017faa273c30be09fd4a61f63cb90",
+            "checksum": "41120d5abb5e0fbc9e95c381b6ca48c5b9094d23a38190ce4e4563ae3fc305ac",
             "mode": 33204,
             "size": 62721,
-            "tag": "T2025.14"
+            "tag": "V2025.5"
         },
         "test/l2gen/CMakeLists.txt": {
             "checksum": "7e7835a73d7fcd7070418e2bdb5f01bece10c751a1e682f7f47218213ab13c96",
@@ -15550,6 +15556,6 @@
     },
     "name": "ocssw_src",
     "tags": [
-        "V2025.3"
+        "V2025.5"
     ]
 }

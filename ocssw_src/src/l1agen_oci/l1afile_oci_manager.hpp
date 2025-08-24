@@ -23,6 +23,27 @@ class L1aFileManager {
         std::map<short, DimensionShape> fileDimShapes;
 
 
+        // outlistData =  {
+        //      1 : { 
+        //          "data_type": "SOL",
+        //          "file_name": "PACE_OCI_SOL.nc",
+        //          "start": "2025-08-07T02:38:24.639",
+        //          "end": "2025-08-07T03:49:34.639",
+        //          "flag": 0,
+        //          
+        //      }
+        //  }
+        // key == DATA_TYPE id 
+        std::map<short, std::map<std::string, std::string>> outlistData;
+
+        // files that do not need to be merged. For now: Lunar
+        std::vector<std::string> noMergeOutlistStrings;
+
+        // track the last data type added so if files cannot be merged due to a large gap
+        // we know what to write out right away
+        short lastDataTypeSeen = -1;
+    
+
         /**
          * @brief create a l1a file for dataType
          * @param dataType 
@@ -58,6 +79,39 @@ class L1aFileManager {
         void closeAllL1aFiles();
 
         void closeAndRemoveFile(short datatype);
+
+        /**
+         * @brief notes down all files generated and track their time, complete flag and data type
+         * @param filename 
+         * @param startTime 
+         * @param endTime 
+         * @param completeFlag 
+         * @param dataType 
+         */
+        void addFileToOutlistBuffer(std::string filename, std::string startTime,
+                                std::string endTime, int completeFlag, 
+                                std::string dataType, short dataTypeId
+        );
+
+        /**
+         * @brief write the buffer information into the provided file name
+         * @param outlist output file
+         */
+        void dumpOutlistBuffer(std::string outlist);
+        
+        /**
+         * @brief Note the last data type that was added to the buffer
+         * @param dataType 
+         */
+        void updateLastDataTypeSeen(short dataType);
+
+        /**
+         * @brief if the next file's time gap is too large, move the last
+         *         file out of the buffer and into the noMergeOutlist
+         */
+        void processPrevFile();
+
+        bool filesWereGenerated();
 
 };
 

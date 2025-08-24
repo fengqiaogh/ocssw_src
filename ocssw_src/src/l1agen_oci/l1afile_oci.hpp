@@ -140,21 +140,21 @@ class L1aFile {
 
     /**
      * @brief Write the files start, end times, file name and basic information about the l1a file
-     * @param starttime
-     * @param endtime
+     * @param startTime time coverage start string already formatted
+     * @param endTime time coverage end string already formatted
+     * @param isFileAppended if the current l1a is being appended to an earlier file
      * @param l1aFileName
      * @param startDirectionStr
      * @param endDirectionStr
      * @param dataType
      * @param swirModeIndex
      * @param cdsModeIndex
-     * @param outlistFile
      * @return
      */
-    int writeGlobalMetaData(AncillaryPktTimeStamp &starttime, AncillaryPktTimeStamp &endtime,
+    int writeGlobalMetaData(std::stringstream &startTime, std::stringstream &endTime, bool isFileAppended,
                             std::string l1aFileName, std::string startDirectionStr,
                             std::string endDirectionStr, short dataType, uint16_t swirModeIndex,
-                            uint16_t cdsModeIndex, std::ofstream &outlistFile);
+                            uint16_t cdsModeIndex);
 
     /**
      * @brief Extract spatial and spectral data and write them to the output NetCDF file
@@ -285,6 +285,7 @@ class L1aFile {
      */
     void synchronizeEpochTime(std::vector<double> &navigationTimeArr, size_t arrSize,
                               double &hktFileEpochTime, double &ancillaryEpochTime);
+   
 };
 
 #endif

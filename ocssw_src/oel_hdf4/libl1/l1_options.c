@@ -584,15 +584,17 @@ void l1_load_options(clo_optionList_t *list, filehandle *l1file) {
                 // Continue to getting gain and offset only if the file open successfully and
                 // if they do not need to be skipped. They are skipped if they are set in CLO
                 // or the command line.
-                char *str = "offset";
-                if(!skipCalfileGain) {
-                    if(!skipCalfileOffset) {
-                        str = "gain and offset";
-                    } else {
-                        str = "gain";
+                if(want_verbose) {
+                    char *str = "offset";
+                    if(!skipCalfileGain) {
+                        if(!skipCalfileOffset) {
+                            str = "gain and offset";
+                        } else {
+                            str = "gain";
+                        }
                     }
+                    printf("Loading %s from calfile: %s\n", str, l1_input->calfile);
                 }
-                printf("Loading %s from calfile: %s\n", str, l1_input->calfile);
 
                 if (!skipCalfileGain) {
                     l1_getGainOffsetFromNcFile(ncFileId, "gain", l1file->nbands);

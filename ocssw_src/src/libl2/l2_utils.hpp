@@ -5,6 +5,7 @@
 #include <find_variable.hpp>
 #include <cmath>
 #include <algorithm>
+#include <unordered_map>
 
 const std::unordered_set<std::string> lat_possible_names = {
     "latitude", "lan", "Latitude"};  // should be made static and moved out to the cpp.
@@ -169,6 +170,46 @@ std::vector<F> vector_rounder(const std::vector<T> &inp) {
     std::transform(inp.begin(), inp.end(), result.begin(),
                    [](const auto &c) { return static_cast<F>(std::round(c)); });
     return result;
+}
+
+/**
+ * @brief Return a netcdf path of a variable or group
+ * @tparam T Group or variable type
+ * @param  var  Group or variable handle
+ * @return netcdf path (i.e. geophysical_data/wavelength)
+ */
+template <class T>
+std::string get_full_nc_path(T &var) {
+    if (var.isNull())
+        return "";
+    else if (var.getName().empty() || var.getName() == "/" ) {
+        return "";
+    } else {
+        std::string base = var.getName();
+        netCDF::NcGroup root_grp = var.getParentGroup();
+        std::string root = get_full_nc_path(root_grp);
+        if (root.empty())
+            return base;
+        else
+            return root + "/" + base;
+    }
+}
+
+/**
+ * @brief Finds a full netcdf path for a given part of the path
+ * @tparam value type of the path
+ * @param dict dictionary that contains keys(full paths) and their values
+ * @param path_part part of a path to search
+ * @return return full netcdf path
+ */
+template <class T>
+std::string find_key_nc_path(const std::unordered_map<std::string, T> &dict, const std::string &path_part) {
+    for (const auto &[key, _] : dict) {
+        if (key.find(path_part) != std::string::npos) {
+            return key;
+        }
+    }
+    return "";
 }
 
 /**

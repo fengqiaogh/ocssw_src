@@ -51,3 +51,4 @@ install(PROGRAMS l1aconvert_seawifs.py DESTINATION bin RENAME l1aconvert_seawifs
 install(PROGRAMS correct_oci_ghosting.py DESTINATION bin RENAME correct_oci_ghosting)
 install(PROGRAMS tracegas_avg.py DESTINATION bin RENAME tracegas_avg)
 install(PROGRAMS rechunk_safe.py DESTINATION bin RENAME rechunk_safe)
+install(PROGRAMS pace_hkt_check_limits.py DESTINATION bin RENAME pace_hkt_check_limits)

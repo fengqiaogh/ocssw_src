@@ -1407,10 +1407,11 @@ int L1aFile::writeScanMetaData(DimensionShape *dimShape, uint32_t scanNum, uint8
 }
 
 // Write to global attributes in the NetCDF file
-int L1aFile::writeGlobalMetaData(AncillaryPktTimeStamp &starttime, AncillaryPktTimeStamp &endtime,
+int L1aFile::writeGlobalMetaData(stringstream &startTime, stringstream &endTime, bool isFileAppended,
                                  std::string l1aFileName, std::string startDirectionStr,
                                  std::string endDirectionStr, short dataType, uint16_t swirModeIndex,
-                                 uint16_t cdsModeIndex, std::ofstream &outlistFile) {
+                                 uint16_t cdsModeIndex) {
+                                    
     string DATA_COLLECT_MODE[] = {"",
                                   "Earth Collect",
                                   "Dark Collect",
@@ -1430,78 +1431,27 @@ int L1aFile::writeGlobalMetaData(AncillaryPktTimeStamp &starttime, AncillaryPktT
 
     string CDS_MODES[] = {"CDS", "Reset", "Video"};
 
-    // Write start, end, create time attributes
-    int16_t month = 0;
-    int16_t day = 0;
-    int32_t hour = 0;
-    int32_t mins = 0;
-    stringstream timeCoveragetStr;  // format time coverage start and end using this stream then write it
 
-    yd2md((int16_t)starttime.year, (int16_t)starttime.day, &month, &day);
+    // if the current file is being appended to an earlier file, update the 'end'
+    // stuff to be the most recent files while retaining the "start" stuff.
+    if (isFileAppended) {
 
-    starttime.second = floor(starttime.second * 1000) / 1000;  // LH, 11/18/2020
-    hour = (int)(starttime.second / 3600);
-    starttime.second -= hour * 3600;
-    mins = (int)(starttime.second / 60);
-    starttime.second -= mins * 60;
-
-    // yyyy-mn-dyThr:mn:ss.sss
-    // for each, set the width of how long it should be and set a fill value if it is less than the width set.
-    timeCoveragetStr = stringstream();
-    timeCoveragetStr << setw(4) << to_string(starttime.year) << "-";  // year is 4 digits always, no fill
-    timeCoveragetStr << setw(2) << setfill('0') << month << "-";      // month can be single digit, fill w/ 0
-    timeCoveragetStr << setw(2) << setfill('0') << day << "T";        // day is the same as month
-
-    timeCoveragetStr << setw(2) << setfill('0') << hour << ":";
-    timeCoveragetStr << setw(2) << setfill('0') << mins << ":";
-    timeCoveragetStr << fixed << setw(6) << setprecision(3) << setfill('0') << starttime.second;
-
-    // Write start time
-    l1afile->putAtt("time_coverage_start", timeCoveragetStr.str() + "Z");
-
-    // Write to outlist if needed
-    if (outlistFile.is_open())
-        outlistFile << timeCoveragetStr.str().c_str() << " ";
-
-    yd2md((int16_t)endtime.year, (int16_t)endtime.day, &month, &day);
-
-    endtime.second =
-        floor(endtime.second * 1000) / 1000;  // LH, 11/18/2020, to handle 2020-11-05T20:06:59.999980000
-    hour = (int)(endtime.second / 3600);
-    endtime.second -= hour * 3600;
-    mins = (int)(endtime.second / 60);
-    endtime.second -= mins * 60;
-
-    // yyyy-mn-dyThr:mn:ss.sss
-    // for each, set the width of how long it should be and set a fill value if it is less than the width set.
-    timeCoveragetStr = stringstream();
-    timeCoveragetStr << setw(4) << to_string(endtime.year) << "-";  // year has 4 digits always and no fill
-    timeCoveragetStr << setw(2) << setfill('0') << month << "-";    // month can be single digit, fill w/ 0
-    timeCoveragetStr << setw(2) << setfill('0') << day << "T";      // day is the same as month
-
-    timeCoveragetStr << setw(2) << setfill('0') << hour << ":";
-    timeCoveragetStr << setw(2) << setfill('0') << mins << ":";
-    timeCoveragetStr << fixed << setw(6) << setprecision(3) << setfill('0') << endtime.second;
-
-    // Write end time
-    l1afile->putAtt("time_coverage_end", timeCoveragetStr.str() + "Z");
-
-    // Write product file name
-    l1afile->putAtt("product_name", l1aFileName.c_str());
-
-    // Write orbit direction
-    l1afile->putAtt("startDirection", startDirectionStr.c_str());
-    l1afile->putAtt("endDirection", endDirectionStr.c_str());
-
-    // Write data collect type and SWIR mode
-    l1afile->putAtt("data_collect_mode", DATA_COLLECT_MODE[dataType].c_str());
-    l1afile->putAtt("SWIR_data_mode", SWIR_DATA_MODES[swirModeIndex].c_str());
-    l1afile->putAtt("CDS_mode", CDS_MODES[cdsModeIndex].c_str());
-
-    // Write to outlist if needed
-    if (outlistFile.is_open())
-        outlistFile << timeCoveragetStr.str().c_str() << " ";
-
+        l1afile->putAtt("time_coverage_end", endTime.str() + "Z");
+        l1afile->putAtt("endDirection", endDirectionStr.c_str());
+    }
+    
+    // if not being appended, write everything
+    else {
+        l1afile->putAtt("time_coverage_start", startTime.str() + "Z");
+        l1afile->putAtt("time_coverage_end", endTime.str() + "Z");
+        l1afile->putAtt("product_name", l1aFileName.c_str());
+        l1afile->putAtt("startDirection", startDirectionStr.c_str());
+        l1afile->putAtt("endDirection", endDirectionStr.c_str());
+        l1afile->putAtt("data_collect_mode", DATA_COLLECT_MODE[dataType].c_str());
+        l1afile->putAtt("SWIR_data_mode", SWIR_DATA_MODES[swirModeIndex].c_str());
+        l1afile->putAtt("CDS_mode", CDS_MODES[cdsModeIndex].c_str());
+    }
+    
     return 0;
 }
 

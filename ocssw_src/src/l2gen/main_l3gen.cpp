@@ -19,7 +19,7 @@
 #include "geo_region.h"
 
 #define NBINREAD MAXPIX
-#define FLAGMASK PRODFAIL
+#define FLAGMASK (PRODFAIL | NAVFAIL)
 
 #include "l12_proto.h"
 

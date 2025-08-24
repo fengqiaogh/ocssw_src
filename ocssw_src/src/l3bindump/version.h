@@ -1,4 +1,4 @@
 #define VERSION_MAJOR 3
 #define VERSION_MINOR 1
 #define VERSION_PATCH 1
-#define GITSHA "V2025.3"
+#define GITSHA "V2025.5"

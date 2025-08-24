@@ -11,7 +11,7 @@ import os,fnmatch
 import argparse
 from datetime import datetime, timezone
 
-__version__ = '1.3 (2025-07-22)'
+__version__ = '1.4 (2025-08-13)'
 
 def find(pattern, path):
 # function to find a file matching pattern in path
@@ -195,6 +195,13 @@ Return value
     red_wave = l1b_dataset['sensor_band_parameters']['red_wavelength'][:]
 
 
+    #Check for spin ID in L1B file
+
+    #; Construct pseudo-spinID
+    stime = l1b_dataset['scan_line_attributes']['time'][:]
+    spinid = np.fix((stime - stime[0])*5.7)
+    nospid = 1
+
     # Get band and scan dimensions
     rbands  = l1b_dataset.dimensions['red_bands'].size
     nscans  = l1b_dataset.dimensions['scans'].size
@@ -228,6 +235,10 @@ Return value
         nscans   = nscans - send_line_off
         nk1      = int(nk1 - send_line_off/2)
         k1       = k1[0:nk1]
+
+    # Check for gaps
+    ksp = np.where((spinid[k1+send_line_off]-spinid[k1]) == send_line_off)
+    k1 = k1[ksp]
 
     # Get striping pixel profile
     str_prof  = make_striping_profile(npixstr)

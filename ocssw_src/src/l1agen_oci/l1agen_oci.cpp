@@ -132,9 +132,39 @@ void makeCloOptionAndAlias(clo_optionList_t *list, const char *optionName, const
     clo_addAlias(list, optionName, alias);
 }
 
+// take time make hours, mins and seconds. Return a time formatted string with Z
+stringstream makeTimeCoverageString(AncillaryPktTimeStamp &time) {
+    // Write start, end, create time attributes
+    int16_t month = 0;
+    int16_t day = 0;
+    int32_t hour = 0;
+    int32_t mins = 0;
+    stringstream timeCoveragetStr;  // format time coverage start and end using this stream then write it
+    
+    yd2md((int16_t)time.year, (int16_t)time.day, &month, &day);
+
+    time.second = floor(time.second * 1000) / 1000;  // LH, 11/18/2020
+    hour = (int)(time.second / 3600);
+    time.second -= hour * 3600;
+    mins = (int)(time.second / 60);
+    time.second -= mins * 60;
+    // yyyy-mn-dyThr:mn:ss.sss
+    // for each, set the width of how long it should be and set a fill value if it is less than the width set.
+    timeCoveragetStr = stringstream();
+    timeCoveragetStr << setw(4) << to_string(time.year) << "-";  // year is 4 digits always, no fill
+    timeCoveragetStr << setw(2) << setfill('0') << month << "-";      // month can be single digit, fill w/ 0
+    timeCoveragetStr << setw(2) << setfill('0') << day << "T";        // day is the same as month
+
+    timeCoveragetStr << setw(2) << setfill('0') << hour << ":";
+    timeCoveragetStr << setw(2) << setfill('0') << mins << ":";
+    timeCoveragetStr << fixed << setw(6) << setprecision(3) << setfill('0') << time.second;
+
+    return timeCoveragetStr;
+}
+
 int main(int argc, char *argv[]) {
     // version of l1agen_oci
-    const string VERSION = "02.11.00_2025-07-17";
+    const string VERSION = "02.13.00_2025-08-20";
 
     cout << "l1agen_oci " << VERSION << " (" << __DATE__ << " " << __TIME__ << ")" << endl;
 
@@ -144,7 +174,9 @@ int main(int argc, char *argv[]) {
         "\nUsage: l1agen_oci [options] \n\nRetuns status codes:\n\
         0 - good\n\
         110 - no ancillary packets found in file\n\
-        120 - no L1A file was generated\n\n");
+        120 - no L1A file was generated\n\
+        130 - duplicate l1a file being generated\n"
+    );
 
     // L0 file list and granule length, no alias.
     clo_addOption(commandLineOptionsList, "ifile", CLO_TYPE_IFILE, NULL,
@@ -157,6 +189,8 @@ int main(int argc, char *argv[]) {
                           "Granule Start Time. Format: YYYYmmddTHHMMSS or YYYY-mm-ddTHH:MM:SS");
     makeCloOptionAndAlias(commandLineOptionsList, "maxgap", "g", CLO_TYPE_INT, "65535",
                           "Max Gap between Spins");
+    makeCloOptionAndAlias(commandLineOptionsList, "max_file_gap", "m", CLO_TYPE_DOUBLE, "300",
+                        "Max Gap between Files in Seconds");
     makeCloOptionAndAlias(commandLineOptionsList, "hktlist", "k", CLO_TYPE_IFILE, NULL,
                           "List of Housekeeping Telemetry (HKT) files");
     makeCloOptionAndAlias(commandLineOptionsList, "swir_loff_set", "s", CLO_TYPE_STRING, NULL,
@@ -186,8 +220,9 @@ int main(int argc, char *argv[]) {
     // flag to determine if you need to read the advanace the packet pointer until it finds a packet where
     // the start time is >= granuleStartTime
     bool isGranuleStartTimeGiven = false;
-    int maxGap = 10;    // by default, the max allowed missing scan  = 10
-    bool isSPW = true;  // by default, OCI data is from DSB and has space wire header
+    int maxGap = 10;            // by default, the max allowed missing scan  = 10
+    double maxFileGap = 300;    // default == 300 seconds == 5 mins 
+    bool isSPW = true;          // by default, OCI data is from DSB and has space wire header
     int returnStatus = 0;
 
     // command line input parameters
@@ -224,6 +259,11 @@ int main(int argc, char *argv[]) {
         if (maxGap == 0) {
             maxGap = 65535;
         }
+    }
+
+    // max_file_gap
+    if (clo_isSet(commandLineOptionsList, "max_file_gap")) {
+        maxFileGap = clo_getDouble(commandLineOptionsList, "max_file_gap");
     }
 
     // swir line offset
@@ -313,10 +353,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    ofstream generatedL1aListFile;
-    if (outlist.compare("") != 0)
-        generatedL1aListFile.open(outlist.c_str());
-
     vector<string> fileNames;
     fileNames = readFileList(ifileName);
     L0Stream tfileStream(fileNames);
@@ -399,7 +435,21 @@ int main(int argc, char *argv[]) {
 
     spatialAggTable spatialAggList[10];
 
-    // when evaluating L0 packets, there can be a data type change. These are all the possible data types
+    
+    /**
+     * when evaluating L0 packets, there can be a data type change. These are all the possible data types.
+     * 
+     * index 0 no data type. used in the instrument configuration to indicate segments of the scan where 
+     * data are not collected. 
+     * 
+     * index 1 is science data (Earth viewing data). No suffix bc all of our l1a files are this.
+     * 
+     * index 10 is filler and we don't use it. Included so the other data type ids line up.
+     * 
+     * NBSB (Non-Baseline Spectral Bands) is NOT a instrument data type but we have it to note if the science data is collected
+     * using the non standard spectral config. 
+     * 
+     */
     string const DATA_TYPES[] = {"",      "",      "_DARK", "_SOL", "_SPCA",   "_LIN",    "_LUN",
                                  "_DIAG", "_STAT", "_SPEC", "",     "_SNAP-X", "_SNAP-I", "_NBSB"};
 
@@ -420,6 +470,9 @@ int main(int argc, char *argv[]) {
     uint8_t noSequenceErrorFlag = 255;
     uint16_t swirMode = 0;
 
+    // l1afile manager so if there's a data type change, dont close the files
+    L1aFileManager l1aFileManager = L1aFileManager();
+
     // Before processing, find the next good spin number that contains an ancillary index
     // Using "next" ancilliary packet var because we have not started processessing
     while ((nextPktAncillaryIndex == -1) && !isEndFile) {
@@ -430,6 +483,7 @@ int main(int argc, char *argv[]) {
 
     if (isEndFile) {
         cout << "No ancillary packets found in file" << endl;
+        l1aFileManager.dumpOutlistBuffer(outlist);
         exit(110);  // ver 0.99.21
     }
 
@@ -459,14 +513,14 @@ int main(int argc, char *argv[]) {
     uint16_t isBlueCcdTapsEnabled[16] = {};
     uint16_t isRedCcdTapsEnabled[16] = {};
 
-    // l1afile manager so if there's a data type change, dont close the files
-    L1aFileManager l1aFileManager = L1aFileManager();
     L1aFile* currentL1aFile = nullptr; 
-
 
     // Packets will continue to be read as long as the ancillary data collection fields did not change.
     // Resets to 1 when processing scans for a new packet. Initializes to 1 in the main loop.
     int ancillaryDataTbleNotModified; 
+
+    // records the time of each new ancillary packet
+    double lastAncillaryPktTime = 0.0; 
 
     ////////////////////// Main Loop ///////////////////
     while (!isEndFile) {
@@ -529,11 +583,14 @@ int main(int argc, char *argv[]) {
             granuleStartTime =
                 (int32_t)(granuleStartTimeIntStruct.tm_hour * 3600 + granuleStartTimeIntStruct.tm_min * 60 +
                           granuleStartTimeIntStruct.tm_sec);
+
             // adjust for different dates
-            granuleStartTime +=
-                (jday(granuleStartTimeIntStruct.tm_year + 1900, 1, granuleStartTimeIntStruct.tm_yday + 1) -
-                 jday(ancillaryPktYear, 1, ancillaryPktDay)) *
-                86400;
+
+            // passed in day is Day of Year (DOY), so ignore month ie: 229 DOY = Aug 17th
+            int32_t startTimeAsJulianDay = jday(granuleStartTimeIntStruct.tm_year + 1900, 1, granuleStartTimeIntStruct.tm_yday + 1);
+            int32_t ancillaryPktTimeAsJulianDay = jday(ancillaryPktYear, 1, ancillaryPktDay);
+            int32_t julianDayDiff = startTimeAsJulianDay - ancillaryPktTimeAsJulianDay;
+            granuleStartTime += julianDayDiff * 86400;
 
             // set max time for the L0 files and max scans depending on granule length.
             // if minutes is 0, then max time is +600 by default to read the entire file.
@@ -549,6 +606,10 @@ int main(int argc, char *argv[]) {
             // moves packet pointer forward if the packets actual start time is less than what we want our
             // granule start time to be.
             while (((ancillaryPktTime < granuleStartTime) || (numCcdPixels == 1)) && !isEndFile) {
+
+                // note previous packet time
+                lastAncillaryPktTime = ancillaryPktTime;
+
                 readScanPackets(&tfileStream, packetBuffer,
                                 (uint8_t(*)[MAX_PACKET_SIZE]) & nextOciPacketBuffer[0][0], nextNumPackets,
                                 nextSpinNum, nextPktAncillaryIndex, nextTelemetryIndices, noSequenceErrorFlag,
@@ -564,10 +625,19 @@ int main(int argc, char *argv[]) {
                     if (numCcdPixels == 1)
                         cout << "Ancillary packet has zero science pixels at spin " << nextSpinNum << endl;
                 }
+
+                // check for crossing date line (ancillary time becomes smaller bc of a new day) and if the 
+                // granuleStartTime > 86400 (max seconds in a day). when the adjusted granuleStartTime via jday()
+                // is > 86400, then the start of the ancillary packet time is in the previous day by 
+                // (granduleStartTime - 86400) seconds. 
+                if (ancillaryPktTime < lastAncillaryPktTime && granuleStartTime > 86400) {
+                    granuleStartTime = granuleStartTime % 86400;
+                }
             }
 
             if (isEndFile) {
                 cout << "No science data in time range" << endl;
+                l1aFileManager.dumpOutlistBuffer(outlist);
                 return 110;
             }
 
@@ -803,10 +873,12 @@ int main(int argc, char *argv[]) {
         int8_t *l0SwirPixelFrameTypes = new int8_t[maxNumOfSwirPixels];
         int8_t *swirFrameTypesSciData = new int8_t[maxNumOfSwirPixels];
 
-        
+
         string maxgap_string = to_string(maxGap);
         string noSPW_string = to_string(isSPW);
 
+        // track if the file is being merge into another file of the same data type
+        bool isFileBeingAppended = false;
 
         // if the file manager does not have a l1a for this data type, initialize output file and get object IDs for EV data
         // -- for lunear calibration, the file is removed after it is done. So Lunar Calibration will not be grouped because
@@ -826,21 +898,38 @@ int main(int argc, char *argv[]) {
                                           pversion, noSPW_string, VERSION);
         }
 
-        // if file manager has the file, then switch the current working l1afile to be the current dataType
-        else {
+        // file manager has the file, but the time gap between this packet and last is larger than requested
+        // close the current one and create a new 
+        else if (l1aFileManager.contains(dataType) && (ancillaryPktTime - lastAncillaryPktTime > maxFileGap)) {
             currentL1aFile = l1aFileManager.getL1aFile(dataType);
 
+            cout << "Closing: " << currentL1aFile->getFileName() << " because max gap between packets exceeds " << maxFileGap/60 << " mins" << endl;
+            l1aFileManager.closeAndRemoveFile(dataType);
+
+            // update the outlist buffer. removed to prevent outlist merging
+            l1aFileManager.processPrevFile();
+
+            cout << "Creating: " << l1aFileName.c_str() << endl;
+            cout << "Starting at spin number " << nextSpinNum << endl;
+
+            // create a new l1a file and initialize it
+            currentL1aFile = l1aFileManager.createL1aOutputFile(dataType);
+            currentL1aFile->initializeL1aFile((char *)l1aFileName.c_str(), maxScans, numCcdPixels, numBlueBands,
+                                     numRedBands, numSwirPixels, numDarkCcdPixels);
+
+            // write in what command and files were used to make this file
+            currentL1aFile->writeProcessingControl(hktList, ifileName, granuleStartTimeStr, maxgap_string,
+                                          outfilePrefixTag, swirLineOffsetString, outlist, l1aFileName, doi,
+                                          pversion, noSPW_string, VERSION);
+        }
+
+        // if file manager has the file, then switch the current working l1afile to be the current dataType
+        else {
             cout << "Creating: " << l1aFileName.c_str() << endl;
             cout << "          " << l1aFileName.c_str() << " will be appened into " << currentL1aFile->getFileName() 
                 << " because it shares the same data-type:  " << DATA_TYPES[dataType] << "." << endl;
             cout << "Starting at spin number " << nextSpinNum << endl;
-        }
-
-        // Write output filename to outlist if needed.
-        long outlistpos;
-        if (outlist.compare("") != 0) {
-            outlistpos = generatedL1aListFile.tellp();
-            generatedL1aListFile << l1aFileName.c_str() << " ";
+            isFileBeingAppended = true;
         }
 
         // Read and process OCI scans
@@ -1148,44 +1237,56 @@ int main(int argc, char *argv[]) {
             // Generate granule metadata and write to file
             string sdir = "Ascending";  // Hard-code until we have spacecraft data
             string edir = "Ascending";  // Hard-code until we have spacecraft data
+               
+            // get ancillary packet start and end times as a string
+            stringstream timeCoverageStart = makeTimeCoverageString(ancillaryPktStartTime);
+            stringstream timeCoverageEnd = makeTimeCoverageString(ancillaryPktEndTime);
 
-            currentL1aFile->writeGlobalMetaData(ancillaryPktStartTime, ancillaryPktEndTime, l1aFileName, sdir,
-                                           edir,
+            // also writes the time converage start into the outlist file for the current file
+            currentL1aFile->writeGlobalMetaData(timeCoverageStart, timeCoverageEnd, isFileBeingAppended, l1aFileName,
+                                           sdir, edir,
                                            dataType,  // spatialAggList[1].dataType changed to dataType
-                                           swirMode, cdsMode, generatedL1aListFile);
-
-            // Write complete flag to outlist if needed
-            // write data type to the last column
-            if (outlist.compare("") != 0) {
-                generatedL1aListFile << completeFlag;
-
-                if (swirMode > 0) {
-                    generatedL1aListFile << " DIAG";
-                } else if (dataType == 0) {
-                    generatedL1aListFile << " _";
-                } else if (DATA_TYPES[dataType].substr(0, 1) == "_") {
-                    generatedL1aListFile << " " << DATA_TYPES[dataType].substr(1);
-                }
-
-                generatedL1aListFile << "\n";
+                                           swirMode, cdsMode);
+            
+            // write the file information to the outlist buffer
+            if (swirMode > 0) {
+                l1aFileManager.addFileToOutlistBuffer(l1aFileName, timeCoverageStart.str(), 
+                timeCoverageEnd.str(), completeFlag, "DIAG", dataType
+                );
+            } 
+            else if (dataType == 0) {
+                l1aFileManager.addFileToOutlistBuffer(l1aFileName, timeCoverageStart.str(), 
+                timeCoverageEnd.str(), completeFlag, "_", dataType
+                ); 
+            } 
+            // named data types
+            else if (DATA_TYPES[dataType].substr(0, 1) == "_") {
+                l1aFileManager.addFileToOutlistBuffer(l1aFileName, timeCoverageStart.str(), 
+                timeCoverageEnd.str(), completeFlag, DATA_TYPES[dataType].substr(1), dataType
+                );
+            } 
+            // normal OCI l1a file and any other data types without a name in DATA_TYPES
+            else {
+                l1aFileManager.addFileToOutlistBuffer(l1aFileName, timeCoverageStart.str(), 
+                timeCoverageEnd.str(), completeFlag, "", dataType
+                );
             }
+
+            // note the last datatype used
+            l1aFileManager.updateLastDataTypeSeen(dataType);
 
             // Write common global metadata
             currentL1aFile->writeGlobalAttributes(history, doi, pversion);
             
-
             // update the number_of_scans dim. This is used in multiple write methods
             // so it is done outside the write method, unlike the other dims.
             currFileDimShape->incrementNumScansShape(currScan);
-
 
         } else {
             // Remove 0-scan file
             int status = remove(l1aFileName.c_str());
             if (status == 0) {
                 cout << "Removing 0-scan file: " << l1aFileName.c_str() << endl;
-                if (outlist.compare("") != 0)
-                    generatedL1aListFile.seekp(outlistpos);
             } else {
                 cout << "Error removing " << l1aFileName.c_str() << endl;
                 exit(EXIT_FAILURE);
@@ -1260,6 +1361,10 @@ int main(int argc, char *argv[]) {
         delete[] tlmdata[0];
         delete[] tlmdata;
 
+        // update last seen time for the next packet to make sure the gap is
+        // not too big
+        lastAncillaryPktTime = ancillaryPktTime;
+
         if (ancillaryPktTime > granuleMaxTime)
             break;
 
@@ -1268,16 +1373,16 @@ int main(int argc, char *argv[]) {
     /////////////////// End Main Loop ///////////////////
 
     l1aFileManager.closeAllL1aFiles();
-    if (outlist.compare("") != 0) {
-        if (generatedL1aListFile.tellp() == 0) {
-            generatedL1aListFile.close();
-            generatedL1aListFile.open(outlist.c_str());
-            generatedL1aListFile << "No L1A file was generated.";  // clear outlist if no L1A is generated.
-            returnStatus = 120;
-        }
 
-        generatedL1aListFile.close();
+    // no l1a made, do not dump outlist buffer so no outlist is generated
+    if (!l1aFileManager.filesWereGenerated()) {
+        returnStatus = 120;
     }
+    else {
+        // dump all the file info into the file and close it
+        l1aFileManager.dumpOutlistBuffer(outlist);
+    }
+    
 
     // Deallocate
     delete[] nextOciPacketBuffer[0];

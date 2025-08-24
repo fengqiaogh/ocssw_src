@@ -599,9 +599,15 @@ int readl1_safe(filehandle *file, int32_t scan, l1str *l1rec, int lonlat) {
                 __FILE__, __LINE__, qualityFlagsFilename.c_str(), "quality_flags");
         exit(FATAL_ERROR);
     }
+
+    // read and interpolate solar zenith
+    for (ip = 0; ip < npix; ip++) {
+        l1rec->solz[ip] = gsl_spline2d_eval(solz_spline, ip, scan, solz_xacc, solz_yacc);
+    }
+
     // only read radiances and compute angles if lonlat set to zero
     if (lonlat == 0) {
-            // read in radiance data
+        // read in radiance data
         for (ib = 0; ib < nbands; ib++) {
             retval = nc_get_vara_ushort(radFileID[ib], radVarID[ib], start, count, rad_data);  // BYSCAN
             if (retval != NC_NOERR) {
@@ -626,7 +632,6 @@ int readl1_safe(filehandle *file, int32_t scan, l1str *l1rec, int lonlat) {
         }  // for ib invoke spline
         for (ip = 0; ip < npix; ip++) {
             double x, y;
-            l1rec->solz[ip] = gsl_spline2d_eval(solz_spline, ip, scan, solz_xacc, solz_yacc);
             x = gsl_spline2d_eval(sola_x_spline, ip, scan, sola_x_xacc, sola_x_yacc);
             y = gsl_spline2d_eval(sola_y_spline, ip, scan, sola_y_xacc, sola_y_yacc);
             l1rec->sola[ip] = atan2(y, x) * OEL_RADEG;

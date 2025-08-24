@@ -284,7 +284,7 @@ file_format getFormat(char *filename) {
                         ret.sensor_id = VIIRSJ1;
                         ret.subsensor_id = VIIRS_J1;
                         if (want_verbose) {
-                            printf("Input file %s is VIIRS JPSS-2 L1A NetCDF4.\n", filename);                    
+                            printf("Input file %s is VIIRS JPSS-1 L1A NetCDF4.\n", filename);                    
                         }
                     }
                     else if (platformStr.find("jpss-2") != string::npos) {

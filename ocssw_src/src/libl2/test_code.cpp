@@ -10,24 +10,8 @@ int main(int argc, char** argv) {
         varname = argv[2];
     }
     else return 1;
-    L2_Reader test = L2_Reader(filename);
-    // auto var = find_nc_variable_cpp("par", test->nc_);
-    ScaledNcVar var = test.get_variable(varname);
-    size_t dim1 = var.getDims()[0].getSize();
-    size_t dim2 = var.getDims()[1].getSize();
-    std::vector<float> data(dim1 * dim2);
-    var.getVar(data.data());
-    size_t bound1 = 0;
-    size_t bound2 = 0;
-    size_t slice = 10;
-    if (argc > 5) {
-        bound1 = atoi(argv[3]);
-        bound2 = atoi(argv[4]);
-        slice = atoi(argv[5]);
-    }
-    for (size_t i =bound1; i < bound1 + slice; i++)
-        for (size_t j =bound2; j < bound2 +  slice; j++)
-            std::cout << data[i * dim2 + j] << " ";
-    test.reset_cache();
+    netCDF::NcFile file_nc(filename,netCDF::NcFile::read );
+    auto var_nc = find_nc_variable_cpp(varname,file_nc);
+    std::cout << get_full_nc_path(var_nc) << std::endl;
     return 0;
 }

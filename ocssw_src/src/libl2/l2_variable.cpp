@@ -37,26 +37,30 @@ void L2Variable::read(netCDF::NcFile &l2_file) {
             size_t dim_size = dims[2].getSize();
             // get variable name using dimension
             const std::string &variable_3d = dim_name;
-            netCDF::NcVar nc_var = find_nc_variable_cpp(variable_3d, l2_file);
+            netCDF::NcGroup parent_grp = var_nc.getParentGroup();
+            netCDF::NcVar nc_var = find_nc_variable_cpp(variable_3d, parent_grp);
             int dim_3d_id = -1;
             size_t dim_3d_size = 0;
             if (!nc_var.isNull()) {
                 dim_3d_id = nc_var.getDims().at(0).getId();
                 dim_3d_size = nc_var.getDims().at(0).getSize();
-                prod_wavenames[variable_3d].insert(var_name);
             }
             if (nc_var.isNull() || dim_3d_id != dim_id || dim_3d_size != dim_size) {
-                netCDF::NcGroup parent_grp = var_nc.getParentGroup();
-                nc_var = find_nc_variable_cpp("wavelength", parent_grp);
-                prod_wavenames[parent_grp.getName()].insert(var_name);
+                nc_var = find_nc_variable_cpp(variable_3d, l2_file);
+            }
+            if (!nc_var.isNull()) {
+                dim_3d_id = nc_var.getDims().at(0).getId();
+                dim_3d_size = nc_var.getDims().at(0).getSize();
             }
             // third dimension is not wavelength
-            if (nc_var.isNull()) {
+            if (nc_var.isNull() || dim_3d_id != dim_id || dim_3d_size != dim_size) {
 #ifdef DEBUG_LOG
                 std::cout << "WARNING: Variable " << var_nc.getName()
                           << " is 3D dimensional but no suitable wavelength set was found" << std::endl;
 #endif
                 continue;
+            } else {
+                prod_wavenames[get_full_nc_path(nc_var)].insert(var_name);
             }
             std::vector<int> waves;
             std::vector<float> waves_original;
@@ -90,6 +94,11 @@ void L2Variable::read(netCDF::NcFile &l2_file) {
         }
         if (attributes.count("units")) {
             attributes.at("units").getValues(products_units.at(var_name));
+        }
+        if (attributes.count("wavelength")) {
+            float wave_var;
+            attributes.at("wavelength").getValues(&wave_var);
+            l3d_wave_attr[var_name] = wave_var;
         }
         if (attributes.count("valid_min") > 0 &&
             attributes.count("valid_max") > 0) {  // need to think about it
@@ -404,13 +413,13 @@ std::unordered_map<std::string,std::string> L2Variable:: parse_wave_subsets(
             std::string subset = subset_wave_requested_list[1];
             
             // Validate wavelength exists
-            if (prod_wavenames.count(wave_name) == 0) {
+            std::string wave_path = find_key_nc_path(prod_wavenames,wave_name);
+            if (wave_path.empty()) {
                 EXIT_LOG(std::cout << "-E- : Wavelength or parent group " << wave_name << " not found in the file "
                                    << input_file_name);
             }
-            
             // Apply subset to all products with this wavelength
-            for (auto &prod : prod_wavenames[wave_name]) {
+            for (auto &prod : prod_wavenames[wave_path]) {
                 prod_subset_waves[prod] = subset;
             }
         }
