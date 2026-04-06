@@ -33,8 +33,7 @@ using namespace netCDF;
 using namespace netCDF::exceptions;
 
 #define PROGRAM_NAME "l1cgen"
-#define VERSION "5.70 02/11/2025"
-
+#define VERSION "5.71 10/28/2025"
 
 int main(int argc, char** argv) {
     int status;
@@ -42,7 +41,7 @@ int main(int argc, char** argv) {
     double etime;
     string ifile_str;
     char* ifile_char;
-    auto start = high_resolution_clock::now();   
+    auto start = high_resolution_clock::now();
     vector<pair<float, int>> vp;
 
     L1C_input l1cinput;
@@ -66,7 +65,7 @@ int main(int argc, char** argv) {
 
     cout << PROGRAM_NAME << " " << VERSION << endl;
     l1cfile.version = VERSION;
-    l1cfile.progname=PROGRAM_NAME;
+    l1cfile.progname = PROGRAM_NAME;
     // grab CLI info
     l1cinput.l1c_inputmain(argc, argv, &l1cinput, &l1cfile, PROGRAM_NAME, VERSION);
 
@@ -75,14 +74,14 @@ int main(int argc, char** argv) {
     file_format format = getFormat(ifile_char);
     l1cfile.format = format.type;
 
-    if (format.type != FT_INVALID) 
-    {
+    if (format.type != FT_INVALID) {
         if (ptl1c->load_l1c_filehandle4(&l1cfile, &l1cinput) != 0) {
             printf("-E- %s: Error loading %sl1c filehandle.\n", argv[0], l1cfile.l1b_name.c_str());
             exit(1);
         }
-        if(l1cfile.l1c_pflag==0) cout<<"Error -- mode = "<<l1cfile.l1c_pflag<<"please provide processing mode >0"<<endl;
-           //----- READING HKT FILES -----------------------------------------------------------------
+        if (l1cfile.l1c_pflag == 0)
+            cout << "Error -- mode = " << l1cfile.l1c_pflag << "please provide processing mode >0" << endl;
+        //----- READING HKT FILES -----------------------------------------------------------------
         //**********************************************************************************************************-
         if (l1cfile.l1c_pflag == 5) {
             cout << "Reading telemetry from HKT files..--> SOCEA -- L1C grid.." << endl;
@@ -111,13 +110,13 @@ int main(int argc, char** argv) {
                  << "minutes..." << endl;
         }
 
-         else if (l1cfile.l1c_pflag == 7) {
+        else if (l1cfile.l1c_pflag == 7) {
             string senstr;
             string l1c_str = l1cinput.l1c_grid;
             cout << "producing L1C grid from L1C granules  and at CTH "
                     "......................................................"
                  << endl;
-         
+
             if (l1cinput.sensor == 34) {
                 senstr = "SPEXone";
                 l1cfile.nbinx = 25;
@@ -157,8 +156,7 @@ int main(int argc, char** argv) {
         }
 
         //**********************************************************************************************************************
-        else if (l1cfile.l1c_pflag == 8) 
-        {
+        else if (l1cfile.l1c_pflag == 8) {
             //---------------------------------------------------------
             // DISCRETE BINNING -------------------------
             //---------------------------------------------------------
@@ -339,9 +337,9 @@ int main(int argc, char** argv) {
             }
 
             strcpy(binl1c.outlist, l1cinput.outlist);
-            if(l1cinput.pversion[0])
+            if (l1cinput.pversion[0])
                 binl1c.pversion = l1cinput.pversion;
-            if(l1cinput.doi[0])
+            if (l1cinput.doi[0])
                 binl1c.doi = l1cinput.doi;
 
             meta_l1c_full(&l1file, &binl1c, l1cinput.l1c_grid,
@@ -355,7 +353,7 @@ int main(int argc, char** argv) {
 
             for (int f = 0; f < nfiles; f++) {
                 skipped[f] = 0;
-                int firstcall=0;
+                int firstcall = 0;
                 if (timebin_ok[f] == 0) {
                     l1cfile.l1b_name = l1cfile.ifiles[f];
                     const char* char_file = l1cfile.l1b_name.c_str();
@@ -392,7 +390,8 @@ int main(int argc, char** argv) {
                     double timetemp = 0.0, time_offset = 0.;
                     for (int sline = 0; sline < l1file.nscan; sline++) {
                         readl1(&l1file, sline, &l1rec);
-                    
+                        binl1c.scan = sline;
+                        
                         // set timetemp to the beginning of the day
                         // only need to calculate for the first line
                         if (sline == 0) {
@@ -414,8 +413,8 @@ int main(int argc, char** argv) {
                             binl1c.outpix += npix;
                         } else {
                             if (l1cinput.cloud_correct > 0) {
-                                result =
-                                    parallax(&l1file, l1c_anc, l1c_grid, &l1rec, &binl1c, gdindex, nc_output,sline,firstcall);
+                                result = parallax(&l1file, l1c_anc, l1c_grid, &l1rec, &binl1c, gdindex,
+                                                  nc_output, sline, firstcall);
                                 if (result == 110) {
                                     if (l1cinput.verbose) {
                                         cout << "WARNING---- some lat/lon out of boundaries or FILLVALUES  "
@@ -426,15 +425,14 @@ int main(int argc, char** argv) {
                                     skipped[f] += 1;
                                 }
                             }
-                           
+
                             bintime_l1c(&l1file, &l1rec, &binl1c, gdindex, timetemp,
                                         nc_output);                                 // TIME VARS
                             bin_l1c(&l1file, &l1rec, &binl1c, gdindex, nc_output);  // NO TIME VARS
                             rmse_l1c_alt(&l1file, &binl1c, &l1rec, gdindex);        // diff2 height
                         }
                         if (sline % 100 == 0)
-                            cout << "scanline " << sline + 1
-                                 << ", pixels binned " << binl1c.inpix
+                            cout << "scanline " << sline + 1 << ", pixels binned " << binl1c.inpix
                                  << ", pixels outside the grid " << binl1c.outpix << endl;
                     }
 
@@ -451,8 +449,7 @@ int main(int argc, char** argv) {
 
             free(gdindex);
             nc_output->close();
-            ptl1c->add_proc_group_l1c(&l1cinput,&l1cfile,l1cinput.ofile);
-    
+            ptl1c->add_proc_group_l1c(&l1cinput, &l1cfile, l1cinput.ofile);
 
             int32_t sk_tot = 0;
             for (int f = 0; f < nfiles; f++) {
@@ -471,7 +468,7 @@ int main(int argc, char** argv) {
                  << "tot pixels: " << npix_tot << "missing scans %.." << 100.0 * sk_tot / nscan_tot << endl;
 
             binl1c.close_bin(&binl1c);
-            delete (l1_input);
+            free(l1_input);
 
             if (ptl1c != nullptr)
                 delete ptl1c;
@@ -492,8 +489,8 @@ int main(int argc, char** argv) {
                 return (130);
             } else
                 return (0);
-        }  
-    }     
+        }
+    }
 
     else {
         printf("-E- %s: Error opening %s for reading unknown sensor...................\n", argv[0],

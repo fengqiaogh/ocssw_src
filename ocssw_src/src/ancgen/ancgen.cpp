@@ -421,7 +421,7 @@ int main(int argc, char *argv[]) {
             if (clo_isOptionSet(option))
                 parse_file_name(clo_getOptionString(option), gebcoFilename);
             else
-                strcpy(gebcoFilename, "$OCDATAROOT/common/gebco_ocssw_v2020.nc");
+                strcpy(gebcoFilename, "$OCDATAROOT/common/gebco_ocssw_v2025.nc");
         }
         else if (strcmp(keyword, "par") == 0) {
             if (clo_isOptionSet(option)) 

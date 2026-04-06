@@ -2,13 +2,13 @@
 #ifndef L1B_OCI_OPTIONS_H
 #define L1B_OCI_OPTIONS_H
 
-#include "device.hpp"
+#include <string>
 #include <clo.h>
 
 namespace oel {
 class L1bOptions {
    public:
-    L1bOptions(int argc, char *argv[]);
+    L1bOptions(int argc, char *argv[], const char *version);
     ~L1bOptions();
 
     std::string l1aFilename;  // Input filename
@@ -25,11 +25,13 @@ class L1bOptions {
     bool disableGeolocation;
     bool enableCrosstalk;  // Used in tandem with xtalkLutFilename. Latter has default value if not set
                            // explicitly, so never empty.
+    bool aggregationOff;   // Used when creating the instrument aggregation matrices
+    bool floatingAngles;   // Whether to output sensor/solar angles as floating point numbers
 
     size_t startingLine;  // start line (first line = 0)
     int32_t endingLine;   // ending line inclusive (first line = 0)
 
-    int deflate; // Compression factor
+    int deflateLevel;  // Compression factor
 
     clo_optionList_t *optionList;
 };

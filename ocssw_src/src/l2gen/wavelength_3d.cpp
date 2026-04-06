@@ -18,6 +18,7 @@ extern "C" void get_wavelength3d(const filehandle *l1file, instr *input) {
     if (wavelength_3d_str.empty()) {
         input->wavelength_3d = l1file->iwave;
         input->nwavelengths_3d = l1file->nbands;
+        input->wavelength_3d_float = l1file->fwave;
         input->wavelength_3d_index = (int *)malloc(l1file->nbands * sizeof(int *));
         for (int i = 0; i < l1file->nbands; i++) {
             input->wavelength_3d_index[i] = i;
@@ -155,8 +156,10 @@ extern "C" void get_wavelength3d(const filehandle *l1file, instr *input) {
     //--------------------------------------------------------------------------------------------------------
         // Populate expanded user wavelength input into wavelength_3d array
         input->wavelength_3d = (int *)malloc((input->nwavelengths_3d) * sizeof(int *));
+        input->wavelength_3d_float = (float *)malloc((input->nwavelengths_3d) * sizeof(float *));
         for (int i = 0; i < input->nwavelengths_3d; i ++) {
             input->wavelength_3d[i] = l1file->iwave[input->wavelength_3d_index[i]];
+            input->wavelength_3d_float[i] = l1file->fwave[input->wavelength_3d_index[i]];
         }
     //--------------------------------------------------------------------------------------------------------
     }

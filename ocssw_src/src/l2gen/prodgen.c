@@ -428,6 +428,7 @@ VOIDP prodgen(l2prodstr *p, l2str *l2rec) {
         break;
     case CAT_ozone:
         pbuf = (VOIDP) l1rec->oz;
+        applyMultiplier(pbuf, pbuf, numPixels, 1000.0);
         break;
     case CAT_no2_tropo:
         pbuf = (VOIDP) l1rec->no2_tropo;
@@ -1247,9 +1248,13 @@ VOIDP prodgen(l2prodstr *p, l2str *l2rec) {
     case CAT_flags_gpig:
         get_gpig(l2rec, p, fbuf);
         pbuf = (VOIDP) fbuf;
-        break;  
+        break;
+    case CAT_qwip:
+        get_qwip(l2rec, fbuf);
+        pbuf = (VOIDP) fbuf;
+        break;
 
-        default:
+    default:
         fprintf(stderr, "-E- %s Line %d: Unknown product catalogue ID %d.\n",
                 __FILE__, __LINE__, p->cat_ix);
         exit(1);

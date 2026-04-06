@@ -496,6 +496,60 @@ file_format getFormat(char *filename) {
                     return ret;
                 }
 
+                // MODIS Collection 7 GEO NetCDF
+                if (titleStr.find("geolocation fields 5-min l1a swath") != string::npos) {
+                    if (instrumentStr == "MODIS") {
+                        if (titleStr.find("1km") != string::npos) {
+                            ret.type = FT_MODISGEOH5;
+                            if (platformStr == "aqua") {
+                                ret.sensor_id = MODISA;
+                                ret.subsensor_id = MODIS_AQUA;
+                            } else {  // (platformStr =="Terra")
+                                ret.sensor_id = MODIST;
+                                ret.subsensor_id = MODIS_TERRA;
+                            }
+                            if (want_verbose) {
+                                cout << "Input file " << filename << " is " << instrumentStr << " "
+                                        << platformStr << " Level-1B HDF5 product." << endl;
+                            }
+                        } else if (titleStr.find("250m") != string::npos) {
+                            cout << "Input resolution of 250m not accepted as input\n";
+                        } else if (titleStr.find("500m") != string::npos) {
+                            cout << "Input resolution of 500m not accepted as input\n";
+                        } else {
+                            cout << "Input resolution is unknown, not accepted as input\n";
+                        }
+                        return ret;
+                    }
+                }
+
+                // MODIS Collection 7 L1B NetCDF
+                if (titleStr.find("calibrated radiances 5-min l1b swath") != string::npos) {
+                    if (instrumentStr == "MODIS") {
+                        if (titleStr.find("1km") != string::npos) {
+                            ret.type = FT_MODISL1BH5;
+                            if (platformStr == "aqua") {
+                                ret.sensor_id = MODISA;
+                                ret.subsensor_id = MODIS_AQUA;
+                            } else {  // (platformStr =="Terra")
+                                ret.sensor_id = MODIST;
+                                ret.subsensor_id = MODIS_TERRA;
+                            }
+                            if (want_verbose) {
+                                cout << "Input file " << filename << " is " << instrumentStr << " "
+                                        << platformStr << " Level-1B HDF5 product." << endl;
+                            }
+                        } else if (titleStr.find("250m") != string::npos) {
+                            cout << "Input resolution of 250m not accepted as input\n";
+                        } else if (titleStr.find("500m") != string::npos) {
+                            cout << "Input resolution of 500m not accepted as input\n";
+                        } else {
+                            cout << "Input resolution is unknown, not accepted as input\n";
+                        }
+                        return ret;
+                    }
+                }
+
                 if (titleStr.find("czcs level-1a data") != string::npos) {
                     ret.type = FT_CZCSL1ANC;
                     ret.sensor_id = CZCS;

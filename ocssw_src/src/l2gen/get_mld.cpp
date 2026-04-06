@@ -245,7 +245,7 @@ vector<float> get_coords(NcFile* ncid, vector<string> varnames) {
     return {};
 }
 
-int init_mld_nc(char* mldfile, mld_info* mldinfo) {
+void init_mld_nc(char* mldfile, mld_info* mldinfo) {
     try {
         NcFile* ncid = new NcFile(mldfile, NcFile::read);
         string varname;
@@ -258,7 +258,7 @@ int init_mld_nc(char* mldfile, mld_info* mldinfo) {
         vector<string> lonnames { "lon", "Longitude", "longitude" };
         mldinfo->lon = get_coords(ncid, lonnames);
         if (mldinfo->lon.size() == 0) {
-            cerr << "-X- " << __FILE__ " line " << __LINE__ << ": "
+            cerr << "-E- " << __FILE__ ":" << __LINE__ << " - "
                  << "No Longitude coordinate variable in " <<  mldfile << endl;
             exit(EXIT_FAILURE);
         }
@@ -266,7 +266,7 @@ int init_mld_nc(char* mldfile, mld_info* mldinfo) {
         vector<string> latnames { "lat", "Latitude", "latitude" };
         mldinfo->lat = get_coords(ncid, latnames);
         if (mldinfo->lat.size() == 0) {
-            cerr << "-X- " << __FILE__ " line " << __LINE__ << ": "
+            cerr << "-E- " << __FILE__ ":" << __LINE__ << " - "
                  << "No Latitude coordinate variable in " <<  mldfile << endl;
             exit(EXIT_FAILURE);
         }
@@ -276,51 +276,43 @@ int init_mld_nc(char* mldfile, mld_info* mldinfo) {
         sorted = mldinfo->lon;
         sort(sorted.begin(), sorted.end());
         if (mldinfo->lon != sorted) {
-            cerr << "-X- " << __FILE__ " line " << __LINE__ << ": "
+            cerr << "-E- " << __FILE__ ":" << __LINE__ << " - "
                  << "Longitude array is not monotonically increasing\n";
             exit(EXIT_FAILURE);
         }
         sorted = mldinfo->lat;
         sort(sorted.begin(), sorted.end());
         if (mldinfo->lat != sorted) {
-            cerr << "-X- " << __FILE__ " line " << __LINE__ << ": "
+            cerr << "-E- " << __FILE__ ":" << __LINE__ << " - "
                  << "Latitude array is not monotonically increasing\n";
             exit(EXIT_FAILURE);
         }
 
-    } catch (NcException const & e) {
-        return 1;
     } catch (exception const & e) {
-        e.what();
-        cerr << "-X- " << __FILE__ " line " << __LINE__ << ": "
-             << e.what() << endl;
+        cerr << "-E- " << __FILE__ ":" << __LINE__
+            << " - Exception reading netCDF MLD file: " << mldfile << endl;
+        cerr << e.what() << endl;
         exit(EXIT_FAILURE);
     }
-
-    return 0;
 }
 
 float get_mld_nc(char* mldfile, float lon, float lat) {
     static int firstCall = 1;
     static mld_info mldinfo;
-    float mld;
+    float mld = BAD_FLT;
 
     // initial file setups
     if (firstCall) {
         firstCall = 0;
-        if (init_mld_nc(mldfile, &mldinfo)) {
-            return (BAD_FLT);
-        }
+        init_mld_nc(mldfile, &mldinfo);
     }
 
     // normalize input coords and find closest index
-    float keeplon = lon;
     lon = wrap(lon,  // put into same range as input lon
                mldinfo.lon.front(),
                mldinfo.lon.front() + 360);
     int ilon = closest_index(mldinfo.lon, lon);
     int ilat = closest_index(mldinfo.lat, lat);
-    lon = keeplon;
 
     // look up mld value
     if ((ilon < 0) || (ilat < 0)) {
@@ -331,8 +323,7 @@ float get_mld_nc(char* mldfile, float lon, float lat) {
             mldinfo.mldvar.getVar(index, &mld);
 
         } catch (exception const & e) {
-            e.what();
-            cerr << "-X- " << __FILE__ " line " << __LINE__ << ": "
+            cerr << "-E- " << __FILE__ ":" << __LINE__ << " - "
                  << e.what()
                  << endl;
             exit(EXIT_FAILURE);
@@ -345,7 +336,7 @@ float get_mld_nc(char* mldfile, float lon, float lat) {
 /*******************************************************************************/
 
 float get_mld(char* mldfile, float lon, float lat, int day) {
-    static int netcdf_mld;
+    static int netcdf_mld = 0;
     static int firstCall = 1;
     int badval = 0;
     float mld;
@@ -353,24 +344,17 @@ float get_mld(char* mldfile, float lon, float lat, int day) {
     // initial file tests
     if (firstCall) {
         firstCall = 0;
-
+        
         if (mldfile != NULL && mldfile[0] != 0) {
             // if the file is an HDF4 file, we will assume for now it is the climatology
             if (!Hishdf(mldfile)) {
-                mld = get_mld_nc(mldfile, lon, lat);
-                netcdf_mld = (mld != BAD_FLT); // is it valid format?
-                if (netcdf_mld) {
-                    printf("Opening mixed layer depth file: %s\n", mldfile);
-                } else {
-                    printf("Failed to read the specified mixed layer depth file: %s\n", mldfile);
-                    exit(EXIT_FAILURE);
-                }
+                netcdf_mld = 1;
+                printf("Opening mixed layer depth file: %s\n", mldfile);
             }
         } else {
-            printf("Reading mixed layer depth info from default climatology\n");
             strcpy(mldfile, mldclimatology_path());
-            netcdf_mld = 0;
         }
+
     } // firstCall done
 
     // try reading from netcdf file; check result

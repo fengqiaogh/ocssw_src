@@ -919,17 +919,17 @@ float get_wv_band_ratio(l1str *l1rec,int32_t ip,int iw){
     float window1 = input->watervapor_bands[iw];
     // derive a transmittance using a line height (or in this case, depth) approach
     band1 = bands[iw];
-    rhot[0] = OEL_PI * l1rec->Lt[ip * l1file->nbands + band1] / l1rec->Fo[band1] / l1rec->csolz[ip];
-
     band2 = bands[iw + 2];
-    rhot[1] = OEL_PI * l1rec->Lt[ip * l1file->nbands + band2] / l1rec->Fo[band2] / l1rec->csolz[ip];
-
     band_absorp = bands[iw + 1];
-    // OCI 940 is fill for the last pixel in the scan
-    // Since we can't compute water vapor without it, bail and report the value from the ancillary input
-    if (l1rec->Lt[ip * l1file->nbands + band_absorp] == BAD_FLT) {
+    // OCI 940 is fill for the last pixel in the scan and 1038 is fill for the first 11 pixels in the scan
+    // Since we can't compute water vapor without these being valid, bail and report the value from the ancillary input
+    if ((l1rec->Lt[ip * l1file->nbands + band_absorp] == BAD_FLT) ||
+        (l1rec->Lt[ip * l1file->nbands + band1] == BAD_FLT) ||
+        (l1rec->Lt[ip * l1file->nbands + band2] == BAD_FLT)){
         return l1rec->wv[ip];
     }
+    rhot[0] = OEL_PI * l1rec->Lt[ip * l1file->nbands + band1] / l1rec->Fo[band1] / l1rec->csolz[ip];
+    rhot[1] = OEL_PI * l1rec->Lt[ip * l1file->nbands + band2] / l1rec->Fo[band2] / l1rec->csolz[ip];
     rhot[2] = OEL_PI * l1rec->Lt[ip * l1file->nbands + band_absorp] / l1rec->Fo[band_absorp] / l1rec->csolz[ip];
 
     rhot_interp = rhot[0] + ((absorp_band - window1) / (window2 - window1)) * (rhot[1] - rhot[0]);

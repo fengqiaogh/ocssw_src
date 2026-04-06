@@ -39,6 +39,8 @@ extern "C" {
 #define PRODUCT_DEFAULT_scaleFactor 1
 #define PRODUCT_DEFAULT_addOffset 0
 #define PRODUCT_DEFAULT_reference NULL
+#define PRODUCT_DEFAULT_flag_values NULL
+#define PRODUCT_DEFAULT_flag_meanings NULL
 #define PRODUCT_DEFAULT_comment NULL
 #define PRODUCT_DEFAULT_titleFormat "no format string"
 
@@ -70,6 +72,8 @@ typedef struct productInfo_str {
     double displayMax; /**< suggested display max */
     double scaleFactor; /**< physicalVal = fileVal * scaleFactor + addOffset */
     double addOffset; /**< physicalVal = fileVal * scaleFactor + addOffset */
+    char *flag_values; /**< list of possible flag values */
+    char *flag_meanings; /**< description of each flag_value */
     char *reference; /**< reference to a paper describing the algorithm */
     char *comment; /**< comments to provide additional useful information */
     char *titleFormat; /**< format string used to make the description */

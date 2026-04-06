@@ -197,6 +197,7 @@ int openl1_write(filehandle *l1file) {
     float *k_no2, *k_no2_p;
 
     int i, n;
+    int f0_status = 0;
     static int firstCall = 1;
     int32_t dm[3];
     const char dm_name[3][80];
@@ -224,6 +225,11 @@ int openl1_write(filehandle *l1file) {
             printf("-E- %s line %d : error allocating memory for l1_generic_write:open1_write.\n",
                     __FILE__, __LINE__);
             exit(1);
+        }
+        f0_status = set_solar_irradiance(l1_input->f0file);
+        if(f0_status) {
+            printf("-E- %s:%d - could not read solar irradiance file \"%s\".\n",
+                    __FILE__, __LINE__, l1_input->f0file);
         }
         firstCall = 0;
     }
@@ -332,8 +338,16 @@ int openl1_write(filehandle *l1file) {
 
         Gain[i] = l1_input->gain[i];
         Offset[i] = l1_input->offset[i];
-        if (l1_input->outband_opt >= 2) {
-            get_f0_thuillier_ext(Lambda[i], BANDW, &Fonom[i]);
+        if (l1_input->outband_opt >= 2 ) {
+            if (f0_status) {
+                printf("-E- %s:%d - error reading solar_irradiance LUT.\n", __FILE__, __LINE__);
+                exit(EXIT_FAILURE);
+            }
+            f0_status = get_f0(Lambda[i],BANDW, &Fonom[i]);
+            if (f0_status) {
+                printf("-E- %s:%d - error reading f0.\n", __FILE__, __LINE__);
+                exit(EXIT_FAILURE);
+            }
             Fonom[i] *= 10.0;
         } else {
             Fonom[i] = Fobar[i];

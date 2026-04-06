@@ -3,7 +3,7 @@
 void l1_mask_set(l1str *l1rec, int32_t ip) {
     l1rec->mask[ip] = (l1_input->landmask && l1rec->land [ip]) ||
             (l1_input->bathmask && l1rec->swater [ip]) ||
-            (l1_input->cloudmask && l1rec->cloud [ip]) ||
+            (l1_input->cloudmask && (l1rec->cloud[ip] != 0)) ||
             (l1_input->glintmask && l1rec->glint [ip]) ||
             (l1_input->stlightmask && l1rec->stlight[ip]) ||
             (l1_input->satzenmask && l1rec->senzmax[ip]) ||
@@ -17,12 +17,8 @@ int setflags(l1str *l1rec) {
     static int firstCall = 1;
 
     static int ib412;
-    static int ib555;
-    static int ib670;
-    static int ib865;
     static int ibcloud;
 
-    int32_t evalmask = l1_input->evalmask;
     float mu0;
     int32_t ip;
     float albedo;
@@ -32,9 +28,6 @@ int setflags(l1str *l1rec) {
     if (firstCall) {
         firstCall = 0;
         ib412 = windex(412., l1file->fwave, nwave);
-        ib555 = windex(550., l1file->fwave, nwave);
-        ib670 = windex(670., l1file->fwave, nwave);
-        ib865 = windex(865., l1file->fwave, nwave);
         ibcloud = windex(l1_input->cloud_wave, l1file->fwave, nwave);
 
         printf("\nUsing %6.1f nm channel for cloud flagging over water.\n", l1file->fwave[ibcloud]);
@@ -71,56 +64,32 @@ int setflags(l1str *l1rec) {
         /* Check for clouds (daytime only) */
         if (l1rec->solz[ip] < SOLZNIGHT) {
 
-            if (!l1rec->land[ip]) {
-                l1rec->cloud_albedo[ip] = l1rec->rhos[ip * nwave + ibcloud]
-                        - l1rec->TLg[ip * nwave + ibcloud] * OEL_PI / mu0 / l1rec->Fo[ibcloud];
-                albedo = l1_input->albedo;
-            } else {
-                l1rec->cloud_albedo[ip] = l1rec->rhos[ip * nwave + ib412];
-                albedo = l1_input->albedo * 4.0;
-            }
-            // If cloud mask file is there, use that 
-            if ( l1_input->cld_msk_file[0]) {
-                char cld_category;
-                l1rec->cloud[ip] = get_sdps_cld_mask( l1rec, ip, &cld_category );
-            }  else {
-                //  use all other standard cloud data
-                if ((evalmask & MODCLOUD) != 0) {
-                    l1rec->cloud[ip] = get_cldmask(l1rec, ip);
-                } else {
-                    if (l1rec->cloud_albedo[ip] > albedo)
-                        l1rec->cloud[ip] = ON;
-                }
-                /* Eval switch to enable spectral cloud test, recover bright water */
-                if ((l1_input->cloud_eps > 0.0) != 0) {
-                    float min_cld_rhos = 1.0;
-                    float max_cld_rhos = 1.0;
-                    float cld_rhos_ratio = 0.0;
-                    if (l1rec->cloud[ip] == ON && !l1rec->land[ip] && l1rec->cloud_albedo[ip] < albedo * 10) {
-                        min_cld_rhos = MIN(MIN(MIN(
-                            l1rec->rhos[ip * nwave + ib865],
-                            l1rec->rhos[ip * nwave + ib670]),
-                            l1rec->rhos[ip * nwave + ib555]),
-                            l1rec->rhos[ip * nwave + ib412]);
-                        max_cld_rhos = MAX(MAX(MAX(
-                            l1rec->rhos[ip * nwave + ib865],
-                            l1rec->rhos[ip * nwave + ib670]),
-                            l1rec->rhos[ip * nwave + ib555]),
-                            l1rec->rhos[ip * nwave + ib412]);
-                        if (min_cld_rhos > 0.0) {
-                            cld_rhos_ratio = max_cld_rhos / min_cld_rhos;
-                            if (cld_rhos_ratio > l1_input->cloud_eps && (evalmask & MODCLOUD) == 0)
-                                l1rec->cloud[ip] = OFF;
-                        }
-                    }
-                }
-            }
+            l1rec->cloud[ip] = OFF;
 
+            // If cloud mask file is provided, use it, else use internal threshold test.
+
+            if ( l1_input->cld_msk_file[0]) {
+                // Note: invalid retrieval in cloud mask file is set to BAD_BYTE (-128), which
+                // will evaluate to TRUE (cloudy) unless explicitly testing for 0 or 1 (BAF).
+                char cld_category;
+                l1rec->cloud[ip] = get_sdps_cld_mask(l1rec, ip, &cld_category);
+            } else {
+                if (!l1rec->land[ip]) {
+                    l1rec->cloud_albedo[ip] = l1rec->rhos[ip * nwave + ibcloud]
+                        - l1rec->TLg[ip * nwave + ibcloud] * OEL_PI / mu0 / l1rec->Fo[ibcloud];
+                    albedo = l1_input->albedo;
+                } else {
+                    l1rec->cloud_albedo[ip] = l1rec->rhos[ip * nwave + ib412];
+                    albedo = l1_input->albedo * 4.0;
+                }
+
+                if (l1rec->cloud_albedo[ip] > albedo)
+                    l1rec->cloud[ip] = ON;
+            }
         }
 
         /* Set masking */
         l1_mask_set(l1rec, ip);
-
     }
 
     return (1);
@@ -162,7 +131,7 @@ void setflagbits_l1(int level, l1str *l1rec, int32_t ipix) {
         for (ip = spix; ip <= epix; ip++) {
             if (l1rec->land [ip]) l1rec->flags[ip] |= LAND;
             if (l1rec->swater [ip]) l1rec->flags[ip] |= COASTZ;
-            if (l1rec->cloud [ip]) l1rec->flags[ip] |= CLOUD;
+            if (l1rec->cloud [ip] != 0) l1rec->flags[ip] |= CLOUD;
             if (l1rec->ice [ip]) l1rec->flags[ip] |= SEAICE;
             if (l1rec->glint [ip]) l1rec->flags[ip] |= HIGLINT;
             if (l1rec->solzmax[ip]) l1rec->flags[ip] |= HISOLZEN;

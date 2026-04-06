@@ -115,19 +115,16 @@ double cross_product_norm_double2(double vector_a[], double vector_b[]) {
     return nvec;
 }
 
-int orb_to_latlon(size_t ix_swt_ini,size_t ix_swt_end,size_t num_gridlines, int nbinx, double *orb_time_tot,
+int orb_to_latlon(size_t ix_swt_ini, size_t ix_swt_end, size_t num_gridlines, int nbinx, double *orb_time_tot,
                   orb_array2 *p, orb_array2 *v, double mgv1, double *tmgv1, double *tmgvf, float **lat_gd,
-                  float **lon_gd, float **alt,int FirsTerrain, bool swathCrossesUtcDay) {
+                  float **lon_gd, float **alt, int FirsTerrain, bool swathCrossesUtcDay) {
     double rl2, pos_norm, clatg2, fe = 1 / 298.257;
     double v1[3], v2[3], vecout[3], orbnorm[3], nvec, vi, toff;
     float Re = 6378.137;  // Re earth radius in km at equator
     double oangle, G[3], glat, glon, gnorm, rem = 6371, omf2, omf2p, pxy, temp;
 
-    size_t number_orecords_corr=ix_swt_end-ix_swt_ini+1;
- 
+    size_t number_orecords_corr = ix_swt_end - ix_swt_ini + 1;
 
-
- 
     orb_array2 *posgrid = new orb_array2[num_gridlines]();  // these are doubles
     orb_array2 *velgrid = new orb_array2[num_gridlines]();
     orb_array2 *posgrid2 = new orb_array2[num_gridlines]();  // these are doubles
@@ -135,22 +132,21 @@ int orb_to_latlon(size_t ix_swt_ini,size_t ix_swt_end,size_t num_gridlines, int 
 
     orb_array2 *pos2 = new orb_array2[number_orecords_corr]();  // these are doubles
     orb_array2 *vel2 = new orb_array2[number_orecords_corr]();
-    double* orb_time_tot2 = (double*)calloc(number_orecords_corr, sizeof(double));
-    int cc=0;
+    double *orb_time_tot2 = (double *)calloc(number_orecords_corr, sizeof(double));
+    int cc = 0;
 
-    for (size_t k=ix_swt_ini;k<=ix_swt_end;k++)
-    {
-    pos2[cc][0]=p[k][0];
-    pos2[cc][1]=p[k][1];
-    pos2[cc][2]=p[k][2];
-    vel2[cc][0]=v[k][0];
-    vel2[cc][1]=v[k][1];
-    vel2[cc][2]=v[k][2];
-    orb_time_tot2[cc]=orb_time_tot[k];
-  
-    cc++;
+    for (size_t k = ix_swt_ini; k <= ix_swt_end; k++) {
+        pos2[cc][0] = p[k][0];
+        pos2[cc][1] = p[k][1];
+        pos2[cc][2] = p[k][2];
+        vel2[cc][0] = v[k][0];
+        vel2[cc][1] = v[k][1];
+        vel2[cc][2] = v[k][2];
+        orb_time_tot2[cc] = orb_time_tot[k];
+
+        cc++;
     }
-  
+
     orb_interp2(number_orecords_corr, num_gridlines, orb_time_tot2, pos2, vel2, tmgv1, posgrid, velgrid);
 
     for (size_t i = 0; i < num_gridlines - 1; i++) {
@@ -165,10 +161,10 @@ int orb_to_latlon(size_t ix_swt_ini,size_t ix_swt_end,size_t num_gridlines, int 
 
         vi = sqrt(v2[0] * v2[0] + v2[1] * v2[1] + v2[2] * v2[2]) * 1000;
         toff = vi / mgv1;
-        tmgvf[i] = tmgv1[i] + toff;       
+        tmgvf[i] = tmgv1[i] + toff;
     }
     orb_interp2(number_orecords_corr, num_gridlines, orb_time_tot2, pos2, vel2, tmgvf, posgrid2, velgrid2);
-    
+
     // angle subsat track----
     omf2 = (1 - fe) * (1 - fe);
 
@@ -207,79 +203,75 @@ int orb_to_latlon(size_t ix_swt_ini,size_t ix_swt_end,size_t num_gridlines, int 
             pxy = G[0] * G[0] + G[1] * G[1];
             temp = sqrt(G[2] * G[2] + omf2p * omf2p * pxy);
             glat = asin(G[2] / temp) * 180 / OEL_PI;
-     
+
             lat_gd[i][j] = glat;
-            lon_gd[i][j] = glon;    
-            alt[i][j]=BAD_FLT;            
+            lon_gd[i][j] = glon;
+            alt[i][j] = BAD_FLT;
         }
-    } 
-  
-
-    for (size_t i = 0; i < num_gridlines-1; i++)
-    {
-    if(swathCrossesUtcDay)
-    {
-    tmgvf[i]-=24*3600;
-    }
     }
 
+    for (size_t i = 0; i < num_gridlines - 1; i++) {
+        if (swathCrossesUtcDay) {
+            tmgvf[i] -= 24 * 3600;
+        }
+    }
 
     //================================================
-//DEM info
- if(FirsTerrain)//terrain flag =0 so DEM  not added to L1C grid
-   { 
-   NcFile *nc_terrain;
-   const char* dem_str="$OCDATAROOT/common/gebco_ocssw_v2020.nc";
-   char demfile[FILENAME_MAX];
-   parse_file_name(dem_str, demfile);
-
-   try {       
-                nc_terrain = new NcFile(demfile, NcFile::read);
-            } catch (NcException& e) {
-                cerr << e.what() << "l1cgen orb_to_latlon: Failure to open terrain height file: " << demfile
-                     << endl;
-                exit(1);
-           }
-
-
-   NcVar terrain,var1,var2,var3;
-   vector<size_t> start,count,count2,start2,start3;
-    //lon/lat dimensions
-   NcDim londim = nc_terrain->getDim("lon");
-   NcDim latdim = nc_terrain->getDim("lat");
-
-   start.push_back(0);
-   start.push_back(0);
-   count.push_back(1);
-   count.push_back(1);
-
-   short oneheight=BAD_FLT;
-
-   double onelat=-90.,onelon=-180.,dcoor=0.00416667;//dcoor in degrees , gridded gebco
-   size_t ix_grid,ix_grid2;
-
-   var1=nc_terrain->getVar("height");
-   num_gridlines-=1;
-
-   //COMPUTE L1C GRID MIN MAX LIMITS
-   for(size_t i=0;i<num_gridlines;i++)
-   {
-    for(int j=0;j<nbinx;j++)
+    // DEM info
+    if (FirsTerrain)  // terrain flag =0 so DEM  not added to L1C grid
     {
-    ix_grid=(-1*onelat+lat_gd[i][j])/dcoor;
-    ix_grid2=(-1*onelon+lon_gd[i][j])/dcoor;
-    start[0]=ix_grid;
-    start[1]=ix_grid2; 
-    var1.getVar(start,count,&oneheight);
-    alt[i][j]=oneheight;
-    if(oneheight==BAD_FLT) cout<<"WARNING: oneheight is a fillvalue"<<oneheight<<"demfile "<<"ybin# "<<i+1<<"xbin# "<<j+1<<endl;
-    }
-    if(i%500==0) cout<<"#gridline with DEM "<<i+1<<endl;
-   }
-  
-    nc_terrain->close();
-   }//if first terrain
- 
+        NcFile *nc_terrain;
+        const char *dem_str = "$OCDATAROOT/common/gebco_ocssw_v2025.nc";
+        char demfile[FILENAME_MAX];
+        parse_file_name(dem_str, demfile);
+
+        try {
+            nc_terrain = new NcFile(demfile, NcFile::read);
+        } catch (NcException &e) {
+            cerr << e.what() << "l1cgen orb_to_latlon: Failure to open terrain height file: " << demfile
+                 << endl;
+            exit(1);
+        }
+
+        NcVar terrain, var1, var2, var3;
+        vector<size_t> start, count, count2, start2, start3;
+        // lon/lat dimensions
+        NcDim londim = nc_terrain->getDim("lon");
+        NcDim latdim = nc_terrain->getDim("lat");
+
+        start.push_back(0);
+        start.push_back(0);
+        count.push_back(1);
+        count.push_back(1);
+
+        short oneheight = BAD_FLT;
+
+        double onelat = -90., onelon = -180., dcoor = 0.00416667;  // dcoor in degrees , gridded gebco
+        size_t ix_grid, ix_grid2;
+
+        var1 = nc_terrain->getVar("height");
+        num_gridlines -= 1;
+
+        // COMPUTE L1C GRID MIN MAX LIMITS
+        for (size_t i = 0; i < num_gridlines; i++) {
+            for (int j = 0; j < nbinx; j++) {
+                ix_grid = (-1 * onelat + lat_gd[i][j]) / dcoor;
+                ix_grid2 = (-1 * onelon + lon_gd[i][j]) / dcoor;
+                start[0] = ix_grid;
+                start[1] = ix_grid2;
+                var1.getVar(start, count, &oneheight);
+                alt[i][j] = oneheight;
+                if (oneheight == BAD_FLT)
+                    cout << "WARNING: oneheight is a fillvalue" << oneheight << "demfile " << "ybin# "
+                         << i + 1 << "xbin# " << j + 1 << endl;
+            }
+            if (i % 500 == 0)
+                cout << "#gridline with DEM " << i + 1 << endl;
+        }
+
+        nc_terrain->close();
+    }  // if first terrain
+
     if (posgrid != nullptr)
         delete[] (posgrid);
     posgrid = nullptr;
@@ -299,13 +291,12 @@ int orb_to_latlon(size_t ix_swt_ini,size_t ix_swt_end,size_t num_gridlines, int 
     if (vel2 != nullptr)
         delete[] (vel2);
     vel2 = nullptr;
-    if ( orb_time_tot2 != nullptr)
-        delete[] ( orb_time_tot2);
-     orb_time_tot2 = nullptr;
+    if (orb_time_tot2 != nullptr)
+        delete[] (orb_time_tot2);
+    orb_time_tot2 = nullptr;
 
     return 0;
 }
-
 
 int orb_interp2(size_t n_orb_rec, size_t sdim, double *torb, orb_array2 *p, orb_array2 *v, double *time,
                 orb_array2 *posi, orb_array2 *veli) {
@@ -486,15 +477,15 @@ int get_nut(int32_t iyr, int32_t idy, double xnut[3][3]) {
     xnut[1][0] = -sin(dpsi / OEL_RADEG) * cos(epsm / OEL_RADEG);
     xnut[2][0] = -sin(dpsi / OEL_RADEG) * sin(epsm / OEL_RADEG);
     xnut[0][1] = sin(dpsi / OEL_RADEG) * cos(eps / OEL_RADEG);
-    xnut[1][1] =
-        cos(dpsi / OEL_RADEG) * cos(eps / OEL_RADEG) * cos(epsm / OEL_RADEG) + sin(eps / OEL_RADEG) * sin(epsm / OEL_RADEG);
-    xnut[2][1] =
-        cos(dpsi / OEL_RADEG) * cos(eps / OEL_RADEG) * sin(epsm / OEL_RADEG) - sin(eps / OEL_RADEG) * cos(epsm / OEL_RADEG);
+    xnut[1][1] = cos(dpsi / OEL_RADEG) * cos(eps / OEL_RADEG) * cos(epsm / OEL_RADEG) +
+                 sin(eps / OEL_RADEG) * sin(epsm / OEL_RADEG);
+    xnut[2][1] = cos(dpsi / OEL_RADEG) * cos(eps / OEL_RADEG) * sin(epsm / OEL_RADEG) -
+                 sin(eps / OEL_RADEG) * cos(epsm / OEL_RADEG);
     xnut[0][2] = sin(dpsi / OEL_RADEG) * sin(eps / OEL_RADEG);
-    xnut[1][2] =
-        cos(dpsi / OEL_RADEG) * sin(eps / OEL_RADEG) * cos(epsm / OEL_RADEG) - cos(eps / OEL_RADEG) * sin(epsm / OEL_RADEG);
-    xnut[2][2] =
-        cos(dpsi / OEL_RADEG) * sin(eps / OEL_RADEG) * sin(epsm / OEL_RADEG) + cos(eps / OEL_RADEG) * cos(epsm / OEL_RADEG);
+    xnut[1][2] = cos(dpsi / OEL_RADEG) * sin(eps / OEL_RADEG) * cos(epsm / OEL_RADEG) -
+                 cos(eps / OEL_RADEG) * sin(epsm / OEL_RADEG);
+    xnut[2][2] = cos(dpsi / OEL_RADEG) * sin(eps / OEL_RADEG) * sin(epsm / OEL_RADEG) +
+                 cos(eps / OEL_RADEG) * cos(epsm / OEL_RADEG);
 
     return 0;
 }
@@ -541,8 +532,9 @@ int nutate(double t, double xls, double gs, double xlm, double omega, double &dp
     //  are included to 0.1 arcsecond.
 
     //  Nutation in Longitude
-    dpsi = -17.1996 * sin(omega / OEL_RADEG) + 0.2062 * sin(2. * omega / OEL_RADEG) - 1.3187 * sin(2. * xls / OEL_RADEG) +
-           0.1426 * sin(gs / OEL_RADEG) - 0.2274 * sin(2. * xlm / OEL_RADEG);
+    dpsi = -17.1996 * sin(omega / OEL_RADEG) + 0.2062 * sin(2. * omega / OEL_RADEG) -
+           1.3187 * sin(2. * xls / OEL_RADEG) + 0.1426 * sin(gs / OEL_RADEG) -
+           0.2274 * sin(2. * xlm / OEL_RADEG);
 
     //  Mean Obliquity of the Ecliptic
     epsm = (double)23.439291 - ((double)3.560e-7) * t;

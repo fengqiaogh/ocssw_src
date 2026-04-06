@@ -461,7 +461,7 @@ void clo_setVersion(const char* str) {
 
 /**
  * Set the version string using the program name and version string.
- * The string is set to: "progName versionStr (__DATE__ __TIME__)"
+ * The string is set to: "progName versionStr (__DATE__)"
  *
  * @param programName name of the program
  * @param versionStr string to use for the version number
@@ -469,7 +469,7 @@ void clo_setVersion(const char* str) {
 void clo_setVersion2(const char* programName, const char* versionStr) {
     int size = 30 + strlen(programName) + strlen(versionStr);
     char* str = (char*) malloc(size);
-    sprintf(str, "%s %s (%s %s)", programName, versionStr, __DATE__, __TIME__);
+    sprintf(str, "%s %s (%s)", programName, versionStr, __DATE__);
     if (clo_versionString)
         free(clo_versionString);
     clo_versionString = str;

@@ -29,6 +29,8 @@ typedef enum {
     FT_MERISL1BSAFE,
     FT_MODISGEO, // MODIS Geolocation (hdf4)
     FT_MODISL1B, // MODIS L1B (hdf4, all bands)
+    FT_MODISGEOH5,  // MODIS Geolocation (hdf5)
+    FT_MODISL1BH5,  // MODIS L1B (hdf5, all bands)
     FT_OCM2L1B,
     FT_OCML1B,
     FT_OCML1BDB,

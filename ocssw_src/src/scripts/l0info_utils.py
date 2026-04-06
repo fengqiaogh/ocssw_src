@@ -18,7 +18,7 @@ def read_cfe_header(filehandle, bVerbose=False):
     chead = filehandle.read(64)
     
     ftime = int.from_bytes(chead[24:28],'big') + int.from_bytes(chead[28:32],'big')/2**32
-    ctime = (datetime.utcfromtimestamp(ftime+epoch_offset) - timedelta(seconds=get_leap_seconds(ftime))).isoformat(sep='T', timespec='microseconds')
+    ctime = (datetime.fromtimestamp(ftime+epoch_offset, timezone.utc) - timedelta(seconds=get_leap_seconds(ftime))).isoformat(sep='T', timespec='microseconds')
     if bVerbose: print('File creation date/time: %s' % ctime)
     
     # Check for valid cFE header
@@ -49,7 +49,7 @@ def read_dsb_header(filehandle, bVerbose=False):
     dhead = filehandle.read(76)
 
     ftime = int.from_bytes(dhead[0:4],'big') + int.from_bytes(dhead[4:8],'big')/2**32
-    etime = (datetime.utcfromtimestamp(ftime+epoch_offset) - timedelta(seconds=get_leap_seconds(ftime))).isoformat(sep='T', timespec='microseconds')
+    etime = (datetime.fromtimestamp(ftime+epoch_offset, timezone.utc) - timedelta(seconds=get_leap_seconds(ftime))).isoformat(sep='T', timespec='microseconds')
     if bVerbose: 
         print('File close date/time:    %s' % etime)
         print('File path/name:         %s'% "".join([chr(x) for x in dhead[12:44]]))

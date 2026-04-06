@@ -49,6 +49,8 @@ class AncillaryDataTypes:
         "icefile": 16,  
         "geo": 32,
         "aer": 64,      # bit 6 - 10 00000
+        "anc_aerosol": 64,
+        "anc_profile": 128,
         # atteph
         "att": 1,
         "eph": 2,
@@ -70,7 +72,10 @@ class AncillaryDataTypes:
 
     # Add additional types to grab if new ones gets added
     # Current anc types the api returns and parses
-    validApiAncTypesRegEx = "met|ozone|sst|ice|aer|geo"
+    validApiAncTypesRegEx = "met|ozone|sst|ice|aer|geo|profile"
+
+    # intentionally not processed
+    ignoredApiTypes = {"defeph"}
 
     validApiAttEphTypesRegEx = "att|eph"
 
@@ -83,7 +88,7 @@ class AncillaryDataTypes:
 
         # lookup table only has the base name (ie. mat for mat1, mat2, etc)
         # extract the base name for names that end in numbers and check the table
-        if (re.search("\d$", ancType)):
+        if (re.search(r"\d$", ancType)):
             ancType = ancType[0: len(ancType)-1]
         
         if ancType not in AncillaryDataTypes.bitwiseErrorValues:
@@ -117,6 +122,10 @@ class AncillaryDataTypes:
                 return currDatabaseStatus | AncillaryDataTypes.bitwiseErrorValues["geo"]
             if re.search('aer', ancType):
                 return currDatabaseStatus | AncillaryDataTypes.bitwiseErrorValues["aer"]
+            if re.search('anc_aerosol', ancType):
+                return currDatabaseStatus | AncillaryDataTypes.bitwiseErrorValues["anc_aerosol"]
+            if re.search('anc_profile', ancType):
+                return currDatabaseStatus | AncillaryDataTypes.bitwiseErrorValues["anc_profile"]
         
         # IS attitude ephemeris
         else:

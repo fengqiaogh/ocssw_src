@@ -187,8 +187,13 @@ void run_owt(l2str *l2rec) {
 
         status = 0;
         for (ib = 0; ib < nrrs; ib++) {
-            rrs[ib] = rrs_above_to_below(l2rec->Rrs[ipb + bindx[ib]]) * l2rec->Rrs[ipb + bindx[ib]];
-            if (rrs[ib] < 0) status++;
+            
+            if (l2rec->Rrs[ipb + bindx[ib]] ==BAD_FLT) {
+                status++;
+                break;
+            }
+            rrs[ib] = rrs_above_to_below(l2rec->Rrs[ipb + bindx[ib]]);
+            
             if (DEBUG_OWT) printf("\nrrs %d %f %f", ib, rrs[ib], l2rec->Rrs[ipb + bindx[ib]]);
         }
 

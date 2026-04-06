@@ -27,7 +27,7 @@ using namespace netCDF::exceptions;
 static float normalizeLon(float lon) {
     while (lon < -180.0)
         lon += 360.0;
-    while (lon >= 180.0)
+    while (lon > 180.0)
         lon -= 360.0;
     return lon;
 }

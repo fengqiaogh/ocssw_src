@@ -49,7 +49,8 @@ met_prof = args.met_prof[0]
 mis_val = 1.e+15
 no2_prof_vars = ['NO2','SO2']
 #no2_prof_vars = ['NO2','SO2', 'CH4','O3']  # they are available
-col_vars = ['TOTCOL_NO2', 'TROPCOL_NO2']
+col_vars = ['TotCol_NO2', 'TropCol_NO2'] # Note: CamelCase here is to play nice with the change in variable names from GMAO
+                                         # however, output variables should be upper case - col_var loop below sets it so
 met_prof_vars = ['DELP']
 var_attrs = ['long_name','units','standard_name','_FillValue',
              'missing_value','scale_factor','add_offset']
@@ -60,7 +61,7 @@ met_prof_fid = Dataset(met_prof, 'r')
 
 sdate = no2_prof_fid.getncattr('RangeBeginningDate')
 stime = no2_prof_fid.getncattr('RangeBeginningTime')
-starttime = datetime.strptime(sdate + ' '+ stime, "%Y-%m-%d %H:%M:%S.%f")
+starttime = datetime.strptime(sdate + ' '+ stime[0:8], "%Y-%m-%d %H:%M:%S")
 
 title = None
 #  new title
@@ -202,9 +203,11 @@ for timestep in range(ntime_steps):
     for v_name in col_vars:
         varin = col_fid.variables.get(v_name)
         if not varin:
-            sys.exit("{} not found in {}\n".format(v_name,col))
+            varin = col_fid.variables.get(v_name.upper())
+            if not varin:
+                sys.exit("{} not found in {}\n".format(v_name,col))
         chunk = varin.chunking()
-        outVar = dsout.createVariable(v_name, varin.datatype, dimensions=('lat','lon'),
+        outVar = dsout.createVariable(v_name.upper(), varin.datatype, dimensions=('lat','lon'),
                                       contiguous=False, chunksizes=chunk[1:],zlib=True,
                                       complevel=4, shuffle=True)
         # Copy variable attributes
@@ -227,6 +230,8 @@ for timestep in range(ntime_steps):
 
     # and put in the data
     varin2 = col_fid.variables.get(col_vars[0])
+    if not varin2:
+            varin2 = col_fid.variables.get(col_vars[0].upper())
     outVar[:] = varin2[timestep][:][:] - varin[timestep][:][:]
 
     # Get variables with scale_factor attribute set to 1.0 and remove if add_offset is 0
@@ -242,11 +247,18 @@ for timestep in range(ntime_steps):
     dsout.date_created=(datetime.fromtimestamp(time.time()).strftime('%Y-%m-%dT%H:%M:%SZ')).encode('ascii')
 
     history = ''
+    source = None
+    for attr_name in no2_prof_fid.ncattrs():
+            if attr_name.lower() == 'history':
+                history = no2_prof_fid.getncattr(attr_name)
+                history += ";"
+            if attr_name.lower() == 'source':
+                source = no2_prof_fid.getncattr(attr_name)
+
     history = "{} -no2_prof {} -col {} -met_prof {}".format(parser.prog,no2_prof,col,met_prof)
     if args.ofile:
         history += " -ofile {}".format(ofile)
 
-    history += "; {}".format(no2_prof_fid.getncattr('History'))
 
     dsout.title=title.encode("ascii")
     dsout.product_name=ofile.encode("ascii")
@@ -262,7 +274,7 @@ for timestep in range(ntime_steps):
     dsout.geospatial_lat_units='degrees_north'.encode("ascii")
     dsout.geospatial_lon_units='degrees_east'.encode("ascii")
     dsout.grid_mapping_name='latitude_longitude'.encode("ascii")
-    dsout.software_version=(no2_prof_fid.getncattr('Source')).encode("ascii")
+    dsout.software_version=source
     dsout.Conventions='CF-1.6'.encode("ascii")
     dsout.Metadata_Conventions='Unidata Dataset Discovery v1.0'.encode("ascii")
     dsout.license='https://science.nasa.gov/earth-science/earth-science-data/data-information-policy/'.encode("ascii")

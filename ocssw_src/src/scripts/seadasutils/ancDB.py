@@ -191,7 +191,7 @@ class ancDB:
         conn.commit()
     
     def isAncillaryTypeValid(self, ancillaryType):
-        if re.search("\d$", ancillaryType):
+        if re.search(r"\d$", ancillaryType):
             ancillaryType = ancillaryType[0 : len(ancillaryType) - 1]
         if ancillaryType not in self.ancillaryTypeCheck:
             return False
@@ -201,7 +201,7 @@ class ancDB:
         
         # grab ancillary types that can have multiple files and strip the number
         # ie. MET1, MET2, etc. to MET
-        if re.search("\d$", anctype):
+        if re.search(r"\d$", anctype):
             anctype = anctype[0 : len(anctype) - 1]
         # anctype exists in the lookup table. Check if it is missing and report it
         if dbstat & AncillaryDataTypes.bitwiseErrorValues[anctype]:

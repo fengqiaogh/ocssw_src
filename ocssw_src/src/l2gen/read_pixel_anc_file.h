@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-    void read_pixel_anc_file(char* filename, l1str *l1rec);
+    void read_pixel_anc_file(char* filename, l1str *l1rec, char * pixel_anc_vars);
 
 
 #ifdef __cplusplus

@@ -2,11 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <mfhdf.h>
-
+#include <netcdf>
+#include <string>
+#include <vector>
+#include <unistd.h>
 #include "genutils.h"
 #include "l3bin_input.h"
-
+#include "sensorInfo.h"
 static char mainProgramName[50];
 
 static char* l3bin_optionKeys[] = {"help",
@@ -17,6 +19,7 @@ static char* l3bin_optionKeys[] = {"help",
                                    "dump_options_xmlfile",
                                    "par",
                                    "pversion",
+                                   "suite",
                                    "ifile",
                                    "ofile",
                                    "oformat",
@@ -106,6 +109,7 @@ int input_init(instr* input_str) {
     input_str->composite_prod[0] = '\0';
     input_str->composite_scheme[0] = '\0';
     input_str->doi[0] = '\0';
+    input_str->suite[0] = '\0';
 
     return 0;
 }
@@ -152,7 +156,7 @@ int l3bin_init_options(clo_optionList_t* list, const char* prog, const char* ver
 
     strcpy(tmpStr, "output file format\n");
     strcat(tmpStr, "           netCDF4: output a netCDF4 file\n");
-    strcat(tmpStr, "           hdf5:    output a HDF5 file\n");
+    strcat(tmpStr, "           hdf5:    output a HDF5 file");
     clo_addOption(list, "oformat", CLO_TYPE_STRING, "netCDF4", tmpStr);
 
     strcpy(tmpStr, "set to 1 to suppress generation of\n        external files");
@@ -183,7 +187,7 @@ int l3bin_init_options(clo_optionList_t* list, const char* prog, const char* ver
     clo_addOption(list, "sday", CLO_TYPE_INT, "1970001", "start datadate (YYYYDDD) ");
     clo_addOption(list, "eday", CLO_TYPE_INT, "2038018", "end datadate (YYYYDDD)");
     clo_addOption(list, "deflate", CLO_TYPE_INT, "5", "deflate level");
-
+    clo_addOption(list, "suite", CLO_TYPE_STRING, NULL, "suite for default parameters");
     clo_addOption(list, "orbit1", CLO_TYPE_INT, "-1", "sorbit");
     clo_addOption(list, "orbit2", CLO_TYPE_INT, "-1", "eorbit");
     clo_addOption(list, "median", CLO_TYPE_INT, "0", "median");
@@ -191,7 +195,7 @@ int l3bin_init_options(clo_optionList_t* list, const char* prog, const char* ver
     clo_addOption(list, "composite_scheme", CLO_TYPE_STRING, NULL, "composite scheme (min/max)");
     clo_addOption(list, "composite_prod", CLO_TYPE_STRING, NULL, "composite product fieldname");
 
-    strcpy(tmpStr, "bin products\n        [default=all products in L3 file]\n");
+    strcpy(tmpStr, "bin products\n        [default=all products in L3 file]");
     option = clo_addOption(list, "prod", CLO_TYPE_STRING, "DEFAULT", tmpStr);
     clo_addOptionAlias(option, "out_parm");
 
@@ -265,7 +269,10 @@ int l3bin_load_input(clo_optionList_t* list, instr* input) {
             }
         } else if (strcmp(keyword, "pversion") == 0) {
             strcpy(input->pversion, clo_getOptionString(option));
-
+        } else if (strcmp(keyword, "suite") == 0) {
+            if (clo_isOptionSet(option)) {
+                strncpy(input->suite, clo_getOptionString(option), sizeof(input->suite) - 1);
+            }
         } else if (strcmp(keyword, "syear") == 0) {
             input->syear = clo_getOptionInt(option);
 
@@ -394,6 +401,8 @@ Invalid_return:
 int l3bin_input(int argc, char** argv, instr* input, const char* prog, const char* version) {
     char str_buf[4096];
 
+    std::string localSuite{};
+
     /*                                                                  */
     /* Set input values to defaults                                     */
     /*                                                                  */
@@ -415,21 +424,115 @@ int l3bin_input(int argc, char** argv, instr* input, const char* prog, const cha
         exit(1);
     }
 
-    clo_setEnableDumpOptions(1);
-
-    // read command line args to get the ifile parameter
+    clo_setEnableDumpOptions(0);
+    // read command line args
     clo_readArgs(list, argc, argv);
+    strncpy(input->infile, clo_getString(list, "ifile"), sizeof(input->infile) - 1);
+    std::vector<std::string> input_files = readFileList(input->infile);
+    // find the sensor and sub-sensor ID for first input file
+    std::string instrument{}, platform{};
+   try {
+       netCDF::NcFile nc_input(input_files[0], netCDF::NcFile::read);
+       nc_input.getAtt("instrument").getValues(instrument);
+       nc_input.getAtt("platform").getValues(platform);
+       nc_input.close();
+   } catch (netCDF::exceptions::NcException const& e) {
+       printf("-Warning-: L3b file %s does not have instrument/platform attributes.See %s:%d \n",
+              input_files[0].c_str(), __FILE__, __LINE__);
+   }
+   int sensorId = instrumentPlatform2SensorId(instrument.c_str(), platform.c_str());
+   int subsensorId = sensorId2SubsensorId(sensorId);
+   if (sensorId == -1) {
+       printf("-Warning-: Can not look up sensor ID for %s.\n", input_files[0].c_str());
+   }
+   std::string dataRoot = std::getenv("OCDATAROOT");
+   if (dataRoot.empty()) {
+       printf("-E-: OCDATAROOT environment variable is not defined. See %s:%d\n", __FILE__, __LINE__);
+       exit(EXIT_FAILURE);
+   }
 
-    if (l3bin_load_input(list, input) != 0) {
-        printf("-E- %s: Error loading options into input structure.\n", __FILE__);
-        clo_deleteList(list);
-        return (-1);
+   // see if suite param was set
+   if (clo_isSet(list, "suite")) {
+       localSuite = clo_getString(list, "suite");
+   }  // suite option was set
+    // load l3bin program defaults
+    snprintf(str_buf, sizeof(str_buf), "%s/common/l3bin_defaults.par", dataRoot.c_str());
+    if (access(str_buf, R_OK) != -1) {
+        if (want_verbose)
+            printf("Loading default parameters from %s\n", str_buf);
+        clo_readFile(list, str_buf);
     }
 
-    clo_deleteList(list);
+    // sensor defaults
+    snprintf(str_buf, sizeof(str_buf), "%s/%s/l3bin_defaults.par", dataRoot.c_str(),
+             sensorId2SensorDir(sensorId));
+    if (access(str_buf, R_OK) != -1) {
+        if (want_verbose)
+            printf("Loading default parameters from %s\n", str_buf);
+        clo_readFile(list, str_buf);
+    }
 
-    readFileList(input->infile);
+    // subsensor defaults
+    if (subsensorId != -1) {
+        snprintf(str_buf, sizeof(str_buf), "%s/%s/%s/l3bin_defaults.par", dataRoot.c_str(),
+                 sensorId2SensorDir(sensorId), subsensorId2SubsensorDir(subsensorId));
+        if (access(str_buf, R_OK) != -1) {
+            if (want_verbose)
+                printf("Loading default parameters from %s\n", str_buf);
+            clo_readFile(list, str_buf);
+        }
+    }
+    // Check for suite entry
+    if (!localSuite.empty()) {
+        int suiteLoaded = 0;
 
+        // load common suite defaults
+        snprintf(str_buf, sizeof(str_buf), "%s/common/l3bin_defaults_%s.par", dataRoot.c_str(), localSuite.c_str());
+        if (access(str_buf, R_OK) != -1) {
+            suiteLoaded = 1;
+            if (want_verbose)
+                printf("Loading default parameters from %s\n", str_buf);
+            clo_readFile(list, str_buf);
+        }
+
+        // sensor suite defaults
+        snprintf(str_buf, sizeof(str_buf), "%s/%s/l3bin_defaults_%s.par", dataRoot.c_str(),
+                 sensorId2SensorDir(sensorId), localSuite.c_str());
+        if (access(str_buf, R_OK) != -1) {
+            suiteLoaded = 1;
+            if (want_verbose)
+                printf("Loading default parameters from %s\n", str_buf);
+            clo_readFile(list, str_buf);
+        }
+
+        // subsensor suite defaults
+        if (subsensorId != -1) {
+            snprintf(str_buf, sizeof(str_buf), "%s/%s/%s/l3bin_defaults_%s.par", dataRoot.c_str(),
+                     sensorId2SensorDir(sensorId), subsensorId2SubsensorDir(subsensorId), localSuite.c_str());
+            if (access(str_buf, R_OK) != -1) {
+                suiteLoaded = 1;
+                if (want_verbose)
+                    printf("Loading default parameters from %s\n", str_buf);
+                clo_readFile(list, str_buf);
+            }
+        }
+
+        if (!suiteLoaded) {
+            printf("-E- Failed to load parameters for suite %s for sensor %s. See %s:%d\n", localSuite.c_str(),
+                   sensorId2SensorName(sensorId), __FILE__, __LINE__);
+            exit(EXIT_FAILURE);
+        }
+    }
+    // re-load the command line and par file
+    if (want_verbose)
+        printf("Loading command line parameters\n\n");
+    clo_setEnableDumpOptions(1);
+    clo_readArgs(list, argc, argv);
+    if (l3bin_load_input(list, input) != 0) {
+        printf("-E- %s:%d Error loading options into input structure.\n", __FILE__,__LINE__);
+        clo_deleteList(list);
+        return 1;
+    }
     /*                                                                  */
     /* Build string of parameters for metadata                          */
     /*                                                                  */
@@ -504,6 +607,10 @@ int l3bin_input(int argc, char** argv, instr* input, const char* prog, const cha
 
     sprintf(str_buf, "doi = %s\n", input->doi);
     strcat(input->parms, str_buf);
+
+    snprintf(str_buf, sizeof(str_buf), "suite = %s\n", input->suite);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
+    clo_deleteList(list);
 
     return 0;
 }

@@ -409,7 +409,7 @@ int main(int argc, char *argv[]) {
         printf("Aerosol parameters will be extracted from %s\n", aefile.name);
     }
 
-    Gring gring(l1rec->l1file->sensorID, 20.0);
+    Gring gring(20.0);
 
     start_time = now();
     printf("\nBegin MSl12 processing at %s\n\n", ydhmsf(start_time, 'L'));
@@ -483,14 +483,14 @@ int main(int argc, char *argv[]) {
                 }
         }
 
-        gring.processScan(l1rec->lat, l1rec->lon, l1rec->npix, iscan, escan, l1rec->flags);
+        gring.tryIncludeScan(l1rec->lat, l1rec->lon, l1rec->npix, iscan, l1rec->flags);
 
     }
 
     printf("\nEnd MSl12 processing at %s\n", ydhmsf(now(), 'L'));
     printf("Processing Rate = %f scans/sec\n\n", ofile[0].nscan / (now() - start_time));
 
-    std::string wkt = gring.getWktString();
+    std::string wkt = gring.getGeospatialBounds();
     float geospatialLatMin = gring.getGeospatialLatitudeMin();
     float geospatialLatMax = gring.getGeospatialLatitudeMax();
     float geospatialLonMin = gring.getGeospatialLongitudeMin();

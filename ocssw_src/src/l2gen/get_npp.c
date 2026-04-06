@@ -139,13 +139,17 @@ void get_npp(l2str *l2rec, int prodnum, float prod[]) {
                 exit(1);
             }
 
-            strcpy(sdsname, "par");
-
+            strcpy(sdsname, "par_day_planar_above");
             status = nc_inq_varid(ncid, sdsname, &sds_id);
             if (status != NC_NOERR) {
-                fprintf(stderr, "-E- %s line %d:  Error reading %s from %s.\n",
-                        __FILE__, __LINE__, sdsname, parfile);
-                exit(1);
+ 
+                strcpy(sdsname, "par");
+                status = nc_inq_varid(ncid, sdsname, &sds_id);
+                if (status != NC_NOERR) {
+                    fprintf(stderr, "-E- %s line %d:  Error reading %s from %s.\n",
+                            __FILE__, __LINE__, sdsname, parfile);
+                    exit(1);
+                }
             }
 
             status = nc_inq_var(ncid, sds_id, 0, &rh_type, &ndims, dimids,

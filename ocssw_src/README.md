@@ -1,12 +1,12 @@
 # Introduction
 
-This contains science processing software used within OBPG. It is provided here with NO SUPPORT. For fully supported code, please use the binaries distributed with SeaDAS <https://seadas.gsfc.nasa.gov/>
+This contains science processing software used within OBPG. It is provided here with NO SUPPORT. For fully supported code, please use the binaries distributed with SeaDAS <https://www.earthdata.nasa.gov/data/tools/seadas/>
 
 OCSSW_bash.env (OCSSW.env for csh) is provided for setting needed environment variables to build the software.
 
 ## REQUIREMENTS:
 
-- gcc (5 or higher, I use 9)
+- gcc (8 or higher, we use 10)
 - g++ (matching gcc version)
 - gfortran (matching gcc version)
 - zlib
@@ -17,23 +17,9 @@ OCSSW_bash.env (OCSSW.env for csh) is provided for setting needed environment va
 - bison
 - flex
 - wget
-- Python3
-
-_additional known OS-specific requirements_
-
-- Ubuntu 20.04
-
-  - zlib1g-dev
-  - libX11-devel
-
-- CentOS 7
-
-  - glibc-static
-  - libgfortran-static
-  - zlib-static
-  - gmp-static
-  - libjpeg-turbo-static
-  - libstdc++-static
+- Python3 (we use 3.12)
+- zlib1g-dev
+- libX11-devel
 
 - Mac:
 
@@ -158,7 +144,6 @@ source $OCSSWROOT/src/scripts/autocomplete_bash.sh
 source $OCSSWROOT/src/scripts/autocomplete_zsh.sh
 ```
 
-
 ## IDE setup
 
 ### MS Visual Studio Code
@@ -169,9 +154,7 @@ Here are the steps needed to use VS Code for programming and debugging:
 
 2. In VSCode "Open Folder" $OCSSWROOT
 
-3. When prompted, install C++ extensions and select the gcc-9 compiler
-
-
+3. When prompted, install C++ extensions and select the gcc-10 compiler
 
 ### NetBeans
 

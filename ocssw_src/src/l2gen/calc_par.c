@@ -834,7 +834,7 @@ float calc_par_impl_of_2023(l2str *l2rec, int ip, int nbands, float *Lt, float t
 
     for (size_t band = 0; band < nbands; band++) {
         fr = (1 - exp(-(TauMol[band] + TauAer[band]) / csolz) / TransA[band]) * (1. - CF_obs) + CF_obs;
-        As[band] = getosa(wl[band], l1rec->solz[ip], wind_speed, chl, fr, &luts_data);
+        As[band] = getosa(wl[band], l1rec->csolz[ip], wind_speed, chl, fr, &luts_data, band, nbands);
         a = -(1 / F[band] - 1) * exp(-(TauMol[band] + TauAer[band]) * airmass2) * Sa[band];
         b = (1 / F[band] - 1) * exp(-(TauMol[band] + TauAer[band]) * airmass2) * Sa[band] * As[band] +
             (1 / F[band] - 1) * exp(-(TauMol[band] + TauAer[band]) * airmass2) +
@@ -850,6 +850,9 @@ float calc_par_impl_of_2023(l2str *l2rec, int ip, int nbands, float *Lt, float t
             } else {
                 Asat[band] = sqrt(discr) - b / 2. / a;
             }
+        }
+        if (Asat[band] > 1) {
+            Asat[band] = As[band];
         }
         if (Asat[band] < As[band])
             Asat[band] = As[band];
@@ -937,45 +940,26 @@ float calc_par_impl_of_2023(l2str *l2rec, int ip, int nbands, float *Lt, float t
         float Aavg_spectral[nbands], Aavg = 0.0f;
         float Tg[nbands];
         float Td[nbands];
-        // float temp1[nbands], temp2[nbands], temp3[nbands];
         float As2[nbands];
         float CosSZ = cos(sz * OEL_PI / 180.);
         float albe_cld[nbands], cf, tau;
         getcldalbe(l1rec->cld_rad->taucld[ip], l1rec->cld_rad->cfcld[ip], CosSZ, t_range[it], t_range,
                    albe_cld, &tau, &cf, t_step, wl,
-                   nbands);  // something is wrong with getcldalbedo
+                   nbands);  //
         if (CosSZ < 0.05)
             CosSZ = 0.05;
         float fCosSZ = (3. / 7.) * (1.0 + 2.0 * CosSZ);
-        size_t dims_tg[] = {luts_data.tgdims.dimwavelength, luts_data.tgdims.dimair_mass,
-                            luts_data.tgdims.dimwater_vapor_pressure,
-                            luts_data.tgdims.dimozone_concentration};
-        size_t dims_td[] = {luts_data.tddims.dimwavelength, luts_data.tddims.dimair_mass,
-                            luts_data.tddims.dimangstrom_coefficients,
-                            luts_data.tddims.dimoptical_depth_at_550_nm};
         airmass = kasten_equation(sz);
         for (size_t band = 0; band < nbands; band++) {
-            float point_tg[] = {wl[band], airmass, watvap, dobson};
-            float point_td[] = {wl[band], airmass, angstrom, taua};
-            Tg[band] = interp4d(dims_tg, point_tg, grid_tg, luts_data.lut_tg);
-            Td[band] = interp4d(dims_td, point_td, grid_td, luts_data.lut_td);
+            Tg[band] = interp4d_TG_fast(&luts_data, wl,  watvap, dobson, airmass, nbands,band);
+            Td[band] = interp4d_TD_fast(&luts_data, wl,  angstrom, taua, airmass, nbands,band);
             fr = (1. - exp(-(TauMol[band] + TauAer[band]) / CosSZ) / Td[band]) * (1. - cf) + cf;
-            As2[band] = getosa(wl[band], sz, wind_speed, chl, fr, &luts_data);
+            As2[band] = getosa(wl[band], CosSZ, wind_speed, chl, fr, &luts_data, band, nbands);
             As2_bar += As2[band] * fo[band] * weight[band] / Denom;
             Tg_bar += Tg[band] * fo[band] * weight[band] / Denom;
             Td_bar += Td[band] * fo[band] * weight[band] / Denom;
             AlbeCld_bar += albe_cld[band] / (float) nbands;
         }
-        // for (size_t band = 0; band < N_5nm; band++) {
-        //     float point_tg[] = {wl_5nm[band], airmass, watvap, dobson};
-        //     float point_td[] = {wl_5nm[band], airmass, angstrom, taua};
-        //     Tg_bar +=
-        //         interp4d(dims_tg, point_tg, grid_tg, luts_data.lut_tg) * F0_5nm[band] * weight_5nm[band];
-        //     Td_bar +=
-        //         interp4d(dims_td, point_td, grid_td, luts_data.lut_td) * F0_5nm[band] * weight_5nm[band];
-        // }
-        // Tg_bar /= Denom_5nm;
-        // Td_bar /= Denom_5nm;
         for (size_t band = 0; band < nbands; band++) {
             Aavg_spectral[band] = Asat[band] >= AsatMax ? AsatMax : Asat[band];
             Abar_spectral[band] = Aavg_spectral[band] +

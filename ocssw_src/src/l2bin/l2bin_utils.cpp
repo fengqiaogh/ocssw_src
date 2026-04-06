@@ -1,6 +1,7 @@
 #include "l2bin_utils.h"
 #include "constants.h"
 #include <hdfi.h>
+#include <boost/algorithm/string/trim.hpp>
 
 #ifdef MAC_MEM
 #include <mach/mach.h>

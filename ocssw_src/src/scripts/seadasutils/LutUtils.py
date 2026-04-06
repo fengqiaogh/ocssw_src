@@ -14,7 +14,7 @@ def lut_version(lut_name):
         return ''.join(parts[4:-4])
 
     # lut_name like <stuff>[_.][vV]<version>.<suffix>
-    v = re.search('[_.][vV]\d+', f)
+    v = re.search(r'[_.][vV]\d+', f)
     if v:
         parts = re.split('([_.])', f[v.start() + 1:])
         return ''.join(parts[0:-2])
@@ -134,7 +134,7 @@ class LutUtils:
                 new1 = self.session.download_allfiles(
                     url, dirpath,
                     dry_run=self.dry_run, clobber=self.clobber,
-                    regex='^((?!\d+).)*' + suffix, check_times=True)
+                    regex=r'^((?!\d+).)*' + suffix, check_times=True)
                 if self.session.status:
                     self.status = 1
     

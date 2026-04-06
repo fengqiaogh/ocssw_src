@@ -19,6 +19,9 @@
 
 #define MAXNPROD 1024
 #define MAXNVDATA MAXNPROD+3
+#define MAXNUMATTR 16
+#define MAXATTRLEN 32
+#define MAXATTRNAMELEN 32
 
 #define SWAP_4(x) ( ((x) << 24) | \
          (((x) << 8) & 0x00ff0000) | \

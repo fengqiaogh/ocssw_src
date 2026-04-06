@@ -107,6 +107,10 @@ void get_datadays(time_t starttime,             /* (in)  swath start time
     referenceHour = (referenceTime % 86400) / 3600.0;
 
     if (dateLineCrossed == DL::NOT_CROSSED) {
+        if (referenceHour < 6 && east < 0)
+            referenceDay-=1;
+        if ( referenceHour > 18 && west > 0)
+            referenceDay+=1;
         *dataday1 = *dataday0 = referenceDay;
     } else if (referenceHour < 6) {
         *dataday0 = referenceDay - 1;
@@ -141,7 +145,29 @@ void getEquatorCrossingTime(int32_t sensorID, bool dayNight, time_t starttime, f
             case OLCIS3B:
                 *equatorialCrossingTime = 10.0;
                 break;
-            case MODIST:
+            case MODIST: {
+                *equatorialCrossingTime = 10.5;
+
+                int16_t year;
+                int16_t day;
+                double secs;
+                unix2yds(starttime, &year, &day, &secs);
+
+                if (year > 2020) {
+                    // The constant 18628 makes d the number of days since 1 Jan. 2021
+                    double d = starttime / 86400.0 - 18628.0;
+                    /*
+                     * Correction equations provided by Fred Patt.
+                     */
+                    double deg = -6.5318574e-10 * d * d * d - 3.4051901e-06 * d * d - 0.0031894909 * d - 22.49659432;
+ 
+                    // The above polynomials yield degrees; convert to hours.
+                    double hours = deg / 15.0;
+ 
+                    *equatorialCrossingTime = 12.0 + hours;
+                }
+                break;
+            }
             case OCTS:
                 *equatorialCrossingTime = 10.5;
                 break;
@@ -155,7 +181,32 @@ void getEquatorCrossingTime(int32_t sensorID, bool dayNight, time_t starttime, f
             case HARP2:
                 *equatorialCrossingTime = 13.0;
                 break;
-            case MODISA:
+            case MODISA: {
+                *equatorialCrossingTime = 13.6;
+
+                int16_t year;
+                int16_t day; // unused
+                double secs; // unused
+                unix2yds(starttime, &year, &day, &secs);
+
+                if (year > 2021) {
+                    // The constant 18993 makes d the number of days since 1 Jan. 2021
+                    constexpr double daysBetweenUnixAnd2022 = 18993.0; // Includes leap days
+                    // The number of days between the current date and Jan 1 2022
+                    double d = starttime / SECONDS_IN_DAY - daysBetweenUnixAnd2022;
+                    /*
+                     * Correction equations provided by Fred Patt.
+                     */
+                    double deg = 1.7030083e-09 * d * d * d + 6.5004829e-06 * d * d + 0.0023256436 * d + 24.060654;
+
+                    // The above polynomials yield degrees; convert to hours.
+                    constexpr double DEGREES_PER_HOUR = 360.0 / 24.0; // 24 hours in a day
+                    double hours = deg / DEGREES_PER_HOUR; 
+ 
+                    *equatorialCrossingTime = 12.0 + hours;
+                }
+                break;
+            }
             case VIIRSN:
             case VIIRSJ1:
             case VIIRSJ2:

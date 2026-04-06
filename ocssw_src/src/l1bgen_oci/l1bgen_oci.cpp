@@ -57,7 +57,7 @@ using namespace netCDF::exceptions;
 template <typename T>
 using matrix2D = boost::multi_array<T, 2>;
 
-#define VERSION "2.3"
+#define VERSION "2.8"
 #define CHUNK_CACHE_SIZE 256 * 1024 * 1024  // 256MiB of cache memory.
 #define CHUNK_CACHE_NELEMS 1033
 #define CHUNK_CACHE_PREEMPTION .75
@@ -68,6 +68,15 @@ using matrix2D = boost::multi_array<T, 2>;
 #define CHUNKPIXELS 2000
 #define CHUNKLINES 16
 #define EXP_DECAY_CONSTS 4
+
+constexpr size_t PIXELS_NOMINAL = 1329;     // L1A pixels differ from L1B, b/c l1bgen_oci aggregates
+constexpr size_t BLUE_BANDS_NOMINAL = 120;  // Pre-agg
+constexpr size_t RED_BANDS_NOMINAL = 168;   // Pre-agg
+constexpr size_t SWIR_BANDS_NOMINAL = 9;
+constexpr size_t PIXELS_NBSB = 2884;
+constexpr size_t BLUE_BANDS_NBSB = 60;
+constexpr size_t RED_BANDS_NBSB = 60;
+constexpr size_t SWIR_BANDS_NBSB = 9;
 
 // Macros defining the views OCI has. The metadata produced from l1agen_oci differs from the OAD for
 // l1bgen_oci
@@ -106,19 +115,30 @@ using matrix2D = boost::multi_array<T, 2>;
 //  Joel Gales     SAIC           02/09/24 0.870 Add scan angle & polarization
 //                                               coefficients
 
-vector<double> aggregateIrradiances(size_t numBands, size_t numWavelengths, vector<double> irradiances,
-                                    float **aggMat) {
-    vector<double> aggregatedIrrs(numBands, 0.0);
-    for (size_t i = 0; i < numBands; i++)
-        for (size_t j = 0; j < numWavelengths; j++)
-            aggregatedIrrs[i] += irradiances[j] * aggMat[j][i];
-    return aggregatedIrrs;
+bool nonBaselineBandsAndPixels(NcFile *l1aFile) {
+    const size_t filePixels = l1aFile->getDim("ccd_pixels").getSize();
+    const size_t fileBlueBands = l1aFile->getDim("blue_bands").getSize();
+    const size_t fileRedBands = l1aFile->getDim("red_bands").getSize();
+    const size_t fileSwirBands = l1aFile->getDim("SWIR_bands").getSize();
+
+    if (filePixels == PIXELS_NBSB && fileBlueBands == BLUE_BANDS_NBSB && fileRedBands == RED_BANDS_NBSB &&
+        fileSwirBands == SWIR_BANDS_NBSB) {
+        return true;
+    } else if (filePixels == PIXELS_NOMINAL && fileBlueBands == BLUE_BANDS_NOMINAL &&
+               fileRedBands == RED_BANDS_NOMINAL && fileSwirBands == SWIR_BANDS_NOMINAL) {
+        return false;
+    } else {
+        std::cerr << "-E- Malformed pixels/bands dimension(s) in input L1A\n   "
+                  << "Pixels: " << filePixels << " | Blue bands " << fileBlueBands << " | Red bands "
+                  << fileRedBands << " | SWIR bands " << fileSwirBands << endl;
+        exit(EXIT_FAILURE);
+    }
 }
 
 int main(int argc, char *argv[]) {
-    cout << "l1bgen_oci " << VERSION << " (" << __DATE__ << " " << __TIME__ << ")" << endl;
+    oel::L1bOptions options(argc, argv, VERSION);
 
-    oel::L1bOptions options(argc, argv);
+    cout << clo_getVersion() << endl;
 
     if (argc == 1) {
         clo_printUsage(options.optionList);
@@ -153,13 +173,13 @@ int main(int argc, char *argv[]) {
 
     double *K2t = (double *)malloc(numK2Times * sizeof(double));
 
-    calLutFile->getGroup("common").getVar("blue_wavelength").getVar(blueWavelengths.data());
-    calLutFile->getGroup("common").getVar("blue_F0").getVar(blueSolarIrradiance.data());
-    calLutFile->getGroup("common").getVar("red_wavelength").getVar(redWavelengths.data());
-    calLutFile->getGroup("common").getVar("red_F0").getVar(redSolarIrradiance.data());
-    calLutFile->getGroup("common").getVar("SWIR_wavelength").getVar(swirWavelengths.data());
-    calLutFile->getGroup("common").getVar("SWIR_F0").getVar(swirSolarIrradiance.data());
-    calLutFile->getGroup("common").getVar("K2t").getVar(K2t);
+    calLutCommon.getVar("blue_wavelength").getVar(blueWavelengths.data());
+    calLutCommon.getVar("blue_F0").getVar(blueSolarIrradiance.data());
+    calLutCommon.getVar("red_wavelength").getVar(redWavelengths.data());
+    calLutCommon.getVar("red_F0").getVar(redSolarIrradiance.data());
+    calLutCommon.getVar("SWIR_wavelength").getVar(swirWavelengths.data());
+    calLutCommon.getVar("SWIR_F0").getVar(swirSolarIrradiance.data());
+    calLutCommon.getVar("K2t").getVar(K2t);
 
     uint32_t numBlueGainBands = 0, numRedGainBands = 0, numSwirGainBands = 0;
     NcDim K3Tdim = calLutFile->getDim("number_of_temperatures");
@@ -216,8 +236,12 @@ int main(int argc, char *argv[]) {
     LocatingContext locatingContext;
     switch (dataTypes.at(MAIN_VIEW)) {
         case EARTH:
-        case NON_BASELINE_SPECTRAL_AGGREGATION:
-            cout << "Input was a normal science granule" << endl;
+            if (nonBaselineBandsAndPixels(l1aFile)) {
+                cout << "Input is high spatial resolution, turning off aggregation" << endl;
+                options.aggregationOff = true;
+            } else {
+                cout << "Input was a normal science file" << endl;
+            }
             locatingContext = GEO;
             break;
 
@@ -225,6 +249,8 @@ int main(int argc, char *argv[]) {
         case SOLAR_MONTHLY_CALIBRATION:
             cout << "Input was a solar calibration granule" << endl;
             locatingContext = HELIO;
+            options.disableGeolocation = true;
+            options.radianceGenerationEnabled = true;
             break;
 
         case LUNAR:
@@ -245,50 +271,11 @@ int main(int argc, char *argv[]) {
 
     cout << "Preparing to calibrate file" << endl;
 
-    CalibrationData redCalData{.color = RED}, blueCalData{.color = BLUE}, swirCalData{.color = SWIR};
-
-    DarkData darkData;
-
-    vector<float> cosineSolarZeniths(geoData.solarZeniths.size());
-
-    if (!options.radianceGenerationEnabled) {
-        transform(geoData.solarZeniths.begin(), geoData.solarZeniths.end(), cosineSolarZeniths.begin(),
-                  [](double zenith) { return cos(zenith * OEL_DEGRAD); });
-    }
-
-    // Get date
-    cout << "time_coverage_start: " << unix2isodate(geoData.unixTimeStart, 'G') << endl;
-    cout << "time_coverage_end:   " << unix2isodate(geoData.unixTimeEnd, 'G') << endl;
-    int16_t year, month, dayOfMonth;
-    double s;  // throwaway
-    unix2ymds(geoData.unixTimeStart, &year, &month, &dayOfMonth, &s);
-    int32_t astroJulDay = jday(year, month, dayOfMonth);
-
-    // Get numbers of blue and red bands
-    blueCalData.numBandsL1a = l1aFile->getDim("blue_bands").getSize();
-    redCalData.numBandsL1a = l1aFile->getDim("red_bands").getSize();
-
-    // allocate qualityFlags
-    blueCalData.qualityFlags = (uint8_t*) malloc(blueCalData.numBandsL1a * geoData.numCcdPix);
-    redCalData.qualityFlags = (uint8_t*) malloc(redCalData.numBandsL1a * geoData.numCcdPix);
-
-    // ******************************************** //
-    // *** Get spatial and spectral aggregation *** //
-    // ******************************************** //
-    uint32_t numTaps = l1aFile->getDim("number_of_taps").getSize();
-    // Number of spatial zones was obtained above for locating context, as were the data types
-
     vector<int16_t> numLinesSpatZones(numSpatialZones);  // Number of lines per spatial zone
     vector<int16_t> spatialAgg(numSpatialZones);         // Spatial aggregation factors per zone
-    vector<int16_t> blueSpecAgg(numTaps);                // Spectral aggregation mode for blue
-    vector<int16_t> redSpecAgg(numTaps);                 // Spectral aggregation mode for red
-    blueCalData.specAgg = &blueSpecAgg;
-    redCalData.specAgg = &redSpecAgg;
     l1aSpatSpecModes.getVar("spatial_zone_data_type").getVar(dataTypes.data());
     l1aSpatSpecModes.getVar("spatial_zone_lines").getVar(numLinesSpatZones.data());
     l1aSpatSpecModes.getVar("spatial_aggregation").getVar(spatialAgg.data());
-    l1aSpatSpecModes.getVar("blue_spectral_mode").getVar(blueCalData.specAgg->data());
-    l1aSpatSpecModes.getVar("red_spectral_mode").getVar(redCalData.specAgg->data());
 
     bool foundSpatialAggregation = false;
     size_t spatialAggregationIndex;
@@ -303,61 +290,46 @@ int main(int argc, char *argv[]) {
             break;
         }
     }
+
     if (!foundSpatialAggregation) {
         cout << "-E- " << __FILE__ << ":" << __LINE__
              << " - Could not find valid spatial aggregation type.\n";
         exit(EXIT_FAILURE);
     }
 
-    // *********************************************************** //
-    // *** Generate matrices for spectral and gain aggregation *** //
-    // *********************************************************** //
-    vector<size_t> tapAggFactors(numTaps);  // A list of scalars, 0-16 inclusive
-    size_t numTapBins[16];
+    CalibrationData blueCalData(l1aFile, geoData, BLUE, numBlueGainBands, numK2Times, K2t, spatialAgg,
+                                spatialAggregationIndex, blueCalLut, blueSolarIrradiance,
+                                options.aggregationOff);
+    CalibrationData redCalData(l1aFile, geoData, RED, numRedGainBands, numK2Times, K2t, spatialAgg,
+                               spatialAggregationIndex, redCalLut, redSolarIrradiance,
+                               options.aggregationOff);
+    CalibrationData swirCalData(l1aFile, geoData, SWIR, numSwirGainBands, numK2Times, K2t, spatialAgg,
+                                spatialAggregationIndex, swirCalLut, swirSolarIrradiance,
+                                options.aggregationOff);
 
-    if (aggregateBands(numTaps, tapAggFactors.data(), numTapBins, blueCalData.specAgg->data(),
-                       blueCalData.numInsBands, blueCalData.numBands) == 2)
-        cout << "All blue taps disabled" << endl;
+    DarkData darkData;
 
-    // Note: blue & red gain matrix are not necessarily contiguous
+    vector<double> cosineSolarZeniths(geoData.solarZeniths.size());
 
-    if (blueCalData.numInsBands != 1) {
-        blueCalData.insAgg = new float *[blueCalData.numBandsL1a];
-        blueCalData.gainAgg = new float *[NUM_BLUE_WAVELENGTHS];
-        getAggregationMatrices(tapAggFactors.data(), blueCalData.specAgg->data(), numTapBins,
-                               blueCalData.numInsBands, blueCalData.numBands, blueCalData.insAgg,
-                               blueCalData.gainAgg);
+    if (!options.radianceGenerationEnabled) {
+        transform(geoData.solarZeniths.begin(), geoData.solarZeniths.end(), cosineSolarZeniths.begin(),
+                  [](double zenith) { return cos(zenith * OEL_DEGRAD); });
     }
 
-    if (blueCalData.numInsBands != blueCalData.numBandsL1a) {
-        cout << "Number of blue bands in file: " << options.l1aFilename.c_str()
-             << " not consistent with spectral aggregation" << endl;
-        l1aFile->close();
-        return 1;
-    } else if (blueCalData.numInsBands < 4)
-        cout << "No blue bands in file: " << options.l1aFilename.c_str() << endl;
+    // Get date
+    cout << "time_coverage_start: " << unix2isodate(geoData.unixTimeStart, 'G') << endl;
+    cout << "time_coverage_end:   " << unix2isodate(geoData.unixTimeEnd, 'G') << endl;
 
-    if (aggregateBands(numTaps, tapAggFactors.data(), numTapBins, redCalData.specAgg->data(),
-                       redCalData.numInsBands, redCalData.numBands) == 2)
-        cout << "All red taps disabled" << endl;
+    // ******************************************** //
+    // *** Get spatial and spectral aggregation *** //
+    // ******************************************** //
+    uint32_t numTaps = l1aFile->getDim("number_of_taps").getSize();
+    // Number of spatial zones was obtained above for locating context, as were the data types
 
-    if (redCalData.numInsBands != 1) {
-        redCalData.insAgg = new float *[redCalData.numInsBands];
-        redCalData.gainAgg = new float *[NUM_RED_WAVELENGTHS];
-        getAggregationMatrices(tapAggFactors.data(), redCalData.specAgg->data(), numTapBins,
-                               redCalData.numInsBands, redCalData.numBands, redCalData.insAgg,
-                               redCalData.gainAgg);
-    }
-
-    if (redCalData.numInsBands != redCalData.numBandsL1a) {
-        cout << "Number of red bands in file: " << options.l1aFilename.c_str()
-             << " not consistent with spectral aggregation" << endl;
-        l1aFile->close();
-        return 1;
-    } else if (redCalData.numInsBands < 4)
-        cout << "No red bands in file: " << options.l1aFilename.c_str() << endl;
-
-    swirCalData.numBands = 9;
+    // numBands is assigned after aggregation
+    blueCalData.saturatedPixelCounts.resize(blueCalData.numBands);
+    redCalData.saturatedPixelCounts.resize(redCalData.numBands);
+    swirCalData.saturatedPixelCounts.resize(swirCalData.numBands);
 
     if (options.enableCrosstalk) { // Crosstalk correction is only needed for blue bands right now
         blueCalData.enableCrosstalk = options.enableCrosstalk;
@@ -393,44 +365,7 @@ int main(int argc, char *argv[]) {
     // *** Generate band gain structs from LUTs, date/time & gain matrices *** //
     // *********************************************************************** //
 
-    if (blueCalData.numInsBands >= 4)
-        blueCalData.gains =
-            makeOciGains(blueCalData.numInsBands, numBlueGainBands, year, astroJulDay,
-                         geoData.earthViewTimes[0], numK2Times, K2t, -1, spatialAgg[spatialAggregationIndex],
-                         blueCalData.specAgg->data(), blueCalLut, &blueCalData.gainAgg[0]);
-
-    if (redCalData.numInsBands >= 4)
-        redCalData.gains =
-            makeOciGains(redCalData.numInsBands, numRedGainBands, year, astroJulDay,
-                         geoData.earthViewTimes[0], numK2Times, K2t, -1, spatialAgg[spatialAggregationIndex],
-                         redCalData.specAgg->data(), redCalLut, &redCalData.gainAgg[0]);
-
-    // Technically would be better to use allocate2d, but this is to ensure compatibility with the other
-    // gainAggs
-    swirCalData.gainAgg = new float *[swirCalData.numBands];
-    for (size_t i = 0; i < swirCalData.numBands; i++) {
-        swirCalData.gainAgg[i] = new float[swirCalData.numBands];
-        for (size_t j = 0; j < swirCalData.numBands; j++) {
-            swirCalData.gainAgg[i][j] = (i == j) ? 1.0 : 0.0;
-        }
-    }
-
-    swirCalData.gains = makeOciGains(swirCalData.numBands, swirCalData.numBands, year, astroJulDay,
-                                     geoData.earthViewTimes[0], numK2Times, K2t, geoData.mceTelem.mceBoardId,
-                                     -1, NULL, swirCalLut, &swirCalData.gainAgg[0]);
     free(K2t);
-
-    vector<double> blueIrrAggGain = aggregateIrradiances(blueCalData.numInsBands, NUM_BLUE_WAVELENGTHS,
-                                                         blueSolarIrradiance, blueCalData.gainAgg);
-    vector<double> blueIrrAggIns = aggregateIrradiances(blueCalData.numBands, blueCalData.numInsBands,
-                                                        blueIrrAggGain, blueCalData.insAgg);
-    blueCalData.solIrrL1a = &blueIrrAggIns;
-
-    vector<double> redIrrAggGain = aggregateIrradiances(redCalData.numInsBands, NUM_RED_WAVELENGTHS,
-                                                        redSolarIrradiance, redCalData.gainAgg);
-    vector<double> redIrrAggIns =
-        aggregateIrradiances(redCalData.numBands, redCalData.numInsBands, redIrrAggGain, redCalData.insAgg);
-    redCalData.solIrrL1a = &redIrrAggIns;
 
     // Read selected temperature fields and interpolate to scan times
     uint16_t numTemps = blueCalData.gains->dimensions[TEMP] + swirCalData.gains->dimensions[TEMP];
@@ -458,7 +393,6 @@ int main(int argc, char *argv[]) {
         count[2] = darkData.numPix;
 
         l1aSciData.getVar("sci_blue").getVar(start, count, &blueSciPixDark[0][0][0]);
-        l1aSciData.getVar("sci_blue").getAtt("_FillValue").getValues(&blueCalData.fillValue);
 
         filterDarkNoise(geoData.numGoodScans, blueCalData.numBands, darkData.numPix, blueCalData.fillValue,
                         blueSciPixDark);
@@ -469,7 +403,6 @@ int main(int argc, char *argv[]) {
         count[2] = darkData.numPix;
 
         l1aSciData.getVar("sci_red").getVar(start, count, &redSciPixDark[0][0][0]);
-        l1aSciData.getVar("sci_red").getAtt("_FillValue").getValues(&redCalData.fillValue);
 
         filterDarkNoise(geoData.numGoodScans, redCalData.numBands, darkData.numPix, redCalData.fillValue,
                         redSciPixDark);
@@ -484,13 +417,12 @@ int main(int argc, char *argv[]) {
     count[2] = numDarkSwirPix;
 
     l1aSciData.getVar("sci_SWIR").getVar(start, count, &swirPixDark[0][0][0]);
-    l1aSciData.getVar("sci_SWIR").getAtt("_FillValue").getValues(&swirCalData.fillValue);
     filterDarkNoise(geoData.numGoodScans, swirCalData.numBands, numDarkSwirPix, swirCalData.fillValue,
                     swirPixDark);
 
     // Calibrated data variables
-    vec2D<float> swirDigiNum(swirCalData.numBands, vector<float>(geoData.numSwirPix));
-    float **swirCal = allocate2d_float(swirCalData.numBands, geoData.numSwirPix);
+    vec2D<double> swirDigiNum(swirCalData.numBands, vector<double>(geoData.numSwirPix));
+    double **swirCal = allocate2d_double(swirCalData.numBands, geoData.numSwirPix);
     uint8_t **swirQualityFlags = allocate2d_uchar(swirCalData.numBands, geoData.numSwirPix);
     vector<double> sciScanAngles(geoData.numCcdPix);
     vector<double> swirScanAngles(geoData.numSwirPix);
@@ -498,7 +430,7 @@ int main(int argc, char *argv[]) {
     uint32_t **swirSciData = (uint32_t **)allocate2d_int(swirCalData.numBands, geoData.numSwirPix);
     int16_t swirAggFactor = 1;
     vector<double> swirTempCorrections(swirCalData.numBands);
-    vector<float> hysterisisCorrection(geoData.numSwirPix);
+    vector<double> hysteresisCorrection(geoData.numSwirPix);
     int32_t *indx = new int32_t[geoData.numSwirPix];
 
     double pprAngle =
@@ -532,7 +464,7 @@ int main(int argc, char *argv[]) {
         // set 10 deg pixels to HAM-B_striping, if normal science data
         if (dataTypes.at(MAIN_VIEW) == EARTH) {
             if (geoData.numCcdPix > 800) {
-                if(geoData.hamSides[currScan]) {
+                if (geoData.hamSides[currScan]) {
                     for (size_t band = 0; band < redCalData.numBands; band++) {
                         uint8_t *ptr = redCalData.qualityFlags + band * geoData.numCcdPix + 680;
                         for (size_t pix = 680; pix < 800; pix++) {
@@ -546,11 +478,26 @@ int main(int argc, char *argv[]) {
 
         //  Get scan angle
         size_t pixelOffset = currScan * geoData.numCcdPix;
-        for (size_t pix = 0; pix < geoData.numCcdPix; pix++)
-            sciScanAngles[pix] = geoData.ccdScanAngles[pixelOffset + pix] * OEL_RADEG;
+        for (size_t pix = 0; pix < geoData.numCcdPix; pix++) { 
+            double angleRadians = geoData.ccdScanAngles[pixelOffset + pix];
+
+            if (angleRadians == BAD_FLT) {
+                continue;
+            } else {
+                sciScanAngles[pix] = angleRadians * OEL_RADEG;
+            }
+        }
+
         pixelOffset = currScan * geoData.numSwirPix;
-        for (size_t pix = 0; pix < geoData.numSwirPix; pix++)
-            swirScanAngles[pix] = geoData.swirScanAngles[pixelOffset + pix] * OEL_RADEG;
+        for (size_t pix = 0; pix < geoData.numSwirPix; pix++) {
+            double angleRadians = geoData.swirScanAngles[pixelOffset + pix];
+
+            if (angleRadians == BAD_FLT) {
+                continue;
+            } else {
+                swirScanAngles[pix] = geoData.swirScanAngles[pixelOffset + pix] * OEL_RADEG;
+            }
+        }
 
         start[0] = currScan;
         start[1] = 0;
@@ -625,7 +572,7 @@ int main(int argc, char *argv[]) {
                             cosineSolarZeniths[currScan * geoData.numCcdPix + j - 1] * (1 - w) +
                             cosineSolarZeniths[currScan * geoData.numCcdPix + j] * w;
                     } else {
-                        cosineSolarZeniths[i] = cosineSolarZeniths[currScan * geoData.numCcdPix + j];
+                        cosSolZensSwir[i] = cosineSolarZeniths[currScan * geoData.numCcdPix + j];
                     }
                 }
 
@@ -636,79 +583,95 @@ int main(int argc, char *argv[]) {
             }
 
             // SWIR band loop
-            for (size_t j = 0; j < swirCalData.numBands; j++) {
+            for (size_t band = 0; band < swirCalData.numBands; band++) {
                 uint32_t numGoodPixels = 0;
-                for (size_t k = 0; k < geoData.numSwirPix; k++) {
-                    bool notFill = swirSciData[j][k] != swirCalData.fillValue;
+                for (size_t pix = 0; pix < geoData.numSwirPix; pix++) {
+                    bool notFill = swirSciData[band][pix] != swirCalData.fillValue;
                     // radiance == true, do not check geoData.qualFlag bc it does not retrieve it
                     if (options.radianceGenerationEnabled && notFill) {
-                        indx[numGoodPixels++] = k;
+                        indx[numGoodPixels++] = pix;
                     }
                     // radiance == false, check quality flag for only "Off_Earth, Solar_eclipse, Terrain_bad"
                     // (0x7)
                     else if (!options.radianceGenerationEnabled && notFill &&
-                             (!(geoData.qualityFlag[currScan * geoData.numCcdPix + k] & 0x7))) {
-                        indx[numGoodPixels++] = k;
+                             (!(geoData.qualityFlag[currScan * geoData.numCcdPix + pix] & 0x7))) {
+                        indx[numGoodPixels++] = pix;
                     } else {
                         // Handle fill value
-                        swirDigiNum[j][k] = BAD_FLT;
-                        swirCal[j][k] = BAD_FLT;
+                        swirDigiNum[band][pix] = BAD_FLT;
+                        swirCal[band][pix] = BAD_FLT;
                     }
                 }
 
                 // Hysteresis correction
-                float prior[EXP_DECAY_CONSTS] = {0, 0, 0, 0};
-                float observation[EXP_DECAY_CONSTS] = {0, 0, 0, 0};
-                hysterisisCorrection[0] = 0.0;
-                array<float, EXP_DECAY_CONSTS> exponentialDecayConsts;
+                double prior[EXP_DECAY_CONSTS] = {0, 0, 0, 0};
+                double observation[EXP_DECAY_CONSTS] = {0, 0, 0, 0};
+                hysteresisCorrection[0] = 0.0;
+                array<double, EXP_DECAY_CONSTS> exponentialDecayConsts;
                 for (size_t k = 0; k < EXP_DECAY_CONSTS; k++) {
-                    exponentialDecayConsts[k] = exp(-1.0 / hysterisisTimes[j][k]);
+                    exponentialDecayConsts[k] = exp(-1.0 / hysterisisTimes[band][k]);
+                }
+                vector<double> deltaScanAngles(swirScanAngles.size());  // in IDL, dtheta
+                for (size_t i = 0; i < swirScanAngles.size() - 1; i++) {
+                    deltaScanAngles[i] = swirScanAngles[i + 1] - swirScanAngles[i];
                 }
 
-                for (size_t k = 1; k < numGoodPixels; k++) {
-                    hysterisisCorrection[k] = 0.0;
-                    for (size_t l = 0; l < EXP_DECAY_CONSTS; l++) {
-                        observation[l] = prior[l] * exponentialDecayConsts[l] +
-                                         swirDigiNum[j][indx[k - 1]] * hysterisisAmplitude[j][l];
-                        hysterisisCorrection[k] += observation[l];
-                        prior[l] = observation[l];
+                for (size_t pix = 1; pix < numGoodPixels; pix++) {
+                    hysteresisCorrection[pix] = 0.0;
+
+                    if (deltaScanAngles[pix - 1] < 0.1) {
+                        for (size_t decayConst = 0; decayConst < EXP_DECAY_CONSTS; decayConst++) {
+                            observation[decayConst] =
+                                prior[decayConst] * exponentialDecayConsts[decayConst] +
+                                swirDigiNum[band][indx[pix - 1]] * hysterisisAmplitude[band][decayConst];
+                            hysteresisCorrection[pix] += observation[decayConst];
+                            prior[decayConst] = observation[decayConst];
+                        }
+                    } else {
+                        for (size_t decayConst = 0; decayConst < EXP_DECAY_CONSTS; decayConst++) {
+                            prior[decayConst] = 0.0;
+                            observation[decayConst] = 0.0;
+                        }
+                        hysteresisCorrection[pix] = 0.0;
                     }
                 }
 
                 double tempCorrection = getTempCorrection(
-                    j, &tempCoefs[nBCalTemps], calibrationTemps[currScan], *swirCalData.gains, SWIR);
+                    band, &tempCoefs[nBCalTemps], calibrationTemps[currScan], *swirCalData.gains, SWIR);
                 for (size_t k = 0; k < numGoodPixels; k++) {
-                    double rvsCorrection = getRvsCorrection(j, indx[k], geoData.hamSides[currScan],
+                    double rvsCorrection = getRvsCorrection(band, indx[k], geoData.hamSides[currScan],
                                                             *swirCalData.gains, swirScanAngles[k]);
                     double nonLinearityCorrection = getNonlinearityCorrection(
-                        j, indx[k], swirCalLut.dimensions[NL], swirCalData.gains->k5Coefs, swirDigiNum);
-                    swirCal[j][indx[k]] = tempCorrection *
-                                          swirCalData.gains->k1K2[j][geoData.hamSides[currScan]] *
-                                          (swirDigiNum[j][indx[k]] - hysterisisCorrection[k]);
+                        band, indx[k], swirCalLut.dimensions[NL], swirCalData.gains->k5Coefs, swirDigiNum);
+                    swirCal[band][indx[k]] = tempCorrection *
+                                          swirCalData.gains->k1K2[band][geoData.hamSides[currScan]] *
+                                          (swirDigiNum[band][indx[k]] - hysteresisCorrection[k]);
 
-                    swirCal[j][indx[k]] *= nonLinearityCorrection * rvsCorrection;
+                    swirCal[band][indx[k]] *= nonLinearityCorrection * rvsCorrection;
 
                     if (!options.radianceGenerationEnabled) {
                         // NOTE: solz is short with scale of 0.01
                         if (geoData.solarZeniths[currScan * geoData.numCcdPix + indx[k]] < MAX_SOLZ)
-                            swirCal[j][indx[k]] *= OEL_PI * geoData.auCorrection /
-                                                   (swirSolarIrradiance[j] * cosSolZensSwir[indx[k]]);
+                            swirCal[band][indx[k]] *= OEL_PI * geoData.auCorrection /
+                                                   (swirSolarIrradiance[band] * cosSolZensSwir[indx[k]]);
                         else
-                            swirCal[j][indx[k]] = BAD_FLT;
+                            swirCal[band][indx[k]] = BAD_FLT;
                     }
                 }  // (reduced) k-loop
 
-            }  // j-loop (band)
+            }  // band loop
 
         }  // iret != -1
 
         // Check for saturation
         for (size_t k = 0; k < geoData.numSwirPix; k++) {
-            for (size_t j = 0; j < swirCalData.numBands; j++) {
-                if (swirSciData[j][k] >= swirCalData.gains->saturationThresholds[j])
-                    swirQualityFlags[j][k] = 1;
+            for (size_t band = 0; band < swirCalData.numBands; band++) {
+                if (swirSciData[band][k] >= swirCalData.gains->saturationThresholds[band]){
+                    swirQualityFlags[band][k] = 1;
+                    swirCalData.saturatedPixelCounts[band] += 1;
+                }
                 else
-                    swirQualityFlags[j][k] = 0;
+                    swirQualityFlags[band][k] = 0;
             }
         }
 
@@ -756,20 +719,25 @@ int main(int argc, char *argv[]) {
     cout << "Calibration finished, writing band info and granule metadata" << endl;
 
     // bgmat#bwave
-    if (blueCalData.numInsBands >= 4)
-        outfile.writeBandInfo(BLUE, blueWavelengths, *blueCalData.solIrrL1a, blueCalData.numBands,
-                              blueCalData.numInsBands, blueCalData.gainAgg, blueCalData.insAgg,
-                              blueCalLut.m12Coefs, blueCalLut.m13Coefs);
-    if (redCalData.numInsBands >= 4)
-        outfile.writeBandInfo(RED, redWavelengths, redIrrAggIns, redCalData.numBands, redCalData.numInsBands,
-                              redCalData.gainAgg, redCalData.insAgg, redCalLut.m12Coefs, redCalLut.m13Coefs);
-    outfile.writeBandInfo(SWIR, swirWavelengths, swirSolarIrradiance, swirCalData.numBands, 0,
-                          swirCalData.gainAgg, swirCalData.gainAgg, swirCalLut.m12Coefs, swirCalLut.m13Coefs);
+    if (blueCalData.numInsBands >= 4) {
+        blueCalData.writeBandInfo(outfile, blueCalLut, blueWavelengths);
+        blueCalData.writeSaturationPercent(outfile, geoData);
+    }
+
+    if (redCalData.numInsBands >= 4) {
+        redCalData.writeBandInfo(outfile, redCalLut, redWavelengths);
+        redCalData.writeSaturationPercent(outfile, geoData);
+    }
+
+    swirCalData.writeBandInfo(outfile, swirCalLut, swirWavelengths);
+    swirCalData.writeSaturationPercent(outfile, geoData);
 
     outfile.writeGranuleMetadata(unix2isodate(geoData.unixTimeStart, 'G'),
                                  unix2isodate(geoData.unixTimeEnd, 'G'), options.l1bFilename);
 
     set_global_attrs(outfile.l1bFile, history, options.digitalObjectId, options.processingVersion);
+
+    outfile.writeProcessingControl(options);
 
     l1aFile->close();
     delete (l1aFile);

@@ -31,7 +31,7 @@ using namespace std;
 #define L3BIN_CACHE_SIZE 8 * 1024  // 8 kb of cache memory.
 #define L3BIN_CACHE_NELEMS 512
 #define L3BIN_CACHE_PREEMPTION .75
-#define VERSION "5.14"
+#define VERSION "5.16"
 
 static instr input;
 
@@ -393,20 +393,45 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    if (strcmp(input.oformat, "HDF5") == 0) {
-        output_binfile = new Hdf::hdf5_bin;
-    } else if (strcmp(input.oformat, "netCDF4") == 0) {
+    if (strcmp(input.oformat, "netCDF4") == 0) {
         output_binfile = new Hdf::cdf4_bin;
         output_binfile->deflate = input.deflate;
+    } else if (strcmp(input.oformat, "HDF4") == 0) {
+        output_binfile = new Hdf::hdf4_bin;
+        if (input.noext == 0) {
+            output_binfile->hasNoext = false;
+            buff += ".main";
+        } else {
+            output_binfile->hasNoext = true;
+        }
+    } else if (strcmp(input.oformat, "HDF5") == 0) {
+        output_binfile = new Hdf::hdf5_bin;
+    } else {
+        printf("-E- Unrecognized oformat = %s\n", input.oformat);
+        exit(EXIT_FAILURE);
     }
 
     int tmpNumProducts = input_binfile[0]->n_active_prod;
     char *tmpProductNames[tmpNumProducts];
-    for (int i = 0; i < tmpNumProducts; i++) {
-        tmpProductNames[i] = (char *)input_binfile[0]->getActiveProdName(i);
+    char(*tmpAttVals[tmpNumProducts])[MAXNUMATTR][MAXATTRLEN];
+    char(*tmpAttNames[tmpNumProducts])[MAXNUMATTR][MAXATTRNAMELEN];
+    int(*tmpAttTypes[tmpNumProducts])[MAXNUMATTR];
+    size_t(*tmpAttSize[tmpNumProducts])[MAXNUMATTR];
+    int tempAttNums[tmpNumProducts];
+
+    for (int active_product = 0; active_product < tmpNumProducts; active_product++) {
+        tmpAttVals[active_product] = nullptr;
+        tmpAttNames[active_product] = nullptr;
+        tmpAttTypes[active_product] = nullptr;
+        tmpAttSize[active_product] = nullptr;
+        tempAttNums[active_product] = 0;
+
+        tmpProductNames[active_product] = (char *)input_binfile[0]->getActiveProdName(active_product);
+            input_binfile[0]->getProdAttrs(tmpProductNames[active_product], &tmpAttVals[active_product], &tmpAttNames[active_product],
+                                           &tmpAttTypes[active_product], &tmpAttSize[active_product], &tempAttNums[active_product]);
     }
 
-    output_binfile->setProductList(tmpNumProducts, tmpProductNames);
+    output_binfile->setProductList(tmpNumProducts, tmpProductNames, tmpAttVals,tmpAttNames,tmpAttSize,tempAttNums,tmpAttTypes);
     if (input_binfile[0]->has_qual()) {
         output_binfile->hasQual = true;
     }

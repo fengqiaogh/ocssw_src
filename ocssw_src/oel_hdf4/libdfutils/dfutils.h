@@ -123,6 +123,8 @@ int CreateNCDF(
         const char *sname, /* short name */
         const char *lname, /* long name */
         const char *standard_name, /* NetCDF standard name (not set if passed NULL or "") */
+        const char *flag_values, 
+        const char *flag_meanings,
         const char *reference,
         const char *comment,
         const char *units, /* units (not set if passed NULL or "") */

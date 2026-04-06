@@ -56,6 +56,7 @@ def main():
              bit 4 set = no ICE file found
              bit 5 set = no GEO file found
              bit 6 set = no AER file found
+             bit 7 set = no ancillary profile file found
 
     e.g. STATUS=11 indicates there are missing optimal MET, OZONE, and NO2 files
 
@@ -74,10 +75,7 @@ def main():
     ancdb_help_text = "Use a custom filename for ancillary database. If " \
                       "full path not given, ANCDB is assumed to exist "\
                       "(or will be created) under " + \
-                      ga.DEFAULT_ANC_DIR_TEXT + "/log/. If " + \
-                      ga.DEFAULT_ANC_DIR_TEXT + "/log/ does not " \
-                      "exist, ANCDB is assumed (or will be created) " \
-                      "under the current working directory"
+                      ga.DEFAULT_ANC_DIR_TEXT + "/log/."
     parser.add_argument("--ancdb", default='ancillary_data.db',help=ancdb_help_text, metavar="ANCDB")
     parser.add_argument("-o", "--ofile", help="output ancillary par file", metavar="ANC_FILE")
     parser.add_argument("--ancdir",
@@ -107,7 +105,25 @@ def main():
     parser.add_argument("-u", "--use_filename", action="store_true", default=False, 
                       help="Use filename to call API instead of deriving start time")
 
+    parser.add_argument("--list-schemes", action="store_true", default=False,
+                      help="List short names and descriptions of available schemes for the mission")
+    parser.add_argument("--scheme", default=None, metavar="SCHEME",
+                      help="Apply a named ancillary scheme to the API query")                                    
+
     args = parser.parse_args()
+
+    if args.list_schemes:
+        if args.filename is None and args.mission is None:
+            print("ERROR: --list-schemes requires either an input file or --mission parameter")
+            sys.exit(1)
+        g = ga.getanc(filename=args.filename,
+                      sensor=args.mission,
+                      timeout=args.timeout,
+                      verbose=args.verbose)
+        env(g)
+        g.list_schemes()
+        sys.exit(0)  
+
     if args.filename is None and args.start is None:
         parser.print_help()
         sys.exit(32)
@@ -126,7 +142,8 @@ def main():
                   download=args.download,
                   timeout=args.timeout,
                   refreshDB=args.refreshDB,
-                  use_filename=args.use_filename)
+                  use_filename=args.use_filename,
+                  scheme=args.scheme)
 
     if args.sst is False:
         g.set_opt_flag('sst', off=True)

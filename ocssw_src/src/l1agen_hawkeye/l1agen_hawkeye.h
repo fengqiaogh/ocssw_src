@@ -1,6 +1,5 @@
-
-   
-using namespace std;
+#ifndef L1AGEN_HAWKEYE_H
+#define L1AGEN_HAWKEYE_H
 
 class l1aFile {
 
@@ -22,7 +21,7 @@ class l1aFile {
                 uint32_t imgWidth, uint32_t imgHeight,
                 uint32_t fndWidth, uint32_t fndHeight);
  
-  int parseDims( string dimString, int *numDims, int *varDims);
+  int parseDims( std::string dimString, int *numDims, int *varDims);
 
   int close();
 };
@@ -93,10 +92,10 @@ enum {SENSOR, PSENSOR, ATTITUDE, PROPAGATOR};
 
 /*
 inline
-int expandEnvVar( string *sValue) {
-  if ( (*sValue).find_first_of( "$" ) == string::npos) return 0;
-  string::size_type posEndIdx = (*sValue).find_first_of( "/" );
-  if ( posEndIdx == string::npos) return 0;
+int expandEnvVar( std::string *sValue) {
+  if ( (*sValue).find_first_of( "$" ) == std::string::npos) return 0;
+  std::string::size_type posEndIdx = (*sValue).find_first_of( "/" );
+  if ( posEndIdx == std::string::npos) return 0;
   char *envVar_str = getenv((*sValue).substr( 1, posEndIdx-1 ).c_str());
   if (envVar_str == 0x0) {
     printf("Environment variable: %s not defined.\n", envVar_str);
@@ -107,3 +106,5 @@ int expandEnvVar( string *sValue) {
   return 0;
 }
 */
+
+#endif  // L1AGEN_HAWKEYE_H

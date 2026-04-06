@@ -610,7 +610,7 @@ extern "C" l2prodstr *get_l2prod_index(const char *prod_name, /* Input SDS name 
         int32_t wave[]) /* Wavelength Array (numBands) */ {
     int i;
     int prodIndex;
-    char tmp_pname[32];
+    char tmp_pname[64];
     l2prodstr *p = NULL;
     int status;
 

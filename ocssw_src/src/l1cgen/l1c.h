@@ -56,20 +56,22 @@ class L1C {
                             double *gvel);
     virtual int32_t create_time_swt(int num_gridlines, double tfile_ini_sec, double *tmgvf,
                                     double tswt_ini_sec, double tswt_end_sec, std::string *tswt_ini,
-                                    std::string *tswt_ini_file, std::string *tswt_mid,std::string *tswt_end);
+                                    std::string *tswt_ini_file, std::string *tswt_mid, std::string *tswt_end);
     virtual int32_t swtime_swt2(int swt, L1C_input *l1cinput, l1c_filehandle *l1cfile, int32_t norbs,
-                                double *tswt, double tcross, double mgv, double *tmgv, double *orb_time_tot,size_t norbs_tot);
+                                double *tswt, double tcross, double mgv, double *tmgv, double *orb_time_tot,
+                                size_t norbs_tot);
     virtual int32_t swtime_swt2_segment(int swt, L1C_input *l1cinput, l1c_filehandle *l1cfile, int32_t norbs,
-                                        double *tswt, double tcross, double mgv, double *tmgv,double *orb_time_tot,size_t norbs_tot);
+                                        double *tswt, double tcross, double mgv, double *tmgv,
+                                        double *orb_time_tot, size_t norbs_tot);
     virtual int32_t write_L1C_granule2(int swtd, l1c_filehandle *l1cfile, L1C_input *l1cinput, double *tmgv,
-                                       float **lat_gd, float **lon_gd, float **alt_gd,double *orb_time_tot);
+                                       float **lat_gd, float **lon_gd, float **alt_gd, double *orb_time_tot);
     virtual int32_t open_l1atol1c3(L1C_input *l1cinput, l1c_filehandle *l1cfile);
     virtual int search_l1cgen(L1C_input *l1cinput, l1c_str *l1cstr, l1c_filehandle *l1cfile, short **gdindex);
     virtual int32_t create_SOCEA2(int swtd, L1C_input *l1cinput, l1c_filehandle *l1cfile, float **lat_gd,
                                   float **lon_gd, float **altitude, double *tswt);
     virtual int32_t openL1Cgrid3(l1c_str *l1cstr, l1c_filehandle *l1cfile, L1C_input *l1cinput);
     virtual int32_t l1_cloud_correct(L1C_input *l1cinput, l1c_filehandle *l1cfile);
-    virtual int32_t add_proc_group_l1c(L1C_input *l1cinput,l1c_filehandle *l1cfile,const char* filename);
+    virtual int32_t add_proc_group_l1c(L1C_input *l1cinput, l1c_filehandle *l1cfile, const char *filename);
 
     //---------------------------------------------
     // global attributes----
@@ -127,9 +129,9 @@ class L1C {
     // these params go to proj class
 
     // multi  attributes (view, pol, bands)
-    float *view_agg;  // views to be aggregated for later products such as vsfs etc
-    float *pol_agg;   // polarization states to be aggregated for post-processing products, linear
-                     // depolarization ratio etc
+    float *view_agg;     // views to be aggregated for later products such as vsfs etc
+    float *pol_agg;      // polarization states to be aggregated for post-processing products, linear
+                         // depolarization ratio etc
     float *band_agg;     // specific bands for future merged products
     bool overlap_vflag;  // tells if we want merged views
     bool overlap_pflag;  // tells if we want merged polarizations
@@ -149,20 +151,21 @@ int32_t ect_swt(l1c_filehandle *l1cfile, int ix1, int ix2, double *tswt_tot, dou
                 double *lonswt_tot, double *ovel_tot, double *gvel_tot, double *tswt, double *latswt,
                 double *lonswt, float *tcross, float *loncross, double *ovel, double *gvel);
 int32_t create_time_swt(int num_gridlines, double tfile_ini_sec, double *tmgvf, double tswt_ini_sec,
-                        double tswt_end_sec, std::string *tswt_ini, std::string *tswt_ini_file,std::string *tswt_mid,
-                        std::string *tswt_end);
+                        double tswt_end_sec, std::string *tswt_ini, std::string *tswt_ini_file,
+                        std::string *tswt_mid, std::string *tswt_end);
 int32_t swtime_swt2(int swt, L1C_input *l1cinput, l1c_filehandle *l1cfile, int32_t norbs, double *tswt,
-                    double tcross, double mgv, double *tmgv,double *orb_time_tot,size_t norbs_tot);
+                    double tcross, double mgv, double *tmgv, double *orb_time_tot, size_t norbs_tot);
 int32_t swtime_swt2_segment(int swt, L1C_input *l1cinput, l1c_filehandle *l1cfile, int32_t norbs,
-                            double *tswt, double tcross, double mgv, double *tmgv,double *orb_time_tot,size_t norbs_tot);
+                            double *tswt, double tcross, double mgv, double *tmgv, double *orb_time_tot,
+                            size_t norbs_tot);
 int32_t write_L1C_granule2(int swtd, l1c_filehandle *l1cfile, L1C_input *l1cinput, double *tmgv,
-                           float **lat_gd, float **lon_gd, float **alt_gd,double *orb_time_tot);
+                           float **lat_gd, float **lon_gd, float **alt_gd, double *orb_time_tot);
 int32_t open_l1atol1c3(L1C_input *l1cinput, l1c_filehandle *l1cfile);
 int search_l1cgen(L1C_input *l1cinput, l1c_str *l1cstr, l1c_filehandle *l1cfile, short **gdindex);
 int32_t create_SOCEA2(int swtd, L1C_input *l1cinput, l1c_filehandle *l1cfile, float **lat_gd, float **lon_gd,
                       float **altitude, double *tswt);
 int32_t openL1Cgrid3(l1c_str *l1cstr, l1c_filehandle *l1cfile, L1C_input *l1cinput);
-int32_t add_proc_group_l1c(L1C_input *l1cinput,l1c_filehandle *l1cfile,const char* filename);
+int32_t add_proc_group_l1c(L1C_input *l1cinput, l1c_filehandle *l1cfile, const char *filename);
 
 }  // namespace l1c
 #endif

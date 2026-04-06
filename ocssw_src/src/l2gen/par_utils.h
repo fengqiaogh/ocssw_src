@@ -25,11 +25,12 @@
 #define PAR_0_2023 176.41f
 #define TAUCONS_LOW 15.0f
 #define TAUCONS_HIGH 300.0f
+#define OCI_BANDS 20
 
 /**
  * @brief Binary search algorithm
  *
- * @param arr input array, sorted (either desending or ascending order. It is
+ * @param arr input array, sorted (either descending or ascending order. It is
  * user responsibility to sort the array)
  * @param s start
  * @param e end
@@ -249,8 +250,8 @@ void getcldalbe(float *TauCld, float *CF, float cosSZ, float t_obs,
                 float *t_range, float *albe_obs, float *TauCld_obs,
                 float *CF_obs, size_t t_step, float *wl, size_t bands_num);
 
-float getosa(float wl, float sza, float wind, float chl, float fr,
-             const luts_par *luts_data);
+float getosa(float wl, float csza, float wind, float chl, float fr,
+             const luts_par *luts_data, int band, int nbands);
 
 void get_luts_data(l2str *l2rec, luts_par *luts_data);
 
@@ -309,4 +310,9 @@ float interp_as_tauhigh(float csz);
  */
 float SunGlint(float sz, float vz, float ra, float ws);
 
+
+float interp4d_TG_fast(luts_par *luts_data, float *wv_bands, float water_vapor, float ozone, float airmass,
+                      int n_bands, int i_band);
+float interp4d_TD_fast(luts_par *luts_data, float *wv_bands, float angstrom, float aot, float airmass,
+                      int n_bands, int i_band);
 #endif

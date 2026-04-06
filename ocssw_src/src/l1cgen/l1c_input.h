@@ -57,7 +57,7 @@ class L1C_input {
     int start_timeflag;
 
     //    char all_l1cprod[MAXPRODl1c][50];//string length rather than number of strings
-    int selgran[10];    // selected granules id (not indexes) for L1C processing, up to 10 files
+    int selgran[10];        // selected granules id (not indexes) for L1C processing, up to 10 files
     int32_t ix_l1cprod[3];  // 3x1 array with selected l1c products, 1: selected
     int32_t l1c_pflag;      // l1c processing flag, 0: no, 1: yes
     float grid_resolution;  // grid resolution in km
@@ -65,7 +65,6 @@ class L1C_input {
     int32_t selday;
     int32_t selmon;
     int32_t selyear;
-  
 
     int32_t projection;
     int32_t sort_method;
@@ -74,15 +73,15 @@ class L1C_input {
     int cloud_correct;     // cloud distortion correction , 1: yes
     int cloud_type;
     int demcloud_flag;
-                        // multi  attributes (view, pol, bands)
+    // multi  attributes (view, pol, bands)
     bool overlap_vflag;  // tells if we want merged views
     bool overlap_pflag;  // tells if we want merged polarizations
     bool overlap_bflag;  // tells if we want merged spectral bands
                          // uncertainty params l1c merged products
-    int32_t unc_meth;   // uncertainity calculation method
-    float unc_thres_v;  // uncertainity threshold of angular merged products as %
-    float unc_thres_p;  // same but for polarization
-    float unc_thres_b;  // same but for multispectral products, same view and polarization
+    int32_t unc_meth;    // uncertainity calculation method
+    float unc_thres_v;   // uncertainity threshold of angular merged products as %
+    float unc_thres_p;   // same but for polarization
+    float unc_thres_b;   // same but for multispectral products, same view and polarization
 
     // constr/destruc
     L1C_input();

@@ -31,6 +31,7 @@ then
     export BRANCH_FOCS=$BASE_T_TAG
     export BRANCH_POLARIMETRY=$BASE_T_TAG
     export BRANCH_UAA=$BASE_T_TAG
+    export BRANCH_TRACE_GAS=$BASE_T_TAG
 else
     export BRANCH_OCSSW=develop
     export BRANCH_OEL_UTIL=develop
@@ -39,6 +40,7 @@ else
     export BRANCH_FOCS=develop
     export BRANCH_POLARIMETRY=develop
     export BRANCH_UAA=develop
+    export BRANCH_TRACE_GAS=develop
 fi
 
 #
@@ -114,6 +116,11 @@ cd $TAGDIR/sat/unified_dtdb_aerosol
 check_return "UAA dir does not exist"
 git fetch && git checkout $BRANCH_UAA && if [[ $tag_type != "V" ]]; then git pull; fi
 check_return "UAA checkout is bad"
+
+cd $TAGDIR/sat/pace_no2
+check_return "Trace Gas dir does not exist"
+git fetch && git checkout $BRANCH_TRACE_GAS && if [[ $tag_type != "V" ]]; then git pull; fi
+check_return "Trace Gas checkout is bad"
 
 #
 # make sure all root repos are checked in and clean
@@ -204,17 +211,17 @@ check_return "UAA cmake failed"
 make install
 check_return "UAA make failed"
 
-
 #
-# make the ocssw/scripts PEX files
+# build Trace Gas
 #
-
-
-
-#
-# make the polarimetry PEX files
-#
-
+cd $TAGDIR/sat/pace_no2
+rm -rf build
+mkdir build
+cd build
+cmake ..
+check_return "Trace Gas cmake failed"
+make -j 20 install
+check_return "Trace Gas make failed"
 
 
 #
@@ -246,6 +253,9 @@ check_return "polarimetry/gpc tag failed"
 
 cd $TAGDIR/sat/unified_dtdb_aerosol && git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
 check_return "UAA tag failed"
+
+cd $TAGDIR/sat/pace_no2 && git tag $THETAG -a -m "$THEMESSAGE" && git push --tags
+check_return "sat/pace_no2 tag failed"
 
 # build the tag for all archetecures
 # make sure build is clean

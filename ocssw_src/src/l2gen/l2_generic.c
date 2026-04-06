@@ -26,7 +26,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <string.h> 
+#include <string.h>
 #include <time.h>
 #include <math.h>
 #include "l12_proto.h"
@@ -364,6 +364,16 @@ int openl2(filehandle *l2file) {
 
     bindex_set(l2file->iwave, l2file->nbands + l2file->nbandsir, BANDW);
 
+    // if fwave doesnt exist in filehandle, allocate it
+    if (l2file->fwave == NULL) {
+        l2file->fwave = (float *) allocateMemory(
+            (numBands + numBandsIR) * sizeof(float), "l2file->fwave");
+        // convert int wavelengths to float
+        for (i = 0; i < numBands + numBandsIR; i++) {
+            l2file->fwave[i] = (float)l2file->iwave[i];
+        }
+    }
+    
     if (l2file->aw == NULL) {
         l2file->aw = (float *) allocateMemory(numBands * sizeof (float), "l2file->aw");
     }
@@ -373,12 +383,16 @@ int openl2(filehandle *l2file) {
     if (l2file->Fonom == NULL) {
         l2file->Fonom = (float *) allocateMemory(numBands * sizeof (float), "l2file->Fonom");
     }
-
+    int status = set_solar_irradiance(l1_input->f0file);
     for (i = 0; i < l2file->nbands; i++) {
         l2file->aw[i] = aw_spectra(l2file->iwave[i], BANDW);
         l2file->bbw[i] = bbw_spectra(l2file->iwave[i], BANDW);
         if (l1_input->outband_opt >= 2) {
-            get_f0_thuillier_ext(l2file->iwave[i], BANDW, l2file->Fonom + i);
+            status = get_f0(l2file->iwave[i],BANDW, l2file->Fonom + i);
+            if (status) {
+                printf("-E- %s:%d - Can't calculate solare irradiance.\n", __FILE__, __LINE__);
+                exit(EXIT_FAILURE);
+            }
         } else {
             l2file->Fonom[i] = l2file->Fobar[i];
         }
@@ -390,7 +404,12 @@ int openl2(filehandle *l2file) {
     /*                                                                  */
     tot_prod = prodlist(l2file->sensorID, l1_input->evalmask, l2file->l2prod,
             l2file->def_l2prod, l2file->l2_prod_names);
-
+    if (tot_prod > L1_MAXPROD) {
+        fprintf(stderr,
+                "-E- %s:%d: number of requested products (%d) exceeds the maximum number of products (%d) .\n",
+                __FILE__, __LINE__, tot_prod, L1_MAXPROD);
+        return (1);
+    }
     strcpy(l2file->l2_prod_names[tot_prod++], "l2_flags");
 
     printf("\n\nThe following products will be included in %s.\n", l2file->name);
@@ -466,6 +485,20 @@ int openl2(filehandle *l2file) {
         nc_def_grp(ds_id.fid, "geophysical_data", &l2file->grp_id[3]);
         nc_def_grp(ds_id.fid, "navigation_data", &l2file->grp_id[4]);
         nc_def_grp(ds_id.fid, "processing_control", &l2file->grp_id[5]);
+
+        // Add wavelength dimension to sensor_band_parameters grp
+        ds_id.fid = l2file->grp_id[0]; // switch to sensor_band_parameters
+        if (nc_def_dim(ds_id.fid, "wavelength", numBands + numBandsIR, &dumdim)
+            != NC_NOERR) exit(1);
+
+        if(product_3d_exists) { // create float wavelength variable in geophysical data grp if 3d prods exist
+            ds_id.fid = l2file->grp_id[3]; // switch to geophysical data grp
+
+            // create 'wavelength' dimension in geophysical_data grp
+            int dumdim;
+            if (nc_def_dim(ds_id.fid, "wavelength", input->nwavelengths_3d, &dumdim)
+                != NC_NOERR) exit(1);
+        }
     }
 
 
@@ -506,6 +539,19 @@ int openl2(filehandle *l2file) {
     /*                                                                  */
     if (l2file->format == FT_L2NCDF) ds_id.fid = l2file->grp_id[3];
 
+    if (product_3d_exists) {
+        dm[0] = input->nwavelengths_3d;
+        strcpy((char *)dm_name[0], "wavelength");
+        PTB(createDS(ds_id, l2file->sensorID, "band_index", dm, dm_name));
+        int32_t dimids[3];
+        PTB(nc_inq_dimid(ds_id.fid, "wavelength", &dimids[0]));
+        PTB(CreateNCDF(ds_id, "wavelength", "wavelengths", "wavelength", NULL, NULL, "", "",
+		       "nm", 0, 0, 1, 0, BAD_FLT, NC_FLOAT, 1, dimids));
+    }
+
+    dm[0] = numScans;
+    strcpy((char *) dm_name[0], numberOfScanLinesStr);
+
     for (i = 0; i < tot_prod; i++) {
         // Skip parameters already included if user requested them specifically
         if (!strcmp(l2file->l2_prod_names[i], "detnum") ||
@@ -540,8 +586,8 @@ int openl2(filehandle *l2file) {
             dm[2] = n_cloud_phase;
             strcpy((char *) dm_name[2], n_cloud_phase_str );
         }else {
-            dm[2] = input->nwavelengths_3d;
-            strcpy((char *) dm_name[2], wavelength_3d_str);
+            dm[2] = numBands + numBandsIR;
+            strcpy((char *) dm_name[2], "wavelength"); // use fwave dimension for all 3d products
         }
   
         PTB(createDS2(ds_id, l2file->l2_prod_names[i], l2file->productInfos[i],
@@ -658,6 +704,15 @@ int openl2(filehandle *l2file) {
                 PTB(setAttr(ds_id, "solar_irradiance", nt_f32, 1, &tmpFloat));
             }
         }
+
+        if(p->param_type == PARAM_TYPE_ALL_WAVE || p->param_type == PARAM_TYPE_VIS_WAVE) {
+            // add float wavelength attribute if fwave is available (for the fwave attribute on single wavelength products)
+            if (l2file->fwave != NULL && p->prod_ix != -1) {
+                float fwave_val = l2file->fwave[p->prod_ix];
+                PTB(setAttr(ds_id, "wavelength", nt_f32, 1, &fwave_val));
+            }
+        }
+
         /*                                                            */
         /* Add bad value attributes to HDF4 files                     */
         /*                                                            */
@@ -700,8 +755,9 @@ int openl2(filehandle *l2file) {
     if (l2file->format == FT_L2NCDF) ds_id.fid = l2file->grp_id[0];
 
     dm[0] = numBands + numBandsIR;
-    strcpy((char *) dm_name[0], totalBandNumberStr);
+    strcpy((char *) dm_name[0], "wavelength");
     PTB(createDS(ds_id, l2file->sensorID, "wavelength", dm, dm_name));
+    PTB(createDS(ds_id, l2file->sensorID, "fwave", dm, dm_name));
 
     if(product_3d_exists) {
         dm[0] = input->nwavelengths_3d;
@@ -752,7 +808,7 @@ int openl2(filehandle *l2file) {
 
     // cleanup and populate calfile metadata
     char *calfile_str;
-    if ((calfile_str = malloc(strlen(l1_input->calfile) + 1)) == NULL) {
+    if ((calfile_str = malloc(strlen(l1_input->calfile) + 256)) == NULL) {
         fprintf(stderr, "-E- %s line %d: Unable to copy calfile string.\n",
                 __FILE__, __LINE__);
         exit(1);
@@ -904,10 +960,19 @@ int openl2(filehandle *l2file) {
     /*                                                                  */
     if (l2file->format == FT_L2NCDF) ds_id.fid = l2file->grp_id[0];
     PTB(writeDS(ds_id, "wavelength", l2file->iwave, 0, 0, 0, numBands + numBandsIR, 0, 0));
+    PTB(writeDS(ds_id, "fwave", l2file->fwave, 0, 0, 0, numBands + numBandsIR, 0, 0));
 
     if(product_3d_exists) {
         PTB(writeDS(ds_id, "wavelength_3d", input->wavelength_3d, 0, 0, 0, input->nwavelengths_3d, 0, 0));
+
+        // set to geophysical_data grp
+        if (l2file->format == FT_L2NCDF) ds_id.fid = l2file->grp_id[3];
+        PTB(writeDS(ds_id, "band_index", input->wavelength_3d_index, 0, 0, 0, input->nwavelengths_3d, 0, 0));
+        PTB(writeDS(ds_id, "wavelength", input->wavelength_3d_float, 0, 0, 0, input->nwavelengths_3d, 0, 0));
     }
+
+    // set to sensor_band_parameters
+    if (l2file->format == FT_L2NCDF) ds_id.fid = l2file->grp_id[0];
 
     if (numBands > 0) {
         PTB(writeDS(ds_id, "vcal_gain", l1_input->gain, 0, 0, 0, numBands, 0, 0));

@@ -100,5 +100,6 @@ namespace adt {
    */
     void print_error_message_for_adt(const std::string &file_path, const std::string &key_word,
                                      const std::string &message = "Undefined keyword");
+    void init_parameters();
 }
 #endif

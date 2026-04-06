@@ -86,28 +86,43 @@ int L1aFile::writeGlobalAttributes(std::string history, std::string doi, std::st
     return 0;
 }
 
+// Find the start and end indicies of navigation data
 int L1aFile::findNavigationIndex(string startTimeStr, double startTimeInUnixSecs, double endTimeInUnixSecs,
                                  double *navigationTimeData, size_t navigationDataSize, int &startIndex,
                                  int &endIndex) {
-    double currTimeInUnix;
+
     int year, month, day;
     sscanf(startTimeStr.c_str(), "%4d-%2d-%2d", &year, &month, &day);
 
+    // unix time of HKT's start day at 00:00:00
+    double hktStartTimeEpoch = ymds2unix(year, month, day, 0.0);
+
     for (size_t i = 0; i < navigationDataSize; i++) {
-        currTimeInUnix = ymds2unix(year, month, day, navigationTimeData[i]);
-        if ((currTimeInUnix > startTimeInUnixSecs - 10) && (startIndex == 1e6)) {
+
+        // navigation time is in seconds of day and when it crosses the date line, it will be > 86400.
+        // adding this time to the start day's epoch will get you the correct time and also cross the
+        // date line correctly.
+        double hktNavTime = navigationTimeData[i];
+        double navTimeInUnix = hktStartTimeEpoch + hktNavTime;
+
+        // find the start nav time index based on the start time of the packet
+        // 10 second padding (10s earlier) for interpolation purposes 
+        if ((navTimeInUnix > startTimeInUnixSecs - 10) && (startIndex == 1e6)) {
             startIndex = i;
             break;
         }
     }
 
+    // find the end index. Same as start time, extra 10s padding for interpolation purposes
     for (size_t i = navigationDataSize - 1; i >= 0; i--) {
-        currTimeInUnix = ymds2unix(year, month, day, navigationTimeData[i]);
-        if ((currTimeInUnix < endTimeInUnixSecs + 10) && (endIndex == -1)) {
+        double hktNavTime = navigationTimeData[i];
+        double navTimeInUnix = hktStartTimeEpoch + hktNavTime;
+        if ((navTimeInUnix < endTimeInUnixSecs + 10) && (endIndex == -1)) {
             endIndex = i;
             break;
         }
     }
+
     return 0;
 }
 
@@ -891,7 +906,7 @@ int L1aFile::initializeL1aFile(char *l1aFileName, uint16_t maxScans, uint16_t nu
                    string("Attitude sample time (seconds of day)"),  // long name
                    tempVarParameter,                                 // dims
                    BAD_FLT,                                          // fill value
-                   0.0,                                              // min
+                   -30.0,                                              // min
                    172800.0,                                         // max
                    string("seconds"),                                // units
                    string("")                                        // reference
@@ -901,7 +916,7 @@ int L1aFile::initializeL1aFile(char *l1aFileName, uint16_t maxScans, uint16_t nu
     tempVarParameter = {numAttRecordsDim, quaternionElementsDim};
     createVariable(navigationDataGroup,                                   // group
                    string("att_quat"),                                    // name
-                   NC_FLOAT,                                              // type
+                   NC_DOUBLE,                                              // type
                    string("Attitude quaternions (J2000 to spacecraft)"),  // long name
                    tempVarParameter,                                      // dims
                    BAD_FLT,                                               // fill value
@@ -915,7 +930,7 @@ int L1aFile::initializeL1aFile(char *l1aFileName, uint16_t maxScans, uint16_t nu
     tempVarParameter = {numAttRecordsDim, vectorElementsDim};
     createVariable(navigationDataGroup,                                   // group
                    string("att_rate"),                                    // name
-                   NC_FLOAT,                                              // type
+                   NC_DOUBLE,                                              // type
                    string("Attitude angular rates in spacecraft frame"),  // long name
                    tempVarParameter,                                      // dims
                    BAD_FLT,                                               // fill value
@@ -933,7 +948,7 @@ int L1aFile::initializeL1aFile(char *l1aFileName, uint16_t maxScans, uint16_t nu
                    string("Orbit vector time (seconds of day)"),  // long name
                    tempVarParameter,                              // dims
                    BAD_FLT,                                       // fill value
-                   0,                                             // min
+                   -30.0,                                             // min
                    172800.0,                                      // max
                    string("seconds"),                             // units
                    string("")                                     // reference
@@ -943,7 +958,7 @@ int L1aFile::initializeL1aFile(char *l1aFileName, uint16_t maxScans, uint16_t nu
     vector<NcDim> orbitPosVelParameters = {orbRecordsDim, vectorElementsDim};
     createVariable(navigationDataGroup,                     // group
                    string("orb_pos"),                       // name
-                   NC_FLOAT,                                // type
+                   NC_DOUBLE,                                // type
                    string("Orbit position vectors (ECR)"),  // long name
                    orbitPosVelParameters,                   // dims
                    -9999999.0,                              // fill value
@@ -956,7 +971,7 @@ int L1aFile::initializeL1aFile(char *l1aFileName, uint16_t maxScans, uint16_t nu
     // orb_vel
     createVariable(navigationDataGroup,                     // group
                    string("orb_vel"),                       // name
-                   NC_FLOAT,                                // type
+                   NC_DOUBLE,                                // type
                    string("Orbit velocity vectors (ECR)"),  // long name
                    orbitPosVelParameters,                   // dims
                    BAD_FLT,                                 // fill value
@@ -974,7 +989,7 @@ int L1aFile::initializeL1aFile(char *l1aFileName, uint16_t maxScans, uint16_t nu
                    string("Tilt time (seconds of day)"),  // long name
                    tiltParameters,                        // dims
                    BAD_FLT,                               // fill value
-                   0,                                     // min
+                   -30.0,                                     // min
                    172800.0,                              // max
                    string("seconds"),                     // units
                    string("")                             // reference
@@ -1299,12 +1314,17 @@ int L1aFile::writeCalibrationData(DimensionShape *dimShape, uint32_t isc, uint16
 
 // write out meta data for scan line attributes. Extract time from the ancillary data packet and report
 // any errors
-int L1aFile::writeScanMetaData(DimensionShape *dimShape, uint32_t scanNum, uint8_t *ancillaryData, uint8_t *sciPacketSequenceError,
+int L1aFile::writeScanMetaData(DimensionShape *dimShape, NavigationTimeFrame* navTimeFrame, short dataType, uint32_t scanNum, uint8_t *ancillaryData, uint8_t *sciPacketSequenceError,
                                int8_t *ccdLineError, int32_t *spinID, AncillaryPktTimeStamp &timeStruct) {
-    
     int32_t year = 0;
     int32_t day = 0;
     double startTime = 0.0;
+
+    // Static so it lives for the duration of the program.
+    // Tick for science file when time string has been set already so epoch time for scan_start_time does
+    // not advance forward if crossing the date. The next Sci file will contain a new start time epoch and
+    // it should NOT be updated.
+    static bool isSciFileTimeStrSet = false;
 
     // Extract and convert times to seconds of day
     // Extract CCSDS scan start times
@@ -1314,19 +1334,46 @@ int L1aFile::writeScanMetaData(DimensionShape *dimShape, uint32_t scanNum, uint8
 
     vector<uint32_t> ccsdsStartScanSeconds(scanNum);
     vector<int32_t> ccsdsStartScanSubSeconds(scanNum);
-
     double firstGoodTime = BAD_FLT;
     for (size_t i = 0; i < scanNum; i++) {
         uint32_t apid = (ancillaryData[i * ANCSIZE] % 8) * 256 + ancillaryData[i * ANCSIZE + 1];
         if (apid == ANCILLARY_APID) {
             getAncillaryPacketTime(&ancillaryData[i * ANCSIZE], year, day, startTime);
-            if (firstGoodTime == BAD_FLT)
+
+            // first good time and is a science data file, update navigation time
+            if (firstGoodTime == BAD_FLT && dataType == SCIENCE_FILE && !navTimeFrame->isStartScanTimeSet()) {
                 firstGoodTime = startTime;
-            if (startTime < firstGoodTime)
-                startTimeArr[i] = startTime + SECONDS_IN_DAY;  // Ensure that startTimeArr[i] stays relative
-                                                               // to the same day that the granule started
-            else
+                navTimeFrame->scanStartTime = startTime;
+
+                // var is static and should be set back to false so that an epoch can be set in the l1a file.
+                // when there is a large gap, the l1a files do not merge and navTimeFrame's scan start time is 
+                // resetted and a new l1a file for the science file is made.
+                isSciFileTimeStrSet = false;
+            }
+            else if (firstGoodTime == BAD_FLT) {
+                firstGoodTime = startTime;
+            }
+
+            // Adjust time so it stays relative to the same day the granule started when it crosses over to the next day.
+            // If it's a science file, check navTimeFrame for the start time because during L1A file merge, the first L1A
+            // science file will have the correct start time for the granule, and subsequent L1A science files will need to be adjusted.
+            if (dataType == SCIENCE_FILE && navTimeFrame->isStartScanTimeSet() && startTime < navTimeFrame->scanStartTime) {
+                startTime += SECONDS_IN_DAY;
+            }
+
+            // for first science files and all other files
+            else if (startTime < firstGoodTime) {
+                startTime += SECONDS_IN_DAY;
+            }
+            
+            // not first good time, update the last time for science file along with the arr
+            if (dataType == SCIENCE_FILE) {
+                startTimeArr[i] = startTime; 
+                navTimeFrame->scanEndTime = startTime;
+            }
+            else {
                 startTimeArr[i] = startTime;
+            }
 
             uint32_t ui32;
             memcpy(&ui32, &ancillaryData[i * ANCSIZE + timeOffset + 4], 4);
@@ -1355,14 +1402,26 @@ int L1aFile::writeScanMetaData(DimensionShape *dimShape, uint32_t scanNum, uint8
     
     // get the size of the current scan
     var.putVar(start, count, startTimeArr.data());
-    
-    // TODO: add an if statement so this is only done once. Crossing dateline might 
-    // advance the date
+
+    // format epoch and update units in scan_start_time to reflect it
     double tmpTime = yds2unix(timeStruct.year, timeStruct.day, timeStruct.second);
     string timeStr = unix2isodate(tmpTime, 'G');
     timeStr = timeStr.substr(0, 10);
     timeStr.insert(0, "seconds since ");
-    var.putAtt("units", timeStr);
+
+    // Science file already have epoch recorded for scan_start_time, dont update it
+    if (dataType == SCIENCE_FILE && !isSciFileTimeStrSet) {
+        var.putAtt("units", timeStr);
+        isSciFileTimeStrSet = true;
+    }
+    // all other files can update the epoch time.
+    // TODO: Most other file types so not span as long and never merge, so usually the epoch is correct even when crossing
+    //          date line. Wrong epoch time has not occured at all for non-sci files, but if it does in the future, NavTimeFrame
+    //          should be updated to handle all datatype and not just science file.
+    else if (dataType != SCIENCE_FILE) {
+        var.putAtt("units", timeStr);
+    }
+
 
     // Scan start time (CCSDS)
 
@@ -2295,14 +2354,15 @@ void L1aFile::synchronizeEpochTime(vector<double> &navigationTimeArr, size_t arr
     if (ancillaryEpochTime != hktFileEpochTime) {
         double epochDiff = hktFileEpochTime - ancillaryEpochTime;
         for (size_t i = 0; i < arrSize; i++) {
-            navigationTimeArr[i] += epochDiff;
+            double newTime = navigationTimeArr[i] + epochDiff;
+            navigationTimeArr[i] = newTime;
         }
     }
 }
 
 // Read the hktlist and open it to get the basic spacecraft navigation data like attitude time, speed etc.
-int L1aFile::writeNavigationData(DimensionShape* dimShape, std::string hktList, AncillaryPktTimeStamp &startTime,
-                                 AncillaryPktTimeStamp &endTime) {
+int L1aFile::writeNavigationData(DimensionShape* dimShape, NavigationTimeFrame* navTimeFrame, short dataType, std::string hktList, 
+                                 AncillaryPktTimeStamp &startTime, AncillaryPktTimeStamp &endTime) {
     uint16_t maxNumNavRecords = 10000;  // max records possible for navigation data
     size_t attitudeRecCount = 0;
     size_t orbitRecCount = 0;
@@ -2311,10 +2371,10 @@ int L1aFile::writeNavigationData(DimensionShape* dimShape, std::string hktList, 
     // convert times to unix seconds
     double startTimeAsUnixSecs = yds2unix(startTime.year, startTime.day, startTime.second);
     double endTimeAsUnixSecs = yds2unix(endTime.year, endTime.day, endTime.second);
-    double epochTimeAsUnixSecs = yds2unix(startTime.year, startTime.day, 0.0);
+    double ancillaryPktStartTimeEpoch = yds2unix(startTime.year, startTime.day, 0.0);
 
     // navigation_data group's time units: seconds since YYYY-MM-DD
-    string epochIsodateStr = unix2isodate(epochTimeAsUnixSecs, 'G');
+    string epochIsodateStr = unix2isodate(ancillaryPktStartTimeEpoch, 'G');
     epochIsodateStr = epochIsodateStr.substr(0, 10);
     epochIsodateStr.insert(0, "seconds since ");
 
@@ -2332,16 +2392,16 @@ int L1aFile::writeNavigationData(DimensionShape* dimShape, std::string hktList, 
     for (size_t i = 0; i < maxNumNavRecords; i++)
         tiltTimes[i] = BAD_FLT;
 
-    float *attitudeRates = new float[3 * maxNumNavRecords];
+    double *attitudeRates = new double[3 * maxNumNavRecords];
     for (size_t i = 0; i < 3 * maxNumNavRecords; i++)
         attitudeRates[i] = BAD_FLT;
-    float *attitudeQuaternions = new float[4 * maxNumNavRecords];
+    double *attitudeQuaternions = new double[4 * maxNumNavRecords];
     for (size_t i = 0; i < 4 * maxNumNavRecords; i++)
         attitudeQuaternions[i] = BAD_FLT;
-    float *orbitPositions = new float[3 * maxNumNavRecords];
+    double *orbitPositions = new double[3 * maxNumNavRecords];
     for (size_t i = 0; i < 3 * maxNumNavRecords; i++)
         orbitPositions[i] = -9999999;
-    float *orbitVelocities = new float[3 * maxNumNavRecords];
+    double *orbitVelocities = new double[3 * maxNumNavRecords];
     for (size_t i = 0; i < maxNumNavRecords; i++)
         orbitVelocities[i] = -9999999;
     for (size_t i = maxNumNavRecords; i < 3 * maxNumNavRecords; i++)
@@ -2354,7 +2414,8 @@ int L1aFile::writeNavigationData(DimensionShape* dimShape, std::string hktList, 
         tiltFlags[i] = 0;
 
     NcVar var;
-
+    
+    // go through the hkt files and grab the telemetry data with times that are in range with the ancillary time
     while (getline(hktFile, hktFileName)) {  // get the HKT file, line by line. Each line is a new file.
         try {
             NcFile hktFile(hktFileName, NcFile::read);
@@ -2380,9 +2441,9 @@ int L1aFile::writeNavigationData(DimensionShape* dimShape, std::string hktList, 
             // conver the time data into unix time
             double hktTimeAsSeconds = (hktHour * 3600) + (hktMin * 60) + hktSec;
             double hktStartTimeAsUnix = ymds2unix(hktYear, hktMonth, hktDay, hktTimeAsSeconds);
-            double hktFileEpoch = ymds2unix(hktYear, hktMonth, hktDay, 0.0);
+            double hktStartTimeEpoch = ymds2unix(hktYear, hktMonth, hktDay, 0.0);
 
-            // if hkt start time is outside the end time of the ancillary data, skip it
+            // hkt file is later than the scans end time Skip.
             if (hktStartTimeAsUnix > endTimeAsUnixSecs + 10) {
                 continue;
             }
@@ -2395,7 +2456,6 @@ int L1aFile::writeNavigationData(DimensionShape* dimShape, std::string hktList, 
             // conver the time data into unix time
             hktTimeAsSeconds = (hktHour * 3600) + (hktMin * 60) + hktSec;
             double hktEndTimeAsUnix = ymds2unix(hktYear, hktMonth, hktDay, hktTimeAsSeconds);
-            hktFileEpoch = ymds2unix(hktYear, hktMonth, hktDay, 0.0);
 
             // if hkt's end time is before the start time of the ancillary data, skip also
             if (hktEndTimeAsUnix < startTimeAsUnixSecs - 10) {
@@ -2411,38 +2471,57 @@ int L1aFile::writeNavigationData(DimensionShape* dimShape, std::string hktList, 
             int attitudeEndIndex = -1;
             size_t numAttitudeRecords = hktFile.getDim("att_records").getSize();  // att_records dimension
 
+            // HKT has records
             if (numAttitudeRecords > 0) {
-                // read var related to attitude
-                vector<double> hktAttTime(numAttitudeRecords);
-                vector<float> hktAttQuaternions(numAttitudeRecords * numQuaternionElements);
-                vector<float> hktAttRates(numAttitudeRecords * numVectorElements);
 
+                // grab the attitude time and see if this HKT file has data in range
+                // if so, then proceed to grab the other data
+                vector<double> hktAttTime(numAttitudeRecords);
                 hktFile.getGroup("navigation_data").getVar("att_time").getVar(hktAttTime.data());
+
+                // checks if HKT's time is in range from the requested L1A time
                 findNavigationIndex(timeCoverageStart, startTimeAsUnixSecs, endTimeAsUnixSecs,
                                     hktAttTime.data(), numAttitudeRecords, attitudeStartIndex,
                                     attitudeEndIndex);
+                
 
-                // grab quaternions and rate of attitude if there is data
-                int startEndIndexDiff = attitudeEndIndex - attitudeStartIndex;
-                if (startEndIndexDiff > 0) {
-                    // grab quaternions and rate from the hkt file
-                    hktFile.getGroup("navigation_data").getVar("att_quat").getVar(hktAttQuaternions.data());
-                    hktFile.getGroup("navigation_data").getVar("att_rate").getVar(hktAttRates.data());
+                // save the attitude time to check for navigation coverage later, only if science file
+                // start time has not been noted yet
+                if (navTimeFrame->navigationStartTime == BAD_FLT && dataType == SCIENCE_FILE) {
+                    navTimeFrame->navigationStartTime = hktAttTime[attitudeStartIndex];
+                    navTimeFrame->navigationEndTime = hktAttTime[attitudeEndIndex];
+                }
+                // only end time gets updated once start time is recorded
+                else if (dataType == SCIENCE_FILE)  {
+                    navTimeFrame->navigationEndTime = hktAttTime[attitudeEndIndex];
+                }
 
-                    // fix the time if l1a and hkt files have different time epoch
-                    synchronizeEpochTime(hktAttTime, numAttitudeRecords, hktFileEpoch, epochTimeAsUnixSecs);
+                // time is in range, add the attitude time, quaternions and rate data for that range
+                if (attitudeEndIndex >= attitudeStartIndex) {
+                    size_t numElementsToAdd = attitudeEndIndex - attitudeStartIndex + 1;
+                    
+                    // att time
+                    // fix the time of L1A and HKT if files have different time epoch
+                    synchronizeEpochTime(hktAttTime, numAttitudeRecords, hktStartTimeEpoch, ancillaryPktStartTimeEpoch);
+                    memcpy(attitudeTimes + attitudeRecCount, hktAttTime.data() + attitudeStartIndex, numElementsToAdd * sizeof(double));
 
-                    // concatenate arrays
-                    size_t numIndices = attitudeEndIndex - attitudeStartIndex + 1;
-                    memcpy(attitudeTimes + attitudeRecCount, hktAttTime.data() + attitudeStartIndex,
-                           numIndices * sizeof(double));
-                    memcpy(attitudeQuaternions + attitudeRecCount * numQuaternionElements,
-                           hktAttQuaternions.data() + attitudeStartIndex * numQuaternionElements,
-                           numQuaternionElements * numIndices * sizeof(float));
-                    memcpy(attitudeRates + attitudeRecCount * numVectorElements,
-                           hktAttRates.data() + attitudeStartIndex * numVectorElements,
-                           numVectorElements * numIndices * sizeof(float));
-                    attitudeRecCount += numIndices;
+                    // att_quat
+                    vector<double> hktQuaternionData(numElementsToAdd * numQuaternionElements);
+                    vector<size_t> start{(size_t)attitudeStartIndex, 0};
+                    vector<size_t> count{numElementsToAdd, (size_t)numQuaternionElements};
+                    
+                    hktFile.getGroup("navigation_data").getVar("att_quat").getVar(start, count, hktQuaternionData.data());
+                    memcpy(attitudeQuaternions + attitudeRecCount * numQuaternionElements, hktQuaternionData.data(), 
+                            numQuaternionElements * numElementsToAdd * sizeof(double));
+                    
+                    // att_rate
+                    vector<double> hktAttRateData(numElementsToAdd * numVectorElements);
+                    count.assign({numElementsToAdd, (size_t)numVectorElements});
+                    hktFile.getGroup("navigation_data").getVar("att_rate").getVar(start, count, hktAttRateData.data());
+                    memcpy(attitudeRates + attitudeRecCount * numVectorElements, hktAttRateData.data(), 
+                            numVectorElements * numElementsToAdd * sizeof(double));
+                    
+                    attitudeRecCount += numElementsToAdd;
                 }
             }
 
@@ -2452,36 +2531,39 @@ int L1aFile::writeNavigationData(DimensionShape* dimShape, std::string hktList, 
             size_t numOrbitRecords = hktFile.getDim("orb_records").getSize();  // att_records dimension
 
             if (numOrbitRecords > 0) {
-                // read var related to attitude
-                vector<double> hktOrbTime(numOrbitRecords);
-                vector<float> hktOrbPosition(numOrbitRecords * numVectorElements);
-                vector<float> hktOrbVelocities(numOrbitRecords * numVectorElements);
-
-                hktFile.getGroup("navigation_data").getVar("orb_time").getVar(hktOrbTime.data());
+                // find orbit time that is in range of the requested L1A file time
+                vector<double> hktOrbTimeData(numOrbitRecords);
+                hktFile.getGroup("navigation_data").getVar("orb_time").getVar(hktOrbTimeData.data());
                 findNavigationIndex(timeCoverageStart, startTimeAsUnixSecs, endTimeAsUnixSecs,
-                                    hktOrbTime.data(), numOrbitRecords, orbitStartIndex, orbitEndIndex);
+                                    hktOrbTimeData.data(), numOrbitRecords, orbitStartIndex, orbitEndIndex);
+
 
                 // grab quaternions and rate of attitude if there is data
-                int startEndIndexDiff = orbitEndIndex - orbitStartIndex;
-                if (startEndIndexDiff > 0) {
-                    // grab quaternions and rate from the hkt file
-                    hktFile.getGroup("navigation_data").getVar("orb_pos").getVar(hktOrbPosition.data());
-                    hktFile.getGroup("navigation_data").getVar("orb_vel").getVar(hktOrbVelocities.data());
+                if (orbitEndIndex >= orbitStartIndex) {
+                    size_t numElementsToAdd = orbitEndIndex - orbitStartIndex + 1;
+        
 
                     // fix the time if l1a and hkt files have different time epoch
-                    synchronizeEpochTime(hktOrbTime, numOrbitRecords, hktFileEpoch, epochTimeAsUnixSecs);
+                    synchronizeEpochTime(hktOrbTimeData, numOrbitRecords, hktStartTimeEpoch, ancillaryPktStartTimeEpoch);
+                    memcpy(orbitTimes + orbitRecCount, hktOrbTimeData.data() + orbitStartIndex,
+                           numElementsToAdd * sizeof(double));
 
-                    // concatenate arrays
-                    size_t numIndices = orbitEndIndex - orbitStartIndex + 1;
-                    memcpy(orbitTimes + orbitRecCount, hktOrbTime.data() + orbitStartIndex,
-                           numIndices * sizeof(double));
-                    memcpy(orbitPositions + orbitRecCount * numVectorElements,
-                           hktOrbPosition.data() + orbitStartIndex * numVectorElements,
-                           numVectorElements * numIndices * sizeof(float));
-                    memcpy(orbitVelocities + orbitRecCount * numVectorElements,
-                           hktOrbVelocities.data() + orbitStartIndex * numVectorElements,
-                           numVectorElements * numIndices * sizeof(float));
-                    orbitRecCount += numIndices;
+                    // orb_time
+                    vector<double> hktOrbPositionData(numOrbitRecords * numVectorElements);
+                    vector<size_t> start{(size_t)orbitStartIndex, 0};
+                    vector<size_t> count{numElementsToAdd, (size_t)numVectorElements};
+
+                    hktFile.getGroup("navigation_data").getVar("orb_pos").getVar(start, count,hktOrbPositionData.data());
+                    memcpy(orbitPositions + orbitRecCount * numVectorElements, hktOrbPositionData.data(),
+                           numVectorElements * numElementsToAdd * sizeof(double));
+                    
+                    // orb_vel
+                    vector<double> hktOrbVelData(numOrbitRecords * numVectorElements);
+                    hktFile.getGroup("navigation_data").getVar("orb_vel").getVar(start, count, hktOrbVelData.data());
+                    memcpy(orbitVelocities + orbitRecCount * numVectorElements, hktOrbVelData.data(),
+                           numVectorElements * numElementsToAdd * sizeof(double));
+                           
+                    orbitRecCount += numElementsToAdd;
                 }
             }
 
@@ -2492,38 +2574,40 @@ int L1aFile::writeNavigationData(DimensionShape* dimShape, std::string hktList, 
 
             if (numTiltRecords > 0) {
                 // read var related to attitude
-                vector<double> hktTiltTime(numTiltRecords);
-                vector<float> hktTilt(numTiltRecords);
-                vector<float> hktTiltFlags(numTiltRecords);
-
-                hktFile.getGroup("navigation_data").getVar("tilt_time").getVar(hktTiltTime.data());
+                vector<double> hktTiltTimeData(numTiltRecords);
+                hktFile.getGroup("navigation_data").getVar("tilt_time").getVar(hktTiltTimeData.data());
                 findNavigationIndex(timeCoverageStart, startTimeAsUnixSecs, endTimeAsUnixSecs,
-                                    hktTiltTime.data(), numTiltRecords, tiltStartIndex, tiltEndIndex);
+                                    hktTiltTimeData.data(), numTiltRecords, tiltStartIndex, tiltEndIndex);
 
                 // grab quaternions and rate of attitude if there is data
-                int startEndIndexDiff = tiltEndIndex - tiltStartIndex;
-                if (startEndIndexDiff > 0) {
-                    // grab quaternions and rate from the hkt file
-                    hktFile.getGroup("navigation_data").getVar("tilt").getVar(hktTilt.data());
+                if (tiltEndIndex >= tiltStartIndex) {
 
+                    size_t numElementsToAdd = tiltEndIndex - tiltStartIndex + 1;
+           
                     // fix the time if l1a and hkt files have different time epoch
-                    synchronizeEpochTime(hktTiltTime, numTiltRecords, hktFileEpoch, epochTimeAsUnixSecs);
+                    synchronizeEpochTime(hktTiltTimeData, numTiltRecords, hktStartTimeEpoch, ancillaryPktStartTimeEpoch);
+                    memcpy(tiltTimes + tiltRecCount, hktTiltTimeData.data() + tiltStartIndex,
+                           numElementsToAdd * sizeof(double));
+                    
+                    // tilt
+                    vector<float> hktTilt(numTiltRecords);
+                    vector<size_t> start{(size_t)tiltStartIndex};
+                    vector<size_t> count{(size_t) numElementsToAdd};
+                    hktFile.getGroup("navigation_data").getVar("tilt").getVar(start, count, hktTilt.data());
+                    memcpy(tilts + tiltRecCount, hktTilt.data(), numElementsToAdd * sizeof(float));
 
-                    // concatenate arrays
-                    size_t numIndices = tiltEndIndex - tiltStartIndex + 1;
-                    memcpy(tiltTimes + tiltRecCount, hktTiltTime.data() + tiltStartIndex,
-                           numIndices * sizeof(double));
-                    memcpy(tilts + tiltRecCount, hktTilt.data() + tiltStartIndex, numIndices * sizeof(float));
 
-                    // check to see if there is tilt flag data in the HKT file
+                    // tilt_flag
+                    vector<float> hktTiltFlags(numTiltRecords);
                     NcVar tiltFlagVar = hktFile.getGroup("navigation_data").getVar("tilt_flag");
                     if (!tiltFlagVar.isNull()) {
-                        // grab and save the flag data and copy it to the outfile tiltFlag array
-                        tiltFlagVar.getVar(hktTiltFlags.data());
-                        memcpy(tiltFlags + tiltRecCount, hktTiltFlags.data() + tiltStartIndex, numIndices);
+
+                        // amt of flags is the same as the tilt data, which is based on the number of records
+                        tiltFlagVar.getVar(start, count, hktTiltFlags.data());
+                        memcpy(tiltFlags + tiltRecCount, hktTiltFlags.data(), numElementsToAdd);
 
                         // set tilt time and tile angle to fill value where the tilt flag is set
-                        for (size_t i = tiltRecCount; i < tiltRecCount + numIndices; i++) {
+                        for (size_t i = tiltRecCount; i < tiltRecCount + numElementsToAdd; i++) {
                             if (tiltFlags[i] > 0) {
                                 tiltTimes[i] = BAD_FLT;
                                 tilts[i] = BAD_FLT;
@@ -2531,7 +2615,7 @@ int L1aFile::writeNavigationData(DimensionShape* dimShape, std::string hktList, 
                         }
                     }
 
-                    tiltRecCount += numIndices;
+                    tiltRecCount += numElementsToAdd;
                 }
             }
 

@@ -621,6 +621,8 @@ int readl1_safe(filehandle *file, int32_t scan, l1str *l1rec, int lonlat) {
                 if (rad_data[ip] == radFillValue[ib]) {
                     l1rec->Lt[ipb] = BAD_FLT;
                     l1rec->navfail[ip] = 1;
+                    l1rec->lat[ip] = BAD_FLT;
+                    l1rec->lon[ip] = BAD_FLT;
                 } else {
                     l1rec->Lt[ipb] = (rad_data[ip] * radScale[ib] + radOffset[ib]) / 10.;  // BYSCAN
 

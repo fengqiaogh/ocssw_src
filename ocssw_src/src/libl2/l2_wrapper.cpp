@@ -27,8 +27,8 @@ std::array<std::vector<float>, MAXNFILES> l2_latitude;   // Latitude values
 std::array<std::vector<float>, MAXNFILES> l2_longitude;  // Longitude values
 
 // Arrays to store sensor-specific information
-std::array<std::vector<uint8_t>, MAXNFILES> mside;   // Mirror side
-std::array<std::vector<uint8_t>, MAXNFILES> detnum;  // Detector number
+std::array<std::vector<int8_t>, MAXNFILES> mside;   // Mirror side
+std::array<std::vector<int8_t>, MAXNFILES> detnum;  // Detector number
 std::array<std::vector<int32_t>, MAXNFILES> pixnum;  // Pixel number
 
 // Index tracking which file is currently being processed

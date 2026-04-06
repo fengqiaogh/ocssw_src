@@ -1,9 +1,13 @@
 import sys
 import numpy as np
 import datetime
+from datetime import timezone
+
+__version__ = "1.2.0 (2026-01-09)"
 
 TAI58_OFFSET = datetime.datetime(1970, 1, 1) - datetime.datetime(1958, 1, 1)
 LEAPSEC = 37  # TODO: look up by year
+GPSSEC = 18
 
 def decode_timestamp(seconds,subseconds):
     return float(seconds) + float(subseconds) / pow(2,8*subseconds.itemsize)
@@ -23,8 +27,12 @@ def readTimestamp(data):
 
 def tai58_as_datetime(tai58):
     # convert tai58 (seconds since 1958, including leapsecs) to datetime object
-    dt = datetime.datetime.utcfromtimestamp(tai58 - LEAPSEC) - TAI58_OFFSET
+    dt = datetime.datetime.fromtimestamp(tai58 - LEAPSEC, timezone.utc) - TAI58_OFFSET
     return dt  # seconds since Jan 1, 1970
+
+def gps_as_datetime(gpstime):
+    dt = datetime.datetime(1980, 1, 6) + datetime.timedelta(seconds=gpstime- GPSSEC)
+    return dt
 
 def seconds_since(tai58, basetime=None):
     # translate TAI58 to seconds since a baseline time (defaults to start of day)

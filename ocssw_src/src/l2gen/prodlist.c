@@ -65,6 +65,9 @@ int32 prodlist(int32 sensorID, int32 evalmask, const char *inprod, const char *d
             strncpy(outprod[tot_prod], &tmp_str[k], i - k);
             outprod[tot_prod][i - k] = '\0';
             tot_prod++;
+            if (tot_prod > L1_MAXPROD) {
+                return tot_prod;
+            }
             if (tmp_str[i] == '\0')
                 break;
         }
@@ -81,7 +84,9 @@ int32 prodlist(int32 sensorID, int32 evalmask, const char *inprod, const char *d
             for (k = tot_prod - 1; k > i; k--)
                 strcpy(outprod[k + nwave - 1], outprod[k]);
             tot_prod = tot_prod + nwave - 1;
-
+            if (tot_prod > L1_MAXPROD) {
+                return tot_prod;
+            }
             // replace
             p1 = outprod[i];
             p2 = tmp_ptr;
@@ -112,7 +117,9 @@ int32 prodlist(int32 sensorID, int32 evalmask, const char *inprod, const char *d
             for (k = tot_prod - 1; k > i; k--)
                 strcpy(outprod[k + nwaveVIS - 1], outprod[k]);
             tot_prod = tot_prod + nwaveVIS - 1;
-
+            if (tot_prod > L1_MAXPROD) {
+                return tot_prod;
+            }
             // replace
             p1 = outprod[i];
             p2 = tmp_ptr;
@@ -142,7 +149,9 @@ int32 prodlist(int32 sensorID, int32 evalmask, const char *inprod, const char *d
             for (k = tot_prod - 1; k > i; k--)
                 strcpy(outprod[k + nwaveIR - 1], outprod[k]);
             tot_prod = tot_prod + nwaveIR - 1;
-
+            if (tot_prod > L1_MAXPROD) {
+                return tot_prod;
+            }
             // replace
             p1 = outprod[i];
             p2 = tmp_ptr;

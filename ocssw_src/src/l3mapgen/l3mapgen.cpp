@@ -7,6 +7,17 @@
 #include "l3mapgen.h"
 
 #include "OutFile.h"
+#include "OutFilePgm.h"
+#include "OutFilePpm.h"
+#include "OutFilePpmRgb.h"
+#include "OutFilePng.h"
+#include "OutFilePngRgb.h"
+#include "OutFileTiff.h"
+#include "OutFileTiffRgb.h"
+#include "OutFileTiffGray.h"
+#include "OutFileTiffColor.h"
+#include "OutFileHdf4.h"
+#include "OutFileNetcdf4.h"
 #include <L3FileSMI.h>
 
 #include <iostream>
@@ -26,60 +37,44 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <boost/algorithm/string.hpp>
-#define EXIT_LOG(...)                                                                     \
-    {                                                                                     \
-        __VA_ARGS__;                                                                      \
-        std::cerr << "Exiting. See line " << __LINE__ << " in " << __FILE__ << std::endl; \
-        exit(EXIT_FAILURE);                                                               \
-    }
+#include "Wave3DParsing.hpp"
+#include "CacheSize.h"
 
 using namespace std;
 using namespace l3;
 
 #define NUM_SEARCH_POINTS 51
 
-enum MeasurementType { Avg, Stdev, Variance, Nobs, Nscenes, ObsTime, BinNum };
-enum InterpType { Interp_Nearest, Interp_Bin, Interp_Linear, Interp_Area };
-enum EastWest { notEastOrWest, IsEast, IsWest };
-// namespace to hold 3d expansion/mapping between 3D and 2D
-namespace wv3d {
-std::vector<std::string> wavelength_3d_list_separated;
-std::unordered_map<std::string, std::vector<int32_t>> wv3d_2d_name_to_3d_expansion;
-std::unordered_map<std::string, std::string> wv3d_3d_name_to_2d_name;
-std::vector<std::string> output_products_with_3d;
-size_t wavelength_3d_size;
-bool numericalOrder(const std::string& a, const std::string& b) {
-                    return std::stoi(a) < std::stoi(b);
-    }
-}  // namespace wv3d
+/** Measurement types for different data processing */
+enum MeasurementType { AVG, STDEV, VARIANCE, NOBS, NSCENES, OBS_TIME, BIN_NUM };
 
-const std::unordered_map<std::string, std::vector<int32_t>>& get_wv3d_2d_name_to_3d_expansion() {
-    return wv3d::wv3d_2d_name_to_3d_expansion;
-}
+/** Interpolation types for mapping data */
+enum InterpType { INTERP_NEAREST, INTERP_BIN, INTERP_LINEAR, INTERP_AREA };
 
-const std::unordered_map<std::string, std::string>& get_wv3d_3d_name_to_2d_name() {
-    return wv3d::wv3d_3d_name_to_2d_name;
-}
+/** Constants for East and West Checks */
+enum EastWest { NOT_EAST_OR_WEST, IS_EAST, IS_WEST };
 
-size_t get_len_wv3d() {
-    return wv3d::wavelength_3d_size;
-}
 
-std::string get_modifier_from_measure(MeasurementType measure) {
+/**
+ * @brief Gets the modifier string based on the measurement type.
+ * @param measure The type of measurement.
+ * @return The modifier string.
+ */
+string getModifierFromMeasure(MeasurementType measure) {
     switch (measure) {
-        case Avg:
+        case AVG:
             return "";
-        case Stdev:
+        case STDEV:
             return "_stdev";
-        case Variance:
+        case VARIANCE:
             return "_var";
-        case Nobs:
+        case NOBS:
             return "_nobs";
-        case Nscenes:
+        case NSCENES:
             return "_nscenes";
-        case ObsTime:
+        case OBS_TIME:
             return "_obs_time";
-        case BinNum:
+        case BIN_NUM:
             return "_bin_num";
         default:
             return "";
@@ -88,28 +83,34 @@ std::string get_modifier_from_measure(MeasurementType measure) {
 // global params for program
 double widthInDeg;
 double heightInDeg;
-double mapEast;
-double mapWest;
+double mapEast; /** Map east boundary */
+double mapWest; /** Map west boundary */
 
-int imageWidth = 0;
+int imageWidth = 0; 
 int imageHeight = 0;
-bool doingQuality = false;
-bool doingRGB = false;
-bool doingTransparency = false;
-bool trimNSEW = false;
-bool write_projtext = false;
+bool doingQuality = false; /**Flag for quality processing */
+bool doingRGB = false; /** Flag for RGB processing */
+bool doingTransparency = false; /** Flag for transparency processing */
+bool trimNSEW = false; /** Flag for trimming North, South, East, West */
+bool writeProjectionText = false; /** Flag for writing projection text */
 
-string prodName;
-vector<string> prodNameList;
-vector<MeasurementType> prodMeasurementList;
-string qualName;
+string productName;
+vector<string> productNameList;
+vector<MeasurementType> productMeasurementList; /** List of measurement types for products */
+string qualityProductName; /** Quality product name */
 
 clo_optionList_t* optionList = NULL;
 
 // landmask
-bool applyMask = false;
-static grid_info_t* landmaskGrid = {0};
+bool applyMask = false; /** Flag to apply landmask */
+static grid_info_t* landmaskGrid = {0}; // TODO: apply naming convention to typedef in /oel_util/libnetcdfutils/nc_gridutils.h
 
+/**
+ * @brief Checks if the given latitude and longitude is land or water.
+ * @param lat Latitude
+ * @param lon Longitude
+ * @return 1 if water, 0 if land
+ */
 int isLand(float lat, float lon) {
     if (landmaskGrid != NULL) {
         double value;
@@ -120,6 +121,10 @@ int isLand(float lat, float lon) {
     return (0);  // assume water if lon, lat not found
 }
 
+/**
+ * @brief Prints start information for output files.
+ * @param outFiles Vector of output files.
+ */
 void printStartInfo(vector<OutFile*> outFiles) {
     if (want_verbose) {
         meta_l3bType* metaData = outFiles[0]->getMetadata();
@@ -145,11 +150,11 @@ void printStartInfo(vector<OutFile*> outFiles) {
         if (clo_isSet(optionList, "width"))
             printf("width      : %d\n", clo_getInt(optionList, "width"));
         if (doingRGB)
-            printf("product_rgb: %s\n", prodName.c_str());
+            printf("product_rgb: %s\n", productName.c_str());
         else
-            printf("product    : %s\n", prodName.c_str());
+            printf("product    : %s\n", productName.c_str());
         if (doingQuality)
-            printf("qual_prod  : %s\n", qualName.c_str());
+            printf("qual_prod  : %s\n", qualityProductName.c_str());
         printf("north      : %8.3f\n", metaData->north);
         printf("south      : %8.3f\n", metaData->south);
         printf("east       : %8.3f\n", metaData->east);
@@ -173,6 +178,10 @@ void printStartInfo(vector<OutFile*> outFiles) {
     }
 }
 
+/**
+ * @brief Prints end information for the output file.
+ * @param outFile Pointer to the output file.
+ */
 void printEndInfo(OutFile* outFile) {
     if (want_verbose) {
         printf("\n\n");
@@ -184,6 +193,10 @@ void printEndInfo(OutFile* outFile) {
     }
 }
 
+/**
+ * @brief Prints the percent completion of the process.
+ * @param percentDone The percentage of completion.
+ */
 void printPercentDone(float percentDone) {
     static float percentPrev = 0.0;
     static const float percentDelta = 0.01;
@@ -194,6 +207,10 @@ void printPercentDone(float percentDone) {
     }
 }
 
+/**
+ * @brief Gets the central meridian value from the option list or metadata (mapWest and mapEast).
+ * @return The central meridian value.
+ */
 float getCentralMeridian() {
     int i;
     float centralMeridian = clo_getFloat(optionList, "central_meridian");
@@ -222,58 +239,80 @@ float getCentralMeridian() {
     return constrainLon(centralMeridian);
 }
 
+
+/**
+ * @brief Converts interpolation type string to InterpType enum.
+ * @param str Interpolation type string.
+ * @return Corresponding InterpType enum value.
+ */
 InterpType interpStr2Type(const char* str) {
     string s = str;
     boost::trim(s);
     boost::to_lower(s);
 
-    if (s.compare("bin") == 0)
-        return Interp_Bin;
-    if (s.compare("linear") == 0)
-        return Interp_Linear;
-    if (s.compare("area") == 0)
-        return Interp_Area;
+    if (s == "bin")
+        return INTERP_BIN;
+    if (s == "linear")
+        return INTERP_LINEAR;
+    if (s == "area")
+        return INTERP_AREA;
 
-    return Interp_Nearest;
+    return INTERP_NEAREST;
 }
 
+
+/**
+ * @brief Converts InterpType enum to string.
+ * @param interp Interpolation type enum.
+ * @return Corresponding string value.
+ */
 const char* interpType2Str(InterpType interp) {
     switch (interp) {
-        case Interp_Nearest:
+        case INTERP_NEAREST:
             return "nearest";
-        case Interp_Bin:
+        case INTERP_BIN:
             return "bin";
-        case Interp_Linear:
+        case INTERP_LINEAR:
             return "linear";
-        case Interp_Area:
+        case INTERP_AREA:
             return "area";
         default:
             return "unknown";
     }
 }
 
+/**
+ * @brief Checks if the dateline is crossed given longitude and delta longitude.
+ * @param lon Longitude.
+ * @param deltaLon Delta longitude.
+ * @return True if dateline is crossed, false otherwise.
+ */
 bool checkDateLineCrossed(double lon, double deltaLon) {
-    bool crossed = false;
-
     float minlon = constrainLon(lon) - (deltaLon / 2.0);
     float maxlon = constrainLon(lon) + (deltaLon / 2.0);
 
-    if (minlon > 0 && maxlon < 0)
-        crossed = true;
-
-    return crossed;
+    return (minlon > 0 && maxlon < 0);
 }
 
-Box_t getBox(float lat, float lon, float deltaLat, float deltaLon, int eastwest = notEastOrWest) {
+/**
+ * @brief Gets a bounding box given latitude, longitude, delta latitude, and delta longitude.
+ * @param lat Latitude.
+ * @param lon Longitude.
+ * @param deltaLat Delta latitude.
+ * @param deltaLon Delta longitude.
+ * @param eastwest East/West enum value (default: NOT_EAST_OR_WEST).
+ * @return Bounding box.
+ */
+Box_t getBox(float lat, float lon, float deltaLat, float deltaLon, int eastwest = NOT_EAST_OR_WEST) {
     Point_t pMin;
     Point_t pMax;
     lon = constrainLon(lon);
-    if (eastwest == IsEast) {
+    if (eastwest == IS_EAST) {
         pMin.set<0>(180.0);
         pMin.set<1>(lat - (deltaLat / 2.0));
         pMax.set<0>(lon + (deltaLon / 2.0));
         pMax.set<1>(lat + (deltaLat / 2.0));
-    } else if (eastwest == IsWest) {
+    } else if (eastwest == IS_WEST) {
         pMin.set<0>(lon - (deltaLon / 2.0));
         pMin.set<1>(lat - (deltaLat / 2.0));
         pMax.set<0>(180.0);
@@ -284,12 +323,23 @@ Box_t getBox(float lat, float lon, float deltaLat, float deltaLon, int eastwest 
         pMax.set<0>(lon + (deltaLon / 2.0));
         pMax.set<1>(lat + (deltaLat / 2.0));
     }
-    Box_t box(pMin, pMax);
-    return box;
+    return Box_t(pMin, pMax);
 }
 
+/**
+ * @brief Gets bins inside a bounding box.
+ * @param l3File Pointer to L3File.
+ * @param lat Latitude.
+ * @param lon Longitude.
+ * @param deltaLat Delta latitude.
+ * @param deltaLon Delta longitude.
+ * @param fudge Fudge factor.
+ * @param areaWeighted Area-weighted flag.
+ * @param eastwest East/West enum value (default: NOT_EAST_OR_WEST).
+ * @return Pointer to L3Bin.
+ */
 L3Bin* getBoxBins(L3File* l3File, float lat, float lon, float deltaLat, float deltaLon, float fudge,
-                  bool areaWeighted, int eastwest = notEastOrWest) {
+                  bool areaWeighted, int eastwest = NOT_EAST_OR_WEST) {
     Box_t box = getBox(lat, lon, deltaLat, deltaLon, eastwest);
 
     L3Bin* l3Bin = l3File->getBinsInside(box, areaWeighted);
@@ -302,9 +352,11 @@ L3Bin* getBoxBins(L3File* l3File, float lat, float lon, float deltaLat, float de
 }
 
 /**
- * figure out if we want and can do quality processing
- * @param l3File input bin file
- * @param outFile output file
+ * @brief Figure out if we want and can do quality processing
+ * @param l3File Pointer to L3File.
+ * @param outFiles Vector of output files.
+ * @param outFile2 Pointer to the second output file.
+ * @return True if quality processing is set up, else false.
  */
 bool setupQualityProcessing(L3File* l3File, vector<OutFile*> outFiles, OutFile* outFile2) {
     doingQuality = true;
@@ -320,9 +372,9 @@ bool setupQualityProcessing(L3File* l3File, vector<OutFile*> outFiles, OutFile* 
                 exit(EXIT_FAILURE);
             }
             if (clo_isSet(optionList, "quality_product")) {
-                qualName = clo_getRawString(optionList, "quality_product");
+                qualityProductName = clo_getRawString(optionList, "quality_product");
             } else {
-                qualName = "qual_" + prodNameList[0];
+                qualityProductName = "qual_" + productNameList[0];
             }
         } else {
             doingQuality = false;
@@ -337,175 +389,153 @@ bool setupQualityProcessing(L3File* l3File, vector<OutFile*> outFiles, OutFile* 
     l3File->setQualityProcessing(doingQuality);
     for (OutFile* outFile : outFiles) {
         outFile->setQualityProcessing(doingQuality);
-        outFile->setQualityName(qualName);
+        outFile->setQualityName(qualityProductName);
     }
     if (outFile2) {
         outFile2->setQualityProcessing(doingQuality);
-        outFile2->setQualityName(qualName);
+        outFile2->setQualityName(qualityProductName);
     }
     return doingQuality;
 }
 
-void setupProduct(string& prodName, MeasurementType measure, OutFile* outFile, OutFile* outFile2) {
+/**
+ * @brief Sets up product information for output files.
+ * @param productName Product name.
+ * @param measure Measurement type.
+ * @param outFile Pointer to the output file.
+ * @param outFile2 Pointer to the second output file.
+ */
+void setupProduct(string& productName, MeasurementType measure, OutFile* outFile, OutFile* outFile2) {
     // get the product info
-    productInfo_t* p_info;
-    p_info = allocateProductInfo();
-
+    productInfo_t* productInfo = allocateProductInfo();
     int sensorId = sensorName2SensorId(outFile->getMetadata()->sensor_name);
+
     if (sensorId == -1) {
-        printf("-E- Unknown sensor name %s\n", outFile->getMetadata()->sensor_name);
+        cerr << "-E -Uknown sensor name " << outFile->getMetadata()->sensor_name << endl;
+        freeProductInfo(productInfo); // clean up before exit
         exit(EXIT_FAILURE);
     }
-
-    if (!findProductInfo(prodName.c_str(), sensorId, p_info)) {
-        printf("-E- product %s not found in XML product table\n", prodName.c_str());
-        exit(EXIT_FAILURE);
+    
+    bool isWavelengthProduct = false;
+    // check if product has wavelength info
+    if (productName.find("_") != string::npos) {
+        vector<string> parts;
+        boost::split(parts, productName, boost::is_any_of("_"));
+        // check if any part is a number that could be a wavelength
+        for (const auto& part : parts) {
+            if (!part.empty() && std::all_of(part.begin(), part.end(), ::isdigit)) {
+                isWavelengthProduct = true;
+                break;
+            }
+        }
     }
 
-    // now we have to fix the p_info structure
-    // Avg, Stdev, Variance, Nobs, Nscenes, ObsTime, BinNum
+    if (!findProductInfo(productName.c_str(), sensorId, productInfo)) {
+        if (isWavelengthProduct) {
+            setupWavelengthProduct(productName, productInfo, sensorId);
+        } else {
+        // Create metadata if products aren't found in XML product table.
+        printf("-E - product %s not found XML product table\n. Creating metadata.", productName.c_str());
+        productInfo->description = strdup("Dynamically generated product");
+        productInfo->units = strdup("unitless");
+        productInfo->dataType = strdup("float");
+        productInfo->validMin = 0;
+        productInfo->validMax = 100;
+        }
+    }
+
+    // now we have to fix the productInfo structure
+    // AVG, STDEV, VARIANCE, NOBS, NSCENES, OBS_TIME, BIN_NUM
     string tmpStr;
     switch (measure) {
-        case Avg:
+        case AVG:
             break;
-        case Stdev:
-            tmpStr = p_info->description;
-            free(p_info->description);
-            tmpStr += " (Standard Deviation)";
-            p_info->description = strdup(tmpStr.c_str());
-            free(p_info->palette);
-            p_info->palette = strdup(PRODUCT_DEFAULT_palette);
-            free(p_info->dataType);
-            p_info->dataType = strdup("float");
-            tmpStr = p_info->suffix;
-            free(p_info->suffix);
-            tmpStr += "_stdev";
-            p_info->suffix = strdup(tmpStr.c_str());
-            free(p_info->displayScale);
-            p_info->displayScale = strdup("linear");
-            p_info->addOffset = 0.0;
-            p_info->scaleFactor = 1.0;
+        case STDEV:
+            tmpStr = productInfo->description;
+            productInfo->description = strdup((tmpStr + " (Standard Deviation)").c_str());
+            productInfo->palette = strdup(PRODUCT_DEFAULT_palette);
+            productInfo->dataType = strdup("float");
+            productInfo->suffix = strdup((string(productInfo->suffix) + "_stdev").c_str());
+            productInfo->displayScale = strdup("linear");
+            productInfo->addOffset = 0.0;
+            productInfo->scaleFactor = 1.0;
             break;
-        case Variance:
-            tmpStr = p_info->description;
-            free(p_info->description);
-            tmpStr += " (Variance)";
-            p_info->description = strdup(tmpStr.c_str());
-            free(p_info->palette);
-            p_info->palette = strdup(PRODUCT_DEFAULT_palette);
-            free(p_info->dataType);
-            p_info->dataType = strdup("float");
-            tmpStr = p_info->suffix;
-            free(p_info->suffix);
-            tmpStr += "_var";
-            p_info->suffix = strdup(tmpStr.c_str());
-            free(p_info->displayScale);
-            p_info->displayScale = strdup("linear");
-            p_info->addOffset = 0.0;
-            p_info->scaleFactor = 1.0;
+        case VARIANCE:
+            tmpStr = productInfo->description;
+            productInfo->description = strdup((tmpStr + " (Variance)").c_str());
+            productInfo->palette = strdup(PRODUCT_DEFAULT_palette);
+            productInfo->dataType = strdup("float");
+            productInfo->suffix = strdup((string(productInfo->suffix) + "_var").c_str());
+            productInfo->displayScale = strdup("linear");
+            productInfo->addOffset = 0.0;
+            productInfo->scaleFactor = 1.0;
             break;
-        case Nobs:
-            tmpStr = p_info->description;
-            free(p_info->description);
-            tmpStr += " (number of observations)";
-            p_info->description = strdup(tmpStr.c_str());
-            free(p_info->units);
-            p_info->units = strdup("counts");
-            free(p_info->palette);
-            p_info->palette = strdup(PRODUCT_DEFAULT_palette);
-            free(p_info->dataType);
-            p_info->dataType = strdup("short");
-            tmpStr = p_info->suffix;
-            free(p_info->suffix);
-            tmpStr += "_nobs";
-            p_info->suffix = strdup(tmpStr.c_str());
-            p_info->fillValue = PRODUCT_DEFAULT_fillValue;
-            p_info->validMin = 0;
-            p_info->validMax = 32767;
-            free(p_info->displayScale);
-            p_info->displayScale = strdup("linear");
-            p_info->displayMin = PRODUCT_DEFAULT_displayMin;
-            p_info->displayMax = PRODUCT_DEFAULT_displayMax;
-            p_info->addOffset = 0.0;
-            p_info->scaleFactor = 1.0;
+        case NOBS:
+            tmpStr = productInfo->description;
+            productInfo->description = strdup((tmpStr + " (number of observations)").c_str());
+            productInfo->units = strdup("counts");
+            productInfo->palette = strdup(PRODUCT_DEFAULT_palette);
+            productInfo->dataType = strdup("short");
+            productInfo->suffix = strdup((string(productInfo->suffix) + "_nobs").c_str());
+            productInfo->fillValue = PRODUCT_DEFAULT_fillValue;
+            productInfo->validMin = 0;
+            productInfo->validMax = 32767;
+            productInfo->displayScale = strdup("linear");
+            productInfo->displayMin = PRODUCT_DEFAULT_displayMin;
+            productInfo->displayMax = PRODUCT_DEFAULT_displayMax;
+            productInfo->addOffset = 0.0;
+            productInfo->scaleFactor = 1.0;
             break;
-        case Nscenes:
-            tmpStr = p_info->description;
-            free(p_info->description);
-            tmpStr += " (number of scenes)";
-            p_info->description = strdup(tmpStr.c_str());
-            free(p_info->units);
-            p_info->units = strdup("counts");
-            free(p_info->palette);
-            p_info->palette = strdup(PRODUCT_DEFAULT_palette);
-            free(p_info->dataType);
-            p_info->dataType = strdup("short");
-            tmpStr = p_info->suffix;
-            free(p_info->suffix);
-            tmpStr += "_nscenes";
-            p_info->suffix = strdup(tmpStr.c_str());
-            p_info->fillValue = PRODUCT_DEFAULT_fillValue;
-            p_info->validMin = 0;
-            p_info->validMax = 32767;
-            free(p_info->displayScale);
-            p_info->displayScale = strdup("linear");
-            p_info->displayMin = PRODUCT_DEFAULT_displayMin;
-            p_info->displayMax = PRODUCT_DEFAULT_displayMax;
-            p_info->addOffset = 0.0;
-            p_info->scaleFactor = 1.0;
+        case NSCENES:
+            tmpStr = productInfo->description;
+            productInfo->description = strdup((tmpStr + " (number of scenes)").c_str());
+            productInfo->units = strdup("counts");
+            productInfo->palette = strdup(PRODUCT_DEFAULT_palette);
+            productInfo->dataType = strdup("short");
+            productInfo->suffix = strdup((string(productInfo->suffix) + "_nscenes").c_str());
+            productInfo->fillValue = PRODUCT_DEFAULT_fillValue;
+            productInfo->validMin = 0;
+            productInfo->validMax = 32767;
+            productInfo->displayScale = strdup("linear");
+            productInfo->displayMin = PRODUCT_DEFAULT_displayMin;
+            productInfo->displayMax = PRODUCT_DEFAULT_displayMax;
+            productInfo->addOffset = 0.0;
+            productInfo->scaleFactor = 1.0;
             break;
-        case ObsTime:
-            tmpStr = p_info->description;
-            free(p_info->description);
-            tmpStr += " (observation time, TAI93)";
-            p_info->description = strdup(tmpStr.c_str());
-            free(p_info->units);
-            p_info->units = strdup("counts");
-            free(p_info->palette);
-            p_info->palette = strdup(PRODUCT_DEFAULT_palette);
-            free(p_info->dataType);
-            p_info->dataType = strdup("float");
-            tmpStr = p_info->suffix;
-            free(p_info->suffix);
-            tmpStr += "_obs_time";
-            p_info->suffix = strdup(tmpStr.c_str());
-            p_info->fillValue = PRODUCT_DEFAULT_fillValue;
-            p_info->validMin = PRODUCT_DEFAULT_validMin;
-            p_info->validMax = PRODUCT_DEFAULT_validMin;
-            free(p_info->displayScale);
-            p_info->displayScale = strdup("linear");
-            p_info->displayMin = PRODUCT_DEFAULT_displayMin;
-            p_info->displayMax = PRODUCT_DEFAULT_displayMax;
-            p_info->addOffset = 0.0;
-            p_info->scaleFactor = 1.0;
+        case OBS_TIME:
+            tmpStr = productInfo->description;
+            productInfo->description = strdup((tmpStr + " (observation time, TAI93)").c_str());
+            productInfo->units = strdup("counts");
+            productInfo->palette = strdup(PRODUCT_DEFAULT_palette);
+            productInfo->dataType = strdup("float");
+            productInfo->suffix = strdup((string(productInfo->suffix) + "_obs_time").c_str());
+            productInfo->fillValue = PRODUCT_DEFAULT_fillValue;
+            productInfo->validMin = PRODUCT_DEFAULT_validMin;
+            productInfo->validMax = PRODUCT_DEFAULT_validMax;
+            productInfo->displayScale = strdup("linear");
+            productInfo->displayMin = PRODUCT_DEFAULT_displayMin;
+            productInfo->displayMax = PRODUCT_DEFAULT_displayMax;
+            productInfo->addOffset = 0.0;
+            productInfo->scaleFactor = 1.0;
             break;
-        case BinNum:
-            tmpStr = p_info->description;
-            free(p_info->description);
-            tmpStr += " (bin ID number)";
-            p_info->description = strdup(tmpStr.c_str());
-            free(p_info->units);
-            p_info->units = strdup("dimensionless");
-            free(p_info->palette);
-            p_info->palette = strdup(PRODUCT_DEFAULT_palette);
-            free(p_info->dataType);
-            p_info->dataType = strdup("int");
-            tmpStr = p_info->suffix;
-            free(p_info->suffix);
-            tmpStr += "_bin_num";
-            p_info->suffix = strdup(tmpStr.c_str());
-            p_info->fillValue = PRODUCT_DEFAULT_fillValue;
-            p_info->validMin = PRODUCT_DEFAULT_validMin;
-            p_info->validMax = PRODUCT_DEFAULT_validMin;
-            free(p_info->displayScale);
-            p_info->displayScale = strdup("linear");
-            p_info->displayMin = PRODUCT_DEFAULT_displayMin;
-            p_info->displayMax = PRODUCT_DEFAULT_displayMax;
-            p_info->addOffset = 0.0;
-            p_info->scaleFactor = 1.0;
+        case BIN_NUM:
+            tmpStr = productInfo->description;
+            productInfo->description = strdup((tmpStr + " (bin ID number)").c_str());
+            productInfo->units = strdup("dimensionless");
+            productInfo->palette = strdup(PRODUCT_DEFAULT_palette);
+            productInfo->dataType = strdup("int");
+            productInfo->suffix = strdup((string(productInfo->suffix) + "_bin_num").c_str());
+            productInfo->fillValue = PRODUCT_DEFAULT_fillValue;
+            productInfo->validMin = PRODUCT_DEFAULT_validMin;
+            productInfo->validMax = PRODUCT_DEFAULT_validMax;
+            productInfo->displayScale = strdup("linear");
+            productInfo->displayMin = PRODUCT_DEFAULT_displayMin;
+            productInfo->displayMax = PRODUCT_DEFAULT_displayMax;
+            productInfo->addOffset = 0.0;
+            productInfo->scaleFactor = 1.0;
             break;
     }  // switch
-
+    
     // load landmask options before palette
     applyMask = clo_getBool(optionList, "mask_land");
     if (applyMask) {
@@ -537,41 +567,70 @@ void setupProduct(string& prodName, MeasurementType measure, OutFile* outFile, O
             if (outFile2)
                 outFile2->setPalette(clo_getOptionString(option), applyMask);
         } else {
-            outFile->setPalette(p_info->palette, applyMask);
+            outFile->setPalette(productInfo->palette, applyMask);
             if (outFile2)
-                outFile2->setPalette(p_info->palette, applyMask);
+                outFile2->setPalette(productInfo->palette, applyMask);
         }
     }
 
     // set the default scale factors for RGB
     if (doingRGB) {
-        p_info->displayMin = 0.01;
-        p_info->displayMax = 0.9;
-        if (p_info->displayScale)
-            free(p_info->displayScale);
-        p_info->displayScale = strdup("log");
+        productInfo->displayMin = 0.01;
+        productInfo->displayMax = 0.9;
+        productInfo->displayScale = strdup("log");
     }
 
     // override default scale parameters if set on command line
     if (clo_isSet(optionList, "datamin")) {
-        p_info->displayMin = clo_getFloat(optionList, "datamin");
+        productInfo->displayMin = clo_getFloat(optionList, "datamin");
     }
     if (clo_isSet(optionList, "datamax")) {
-        p_info->displayMax = clo_getFloat(optionList, "datamax");
+        productInfo->displayMax = clo_getFloat(optionList, "datamax");
     }
     if (clo_isSet(optionList, "scale_type")) {
-        if (p_info->displayScale)
-            free(p_info->displayScale);
-        p_info->displayScale = strdup(clo_getString(optionList, "scale_type"));
+        productInfo->displayScale = strdup(clo_getString(optionList, "scale_type"));
     }
 
-    outFile->addProduct(p_info);
+    outFile->addProduct(productInfo, applyMask);
     if (outFile2)
-        outFile2->addProduct(p_info);
-
-    freeProductInfo(p_info);
+        outFile2->addProduct(productInfo, applyMask);
+    
+    freeProductInfo(productInfo);
 }
 
+/**
+* @brief Parses product name to find "base" name (eg: rrs) and wavelength value and creates product metadata for wavelength-dependent variables that aren't found in product.xml
+**/
+void setupWavelengthProduct(const string& productName, productInfo_t* productInfo, int sensorId) {
+    vector<string> parts;
+    boost::split(parts, productName, boost::is_any_of("_"));
+    string baseProduct;
+    string wavelength;
+    
+    for (const auto& part : parts) {
+        if (std::all_of(part.begin(), part.end(), ::isdigit)) {
+            wavelength = part;
+            productInfo->prod_ix = stoi(wavelength); // use prod_ix for storing wavelength
+        } else {
+            if (!baseProduct.empty()) baseProduct += "_";
+            baseProduct += part;
+        }
+    }
+    
+    productInfo->productName = strdup(productName.c_str());
+    productInfo->description = strdup((baseProduct + " at " + wavelength).c_str());
+    productInfo->units = strdup("dimensionless"); 
+    productInfo->dataType = strdup("float");
+    productInfo->displayScale = strdup("linear");
+}
+
+
+/**
+ * @brief Writes raw output file.
+ * @param l3File Pointer to L3File.
+ * @param outFiles Vector of output files.
+ * @param outFile2 Pointer to the second output file.
+ */
 void writeRawFile(L3File* l3File, vector<OutFile*> outFiles, OutFile* outFile2) {
     L3Bin* l3Bin;
     L3Row* l3Row;
@@ -591,10 +650,11 @@ void writeRawFile(L3File* l3File, vector<OutFile*> outFiles, OutFile* outFile2) 
     string mapDesc = "Bin";
     string projName = "Integerized Sinusoidal";
 
+    string tmpTitle = metaData->sensor_name + (string)" Level-3 " + mapDesc + (string)" Mapped Image";
     if (clo_isSet(optionList, "suite"))
-        sprintf(metaData->title, "%s Level-3 %s Mapped Image %s", metaData->sensor_name, mapDesc.c_str(), clo_getString(optionList, "suite"));
-    else
-        sprintf(metaData->title, "%s Level-3 %s Mapped Image", metaData->sensor_name, mapDesc.c_str());
+        tmpTitle += " " + (string)clo_getString(optionList, "suite");
+    strcpy(metaData->title, tmpTitle.c_str());
+
     for (OutFile* outFile : outFiles) {
         strcpy(outFile->getMetadata()->title, metaData->title);
         outFile->setFullLatLon(false);
@@ -611,17 +671,21 @@ void writeRawFile(L3File* l3File, vector<OutFile*> outFiles, OutFile* outFile2) 
     }
 
     // setup all the product structures
-    for (size_t i = 0; i < prodNameList.size(); i++) {
+    for (size_t i = 0; i < productNameList.size(); i++) {
         OutFile* outFile;
         if (outFiles.size() == 1)
             outFile = outFiles[0];
         else
             outFile = outFiles[i];
-        setupProduct(prodNameList[i], prodMeasurementList[i], outFile, outFile2);
+        setupProduct(productNameList[i], productMeasurementList[i], outFile, outFile2);
     }
 
     printStartInfo(outFiles);
-
+    // set cache size for writing
+    if (!set_cache_size_chunk_size_write(l3File,outFiles[0],outFile2,want_verbose)) {
+        fprintf(stderr, "-E-: %s:%d Could not set cache size for writing.\n",__FILE__,__LINE__);
+        exit(EXIT_FAILURE);
+    }
     for (OutFile* outFile : outFiles) {
         if (!outFile->open()) {
             printf("-E- Could not open ofile=\"%s\".\n", outFile->getFileName().c_str());
@@ -667,28 +731,28 @@ void writeRawFile(L3File* l3File, vector<OutFile*> outFiles, OutFile* outFile2) 
                     if (outFile2)
                         outFile2->setPixelRGB(col, l3Bin->getMean(0), l3Bin->getMean(1), l3Bin->getMean(2));
                 } else {
-                    for (size_t prod = 0; prod < prodNameList.size(); prod++) {
+                    for (size_t prod = 0; prod < productNameList.size(); prod++) {
                         float val;
-                        switch (prodMeasurementList[prod]) {
-                            case Avg:
+                        switch (productMeasurementList[prod]) {
+                            case AVG:
                                 val = l3Bin->getMean(prod);
                                 break;
-                            case Stdev:
+                            case STDEV:
                                 val = l3Bin->getStdev(prod);
                                 break;
-                            case Variance:
+                            case VARIANCE:
                                 val = l3Bin->getVariance(prod);
                                 break;
-                            case Nobs:
+                            case NOBS:
                                 val = l3Bin->getNobs();
                                 break;
-                            case Nscenes:
+                            case NSCENES:
                                 val = l3Bin->getNscenes();
                                 break;
-                            case ObsTime:
+                            case OBS_TIME:
                                 val = l3Bin->getObsTime();
                                 break;
-                            case BinNum:
+                            case BIN_NUM:
                                 val = l3Bin->getBinNum();
                                 break;
                             default:
@@ -739,6 +803,12 @@ void writeRawFile(L3File* l3File, vector<OutFile*> outFiles, OutFile* outFile2) 
     }
 }
 
+/**
+ * @brief Writes SMI output file.
+ * @param l3File Pointer to L3File.
+ * @param outFiles Vector of output files.
+ * @param outFile2 Pointer to the second output file.
+ */
 void writeSmiFile(L3File* l3File, vector<OutFile*> outFiles, OutFile* outFile2) {
     int32_t numFilledPixels = 0;
     meta_l3bType* metaData = outFiles[0]->getMetadata();
@@ -746,8 +816,8 @@ void writeSmiFile(L3File* l3File, vector<OutFile*> outFiles, OutFile* outFile2) 
 
     string mapDesc = "Standard";
     string projName = "Equidistant Cylindrical";
-
-    sprintf(metaData->title, "%s Level-3 %s Mapped Image", metaData->sensor_name, mapDesc.c_str());
+    string tmpTitle = (string)metaData->sensor_name + " Level-3 " + mapDesc + " Mapped Image";
+    strcpy(metaData->title, tmpTitle.c_str());
 
     // set up image parameters
     if (imageWidth <= 0) {
@@ -781,19 +851,23 @@ void writeSmiFile(L3File* l3File, vector<OutFile*> outFiles, OutFile* outFile2) 
     }
 
     // set up all the product structures
-    for (size_t i = 0; i < prodNameList.size(); i++) {
+    for (size_t i = 0; i < productNameList.size(); i++) {
         OutFile* outFile;
         if (outFiles.size() == 1)
             outFile = outFiles[0];
         else
             outFile = outFiles[i];
-        setupProduct(prodNameList[i], prodMeasurementList[i], outFile, outFile2);
+        setupProduct(productNameList[i], productMeasurementList[i], outFile, outFile2);
     }
     // set up quality processing
     setupQualityProcessing(l3File, outFiles, outFile2);
 
     printStartInfo(outFiles);
-
+    // set cache size for writing
+    if (!set_cache_size_chunk_size_write(l3File,outFiles[0],outFile2,want_verbose)) {
+        fprintf(stderr, "-E-: %s:%d Could not set cache size for writing.\n",__FILE__,__LINE__);
+        exit(EXIT_FAILURE);
+    }
     for (OutFile* outFile : outFiles) {
         if (!outFile->open()) {
             printf("-E- Could not open ofile=\"%s\".\n", outFile->getFileName().c_str());
@@ -828,14 +902,14 @@ void writeSmiFile(L3File* l3File, vector<OutFile*> outFiles, OutFile* outFile2) 
 
             } else {
                 switch (interp) {
-                    case Interp_Nearest:
+                    case INTERP_NEAREST:
                         l3Bin = l3File->getClosestBin(lat, lon);
                         break;
-                    case Interp_Bin:
-                    case Interp_Area: {
+                    case INTERP_BIN:
+                    case INTERP_AREA: {
                         bool areaWeighted;
 
-                        if (interp == Interp_Area)
+                        if (interp == INTERP_AREA)
                             areaWeighted = true;
                         else
                             areaWeighted = false;
@@ -858,28 +932,28 @@ void writeSmiFile(L3File* l3File, vector<OutFile*> outFiles, OutFile* outFile2) 
                             outFile2->setPixelRGB(col, l3Bin->getMean(0), l3Bin->getMean(1),
                                                   l3Bin->getMean(2));
                     } else {
-                        for (size_t prod = 0; prod < prodNameList.size(); prod++) {
+                        for (size_t prod = 0; prod < productNameList.size(); prod++) {
                             float val;
-                            switch (prodMeasurementList[prod]) {
-                                case Avg:
+                            switch (productMeasurementList[prod]) {
+                                case AVG:
                                     val = l3Bin->getMean(prod);
                                     break;
-                                case Stdev:
+                                case STDEV:
                                     val = l3Bin->getStdev(prod);
                                     break;
-                                case Variance:
+                                case VARIANCE:
                                     val = l3Bin->getVariance(prod);
                                     break;
-                                case Nobs:
+                                case NOBS:
                                     val = l3Bin->getNobs();
                                     break;
-                                case Nscenes:
+                                case NSCENES:
                                     val = l3Bin->getNscenes();
                                     break;
-                                case ObsTime:
+                                case OBS_TIME:
                                     val = l3Bin->getObsTime();
                                     break;
-                                case BinNum:
+                                case BIN_NUM:
                                     val = l3Bin->getBinNum();
                                     break;
                                 default:
@@ -926,7 +1000,14 @@ void writeSmiFile(L3File* l3File, vector<OutFile*> outFiles, OutFile* outFile2) 
 }
 
 // writing netcdf 4 file
-// the writitng is done here
+/**
+ * @brief Writes projected output file using PROJ.4 library (the writitng is done here).
+ * @param l3File Pointer to L3File.
+ * @param projectionStr Projection string.
+ * @param outFiles Vector of output files.
+ * @param outFile2 Pointer to the second output file.
+ * @param trimNSEW Flag to trim North, South, East, West.
+ */
 void writeProj4File(L3File* l3File, char* projectionStr, vector<OutFile*> outFiles, OutFile* outFile2,
                     bool trimNSEW) {
     int32_t numFilledPixels = 0;
@@ -943,7 +1024,6 @@ void writeProj4File(L3File* l3File, char* projectionStr, vector<OutFile*> outFil
     double minY = limitMax;
     double maxX = limitMin;
     double maxY = limitMin;
-    bool* inBox;
     double lat, lon;
     double x, y;
     double deltaLat = (metaData->north - metaData->south) / (NUM_SEARCH_POINTS - 1);
@@ -1007,7 +1087,7 @@ void writeProj4File(L3File* l3File, char* projectionStr, vector<OutFile*> outFil
         string zone = clo_getString(optionList, "utm_zone");
         utmStr = " +zone=";
         utmStr += zone;
-        if (utmStr.find('S') != std::string::npos) {
+        if (utmStr.find('S') != string::npos) {
             utmStr.pop_back();
             utmStr += " +south";
         }
@@ -1147,7 +1227,9 @@ void writeProj4File(L3File* l3File, char* projectionStr, vector<OutFile*> outFil
     }
 
     // save parameters in metadata
-    sprintf(metaData->title, "%s Level-3 %s Mapped Image", metaData->sensor_name, mapDesc.c_str());
+    string tmpTitle = (string)metaData->sensor_name + " Level-3 " + mapDesc + " Mapped Image";
+    strcpy(metaData->title, tmpTitle.c_str());
+
     for (OutFile* outFile : outFiles) {
         if (outFile->getMetadata() != metaData)
             strcpy(outFile->getMetadata()->title, metaData->title);
@@ -1164,8 +1246,6 @@ void writeProj4File(L3File* l3File, char* projectionStr, vector<OutFile*> outFil
     PJ_COORD c, c_out;
 
     // init the proj4 projections
-    //    pj = proj_create_crs_to_crs(PJ_DEFAULT_CTX, "+proj=longlat +ellps=WGS84 +datum=WGS84",
-    //    projStr.c_str(),                                NULL);
     pj = proj_create_crs_to_crs(PJ_DEFAULT_CTX, "EPSG:4326", projStr.c_str(), NULL);
     if (pj == NULL) {
         printf("Error - l3mapgen first PROJ projection failed to init\n");
@@ -1182,18 +1262,17 @@ void writeProj4File(L3File* l3File, char* projectionStr, vector<OutFile*> outFil
     // calculate start and delta for grid
     // set default z and t
     c.xyzt.z = 0.0;
-    // c.xyzt.t = HUGE_VAL;
     c.xyzt.t = 0.0;
 
     // define "inBox" region for trimNSEW option using lat/lon arrays based on
     // metaData struct
-    std::array<double, 9> lats{{metaData->south, metaData->south, metaData->south,
+    array<double, 9> lats{{metaData->south, metaData->south, metaData->south,
                                 (metaData->north + metaData->south) / 2., metaData->north, metaData->north,
                                 metaData->north, (metaData->north + metaData->south) / 2., metaData->south}};
-    std::array<double, 9> lons{{metaData->west, (metaData->east + metaData->west) / 2., metaData->east,
+    array<double, 9> lons{{metaData->west, (metaData->east + metaData->west) / 2., metaData->east,
                                 metaData->east, metaData->east, (metaData->east + metaData->west) / 2.,
                                 metaData->west, metaData->west, metaData->west}};
-    std::vector<Point_t> points;
+    vector<Point_t> points;
     for (int32_t i = 0; i < 9; i++) {
         c.xy.x = lons[i];
         c.xy.y = lats[i];
@@ -1394,20 +1473,24 @@ void writeProj4File(L3File* l3File, char* projectionStr, vector<OutFile*> outFil
     }
 
     // set up all the product structures
-    for (size_t i = 0; i < prodNameList.size(); i++) {
+    for (size_t i = 0; i < productNameList.size(); i++) {
         OutFile* outFile;
         if (outFiles.size() == 1)
             outFile = outFiles[0];
         else
             outFile = outFiles[i];
-        setupProduct(prodNameList[i], prodMeasurementList[i], outFile, outFile2);
+        setupProduct(productNameList[i], productMeasurementList[i], outFile, outFile2);
     }
 
     // set up quality processing
     setupQualityProcessing(l3File, outFiles, outFile2);
 
     printStartInfo(outFiles);
-
+    // set cache size for writing
+    if (!set_cache_size_chunk_size_write(l3File,outFiles[0],outFile2,want_verbose)) {
+        fprintf(stderr, "-E-: %s:%d Could not set cache size for writing.\n",__FILE__,__LINE__);
+        exit(EXIT_FAILURE);
+    }
     for (OutFile* outFile : outFiles) {
         if (!outFile->open()) {
             printf("-E- Could not open ofile=\"%s\".\n", outFile->getFileName().c_str());
@@ -1426,20 +1509,21 @@ void writeProj4File(L3File* l3File, char* projectionStr, vector<OutFile*> outFil
     float fudge = clo_getFloat(optionList, "fudge");
 
     // loop through output pixels
-    double* tmpX = (double*)allocateMemory(imageWidth * sizeof(double), "tmpX");
-    double* tmpY = (double*)allocateMemory(imageWidth * sizeof(double), "tmpY");
-    inBox = (bool*)allocateMemory(imageWidth * sizeof(bool), "inBox");
+    vector<double> tmpX(imageWidth);
+    vector<double> tmpY(imageWidth);
+    vector<bool> inBox(imageWidth, false);
 
     deltaLon = widthInDeg / imageWidth;
     deltaLat = heightInDeg / imageHeight;
     double startX = minX + resolution / 2;
     double startY = maxY - resolution / 2;
     y = startY;
+
     // setting values begins
     for (int row = 0; row < imageHeight; row++) {
         printPercentDone((float)row / (float)imageHeight);
         x = startX;
-        std::fill(inBox, inBox + imageWidth, false);
+        fill(inBox.begin(), inBox.end(), false);
         for (int col = 0; col < imageWidth; col++) {
             c.xy.x = x;
             c.xy.y = y;
@@ -1480,14 +1564,14 @@ void writeProj4File(L3File* l3File, char* projectionStr, vector<OutFile*> outFil
 
             } else {
                 switch (interp) {
-                    case Interp_Nearest:
+                    case INTERP_NEAREST:
                         l3Bin = l3File->getClosestBin(lat, lon);
                         break;
-                    case Interp_Bin:
-                    case Interp_Area: {
+                    case INTERP_BIN:
+                    case INTERP_AREA: {
                         bool areaWeighted;
 
-                        if (interp == Interp_Area)
+                        if (interp == INTERP_AREA)
                             areaWeighted = true;
                         else
                             areaWeighted = false;
@@ -1495,11 +1579,11 @@ void writeProj4File(L3File* l3File, char* projectionStr, vector<OutFile*> outFil
                         if (checkDateLineCrossed(lon, deltaLon)) {
                             // East
                             l3Bin =
-                                getBoxBins(l3File, lat, lon, deltaLat, deltaLon, fudge, areaWeighted, IsEast);
+                                getBoxBins(l3File, lat, lon, deltaLat, deltaLon, fudge, areaWeighted, IS_EAST);
 
                             // West
                             L3Bin* tmpBin =
-                                getBoxBins(l3File, lat, lon, deltaLat, deltaLon, fudge, areaWeighted, IsWest);
+                                getBoxBins(l3File, lat, lon, deltaLat, deltaLon, fudge, areaWeighted, IS_WEST);
                             if (tmpBin) {
                                 *l3Bin += *tmpBin;
                             }
@@ -1524,28 +1608,28 @@ void writeProj4File(L3File* l3File, char* projectionStr, vector<OutFile*> outFil
                                                   l3Bin->getMean(2));
                     } else {
                         // it loops through product index
-                        for (size_t prod = 0; prod < prodNameList.size(); prod++) {
+                        for (size_t prod = 0; prod < productNameList.size(); prod++) {
                             float val;
-                            switch (prodMeasurementList[prod]) {
-                                case Avg:
+                            switch (productMeasurementList[prod]) {
+                                case AVG:
                                     val = l3Bin->getMean(prod);
                                     break;
-                                case Stdev:
+                                case STDEV:
                                     val = l3Bin->getStdev(prod);
                                     break;
-                                case Variance:
+                                case VARIANCE:
                                     val = l3Bin->getVariance(prod);
                                     break;
-                                case Nobs:
+                                case NOBS:
                                     val = l3Bin->getNobs();
                                     break;
-                                case Nscenes:
+                                case NSCENES:
                                     val = l3Bin->getNscenes();
                                     break;
-                                case ObsTime:
+                                case OBS_TIME:
                                     val = l3Bin->getObsTime();
                                     break;
-                                case BinNum:
+                                case BIN_NUM:
                                     val = l3Bin->getBinNum();
                                     break;
                                 default:
@@ -1574,24 +1658,21 @@ void writeProj4File(L3File* l3File, char* projectionStr, vector<OutFile*> outFil
             }
         }  // for col
         for (OutFile* outFile : outFiles) {
-            outFile->setLatLon(tmpY, tmpX);
+            outFile->setLatLon(tmpY.data(), tmpX.data());
             outFile->writeLine();
         }
         if (outFile2) {
-            outFile2->setLatLon(tmpY, tmpX);
+            outFile2->setLatLon(tmpY.data(), tmpX.data());
             outFile2->writeLine();
         }
         y -= resolution;
     }  // for row
        // values set ends here
-    free(tmpX);
-    free(tmpY);
-    free(inBox);
 
     proj_destroy(pj_new);
 
     for (OutFile* outFile : outFiles) {
-        if (write_projtext) {
+        if (writeProjectionText) {
             string projtxtfilename;
             projtxtfilename = outFile->getFileName();
             projtxtfilename += ".projtxt";
@@ -1599,18 +1680,18 @@ void writeProj4File(L3File* l3File, char* projectionStr, vector<OutFile*> outFil
             if (projtxtfile.is_open()) {
                 projtxtfile << "# Projection information for " << outFile->getFileName() << "\n";
                 projtxtfile << "proj=" << projStr << "\n";
-                projtxtfile << "minX=" << std::setprecision(11) << minX << "\n";
-                projtxtfile << "maxX=" << std::setprecision(11) << maxX << "\n";
-                projtxtfile << "minY=" << std::setprecision(11) << minY << "\n";
-                projtxtfile << "maxY=" << std::setprecision(11) << maxY << "\n";
-                projtxtfile << "north=" << std::setprecision(11) << metaData->north << "\n";
-                projtxtfile << "south=" << std::setprecision(11) << metaData->south << "\n";
-                projtxtfile << "east=" << std::setprecision(11) << metaData->east << "\n";
-                projtxtfile << "west=" << std::setprecision(11) << metaData->west << "\n";
+                projtxtfile << "minX=" << setprecision(11) << minX << "\n";
+                projtxtfile << "maxX=" << setprecision(11) << maxX << "\n";
+                projtxtfile << "minY=" << setprecision(11) << minY << "\n";
+                projtxtfile << "maxY=" << setprecision(11) << maxY << "\n";
+                projtxtfile << "north=" << setprecision(11) << metaData->north << "\n";
+                projtxtfile << "south=" << setprecision(11) << metaData->south << "\n";
+                projtxtfile << "east=" << setprecision(11) << metaData->east << "\n";
+                projtxtfile << "west=" << setprecision(11) << metaData->west << "\n";
 
                 projtxtfile << "scale_type=" << outFile->getScaleTypeString() << "\n";
-                projtxtfile << "datamin=" << std::setprecision(11) << outFile->getMinValue() << "\n";
-                projtxtfile << "datamax=" << std::setprecision(11) << outFile->getMaxValue() << "\n";
+                projtxtfile << "datamin=" << setprecision(11) << outFile->getMinValue() << "\n";
+                projtxtfile << "datamax=" << setprecision(11) << outFile->getMaxValue() << "\n";
                 projtxtfile << "width=" << imageWidth << "\n";
                 projtxtfile << "height=" << imageHeight << "\n";
 
@@ -1627,6 +1708,12 @@ void writeProj4File(L3File* l3File, char* projectionStr, vector<OutFile*> outFil
     }
 }
 
+/**
+ * @brief Creates an output file object based on format.
+ * @param oformatStr Output format string.
+ * @param useColor Flag to use color.
+ * @return Pointer to the created output file object.
+ */
 OutFile* makeOutputFile(const char* oformatStr, bool useColor) {
     OutFile* outFile = NULL;
 
@@ -1640,34 +1727,34 @@ OutFile* makeOutputFile(const char* oformatStr, bool useColor) {
     string oformat = oformatStr2;
     if (oformat.compare("PPM") == 0) {
         if (doingRGB) {
-            outFile = new OutFile_ppm_rgb();
+            outFile = new OutFilePpmRgb();
         } else {
             if (useColor) {
-                outFile = new OutFile_ppm();
+                outFile = new OutFilePpm();
             } else {
-                outFile = new OutFile_pgm();
+                outFile = new OutFilePgm();
             }
         }
     } else if (oformat.compare("PNG") == 0) {
         if (doingRGB) {
-            outFile = new OutFile_png_rgb();
+            outFile = new OutFilePngRgb();
         } else {
-            outFile = new OutFile_png(useColor);
+            outFile = new OutFilePng(useColor);
         }
     } else if (oformat.compare("TIFF") == 0) {
         if (doingRGB) {
-            outFile = new OutFile_tiff_rgb();
+            outFile = new OutFileTiffRgb();
         } else {
             if (useColor) {
-                outFile = new OutFile_tiff_color();
+                outFile = new OutFileTiffColor();
             } else {
-                outFile = new OutFile_tiff_gray();
+                outFile = new OutFileTiffGray();
             }
         }
     } else if (oformat.compare("HDF4") == 0) {
-        outFile = new OutFile_hdf4();
+        outFile = new OutFileHdf4();
     } else if (oformat.compare("netCDF4") == 0) {
-        outFile = new OutFile_netcdf4();
+        outFile = new OutFileNetcdf4();
     } else {
         printf("-E- Output file type %s not implemented\n", oformat.c_str());
         exit(EXIT_FAILURE);
@@ -1678,6 +1765,11 @@ OutFile* makeOutputFile(const char* oformatStr, bool useColor) {
     return outFile;
 }
 
+/**
+ * @brief Creates a list of output files based on the options.
+ * @param optionList Pointer to the option list.
+ * @return Vector of pointers to the created output files.
+ */
 vector<OutFile*> makeOutputFileList(clo_optionList_t* optionList) {
     vector<OutFile*> outFiles;
     OutFile* outFile;
@@ -1686,7 +1778,7 @@ vector<OutFile*> makeOutputFileList(clo_optionList_t* optionList) {
     string tag = clo_getString(optionList, "ofile_product_tag");
     // if netcdf4 format specified just one file will be produced
     // need to put a check : if there 3D vars, then only netcdf is acceptable
-    if (oformatStr.compare("netCDF4") == 0 || prodNameList.size() == 1 || doingRGB) {
+    if (oformatStr.compare("netCDF4") == 0 || productNameList.size() == 1 || doingRGB) {
         outFile = makeOutputFile(clo_getString(optionList, "oformat"), clo_getBool(optionList, "apply_pal"));
         outFile->setFileName(originalOfile);
         outFiles.push_back(outFile);
@@ -1701,10 +1793,10 @@ vector<OutFile*> makeOutputFileList(clo_optionList_t* optionList) {
             exit(EXIT_FAILURE);
         }
 
-        for (size_t i = 0; i < prodNameList.size(); i++) {
-            std::string newName = originalOfile;
-            std::string prodName_clean = prodNameList.at(i);
-            std::string modifier = get_modifier_from_measure(prodMeasurementList.at(i));
+        for (size_t i = 0; i < productNameList.size(); i++) {
+            string newName = originalOfile;
+            string prodName_clean = productNameList.at(i);
+            string modifier = getModifierFromMeasure(productMeasurementList.at(i));
             newName.replace(pos, tag.size(), prodName_clean + modifier);
             outFile =
                 makeOutputFile(clo_getString(optionList, "oformat"), clo_getBool(optionList, "apply_pal"));
@@ -1720,6 +1812,12 @@ vector<OutFile*> makeOutputFileList(clo_optionList_t* optionList) {
 // main
 //------------------------------------------------------------------------------
 
+/**
+ * @brief Main function for the l3mapgen program.
+ * @param argc Argument count.
+ * @param argv Argument vector.
+ * @return Exit status.
+ */
 int main(int argc, char* argv[]) {
     vector<OutFile*> outFiles;
     OutFile* outFile2 = NULL;
@@ -1728,34 +1826,35 @@ int main(int argc, char* argv[]) {
     int i;
     char* tmpStr;
 
-    char softwareVersion[200];
-    sprintf(softwareVersion, "%d.%d.%d-%s", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, GITSHA);
-
-    // init the netCDF file cache
-    nc_init_chunk_cache();
+    string softwareVersion = to_string(VERSION_MAJOR) + "." + to_string(VERSION_MINOR) + "." + to_string(VERSION_PATCH) + "-" + GITSHA;
 
     optionList = clo_createList();
 
-    l3mapgen_init_options(optionList, softwareVersion);
+    l3mapgenInitOptions(optionList, softwareVersion.c_str());
     if (argc == 1) {
         clo_printUsage(optionList);
         exit(EXIT_FAILURE);
     }
-    l3mapgen_read_options(optionList, argc, argv);
+    l3mapgenReadOptions(optionList, argc, argv);
 
     if (clo_getBool(optionList, "quiet")) {
         want_verbose = 0;
     }
 
     ifileName = clo_getString(optionList, "ifile");
-
+    // set proper cache size for reading
+     if (!set_cache_size_chunk_size_read(ifileName, want_verbose)) {
+         fprintf(stderr, "-E-: %s:%d Could not set cache size for reading.\n",__FILE__,__LINE__);
+         exit(EXIT_FAILURE);
+     }
     // try SMI input file
     int oldVerbose = want_verbose;
     want_verbose = 0;
     L3File* l3File = new L3FileSMI();
     if (!l3File->open(ifileName)) {
+        delete l3File; // open failed, delete current object
+        
         // try real L3 bin format
-        delete l3File;
         l3File = new L3File();
         if (!l3File->open(ifileName)) {
             printf("-E- Could not open ifile=\"%s\".\n", ifileName);
@@ -1769,240 +1868,55 @@ int main(int argc, char* argv[]) {
     }
     if (clo_getBool(optionList, "use_rgb")) {
         doingRGB = true;
-        prodName = clo_getRawString(optionList, "product_rgb");
+        productName = clo_getRawString(optionList, "product_rgb");
     } else {
         doingRGB = false;
         if (clo_isSet(optionList, "product")) {
-            prodName = clo_getRawString(optionList, "product");
+            productName = clo_getRawString(optionList, "product");
         } else {
-            prodName.clear();
+            productName.clear();
             for (int i = 0; i < l3File->getNumProducts(); i++) {
                 string tmpName = l3File->getProductName(i);
                 if (tmpName != "qual_l3") {
-                    if (!prodName.empty())
-                        prodName += ",";
-                    prodName += tmpName;
+                    if (!productName.empty())
+                        productName += ",";
+                    productName += tmpName;
                 }
             }
         }
     }
     trimNSEW = clo_getBool(optionList, "trimNSEW");
-    write_projtext = clo_getBool(optionList, "write_projtext");
+    writeProjectionText = clo_getBool(optionList, "write_projtext");
 
-    boost::split(prodNameList, prodName, boost::is_any_of(","));
-    string cleanProdName;
+
+    getProductNames(productName,productNameList,l3File, optionList);
+    std::string cleanProdName;
     vector<string> parts;
-    meta_l3bType metaData = *l3File->getMetaData();  // get metadata
-    // all the wavelength for the sensor
-    int32_t* wave_array_of_the_sensor;
-    // quick look up for wv
-    std::unordered_set<int32_t> look_up_for_wv;
-    want_verbose = 0;
-    const auto total_num_bands =
-        rdsensorinfo(metaData.sensorID, 0, "Lambda", (void**)&wave_array_of_the_sensor);
-    // to lookup a rank
-    productInfo_t* p_info;
-    p_info = allocateProductInfo();
-    want_verbose = 1;
-    for (int i = 0; i < total_num_bands; i++) {
-        look_up_for_wv.insert(wave_array_of_the_sensor[i]);
-    }
-    if (clo_isSet(optionList, "wavelength_3d")) {
-        const std::string wavelengths_3d_list = clo_getRawString(optionList, "wavelength_3d");
-        boost::split(wv3d::wavelength_3d_list_separated, wavelengths_3d_list, boost::is_any_of(", "),
-                     boost::algorithm::token_compress_on);
-
-        std::vector<std::string> colon_expanded_list;
-        for (const auto& wv_par : wv3d::wavelength_3d_list_separated) {
-            if (boost::contains(wv_par, ":")) {
-                std::vector<std::string> pars;
-                boost::split(pars, wv_par, boost::is_any_of(":"));
-                if (pars.size() != 2) {
-                    EXIT_LOG(std::cerr << "--Error-: Wrong range specifier: " << wv_par << std::endl;)
-                    }
-                try {
-                    int wav_st = boost::lexical_cast<int32_t>(pars.at(0));
-                    int wav_end = boost::lexical_cast<int32_t>(pars.at(1));
-                    if (look_up_for_wv.count(wav_st) == 0) {
-                        EXIT_LOG(std::cerr << "--Error--: The start wavelength " << wav_st
-                                           << " is not found in sensor wv list.\n Check "
-                                              "the range "
-                                           << wv_par << std::endl);
-                    }
-                    if (look_up_for_wv.count(wav_end) == 0) {
-                        EXIT_LOG(std::cerr << "--Error--: The end wavelength " << wav_end
-                                           << " is not found in sensor wv list.\n Check "
-                                              "the range "
-                                           << wv_par << std::endl);
-                    }
-                    for (int32_t i = wav_st; i <= wav_end; i++) {
-                        if (look_up_for_wv.count(i) == 0)
-                            continue;
-                        colon_expanded_list.push_back(boost::lexical_cast<std::string>(i));
-                    }
-                } catch (const boost::bad_lexical_cast& e) {
-                    EXIT_LOG(std::cerr << e.what() << '\n'; std::cerr
-                                                            << "--Error--: Provided wavelength are not valid "
-                                                               "numbers. "
-                                                            << wv_par << std::endl;)
-                }
-            } else {
-                colon_expanded_list.push_back(wv_par);
-            }
-        }
-        wv3d::wavelength_3d_list_separated = std::move(colon_expanded_list);
-    }
-
-    // make temp unordered set for quick lookup;
-    std::unordered_set<std::string> look_up_table_product_availiable_list;
-    const int number_of_products = l3File->getNumProducts();
-    for (int i = 0; i < number_of_products; i++) {
-        const std::string& name = l3File->getProductName(i);
-        look_up_table_product_availiable_list.insert(name);
-    }
-    std::vector<std::string> temp_prod_name_list;
-    std::unordered_set<std::string> already_set_wv;
-    // check that there are no duplicates in the wv list
-    for (const auto& wv : wv3d::wavelength_3d_list_separated)
-        if (already_set_wv.count(wv) == 0) {
-            already_set_wv.insert(wv);
-        } else {
-            EXIT_LOG(std::cerr << "--Error--: A duplicate found in the wavelength_3d list  " << wv
-                               << std::endl);
-        }
-
-    for (size_t i = 0; i < prodNameList.size(); i++) {
-        std::vector<std::string> names;
-        boost::split(names, prodNameList.at(i), boost::is_any_of(":"));
-        std::string clean_name = names.at(0);
-        int result = findProductInfo(clean_name.c_str(), metaData.sensorID, p_info);
-        if (result != 1) {
-            EXIT_LOG(std::cerr << "--Error--: Could not find the product: " << clean_name << std::endl);
-        }
-        int prod_rank = p_info->rank;
-        const std::string suffix = p_info->suffix;
-        std::string prefix = p_info->prefix;
-
-        if (look_up_table_product_availiable_list.count(clean_name) == 0) {
-            if (prod_rank != 3) {
-                EXIT_LOG(std::cerr << "--Error--: Non-3D Product " << clean_name
-                                   << " is not found in the bin  l3 file\n");
-            }
-            // check if the list empty
-            if (wv3d::wavelength_3d_list_separated.empty()) {
-                for (const auto& product_in_l3in : look_up_table_product_availiable_list) {
-                    int res = findProductInfo(product_in_l3in.c_str(), metaData.sensorID, p_info);
-
-                    if (res != 1) {
-                        EXIT_LOG(std::cerr << "--Error--: Could not read the product info " << product_in_l3in
-                                           << std::endl);
-                    }
-                    const std::string local_suffix = p_info->suffix;
-                    const std::string local_name = p_info->productName;
-                    if (boost::contains(clean_name, local_name)) {
-                        if (!local_suffix.empty()) {
-                            if (!boost::contains(clean_name, local_suffix))
-                                continue;
-                        } else {
-                            if (clean_name != local_name)
-                                continue;
-                        }
-
-                        const std::string wave_length = boost::lexical_cast<std::string>(p_info->prod_ix);
-                        if (wave_length.empty()) {
-                            EXIT_LOG(std::cerr << "--Error--: Not valid 2D slice of " << clean_name
-                                               << "in the l3bin file " << std::endl);
-                        }
-                        wv3d::wavelength_3d_list_separated.push_back(wave_length);
-                    }
-                }                
-                std::sort(wv3d::wavelength_3d_list_separated.begin(),
-                          wv3d::wavelength_3d_list_separated.end(),
-                          wv3d::numericalOrder);
-            }
-            bool prod_3d_expand_found = false;
-            for (size_t i = 0; i < wv3d::wavelength_3d_list_separated.size(); i++) {
-                std::string wv = wv3d::wavelength_3d_list_separated.at(i);
-                std::string prod_3d_name = prefix + "_" + wv + suffix;
-                if (look_up_table_product_availiable_list.count(prod_3d_name) == 0) {
-                    EXIT_LOG(std::cerr << "--Error--: Neither product " << clean_name
-                                       << " or its wavelength 3d slice " << prod_3d_name
-                                       << " are found. \nExiting ... " << std::endl);
-                } else {
-                    prod_3d_expand_found = true;
-                    names.at(0) = prod_3d_name;
-                    int32_t wavelength;
-                    try {
-                        wavelength = boost::lexical_cast<int32_t>(wv);
-                    } catch (const boost::bad_lexical_cast& e) {
-                        EXIT_LOG(std::cerr << e.what() << '\n';
-                                 std::cerr << "--Error--: Provided wavelength are not valid "
-                                              "numbers. \nExiting...");
-                    }
-
-                    wv3d::wv3d_2d_name_to_3d_expansion[clean_name].push_back(wavelength);
-                    wv3d::wv3d_3d_name_to_2d_name[prod_3d_name] = clean_name;
-                    std::string temp_prod_3d_name;
-                    for (const auto& name : names) {
-                        if (!temp_prod_3d_name.empty())
-                            temp_prod_3d_name += ":";
-                        temp_prod_3d_name += name;
-                    }
-                    temp_prod_name_list.push_back(temp_prod_3d_name);
-                }
-            }
-            if (!prod_3d_expand_found) {
-                EXIT_LOG(std::cerr << "--Error--: Product not found : " << clean_name << std::endl);
-            }
-
-        } else {
-            if (prod_rank != 2) {
-                EXIT_LOG(std::cerr << "--Error--: The product in the bin file " << clean_name
-                                   << " is not a 2D prodcut" << std::endl);
-            }
-            temp_prod_name_list.push_back(prodNameList.at(i));
-        }
-        wv3d::output_products_with_3d.push_back(clean_name);
-    }
-    prodNameList = std::move(temp_prod_name_list);
-    wv3d::wavelength_3d_size = wv3d::wavelength_3d_list_separated.size();
-    if (wv3d::wavelength_3d_size >= 1) {
-        if (wv3d::wv3d_2d_name_to_3d_expansion.size() > 0) {
-            if (clo_isSet(optionList, "ofile2")) {
-                const std::string oformatStr2 = getFileFormatName(clo_getString(optionList, "oformat2"));
-                if (oformatStr2.compare("netCDF4") != 0) {
-                    EXIT_LOG(std::cerr << "The user supplied a 3D product "
-                                       << " and the output format for ofile2 is not netCDF4.\n"
-                                       << "Exiting ... " << std::endl);
-                }
-            }
-        }
-    }
-    // setup measurments
-    for (size_t i = 0; i < prodNameList.size(); i++) {
+    // setup measurements
+    for (size_t i = 0; i < productNameList.size(); i++) {
         if (i != 0)
             cleanProdName += ",";
-        boost::split(parts, prodNameList[i], boost::is_any_of(":"));
+        boost::split(parts, productNameList[i], boost::is_any_of(":"));
         if (parts.size() == 1) {
             cleanProdName += parts[0];
-            prodMeasurementList.push_back(Avg);
+            productMeasurementList.push_back(AVG);
         } else if (parts.size() == 2) {
-            prodNameList[i] = parts[0];  // get rid of the modifier
+            productNameList[i] = parts[0];  // get rid of the modifier
             cleanProdName += parts[0];
             if (parts[1].compare("avg") == 0)
-                prodMeasurementList.push_back(Avg);
+                productMeasurementList.push_back(AVG);
             else if (parts[1].compare("stdev") == 0)
-                prodMeasurementList.push_back(Stdev);
+                productMeasurementList.push_back(STDEV);
             else if (parts[1].compare("var") == 0)
-                prodMeasurementList.push_back(Variance);
+                productMeasurementList.push_back(VARIANCE);
             else if (parts[1].compare("nobs") == 0)
-                prodMeasurementList.push_back(Nobs);
+                productMeasurementList.push_back(NOBS);
             else if (parts[1].compare("nscenes") == 0)
-                prodMeasurementList.push_back(Nscenes);
+                productMeasurementList.push_back(NSCENES);
             else if (parts[1].compare("obs_time") == 0)
-                prodMeasurementList.push_back(ObsTime);
+                productMeasurementList.push_back(OBS_TIME);
             else if (parts[1].compare("bin_num") == 0)
-                prodMeasurementList.push_back(BinNum);
+                productMeasurementList.push_back(BIN_NUM);
             else {
                 EXIT_LOG(
                     printf("-E- measurement type \"%s\" "
@@ -2010,7 +1924,7 @@ int main(int argc, char* argv[]) {
                            parts[1].c_str(), parts[0].c_str()));
             }
         } else {
-            EXIT_LOG(printf("-E- product name not understood \"%s\".\n", prodNameList[i].c_str()));
+            EXIT_LOG(printf("-E- product name not understood \"%s\".\n", productNameList[i].c_str()));
         }
     }
     if (!l3File->setActiveProductList(cleanProdName.c_str())) {
@@ -2059,7 +1973,7 @@ int main(int argc, char* argv[]) {
     // projection
     clo_option_t* projectionOption = clo_findOption(optionList, "projection");
     char* projectionStr = clo_getOptionRawString(projectionOption);
-
+    meta_l3bType metaData = *l3File->getMetaData();
     // check the metadata of the bin file
     if (metaData.north == metaData.south) {
         printf("-E- north and south metadata are equal.\n");
@@ -2125,7 +2039,7 @@ int main(int argc, char* argv[]) {
 
     // set other fields in the metadata
     strcpy(metaData.soft_name, "l3mapgen");
-    strcpy(metaData.soft_ver, softwareVersion);
+    strcpy(metaData.soft_ver, softwareVersion.c_str());
     if ((tmpStr = strrchr(ifileName, '/')) != NULL)
         tmpStr++;
     else
@@ -2237,6 +2151,5 @@ int main(int argc, char* argv[]) {
     if (outFile2)
         delete outFile2;
     delete l3File;
-
     return EXIT_SUCCESS;
 }

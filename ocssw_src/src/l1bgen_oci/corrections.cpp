@@ -15,7 +15,7 @@ using namespace std;
 
 int getDarkCorrection(const size_t scanIndex, const uint32_t numScans, const vector<uint8_t> &hamSides,
                       const uint16_t numScansAvg, const uint16_t numPixSkip, const int16_t sciSpatialAgg,
-                      const int16_t darkSpatialAgg, const uint32_t numTaps, const vector<int16_t> &specAgg,
+                      const int16_t darkSpatialAgg, const uint32_t numTaps, const vector<int16_t> &specAggModes,
                       const uint32_t fillValue, const int16_t numPixAverage, uint32_t ***darkPixels,
                       vector<double> &darkCorrections) {
     // Determine number of bands per tap for hyperspectral data
@@ -24,8 +24,8 @@ int getDarkCorrection(const size_t scanIndex, const uint32_t numScans, const vec
     if (numTaps == NUMBER_OF_TAPS) {
         // hyperspectral bands
         for (size_t i = 0; i < numTaps; i++)
-            if (specAgg[i] > 0)
-                numBandsPerTap[i] = 32 / specAgg[i];
+            if (specAggModes[i] > 0)
+                numBandsPerTap[i] = 32 / specAggModes[i];
             else
                 numBandsPerTap[i] = 0;
     } else {
@@ -97,16 +97,16 @@ int getDarkCorrection(const size_t scanIndex, const uint32_t numScans, const vec
     // Loop through taps and compute dark correction
     int16_t bandIndex = 0;
     for (size_t tapIndex = 0; tapIndex < numTaps; tapIndex++) {
-        if (specAgg[tapIndex] <= 0) {
+        if (specAggModes[tapIndex] <= 0) {
             continue;
         }
 
         float darkDivisor = 1.0;
         float darkOffset = 0.0;
 
-        const bool needsAggregationAdjustment = (sciSpatialAgg * specAgg[tapIndex] > 4);
+        const bool needsAggregationAdjustment = (sciSpatialAgg * specAggModes[tapIndex] > 4);
         if (needsAggregationAdjustment) {
-            darkDivisor = darkSpatialAgg * specAgg[tapIndex] / 4.0;
+            darkDivisor = darkSpatialAgg * specAggModes[tapIndex] / 4.0;
             darkOffset = (darkDivisor - 1) / (2 * darkDivisor);
         }
 
@@ -177,7 +177,7 @@ double getRvsCorrection(const size_t band, const size_t numPixels, const uint8_t
 }
 
 double getNonlinearityCorrection(const size_t band, const size_t pixel, const uint32_t numNonlinearTerms,
-                                 const vec2D<double> &k5Coefs, const vec2D<float> &digitalNumbers) {
+                                 const vec2D<double> &k5Coefs, const vec2D<double> &digitalNumbers) {
     // Initialize with the zeroth-order correction
     float correction = k5Coefs[band][0];
 
@@ -194,39 +194,38 @@ double getNonlinearityCorrection(const size_t band, const size_t pixel, const ui
 vector<uint8_t> saturationFlags;
 vector<float> qualityMatrix;
 size_t largestDim{0};
-void getQualityFlags(size_t numPix, size_t numBands, size_t numInsBands, vec2D<float> &digitalNumbers,
-                     float **insAggMat, std::vector<uint32_t> &saturationThresholds,
-                     uint8_t *qualityFlags) {
+void getQualityFlags(CalibrationData &calData, size_t numPix, const vec2D<double> &digitalNumbers) {
     using namespace boost;
 
-    if (largestDim < max(numInsBands * numPix, numBands * numPix)) {
-        largestDim = max(numInsBands * numPix, numBands * numPix);
+    if (largestDim < max(calData.numInsBands * numPix, calData.numBands * numPix)) {
+        largestDim = max(calData.numInsBands * numPix, calData.numBands * numPix);
         saturationFlags.resize(largestDim);
         qualityMatrix.resize(largestDim);
     }
 
     fill(qualityMatrix.begin(), qualityMatrix.end(), 0);
 
-    for (size_t insBand = 0; insBand < numInsBands; insBand++) {
+    for (size_t insBand = 0; insBand < calData.numInsBands; insBand++) {
         for (size_t pix = 0; pix < numPix; pix++) {
             saturationFlags[insBand * numPix + pix] =
-                (digitalNumbers[insBand][pix] >= saturationThresholds[insBand]) ? 1 : 0;
+                (digitalNumbers[insBand][pix] >= calData.gains->saturationThresholds[insBand]) ? 1 : 0;
         }
     }
 
-    for (size_t insBand = 0; insBand < numInsBands; insBand++) {
-        for (size_t l1bBand = 0; l1bBand < numBands; l1bBand++) {
+    for (size_t insBand = 0; insBand < calData.numInsBands; insBand++) {
+        for (size_t l1bBand = 0; l1bBand < calData.numBands; l1bBand++) {
             for (size_t pix = 0; pix < numPix; pix++) {
                 qualityMatrix[l1bBand * numPix + pix] +=
-                    insAggMat[insBand][l1bBand] * saturationFlags[insBand * numPix + pix];
+                    calData.insAgg[insBand][l1bBand] * saturationFlags[insBand * numPix + pix];
             }
         }
     }
 
-    for (size_t l1bBand = 0; l1bBand < numBands; l1bBand++) {
+    for (size_t l1bBand = 0; l1bBand < calData.numBands; l1bBand++) {
         for (size_t pix = 0; pix < numPix; pix++) {
             if(qualityMatrix[l1bBand * numPix + pix] > 0) {
-                qualityFlags[l1bBand * numPix + pix] |= 1;
+                calData.qualityFlags[l1bBand * numPix + pix] |= 1;
+                calData.saturatedPixelCounts[l1bBand] += 1;
             }
         }
     }
@@ -356,9 +355,9 @@ void makeXtalkMat(int16_t spatialAgg, CalibrationData &calData, float ***cmat_in
 }
 
 void getXtalkCorrection(uint32_t numInsBands, size_t numCcdPix, size_t ncpix, double ***cmat,
-                        const vec2D<float> &digitalNumbers, vec2D<double> &xtalkCorrection) {
+                        const vec2D<double> &digitalNumbers, vec2D<double> &xtalkCorrection) {
     size_t nco2 = ncpix / 2;
-    vec2D<float> bandPad = digitalNumbers;
+    vec2D<double> bandPad = digitalNumbers;
 
     // create band array with padding
 

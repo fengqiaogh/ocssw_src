@@ -106,6 +106,34 @@ void ephparms(double t, double* xls, double* gs, double* xlm, double* omega);
 
 #ifdef  __cplusplus
 }
+
+/**
+ * @brief
+This subroutine computes the Sun vector in geocentric inertial
+(equatorial) coodinates.  It uses the model referenced in The
+Astronomical Almanac for 1984, Section S (Supplement) and documented
+in "Exact closed-form geolocation algorithm for Earth survey
+sensors", by F.S. Patt and W.W. Gregg, Int. Journal of Remote
+Sensing, 1993.  The accuracy of the Sun vector is approximately 0.1
+       Subprograms referenced:
+       JD              Computes Julian day from calendar date
+       EPHPARMS        Computes mean solar longitude and anomaly and
+                        mean lunar lontitude and ascending node
+       NUTATE          Compute nutation corrections to lontitude and
+                        obliquityc
+       Coded by:  Frederick S. Patt, GSC, November 2, 1992
+       Modified to include Earth constants subroutine by W. Gregg,
+               May 11, 1993.
+arcminute.
+ * @param year e.g., 1993
+ * @param dayOfYear (1-366)
+ * @param secondsOfDay Seconds of day
+ * @param[out] sunUnitInertial Unit Sun vector in geocentric inertial  coordinates of date
+ * @param[out] earthSunDistance Magnitude of the Sun vector (AU)
+ */
+template <typename T>
+void getUnitInertialSunVector(int year, int dayOfYear, double secondsofDay, T sunUnitInertial[3],
+                              T &earthSunDistance);
 #endif
 
 #endif  // OCSSW_SUN2000_H

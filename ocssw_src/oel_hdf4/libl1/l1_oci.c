@@ -14,7 +14,7 @@
 
 #include <netcdf.h>
 #include "l1_oci.h"
-
+#include "libnav.h"
 #include "l1.h"
 #include <nc4utils.h>
 #include "libnav.h"
@@ -22,6 +22,8 @@
 #include <math.h>
 #include <allocate2d.h>
 #include "l1_oci_private.h"
+#include <gsl/gsl_matrix.h>
+#include <compute_alpha.h>
 
 #define SATURATION_BIT 1
 
@@ -34,13 +36,9 @@ static int bad_num_bands = 0;
 static short *tmpShort;
 
 // whole file stuff
-static size_t expected_num_blue_bands = 119;
-static size_t expected_num_red_bands = 163;
-static size_t expected_num_SWIR_bands = 9;
 
 static size_t num_scans, num_pixels;
 static size_t num_blue_bands, num_red_bands, num_SWIR_bands;
-static size_t tot_num_bands = 286;
 static int ncid_L1B;
 
 // scan line attributes
@@ -52,7 +50,7 @@ static uint8_t *hamside;
 
 // geolocation data
 static int geolocationGrp; // netCDF groupid
-static int lonId, latId, heightId, senzId, senaId, solzId, solaId; // netCDF varids
+static int lonId, latId, heightId, senzId, senaId, solzId, solaId, attQuatId; // netCDF varids
 static float latFillValue = BAD_FLT;
 static float lonFillValue = BAD_FLT;
 static short heightFillValue = BAD_FLT;
@@ -85,6 +83,10 @@ static float *blue_solar_irradiance; // [num_blue_bands]
 static float *red_solar_irradiance; // [num_red_bands]
 static float *SWIR_solar_irradiance; // [num_SWIR_bands]
 static double earth_sun_distance_correction;
+
+// OCI rotation angle data that will get updated for each scan
+// {x, y, z}
+static float eulerAngles[3] = {0.0};
 
 /**
  * Open the OCI L1B file and perform some one-time tasks (as opposed to tasks that
@@ -255,7 +257,16 @@ int openl1_oci(filehandle * file) {
         if(scan_time[i] == scan_timeFillValue)
             scan_time[i] = BAD_FLT;
     }
-    
+
+    // get extract pixel start
+    nc_type vr_type; /* attribute type */
+    size_t vr_len; /* attribute length */
+    if ((nc_inq_att(ncid_L1B, NC_GLOBAL, "extract_pixel_start", &vr_type, &vr_len) == NC_NOERR)) {
+      nc_get_att_int(ncid_L1B, NC_GLOBAL,
+		     "extract_pixel_start", &extract_pixel_start);
+      extract_pixel_start--; // Attribute is one-based
+    }
+
     // Setup geofile pointers
     status = nc_inq_grp_ncid(ncid_L1B, "geolocation_data", &geolocationGrp);
     check_err(status, __LINE__, __FILE__);
@@ -373,6 +384,10 @@ int openl1_oci(filehandle * file) {
     status = nc_inq_varid(navigationGrp, "CCD_scan_angles", &ccdScanAnglesId);
     check_err(status, __LINE__, __FILE__);
 
+    // grab att_quat id for alpha calculation 
+    status = nc_inq_varid(navigationGrp, "att_quat", &attQuatId);
+    check_err(status, __LINE__, __FILE__);
+
     status = nc_inq_varid(observationGrp, "qual_SWIR", &qual_SWIRId);
     check_err(status, __LINE__, __FILE__);
 
@@ -460,6 +475,10 @@ int readl1_oci(filehandle *file, int32_t line, l1str *l1rec, int lonlat) {
 
         // hook it onto l1rec's private_data
         l1rec->private_data = polcorPrivateData;
+
+        // set L1B netcdf id
+        // only used by l1cgen for now
+        polcorPrivateData->ncid_L1B = ncid_L1B;
 
         // save the bands on initial read because it wont change for the rest of the scan
         polcorPrivateData->num_blue_bands = num_blue_bands;
@@ -615,7 +634,57 @@ int readl1_oci(filehandle *file, int32_t line, l1str *l1rec, int lonlat) {
         else
             l1rec->sola[i] = tmpShort[i] * solaScale + solaOffset;
     }
-    
+
+    // compute alpha for this current line
+    // grab the attitude quaternions for this line 
+    start[0] = line;
+    start[1] = 0;
+    start[2] = 0;
+    count[0] = 1;
+    count[1] = 4; // each scan has 4 quaternion elements
+    count[2] = 1;
+
+    // grab quaternions for this current line 
+    //double* attQuat = (double*)malloc(4 * sizeof(double));
+    double attQuat[4] = {0.0};
+    status = nc_get_vara_double(navigationGrp, attQuatId, start, count, attQuat);
+
+    // convert quaternions to eqivalent direction cosine matrix
+    gsl_matrix* quatCosMatrix = gsl_matrix_calloc(3, 3);
+    convertQuatToCosineMatrix(attQuat, quatCosMatrix);
+
+    // compute euler sequence
+    eulerAngles[1] = l1rec->tilt;
+    gsl_matrix* eulerSequence = gsl_matrix_calloc(3, 3);
+    computeEulerSequence(eulerAngles, eulerSequence);
+
+    // smat = eulerSequence * quatCosMatrix in IDL, in C it needs to be flipped, so:
+    //      = quatCosMatrix * eulerSequence
+    gsl_matrix* smat = gsl_matrix_calloc(3, 3);
+    gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, quatCosMatrix, eulerSequence, 0.0, smat);
+
+    // mirror normal value for this scan, get it from the first row of smat
+    double mirrorNormal[3] = {0.0};
+    for (int i = 0; i < 3; i++) {
+       mirrorNormal[i] = gsl_matrix_get(smat, i, 0);
+    }
+
+    // calculate alpha 
+    compute_alpha(
+        l1rec->lon, 
+        l1rec->lat, 
+        l1rec->senz, 
+        l1rec->sena, 
+        mirrorNormal, 
+        l1rec->npix,
+        l1rec->alpha
+    );
+
+    // free for next line
+    gsl_matrix_free(quatCosMatrix);
+    gsl_matrix_free(eulerSequence);
+    gsl_matrix_free(smat);
+
     
     start[0] = 0;
     start[1] = line;

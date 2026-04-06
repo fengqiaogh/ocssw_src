@@ -336,7 +336,7 @@ int write_l3b_meta_netcdf4(idDS ds_id, meta_l3bType *meta_l3b, int write64bit) {
     char *cleanInputParams = replace_ocroots(meta_l3b->input_parms);
     char *end_str;
     char *token = strtok_r(cleanInputParams, "\n", &end_str);
-    char tmp_buf[16384];
+    char tmp_buf[LG_ATTRSZ];
     while (token != NULL) {
         char *end_token;
         strcpy(tmp_buf, token);

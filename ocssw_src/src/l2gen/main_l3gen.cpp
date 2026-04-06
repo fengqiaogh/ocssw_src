@@ -69,10 +69,20 @@ void load_input_filehandle(filehandle *l1file) {
         printf("-E- (%s, %d) Cannot allocate space for l1file->Fonom\n", __FILE__, __LINE__);
         exit(EXIT_FAILURE);
     }
+
+    int status = set_solar_irradiance(l1_input->f0file);
     int i;
     for (i = 0; i < l1file->nbands; i++) {
         if (l1_input->outband_opt >= 2) {
-            get_f0_thuillier_ext(l1file->iwave[i], BANDW, l1file->Fonom + i);
+            if (status) {
+                printf("-E- %s:%d : error reading solar_irradiance LUT \"%s\".\n", __FILE__, __LINE__, l1_input->f0file);
+                exit(EXIT_FAILURE);
+            }
+            status = get_f0(l1file->iwave[i],BANDW,l1file->Fonom + i);
+            if (status) {
+                printf("-E- %s:%d - Can't calculate solar irradiance.\n", __FILE__, __LINE__);
+                exit(EXIT_FAILURE);
+            }
         } else {
             l1file->Fonom[i] = l1file->Fobar[i];
         }

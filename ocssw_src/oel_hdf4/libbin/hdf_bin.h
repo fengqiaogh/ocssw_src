@@ -16,7 +16,11 @@ protected:
     int32_t n_data_prod;
     char proddata_name[MAXNPROD][80];
     char *product_array[MAXNPROD];
-
+    char product_attributes_values[MAXNPROD][MAXNUMATTR][MAXATTRLEN]; //4 attributes max,  16 bytes each max, only netCDF bin files
+    size_t product_attributes_sizes[MAXNPROD][MAXNUMATTR];
+    int  product_number_of_attributes[MAXNPROD];
+    char product_attributes_names[MAXNPROD][MAXNUMATTR][MAXATTRNAMELEN];
+    int product_attributes_types[MAXNPROD][MAXNUMATTR];
     l3::L3Shape* binShape;
     
     size_t binListPtr;
@@ -32,11 +36,17 @@ public:
     virtual int query(char ***prod_array);
     virtual int get_prodname(int iprod, char *prodname);
     virtual void setProductList(int numProducts, char* prodNames[]);
-
+    virtual void setProductList(int numProducts, char* prodNames[],
+                                char (*prodAttributesVals[])[MAXNUMATTR][MAXATTRLEN],
+                                char (*prodAttributesNames[])[MAXNUMATTR][MAXATTRNAMELEN],
+                                size_t (*prodAttrLen[])[MAXNUMATTR], int prodAttrNum[],
+                                int (*prodAttrType[])[MAXNUMATTR]);
     virtual const char* getProdName(int prodNum) const;
     virtual int getProdIndex(const char *prodname) const;
     virtual const char* getActiveProdName(int prodNum) const;
-
+    virtual void getProdAttrs(const char* prodname, char (**attrVal)[MAXNUMATTR][MAXATTRLEN],
+                                    char (**attrNames)[MAXNUMATTR][MAXATTRNAMELEN],
+                                    int (**attrType)[MAXNUMATTR], size_t (**attrLen)[MAXNUMATTR], int* attrNum);
     virtual int read(char* product_list);
 
     virtual int64_t get_beg() = 0;
@@ -465,7 +475,7 @@ class cdf4_bin : public hdf_bin {
 
     int n_datasets;
 
-    int bindata_idx;
+    int *bindata_varids;
     int binqual_idx;
     int binlist_idx;
     int binindex_idx;

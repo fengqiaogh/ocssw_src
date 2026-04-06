@@ -22,7 +22,7 @@ def readTimestamp(data):
 
 def tai58_as_datetime(tai58):
     # convert tai58 (seconds since 1958, including leapsecs) to datetime object
-    dt = datetime.datetime.utcfromtimestamp(tai58 - LEAPSEC) - TAI58_OFFSET
+    dt = datetime.datetime.fromtimestamp(tai58 - LEAPSEC, tz=datetime.timezone.utc) - TAI58_OFFSET
     return dt  # seconds since Jan 1, 1970
 
 def seconds_since(tai58, basetime=None):

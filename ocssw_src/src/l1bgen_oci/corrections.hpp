@@ -10,7 +10,6 @@
 
 #include <boost/multi_array.hpp>
 #include "gains.hpp"
-#include "dark_data.hpp"
 #include "device.hpp"
 #include "calibrations.hpp"
 
@@ -28,7 +27,7 @@
  * @param sciSpatialAgg Spatial aggregation for science data
  * @param darkSpatialAgg Spatial aggregation for dark data
  * @param numTaps Number of taps
- * @param specAgg Spectral aggregation factors for each tap. One of 0, 2, 4, 8, 16.
+ * @param specAggModes Spectral aggregation factors for each tap. One of 0, 2, 4, 8, 16.
  * @param fillValue Fill value
  * @param numPixAverage Number of dark pixels to average at one time
  * @param darkPixels The dark collect pixel values
@@ -39,7 +38,7 @@
 int getDarkCorrection(const size_t scanIndex, const uint32_t numScans, const std::vector<uint8_t> &hamSides,
                       const uint16_t numScansAvg, const uint16_t numPixSkip, const int16_t sciSpatialAgg,
                       const int16_t darkSpatialAgg, const uint32_t numTaps,
-                      const std::vector<int16_t> &specAgg, const uint32_t fillValue,
+                      const std::vector<int16_t> &specAggModes, const uint32_t fillValue,
                       const int16_t numPixAverage, uint32_t ***darkPixels,
                       std::vector<double> &darkCorrections);
 
@@ -85,20 +84,19 @@ double getRvsCorrection(const size_t band, const size_t pixel, const uint8_t ham
  */
 
 double getNonlinearityCorrection(const size_t band, const size_t pixel, const uint32_t numNonlinearTerms,
-                                 const vec2D<double> &k5Coefs, const vec2D<float> &digitalNumbers);
+                                 const vec2D<double> &k5Coefs, const vec2D<double> &digitalNumbers);
 
 /**
  * @brief Compute and return quality flags for one line of data.
- * @param numPix The number of pixels in to work over
- * @param numBands The number of bands
- * @param numInsBands The number of bands after instrument aggregation
- * @param digitalNumbers The raw data values from the device
- * @param saturationThresholds The values above which each pixel will be considered saturated
- * @return A 2D array of flag values that indicate saturation for each pixel in the current line
+ *
+ * @param calData A struct containing the number of instrument bands, the number of L1B bands, a 2D
+ * instrument aggregation matrix and a Gains struct that has a vector of saturation thresholds. The result is
+ * stored in this struct's qualityFlags field.
+ * @param numPixels The number of pixels to work over
+ * @param digitalNumbers The dark-corrected L1A science data
+ *
  */
-void getQualityFlags(size_t numPix, size_t numBands, size_t numInsBands, vec2D<float> &digitalNumbers,
-                     float **insAggMat, std::vector<uint32_t> &saturationThresholds,
-                     uint8_t *qualityFlags);
+void getQualityFlags(CalibrationData &calData, size_t numPixels, const vec2D<double> &digitalNumbers);
 
 /**
  * @brief Read the OCI cross-correlation matrix for a band and aggregate the coefficients for the instrument
@@ -122,6 +120,6 @@ void makeXtalkMat(int16_t spatialAgg, CalibrationData &calData, float ***cmat_in
  * @param The crosstalk correction for sensor bands in question
  **/
 void getXtalkCorrection(uint32_t numInsBands, size_t numCcdPix, size_t ncpix, double ***cmat,
-                        const vec2D<float> &digitalNumbers, vec2D<double> &xtalkCorrection);
+                        const vec2D<double> &digitalNumbers, vec2D<double> &xtalkCorrection);
 
 #endif

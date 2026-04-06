@@ -28,11 +28,11 @@ ADD_LIBRARY(nav
   math_utils.c
   crossp.c
   sunangs.c
-  sun2000.c
+  sun2000.cpp
   gha2000.c
   ephparms.c
   nutate.c
-  l_sun.c
+  l_sun.cpp
   ocorient.c
   esdist.c
   getenv.cpp

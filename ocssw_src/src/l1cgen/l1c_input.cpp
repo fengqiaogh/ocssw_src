@@ -35,8 +35,8 @@ namespace l1c {
 
 static char *l1cgen_optionKeys[] = {
     "-help", "-version", "-dump_options", "-dump_options_paramfile", "-dump_options_xmlfile", "par",
-    "pversion","doi","verbose","ifile","ofile","outlist","l1c_grid", "l1c_anc", "mode", "south", "north", "west",
-    "east", "history","l2prod","ix_l1cprod",
+    "pversion", "doi", "verbose", "ifile", "ofile", "outlist", "l1c_grid", "l1c_anc", "mode", "south",
+    "north", "west", "east", "history", "l2prod", "ix_l1cprod",
     "selgran",          // selected granules up to 10 files, they are ids not indexes!!
     "selyear",          // selected year
     "selmon",           // selected month
@@ -44,16 +44,15 @@ static char *l1cgen_optionKeys[] = {
     "grid_resolution",  // grid resolution in km
     "sensor",           // SPEX 1, OCI 2 and HARP 3
     "gransize", "grantype", "bintype", "start_timeflag",
-    "start_time",  // initial time as ISO for selecting granules
-    "end_time",    // final time as ISO for selecting granules
-    "projection",       // projection type,"swath_grid":0 (default-Fred) or "socea=1"
-    "sort_method",      // binning sorting type: 0 orbital fred search, 1: SBS
-    "cloud_height",     // cloud top height in km
+    "start_time",    // initial time as ISO for selecting granules
+    "end_time",      // final time as ISO for selecting granules
+    "projection",    // projection type,"swath_grid":0 (default-Fred) or "socea=1"
+    "sort_method",   // binning sorting type: 0 orbital fred search, 1: SBS
+    "cloud_height",  // cloud top height in km
     "demfile",
     "terrain_correct",  // terrain distortion correction , 1: yes
     "cloud_correct",    // 0: no parallax, L1C at cth=0, 1: L1C at cth = k, 2: L1B at cht=variable
-    "cloud_type",
-    "demcloud_flag",
+    "cloud_type", "demcloud_flag",
     // multi  attributes (view, pol, bands)
     "overlap_vflag",  // tells if we want merged views
     "overlap_pflag",  // tells if we want merged polarizations
@@ -65,8 +64,8 @@ static char *l1cgen_optionKeys[] = {
     "unc_thres_b",  // sam
     NULL};
 
-L1C_input::L1C_input(){};  // constructor
-L1C_input::~L1C_input(){};
+L1C_input::L1C_input() {};  // constructor
+L1C_input::~L1C_input() {};
 
 int32_t L1C_input::l1c_usage(const char *prog, const char *ver) {
     clo_optionList_t *list;
@@ -273,7 +272,7 @@ int32_t L1C_input::l1c_init_options(clo_optionList_t *list, const char *prog, co
 
     strcpy(tmpStr, "Digital Elevation Model file");
     strcat(tmpStr, " *.nc file");
-    clo_addOption(list, "demfile", CLO_TYPE_STRING, "$OCDATAROOT/common/gebco_ocssw_v2020.nc", tmpStr);
+    clo_addOption(list, "demfile", CLO_TYPE_STRING, "$OCDATAROOT/common/gebco_ocssw_v2025.nc", tmpStr);
 
     //*************************************************************************-
 
@@ -341,8 +340,7 @@ int32_t L1C_input::l1c_load_input(clo_optionList_t *list, L1C_input *l1ccli) {
                 strcpy(l1ccli->l1c_grid, tmp_file);
             }
 
-        }
-         else if (strcmp(keyword, "l1c_anc") == 0) {
+        } else if (strcmp(keyword, "l1c_anc") == 0) {
             if (clo_isOptionSet(option)) {
                 parm_str = clo_getOptionString(option);
                 parse_file_name(parm_str, tmp_file);
@@ -403,7 +401,7 @@ int32_t L1C_input::l1c_load_input(clo_optionList_t *list, L1C_input *l1ccli) {
         } else if (strcmp(keyword, "sensor") == 0) {
             if (clo_isOptionSet(option)) {
                 const char *sname = clo_getOptionString(option);
-                l1ccli->sensor = sensorName2SensorId(sname);              
+                l1ccli->sensor = sensorName2SensorId(sname);
             }
         } else if (strcmp(keyword, "gransize") == 0) {
             l1ccli->gransize = clo_getOptionInt(option);
@@ -435,21 +433,19 @@ int32_t L1C_input::l1c_load_input(clo_optionList_t *list, L1C_input *l1ccli) {
                 string gran_end_time = s1 + ":" + s2 + ":" + s3.substr(0, 2) + "Z";
                 strcpy(l1ccli->end_time, gran_end_time.c_str());
             }
-        } 
-          else if (strcmp(keyword, "demfile") == 0) {
+        } else if (strcmp(keyword, "demfile") == 0) {
             if (clo_isOptionSet(option)) {
                 cArray = clo_getOptionStrings(option, &count);
                 string s1(cArray[0]);
                 string gran_demfile = s1;
                 strcpy(l1ccli->demfile, gran_demfile.c_str());
-        }
-  /*          else if (strcmp(keyword, "demfile") == 0) {
-            parm_str = clo_getOptionString(option);   
-            strcpy(l1ccli->demfile,parm_str);
-        } */
-          }    
-            else if (strcmp(keyword, "start_timeflag") == 0) {
-            l1ccli->start_timeflag = clo_getOptionInt(option);         
+            }
+            /*          else if (strcmp(keyword, "demfile") == 0) {
+                      parm_str = clo_getOptionString(option);
+                      strcpy(l1ccli->demfile,parm_str);
+                  } */
+        } else if (strcmp(keyword, "start_timeflag") == 0) {
+            l1ccli->start_timeflag = clo_getOptionInt(option);
         } else if (strcmp(keyword, "selday") == 0) {
             l1ccli->selday = clo_getOptionInt(option);
         } else if (strcmp(keyword, "selmon") == 0) {
@@ -469,7 +465,7 @@ int32_t L1C_input::l1c_load_input(clo_optionList_t *list, L1C_input *l1ccli) {
         } else if (strcmp(keyword, "terrain_correct") == 0) {
             l1ccli->terrain_correct = clo_getOptionBool(option);
         } else if (strcmp(keyword, "cloud_correct") == 0) {
-            l1ccli->cloud_correct = clo_getOptionInt(option);         
+            l1ccli->cloud_correct = clo_getOptionInt(option);
         } else if (strcmp(keyword, "cloud_type") == 0) {
             l1ccli->cloud_type = clo_getOptionInt(option);
         } else if (strcmp(keyword, "overlap_vflag") == 0) {
@@ -510,7 +506,7 @@ int32_t L1C_input::l1c_input_init(L1C_input *l1ccli) {
     l1ccli->doi[0] = '\0';
     l1ccli->l2prod[0] = '\0';
     for (int i = 0; i < 3; i++) {
-        l1ccli->ix_l1cprod[i] = i+1;
+        l1ccli->ix_l1cprod[i] = i + 1;
     }  // 3x1 array with selected l1c products, 1: selected
     l1ccli->l1c_pflag = 0;
     l1ccli->south = -90;  // latitude in degrees
@@ -529,7 +525,7 @@ int32_t L1C_input::l1c_input_init(L1C_input *l1ccli) {
     l1ccli->bintype = 0;
     l1ccli->start_time[0] = '\0';
     l1ccli->end_time[0] = '\0';
-    l1ccli->demfile[0]='\0';  // as ISO
+    l1ccli->demfile[0] = '\0';  // as ISO
     l1ccli->history[0] = '\0';
     l1ccli->start_timeflag = 0;  // flag=0 or to=0 in seconds of the day
     l1ccli->swath_num = 1;       // in minutes
@@ -616,24 +612,26 @@ int32_t L1C_input::l1c_inputmain(int argc, char **argv, L1C_input *l1cinput, l1c
     }
 
     ifile_str = l1cinput->files[0];
-    ifile = (char*)ifile_str.c_str();
+    ifile = (char *)ifile_str.c_str();
 
     l1cfile->l1b_name = ifile_str;
 
-    if(l1cinput->verbose) cout<<"ifile.."<<ifile<<endl;
+    if (l1cinput->verbose)
+        cout << "ifile.." << ifile << endl;
     file_format format = getFormat(ifile);  // reading from a nc file ---
     l1cfile->format = format.type;
 
-    if(l1cinput->verbose)    
-    {
-        cout<<"l1cinput->files[0].."<<l1cfile->l1b_name<<endl;
-        printf("format.type....%d..",format.type);
-        printf("sensor id.....%d..",format.sensor_id);
-    }   
+    if (l1cinput->verbose) {
+        cout << "l1cinput->files[0].." << l1cfile->l1b_name << endl;
+        printf("format.type....%d..", format.type);
+        printf("sensor id.....%d..", format.sensor_id);
+    }
 
     l1cfile->format = format.type;
 
-    if(l1cinput->verbose) cout<<"sensor id.."<<format.sensor_id<<"sensor name.."<<sensorId2SensorName(format.sensor_id)<<endl;
+    if (l1cinput->verbose)
+        cout << "sensor id.." << format.sensor_id << "sensor name.." << sensorId2SensorName(format.sensor_id)
+             << endl;
 
     if (format.type == FT_INVALID) {
         printf("-E- %s Line %d: Could not find type for file %s.\n", __FILE__, __LINE__, ifile);
@@ -667,9 +665,9 @@ int32_t L1C_input::l1c_inputmain(int argc, char **argv, L1C_input *l1cinput, l1c
 
     if (l1cinput->l1c_pflag == 8 || l1cinput->l1c_pflag == 7 || l1cinput->l1c_pflag == 3) {
         strcpy(localIfile_l1c, clo_getString(list, "l1c_grid"));
-        l1cinput->files_l1c = readFileList(localIfile_l1c);  // files stored in a vector container in input struc
-        if(l1cinput->verbose)
-        {
+        l1cinput->files_l1c =
+            readFileList(localIfile_l1c);  // files stored in a vector container in input struc
+        if (l1cinput->verbose) {
             cout << localIfile_l1c << endl;
             cout << l1cinput->files_l1c.size() << endl;
         }
@@ -680,7 +678,8 @@ int32_t L1C_input::l1c_inputmain(int argc, char **argv, L1C_input *l1cinput, l1c
         }
     }
 
-     if(l1cinput->verbose) cout << "processing mode...." << l1cinput->l1c_pflag << endl;
+    if (l1cinput->verbose)
+        cout << "processing mode...." << l1cinput->l1c_pflag << endl;
 
     clo_deleteList(list);
 

@@ -41,10 +41,53 @@ struct GeoData {
 
         int32_t rtaNadir[2];  // Pulse per revolution (PPR) offset from RTA nadir angle in encoder counts
 
-        double alongTrackPlanarity[5];   // The plane that intersects `acrossTrackPlanarity` at the spacecraft
-        double acrossTrackPlanarity[5];  // The plane that intersects `alongTrackPlanarity` at the spacecraft
+        double alongTrackPlanarity[5];  // The plane that intersects `acrossTrackPlanarity` at the spacecraft
+        double alongScanPlanarity[5];   // The plane that intersects `alongTrackPlanarity` at the spacecraft
 
         netCDF::NcFile *file;
+
+        GeoLut() {
+        }
+        GeoLut(std::string filename) {
+            file = new netCDF::NcFile(filename, netCDF::NcFile::FileMode::read);
+            netCDF::NcGroup timeParameters, coordinateTranslationParams, rtaHamParameters, planarityParams;
+
+            timeParameters = file->getGroup("time_params");
+            timeParameters.getVar("master_clock").getVar(&masterClock);  // Freq of OCI master clock in Hz
+            timeParameters.getVar("MCE_clock").getVar(&mceClock);        // Freq of OCI MCE clock in Hz
+
+            coordinateTranslationParams = file->getGroup("coord_trans");
+            coordinateTranslationParams.getVar("sc_to_tilt").getVar(&craftToTilt);
+            coordinateTranslationParams.getVar("tilt_axis").getVar(&tiltAxis);
+            // Tilt angles at fixed positions (aft, forward)
+            coordinateTranslationParams.getVar("tilt_angles").getVar(&tiltAngles);
+            coordinateTranslationParams.getVar("tilt_home").getVar(&tiltHome);
+            // Tilt platform to OCI mechanical transformation
+            coordinateTranslationParams.getVar("tilt_to_oci_mech").getVar(&tiltToOciMech);
+            // OCI mechanical to optical transformation
+            coordinateTranslationParams.getVar("oci_mech_to_oci_opt").getVar(&ociMechToOciOpt);
+
+            rtaHamParameters = file->getGroup("RTA_HAM_params");
+            rtaHamParameters.getVar("RTA_axis")
+                .getVar(&rtaAxis);  // Rotating Telescope Assembly rotation axis
+            rtaHamParameters.getVar("HAM_axis").getVar(&hamAxis);  // Half Angle Mirror rotation axis
+            // Along-track mirror-to-axis angles
+            rtaHamParameters.getVar("HAM_AT_angles").getVar(hamAlongTrackAngles);
+            // Cross-track mirror-to-axis angles
+            rtaHamParameters.getVar("HAM_CT_angles").getVar(hamCrossTrackAngles);
+            // RTA encoder conversion to arcseconds
+            rtaHamParameters.getVar("RTA_enc_scale").getVar(&rtaEncoderScale);
+            // HAM encoder conversion to arcseconds
+            rtaHamParameters.getVar("HAM_enc_scale").getVar(&hamEncoderScale);
+            // Pulse per revolution offset from RTA nadir angle measured in encoder counts
+            rtaHamParameters.getVar("RTA_nadir").getVar(rtaNadir);
+
+            planarityParams = file->getGroup("planarity");
+            planarityParams.getVar("along_scan_planarity").getVar(&alongScanPlanarity);
+            planarityParams.getVar("along_track_planarity").getVar(&alongTrackPlanarity);  // PACE prograde
+
+            file->close();
+        }
 
     };  // GeoLut
 
@@ -66,18 +109,21 @@ struct GeoData {
     std::vector<double> swirPixOffset;
     std::vector<double> ccdScanAngles;
     std::vector<double> swirScanAngles;
-    std::vector<float> pixelLatitudes;
-    std::vector<float> pixelLongtitudes;
-    std::vector<float> scienceLines;
-    std::vector<float> swirLines;
+    std::vector<double> pixelLatitudes;
+    std::vector<double> pixelLongtitudes;
+    std::vector<double> scienceLines;
+    std::vector<double> swirLines;
     std::vector<int32_t> spinIds;
     std::vector<short> height;  // ASL per pixel
-    std::vector<float> sensorAzimuths;
-    std::vector<float> sensorZeniths;
-    std::vector<float> solarAzimuths;
-    std::vector<float> solarZeniths;
+    std::vector<double> sensorAzimuths;
+    std::vector<double> sensorZeniths;
+    std::vector<double> solarAzimuths;
+    std::vector<double> solarZeniths;
     std::vector<uint8_t> hamSides;
     std::vector<uint8_t> qualityFlag;
+
+    GeoData() {
+    }
 };
 
 #endif

@@ -137,7 +137,7 @@ cdf4_bin::cdf4_bin() {
     access_mode = NC_NOWRITE;
     n_datasets = 0;
 
-    bindata_idx = -1;
+    bindata_varids = NULL;
     binqual_idx = -1;
     binlist_idx = -1;
     binindex_idx = -1;
@@ -2296,9 +2296,8 @@ int cdf4_bin::open(const char* l3b_filename) {
     int *varids = (int *) calloc(numTables, sizeof (int));
     status = nc_inq_varids(grp1, &numTables, varids);
 
-    bindata_idx = -1;
-
-    bool first = true;
+    bindata_varids = (int*) calloc(numTables, sizeof(int));
+    n_data_prod = 0;
     for (int i = 0; i < numTables; i++) {
         status = nc_inq_varname(grp1, varids[i], nam_buf);
 
@@ -2306,8 +2305,60 @@ int cdf4_bin::open(const char* l3b_filename) {
             continue;
         if (strcmp(nam_buf, "BinList") == 0)
             continue;
+        strcpy(proddata_name[n_data_prod], nam_buf);
+        // get variable attributes
+        int number_of_attributes = 0;
+        status = nc_inq_varnatts(grp1, varids[i], &number_of_attributes);
+        check_err(status, __LINE__, __FILE__);
+        product_number_of_attributes[n_data_prod] = number_of_attributes;
+        if (number_of_attributes > MAXNUMATTR) {
+            fprintf(stderr, "-E- %s:%d - too many attributes for variable %s\n", __FILE__, __LINE__,
+                    nam_buf);
+            exit(1);
+        }
+        for (int id = 0; id < number_of_attributes; id++) {
+            status = nc_inq_attname(grp1, varids[i], id, product_attributes_names[n_data_prod][id]);
+            check_err(status, __LINE__, __FILE__);
+            status = nc_inq_attlen(grp1, varids[i], product_attributes_names[n_data_prod][id],
+                          &product_attributes_sizes[n_data_prod][id]);
+            check_err(status, __LINE__, __FILE__);
+            status = nc_inq_atttype(grp1, varids[i], product_attributes_names[n_data_prod][id],
+                           &product_attributes_types[n_data_prod][id]);
+            check_err(status, __LINE__, __FILE__);
+            size_t attribute_size = product_attributes_sizes[n_data_prod][id];
+            switch (product_attributes_types[n_data_prod][id]) {
+                case NC_CHAR:
+                case NC_BYTE:
+                case NC_UBYTE:
+                    break;
+                case NC_SHORT:
+                case NC_USHORT:
+                    attribute_size*=2;
+                    break;
+                case NC_INT:
+                case NC_UINT:
+                case NC_FLOAT:
+                    attribute_size*=4;
+                    break;
+                default:
+                    attribute_size*=8;
+                    break;
+            }
+            if (attribute_size > MAXATTRLEN) {
+                fprintf(stderr, "-E- - %s:%d - attribute %s size is too large.\n", __FILE__, __LINE__,
+                        product_attributes_names[n_data_prod][id]);
+                exit(1);
+            }
+            status = nc_get_att(grp1, varids[i], product_attributes_names[n_data_prod][id],
+                       product_attributes_values[n_data_prod][id]);
+            check_err(status, __LINE__, __FILE__);
+        }
 
-        strcpy(proddata_name[n_data_prod++], nam_buf);
+        // save the product varid indexed by product number
+        bindata_varids[n_data_prod] = varids[i];
+
+        // increment the number of products
+        n_data_prod++;
         //      n_datasets++;
 
         if(n_data_prod >= MAXNPROD) {
@@ -2315,10 +2366,6 @@ int cdf4_bin::open(const char* l3b_filename) {
             exit(EXIT_FAILURE);
         }
 
-        if (first) {
-            bindata_idx = i;
-            first = false;
-        }
     }
     free(varids);
     
@@ -2455,7 +2502,7 @@ int cdf4_bin::readSums(float* sums, int32_t nbins_to_read, int iprod) {
     for (int32_t i = 0; i < n_data_prod; i++) {
         if (active_data_prod[i] == true && (i == iprod || iprod == -1)) {
 
-            status = nc_get_vara(grp1, bindata_idx + i,
+            status = nc_get_vara(grp1, bindata_varids[i],
                     (size_t *) & binDataPtr, &n2read,
                     (void *) &sums[2 * k * nbins_to_read]);
             if (status != NC_NOERR) {
@@ -2485,7 +2532,7 @@ int cdf4_bin::readSums(float* sums, int32_t* listOfBins,
 
             for (int32_t j = 0; j < nbins_to_read; j++) {
                 binPtr = listOfBins[j];
-                status = nc_get_vara(grp1, bindata_idx + i,
+                status = nc_get_vara(grp1, bindata_varids[i],
                         (size_t *) & binPtr, &one, (void *) &sums[2 * k]);
                 if (status != NC_NOERR) {
                     printf("-E- %s %d: %s for prod# %d\n",
@@ -2738,6 +2785,9 @@ int cdf4_bin::close() {
         
     nc_close(ncid);
 
+    free(bindata_varids);
+    bindata_varids = NULL;
+
     if(is64bit)
         delete[] binList64;
     else
@@ -2825,6 +2875,39 @@ void hdf_bin::setProductList(int numProducts, char* prodNames[]) {
     }
 }
 
+/***
+ *
+ */
+void hdf_bin::setProductList(int numProducts, char *prodNames[], char (*prodAttributesVals[])[MAXNUMATTR][MAXATTRLEN],
+                             char (*prodAttributesNames[])[MAXNUMATTR][MAXATTRNAMELEN], size_t (*prodAttrLen[])[MAXNUMATTR], int prodAttrNum[],
+                             int (*prodAttrType[])[MAXNUMATTR]) {
+    if (numProducts > MAXNPROD) {
+        printf("Error - %s:%d - setProductList - Maximum number of products exceeded", __FILE__, __LINE__);
+        exit(1);
+    }
+
+    n_data_prod = numProducts;
+    for (int i = 0; i < numProducts; i++) {
+        if (strlen(prodNames[i]) >= 80) {
+            printf("Error - %s:%d - setProductList - Product name too long \"%s\"", __FILE__, __LINE__,
+                   prodNames[i]);
+            exit(1);
+        }
+        strcpy(proddata_name[i], prodNames[i]);
+        product_array[i] = proddata_name[i];
+        product_number_of_attributes[i] = prodAttrNum[i];
+        if(prodAttrNum[i] == 0)
+            continue;
+        memcpy(product_attributes_values[i], prodAttributesVals[i], MAXNUMATTR * MAXATTRLEN * sizeof(char));
+        memcpy(product_attributes_names[i], prodAttributesNames[i],
+               MAXNUMATTR * MAXATTRNAMELEN * sizeof(char));
+        memcpy(product_attributes_types[i], prodAttrType[i], MAXNUMATTR * sizeof(nc_type));
+        memcpy(product_attributes_sizes[i],prodAttrLen[i], MAXNUMATTR * sizeof(size_t));
+    }
+}
+
+
+
 /**
  * Get the name of a product given the index.
  * @param prodIndex index of the product
@@ -2871,6 +2954,33 @@ const char* hdf_bin::getActiveProdName(int prodIndex) const {
         }
     }
     return NULL;
+}
+
+void hdf_bin::getProdAttrs(const char* prodname, char (**attrVal)[MAXNUMATTR][MAXATTRLEN],
+                                 char (**attrNames)[MAXNUMATTR][MAXATTRNAMELEN],
+                                 int (**attrType)[MAXNUMATTR], size_t (**attrLen)[MAXNUMATTR],
+                                 int *attrNum) {
+    int prodIndex = -1;
+    for (int i = 0; i < n_data_prod; i++) {
+        if (strcmp(proddata_name[i],prodname) == 0) {
+            prodIndex = i;
+            break;
+        }
+    }
+    if (prodIndex < 0 || prodIndex >= n_data_prod) {
+        *attrNum = 0;
+        return;
+    }
+
+    if (product_number_of_attributes[prodIndex]) {
+        *attrVal = &product_attributes_values[prodIndex];
+        *attrNames= &product_attributes_names[prodIndex];
+        *attrType= &product_attributes_types[prodIndex];
+        *attrLen = &product_attributes_sizes[prodIndex];
+        *attrNum = product_number_of_attributes[prodIndex];
+    } else {
+        *attrNum = 0;
+    }
 }
 
 int hdf_bin::copymeta(int32_t nfiles, Hdf::hdf_bin *input_binfile[]) {

@@ -39,12 +39,11 @@ static size_t expected_num_SWIR_bands = 9;
 static size_t tot_num_bands = 239;  // 249-10
 */
 
-//OCI
+// OCI
 static size_t expected_num_blue_bands = 121;
 static size_t expected_num_red_bands = 165;
 static size_t expected_num_SWIR_bands = 9;
-static size_t tot_num_bands = 295;  
-
+static size_t tot_num_bands = 295;
 
 // static size_t nviews;
 // static size_t nbands;
@@ -64,7 +63,7 @@ static int32_t scan_time_year, scan_time_month, scan_time_day;
 // geolocation data
 static int geolocationGrp, lambdaGrp, blueGrp;
 static int lonId, latId, senzId, senaId, solzId, solaId, bwId, rwId, swId, iwId, pwId, IntId, IpolId, vpId;
-static float latFillValue =BAD_FLT;
+static float latFillValue = BAD_FLT;
 static float lonFillValue = BAD_FLT;
 static short senzFillValue = BAD_FLT;
 static short senaFillValue = BAD_FLT;
@@ -442,7 +441,7 @@ int32_t l1c_str::openl1b_oci_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile) {
         if (num_blue_bands < expected_num_blue_bands) {
             fprintf(stderr, "-E- blue bands in file are less than expected!, expecting %d, found %d.\n",
                     (int)expected_num_blue_bands, (int)num_blue_bands);
-//            exit(EXIT_FAILURE);
+            //            exit(EXIT_FAILURE);
         }
 
         // num_red_bands
@@ -455,7 +454,7 @@ int32_t l1c_str::openl1b_oci_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile) {
         if (num_red_bands < expected_num_red_bands) {
             fprintf(stderr, "-E- red bands in file are less than expected!, expecting %d, found %d.\n",
                     (int)expected_num_red_bands, (int)num_red_bands);
-//            exit(EXIT_FAILURE);
+            //            exit(EXIT_FAILURE);
         }
 
         // num_SWIR_bands
@@ -468,7 +467,7 @@ int32_t l1c_str::openl1b_oci_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile) {
         if (num_SWIR_bands < expected_num_SWIR_bands) {
             fprintf(stderr, "-E- SWIR bands in file are less than expected!, expecting %d, found %d.\n",
                     (int)expected_num_SWIR_bands, (int)num_SWIR_bands);
-//            exit(EXIT_FAILURE);
+            //            exit(EXIT_FAILURE);
         }
     }
 
@@ -1140,21 +1139,21 @@ int32_t l1c_str::closel1b_spex_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile) {
     check_err(status, __LINE__, __FILE__);
 
     if (l1cstr->viewport != nullptr)
-        free (l1cstr->viewport);
+        free(l1cstr->viewport);
     if (l1cstr->senazpix != nullptr)
-        free (l1cstr->senazpix);
+        free(l1cstr->senazpix);
     if (l1cstr->latpix != nullptr)
-        free (l1cstr->latpix);
+        free(l1cstr->latpix);
     if (l1cstr->lonpix != nullptr)
-        free (l1cstr->lonpix);
+        free(l1cstr->lonpix);
     if (l1cstr->latpix2 != nullptr)
-        free (l1cstr->latpix2);
+        free(l1cstr->latpix2);
     if (l1cstr->lonpix2 != nullptr)
-        free (l1cstr->lonpix2);
+        free(l1cstr->lonpix2);
     if (l1cstr->latpix3 != nullptr)
-        free (l1cstr->latpix3);
+        free(l1cstr->latpix3);
     if (l1cstr->lonpix3 != nullptr)
-        free (l1cstr->lonpix3);
+        free(l1cstr->lonpix3);
 
     if (I_lambdas)
         free(I_lambdas);
@@ -1191,21 +1190,21 @@ int32_t l1c_str::closel1b_oci_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile) {
     // Free memory
     // From openl1b_ocis
     if (l1cstr->latpix != nullptr)
-        free (l1cstr->latpix);
+        free(l1cstr->latpix);
     if (l1cstr->lonpix != nullptr)
-        free (l1cstr->lonpix);
+        free(l1cstr->lonpix);
     if (l1cstr->latpix2 != nullptr)
-        free (l1cstr->latpix2);
+        free(l1cstr->latpix2);
     if (l1cstr->lonpix2 != nullptr)
-        free (l1cstr->lonpix2);
+        free(l1cstr->lonpix2);
     if (l1cstr->latpix3 != nullptr)
-        free (l1cstr->latpix3);
+        free(l1cstr->latpix3);
     if (l1cstr->lonpix3 != nullptr)
-        free (l1cstr->lonpix3);
+        free(l1cstr->lonpix3);
     if (l1cstr->timepix != nullptr)
-        free (l1cstr->timepix);
+        free(l1cstr->timepix);
     if (l1cstr->tilt != nullptr)
-        free (l1cstr->tilt);
+        free(l1cstr->tilt);
 
     if (tmpShort)
         free(tmpShort);
@@ -1226,13 +1225,13 @@ int32_t l1c_str::closel1b_oci_l1c(l1c_str *l1cstr, l1c_filehandle *l1cfile) {
         free2d_float(l1cstr->Lt_SWIR);
 
     if (l1cstr->Lt_tot != nullptr)
-        free (l1cstr->Lt_tot);
+        free(l1cstr->Lt_tot);
     if (l1cstr->Fobar != nullptr)
-        free (l1cstr->Fobar);
+        free(l1cstr->Fobar);
     if (l1cstr->solz != nullptr)
-        free (l1cstr->solz);
+        free(l1cstr->solz);
     if (l1cstr->senz != nullptr)
-        free (l1cstr->senz);
+        free(l1cstr->senz);
 
     l1cstr->latpix = nullptr;
     l1cstr->latpix2 = nullptr;

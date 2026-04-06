@@ -3,8 +3,8 @@ cmake_minimum_required(VERSION 3.12)
 #
 # Make a version file containing the current version from git.
 #
-set (VERSION_MAJOR 2)
-set (VERSION_MINOR 4)
+set (VERSION_MAJOR 3)
+set (VERSION_MINOR 2)
 set (VERSION_PATCH 0)
 include(GetOcsswVersion)
 
@@ -27,8 +27,21 @@ list(APPEND LIBS PROJ::proj)
 
 add_executable(l3mapgen
   OutFile.cpp
+  OutFilePgm.cpp
+  OutFilePpm.cpp
+  OutFilePpmRgb.cpp
+  OutFilePng.cpp
+  OutFilePngRgb.cpp
+  OutFileTiff.cpp
+  OutFileTiffRgb.cpp
+  OutFileTiffGray.cpp
+  OutFileTiffColor.cpp
+  OutFileHdf4.cpp
+  OutFileNetcdf4.cpp
   l3mapgen.cpp
   l3mapgen_input.cpp
+  Wave3DParsing.cpp
+  CacheSize.cpp
   )
 
 target_link_libraries(l3mapgen

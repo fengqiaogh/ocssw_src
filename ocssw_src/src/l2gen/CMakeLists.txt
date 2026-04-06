@@ -3,8 +3,8 @@ cmake_minimum_required(VERSION 3.12)
 #
 # Make a version file containing the current version from git.
 #
-set (VERSION_MAJOR 9)
-set (VERSION_MINOR 11)
+set (VERSION_MAJOR 10)
+set (VERSION_MINOR 0)
 set (VERSION_PATCH 0)
 include(GetOcsswVersion)
 
@@ -86,6 +86,7 @@ set(L2GEN_PRODUCT_FILES
   prodlist.c
   get_l2prod_index.cpp
   get_chl.c
+  get_qwip.c
   get_es.c
   get_habs.c
   get_Kd.c

@@ -27,6 +27,7 @@ set(MISSIONS
      oli
      ocm
      ocm2
+     oci
 )
 
 

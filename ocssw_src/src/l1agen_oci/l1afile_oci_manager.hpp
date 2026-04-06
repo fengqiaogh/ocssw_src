@@ -4,6 +4,7 @@
 #include <map>
 #include "l1afile_oci.hpp"
 #include "dimension_shape.hpp"
+#include "navigation_timeframe.hpp"
 
 // Manages writing to multiple L1A files for OCI. When there's a datatype change in-between OCI science data packets, 
 // create a new l1a file and write to it. When it ends, resume writing into the science l1a file.
@@ -14,6 +15,19 @@ class L1aFileManager {
     public:
         L1aFileManager();
         ~L1aFileManager();
+
+        // most recent ancillarty packet time (in unix time) for each data type
+        // each index == time for the data type.
+        // ie: science data index == 1, so lastSeenPacketTime[1] is the last time seen for
+        // science data
+        std::vector<double> prevAncillaryPktTimes;
+        
+
+
+        //********************************************************* */
+        //*************** File Tracking Variables ***************** */
+        //********************************************************* */
+
         
         // reference multiple L1a files based on data type id
         std::map<short, L1aFile> fileCabinet; 
@@ -39,10 +53,24 @@ class L1aFileManager {
         // files that do not need to be merged. For now: Lunar
         std::vector<std::string> noMergeOutlistStrings;
 
-        // track the last data type added so if files cannot be merged due to a large gap
-        // we know what to write out right away
-        short lastDataTypeSeen = -1;
     
+
+        /**
+         * @brief update the previous time tracking for dataType with new time
+         * @param dataType 
+         * @param time 
+         */
+        void updatePrevAncillaryPktTimeFor(short dataType, double time);
+
+
+        /**
+         * @brief grab the last ancillary packet time for dataType file
+         * @param dataType 
+         * @return 
+         */
+        double getPrevAncillaryPktTimeFor(short dataType);
+    
+
 
         /**
          * @brief create a l1a file for dataType
@@ -58,8 +86,19 @@ class L1aFileManager {
          */
         bool contains(short dataType);
 
+        /**
+         * @brief grabs and returns a reference to the L1A file with dataType
+         * @param dataType 
+         * @return 
+         */
         L1aFile* getL1aFile(short dataType);
 
+        /**
+         * @brief grabs and returns a reference to the dimension shape for 
+         *          the L1A file with dataType 
+         * @param dataType 
+         * @return 
+         */
         DimensionShape* getCurrL1aFileDimShape(short dataType);
 
         bool incrementNumScansShape(short dataType, size_t incrementBy);
@@ -76,6 +115,9 @@ class L1aFileManager {
 
         bool incrementTiltSampleShape(short dataType, size_t incrementBy);
 
+        /**
+         * @brief goes through all currently opened L1A files and closes them
+         */
         void closeAllL1aFiles();
 
         void closeAndRemoveFile(short datatype);
@@ -96,6 +138,7 @@ class L1aFileManager {
         /**
          * @brief write the buffer information into the provided file name
          * @param outlist output file
+         * @param returnStatus update return status if any errors happen during dumping
          */
         void dumpOutlistBuffer(std::string outlist);
         
@@ -108,10 +151,28 @@ class L1aFileManager {
         /**
          * @brief if the next file's time gap is too large, move the last
          *         file out of the buffer and into the noMergeOutlist
+         * @param dataType file type to process
          */
-        void processPrevFile();
+        void processOutlistFor(short dataType);
 
         bool filesWereGenerated();
+
+
+        //********************************************************* */
+        //****** navigation coverage tracking Variables *********** */
+        //********************************************************* */
+        // Only Scinece files will be using this dataType == 1
+        // if multiple due to file time gaps, then the previous one should be closed
+        // and reset this navTimeFrame
+
+        NavigationTimeFrame navTimeFrame;
+
+        /**
+         * @brief pointer to the NavigationTimeFrame object so it can be passed into a function
+         *          and get updated when processing scan times
+         * @return 
+         */
+        NavigationTimeFrame* getNavTimeFrameRef();
 
 };
 

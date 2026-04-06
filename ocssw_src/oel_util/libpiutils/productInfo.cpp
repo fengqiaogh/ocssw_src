@@ -103,6 +103,12 @@ extern "C" void clearProductInfo(productInfo_t* info) {
     info->displayMax = PRODUCT_DEFAULT_displayMax;
     info->scaleFactor = PRODUCT_DEFAULT_scaleFactor;
     info->addOffset = PRODUCT_DEFAULT_addOffset;
+    if (info->flag_values)
+        free(info->flag_values);
+    info->flag_values = duplicateString(PRODUCT_DEFAULT_flag_values);
+    if (info->flag_meanings)
+        free(info->flag_meanings);
+    info->flag_meanings = duplicateString(PRODUCT_DEFAULT_flag_meanings);
     if (info->reference)
         free(info->reference);
     info->reference = duplicateString(PRODUCT_DEFAULT_reference);
@@ -167,6 +173,10 @@ extern "C" void freeProductInfo(productInfo_t* info) {
         free(info->productName);
     if (info->displayScale)
         free(info->displayScale);
+    if (info->flag_values)
+        free(info->flag_values);
+    if (info->flag_meanings)
+        free(info->flag_meanings);
     if (info->reference)
         free(info->reference);
     if (info->comment)
@@ -248,6 +258,12 @@ extern "C" void copyProductInfo(productInfo_t* dest, const productInfo_t* src) {
     dest->displayMax = src->displayMax;
     dest->scaleFactor = src->scaleFactor;
     dest->addOffset = src->addOffset;
+    if (dest->flag_values)
+        free(dest->flag_values);
+    dest->flag_values = duplicateString(src->flag_values);
+    if (dest->flag_meanings)
+        free(dest->flag_meanings);
+    dest->flag_meanings = duplicateString(src->flag_meanings);
     if (dest->reference)
         free(dest->reference);
     dest->reference = duplicateString(src->reference);
@@ -579,6 +595,17 @@ void readProduct(int paramVal) {
         }
     }
 
+    if ((node = productNode.child("flag_values"))) {
+        if (productInfo->flag_values)
+            free(productInfo->flag_values);
+        productInfo->flag_values = trimBlanksDup(node.child_value());
+    }
+    if ((node = productNode.child("flag_meanings"))) {
+        if (productInfo->flag_meanings)
+            free(productInfo->flag_meanings);
+        productInfo->flag_meanings = trimBlanksDup(node.child_value());
+    }
+
     if ((node = productNode.child("reference"))) {
         if (productInfo->reference)
             free(productInfo->reference);
@@ -708,6 +735,17 @@ void readAlgorithm(int paramVal) {
         algorithmInfo->description = (char*) malloc(strlen(tmpStr) + 64);
         algorithmInfo->prod_ix = paramVal;
         sprintf(algorithmInfo->description, tmpStr, algorithmInfo->prod_ix);
+    }
+
+    if ((node = algorithmNode.child("flag_values"))) {
+        if (algorithmInfo->flag_values)
+            free(algorithmInfo->flag_values);
+        algorithmInfo->flag_values = trimBlanksDup(node.child_value());
+    }
+    if ((node = algorithmNode.child("flag_meanings"))) {
+        if (algorithmInfo->flag_meanings)
+            free(algorithmInfo->flag_meanings);
+        algorithmInfo->flag_meanings = trimBlanksDup(node.child_value());
     }
 
     if ((node = algorithmNode.child("reference"))) {
@@ -1063,6 +1101,8 @@ extern "C" void printProductInfo(const char* productFullName, const productInfo_
     printf("displayMax=%g\n", info->displayMax);
     printf("scaleFactor=%g\n", info->scaleFactor);
     printf("addOffset=%g\n", info->addOffset);
+    printf("flag_values=%s\n", info->flag_values);
+    printf("flag_meanings=%s\n", info->flag_meanings);
     printf("reference=%s\n", info->reference);
     printf("comment=%s\n", info->comment);
     printf("titleFormat=%s\n", info->titleFormat);

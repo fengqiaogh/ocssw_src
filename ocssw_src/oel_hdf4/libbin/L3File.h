@@ -256,6 +256,28 @@ public:
     virtual L3Bin* getBin(int32_t row, int32_t col);
     virtual L3Bin* getClosestBin(float lat, float lon);
 
+    template <typename T>
+    bool getProductAttribute(const std::string& prodName, const std::string& attributeName, T* attrValue) {
+        char(*tmpAttVals)[MAXNUMATTR][MAXATTRLEN];
+        char(*tmpAttNames)[MAXNUMATTR][MAXATTRNAMELEN];
+        int(*tmpAttTypes)[MAXNUMATTR];
+        size_t(*tmpAttSize)[MAXNUMATTR];
+        int tempAttNums;
+        if (binObj == NULL) {
+            return false;
+        }
+        binObj->getProdAttrs(prodName.c_str(), &tmpAttVals, &tmpAttNames, &tmpAttTypes, &tmpAttSize, &tempAttNums);
+        for (int i_attr = 0; i_attr < tempAttNums; i_attr++) {
+            if (attributeName == (*tmpAttNames)[i_attr]) {
+                char* val = (*tmpAttVals)[i_attr];
+                size_t attr_dim = (*tmpAttSize)[i_attr];
+                memcpy(attrValue, val, sizeof(T) * attr_dim);
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * return a bin with binned data for all of the bins that intersect
      * Geometry

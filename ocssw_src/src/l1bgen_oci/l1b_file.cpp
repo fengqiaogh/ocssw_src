@@ -16,6 +16,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/multi_array.hpp>
+#include "clo.h"
 #include <allocate3d.h>
 
 using namespace std;
@@ -24,24 +25,32 @@ using namespace netCDF::exceptions;
 
 int DEFLATE_LEVEL = 5;
 
-int Level1bFile::createFile(size_t numScans, size_t numBlueBands, size_t numRedBands, size_t numHyperSciPix,
-                            size_t numSwirPix, size_t numSwirBands, int32_t *pprOffset,
-                            bool radianceGenerationEnabled, LocatingContext locatingContext,
-                            int deflateLevel) {
-
-    if (deflateLevel < 0 || 9 < deflateLevel) { // Should never happen; should be checked by L1bOptions
-        cerr << "Invalid deflate level: " << to_string(deflateLevel) << endl;
+int Level1bFile::createFile(size_t numScans, size_t numBlueBands, size_t numRedBands, size_t numSwirBands,
+                            size_t numHyperSciPix, size_t numSwirPix, int32_t* pprOffset,
+                            const std::vector<int16_t>& blueSpectralMode,
+                            const std::vector<int16_t>& redSpectralMode,
+                            const int16_t spatialAggregationFactor, LocatingContext locatingContext,
+                            oel::L1bOptions options) {
+    if (options.deflateLevel < 0 || 9 < options.deflateLevel) {  // Should never happen; should be checked by L1bOptions
+        cerr << "Invalid deflate level: " << to_string(options.deflateLevel) << endl;
         exit(EXIT_FAILURE);
     }
 
-    DEFLATE_LEVEL = deflateLevel;
+    DEFLATE_LEVEL = options.deflateLevel;
 
     // Put global dimensions
     map<string, size_t> dims;
     if (numHyperSciPix == numSwirPix) {
-        dims = {{"scans", numScans},          {"pixels", numHyperSciPix},       {"red_bands", numRedBands},
-                {"blue_bands", numBlueBands}, {"SWIR_bands", numSwirBands},     {"vector_elements", 3},
-                {"quaternion_elements", 4},   {"polarization_coefficients", 3}, {"HAM_sides", 2}};
+        dims = {{"scans", numScans},
+                {"pixels", numHyperSciPix},
+                {"red_bands", numRedBands},
+                {"blue_bands", numBlueBands},
+                {"SWIR_bands", numSwirBands},
+                {"vector_elements", 3},
+                {"quaternion_elements", 4},
+                {"polarization_coefficients", 3},
+                {"HAM_sides", 2},
+                {"number_of_taps", blueSpectralMode.size()}};
     } else {
         dims = {{"scans", numScans},
                 {"ccd_pixels", numHyperSciPix},
@@ -141,12 +150,27 @@ int Level1bFile::createFile(size_t numScans, size_t numBlueBands, size_t numRedB
                 NULL, "", fillDouble, "", "", fillDouble, fillDouble, 1.0, 0.0, NC_FLOAT, dimVec, "");
     createField(sensorBandParameters, "SWIR_m13_coef", "SWIR band M13/M11 polynomial coefficients", NULL,
                 NULL, "", fillDouble, "", "", fillDouble, fillDouble, 1.0, 0.0, NC_FLOAT, dimVec, "");
+    dimVec = {l1bFile->getDim("number_of_taps")};
+    if (!dimVec[0].isNull()) {
+        createField(sensorBandParameters, "blue_spectral_mode", "Blue CCD spectral aggregation mode", NULL, NULL,
+                    "", fillDouble, "0s, 1s, 2s, 4s, 8s", "disabled 1to1 2to1 4to1 8to1", 1, 0,
+                    1.0, 0.0, NC_SHORT, dimVec, "");
+    }
+    dimVec = {l1bFile->getDim("number_of_taps")};
+    if (!dimVec[0].isNull()) {
+        createField(sensorBandParameters, "red_spectral_mode", "Red CCD spectral aggregation mode", NULL, NULL,
+                    "", fillDouble, "0s, 1s, 2s, 4s, 8s", "disabled 1to1 2to1 4to1 8to1", 1, 0,
+                    1.0, 0.0, NC_SHORT, dimVec, "");
+    }
+    sensorBandParameters.putAtt("spatial_aggregation_factor", NC_SHORT, spatialAggregationFactor);
 
     // scan_line_attributes
     vector<NcDim> scanLineAttrs{l1bFile->getDim("scans")};
     createField(scanLineAttributes, "time", "time", NULL, "seconds since YYYY-MM-DD 00:00:00Z",
                 "Earth view mid time in seconds of day", fillDouble, "", "", 0., 172802., 1.0, 0.0, NC_DOUBLE,
                 scanLineAttrs, "");
+    createField(scanLineAttributes, "spin_ID", "Telescope spin counter from power-up", NULL, NULL, NULL,
+                BAD_INT, "", "", 0, 2147483647, 1.0, 0.0, NC_INT, scanLineAttrs, "");
     createField(scanLineAttributes, "HAM_side", "Half-angle mirror side", NULL, NULL, NULL, BAD_UBYTE, "", "",
                 0, 1, 1.0, 0.0, NC_UBYTE, scanLineAttrs, "");
     createField(scanLineAttributes, "scan_quality_flags", "Scan quality flags ", NULL, NULL, NULL, BAD_UBYTE,
@@ -175,31 +199,20 @@ int Level1bFile::createFile(size_t numScans, size_t numBlueBands, size_t numRedB
                 scansByPixels, "longitude latitude");
     createField(geolocationData, "watermask", "Watermask", NULL, "", "0 for land, 1 for water", BAD_UBYTE, "",
                 "", 0, 1, 1, 0, NC_UBYTE, scansByPixels, "longitude latitude");
+
+    int anglesType = options.floatingAngles ? NC_FLOAT : NC_SHORT;
     createField(geolocationData, "sensor_azimuth", "Sensor azimuth angle at pixel locations", NULL, "degrees",
-                NULL, fillDouble, "", "", -18000, 18000, 0.01, 0.f, NC_SHORT, scansByPixels,
+                NULL, fillDouble, "", "", -18000, 18000, 0.01, 0.f, anglesType, scansByPixels,
                 "longitude latitude");
     createField(geolocationData, "sensor_zenith", "Sensor zenith angle at pixel locations", NULL, "degrees",
-                NULL, fillDouble, "", "", 0, 18000, 0.01, 0.f, NC_SHORT, scansByPixels, "longitude latitude");
+                NULL, fillDouble, "", "", 0, 18000, 0.01, 0.f, anglesType, scansByPixels,
+                "longitude latitude");
     createField(geolocationData, "solar_azimuth", "Solar azimuth angle at pixel locations", NULL, "degrees",
-                NULL, fillDouble, "", "", -18000, 18000, 0.01, 0.f, NC_SHORT, scansByPixels,
+                NULL, fillDouble, "", "", -18000, 18000, 0.01, 0.f, anglesType, scansByPixels,
                 "longitude latitude");
     createField(geolocationData, "solar_zenith", "Solar zenith angle at pixel locations", NULL, "degrees",
-                NULL, fillDouble, "", "", 0, 18000, 0.01, 0.f, NC_SHORT, scansByPixels, "longitude latitude");
-
-    // Uncomment these and delete above when time comes to use floats in the output instead of shorts
-    // createField(geolocationData, "sensor_azimuth", "Sensor azimuth angle at pixel locations", NULL,
-    // "degrees",
-    //             NULL, fillDouble, "", "", -180, 180, 1.0, 0.f, NC_FLOAT, scansByPixels,
-    //             "longitude latitude");
-    // createField(geolocationData, "sensor_zenith", "Sensor zenith angle at pixel locations", NULL,
-    // "degrees",
-    //             NULL, fillDouble, "", "", 0, 180, 1.0, 0.f, NC_FLOAT, scansByPixels, "longitude latitude");
-    // createField(geolocationData, "solar_azimuth", "Solar azimuth angle at pixel locations", NULL,
-    // "degrees",
-    //             NULL, fillDouble, "", "", -180, 180, 1.0, 0.f, NC_FLOAT, scansByPixels,
-    //             "longitude latitude");
-    // createField(geolocationData, "solar_zenith", "Solar zenith angle at pixel locations", NULL, "degrees",
-    //             NULL, fillDouble, "", "", 0, 180, 1.0, 0.f, NC_FLOAT, scansByPixels, "longitude latitude");
+                NULL, fillDouble, "", "", 0, 18000, 0.01, 0.f, anglesType, scansByPixels,
+                "longitude latitude");
 
     createField(geolocationData, "quality_flag", "Geolocation pixel quality flags", NULL, NULL, NULL,
                 BAD_UBYTE, "1UB, 2UB, 4UB", "Off_Earth Solar_eclipse Terrain_bad", 0, 0, 1.0, 0.0, NC_UBYTE,
@@ -249,7 +262,7 @@ int Level1bFile::createFile(size_t numScans, size_t numBlueBands, size_t numRedB
                        l1bFile->getDim("SWIR_pixels")};
     }
 
-    if (radianceGenerationEnabled) {
+    if (options.radianceGenerationEnabled) {
         createField(observationData, "Lt_blue", "Top of Atmosphere Blue Band Radiance", NULL, "W m-2 sr-1",
                     "", BAD_FLT, "", "", 0.0f, 800.0f, 1.0, 0.0, NC_FLOAT, bluePicture, "longitude latitude");
         createField(observationData, "Lt_red", "Top of Atmosphere Red Band Radiance", NULL, "W m-2 sr-1", "",
@@ -274,6 +287,17 @@ int Level1bFile::createFile(size_t numScans, size_t numBlueBands, size_t numRedB
                 "saturation HAM-B_striping", 0, 0, 1.0, 0.0, NC_UBYTE, redPicture, "longitude latitude");
     createField(observationData, "qual_SWIR", "SWIR Band Quality Flag", NULL, NULL, NULL, BAD_UBYTE, "1UB",
                 "saturation", 0, 0, 1.0, 0.0, NC_UBYTE, swirPicture, "longitude latitude");
+
+    vector<NcDim> blueBands(1, l1bFile->getDim("blue_bands"));
+    vector<NcDim> redBands(1, l1bFile->getDim("red_bands"));
+    vector<NcDim> swirBands(1, l1bFile->getDim("SWIR_bands"));
+
+    createField(observationData, "blue_percent_saturated", "Percent saturated in each blue band", NULL, NULL,
+                NULL, BAD_FLT, "", "", 0.0, 100.0, 1.0, 0.0, NC_FLOAT, blueBands, "longitude latitude");
+    createField(observationData, "red_percent_saturated", "Percent saturated in each red band", NULL, NULL,
+                NULL, BAD_FLT, "", "", 0.0, 100.0, 1.0, 0.0, NC_FLOAT, redBands, "longitude latitude");
+    createField(observationData, "SWIR_percent_saturated", "Percent saturated in each SWIR band", NULL, NULL,
+                NULL, BAD_FLT, "", "", 0.0, 100.0, 1.0, 0.0, NC_FLOAT, swirBands, "longitude latitude");
 
     return EXIT_SUCCESS;
 }
@@ -366,7 +390,7 @@ int Level1bFile::createField(NcGroup &parentGroup, const char *shortName, const 
     /* vary chunck size based on dimensions */
     vector<size_t> chunkVec;
     if (parentGroupName == "geolocation_data" || parentGroupName == "observation_data") {
-        if (dimVec.size() == 2)
+        if (dimVec.size() >= 1)
             chunkVec = {512, 1272};  // 256 lines, all pixels(1272)
         if (dimVec.size() == 3)
             chunkVec = {40, 16, 1272};  // 40 bands, 16 lines, all pixels(1272)
@@ -520,79 +544,6 @@ int Level1bFile::writeGranuleMetadata(std::string tstart, std::string tend, std:
     return EXIT_SUCCESS;
 }
 
-int Level1bFile::writeBandInfo(Device deviceType, const vector<float> &l1aWavelengths,
-                               const vector<double> &irradiances, const size_t numBands,
-                               const size_t numInsBands, float **gainAggMat, float **insAggMat,
-                               float ***m12Coefs, float ***m13Coefs) {
-    vector<float> l1bWavelengths = vector<float>(numBands);
-    vector<float> sum = vector<float>(numInsBands);
-    string color = determineColor(deviceType);
-
-    for (size_t i = 0; i < numInsBands; i++) {
-        sum[i] = 0.0;
-        for (size_t j = 0; j < NUM_BLUE_WAVELENGTHS; j++) {
-            sum[i] += l1aWavelengths[j] * gainAggMat[j][i];
-        }
-    }
-
-    // bamat#sum
-    for (size_t i = 0; i < numBands; i++) {
-        l1bWavelengths[i] = 0.0;
-        for (size_t j = 0; j < numInsBands; j++) {
-            l1bWavelengths[i] += insAggMat[j][i] * sum[j];
-        }
-    }
-
-    const size_t HAM_SIDES = 2;
-    const size_t POLARIZATION_COEFS = 3;
-    float ***l1bM12 = allocate3d_float(numBands, HAM_SIDES, POLARIZATION_COEFS);
-    float ***l1bM13 = allocate3d_float(numBands, HAM_SIDES, POLARIZATION_COEFS);
-
-    for (size_t l = 0; l < POLARIZATION_COEFS; l++) {
-        for (size_t m = 0; m < HAM_SIDES; m++) {
-            for (size_t k = 0; k < 2; k++) {  // k=0 for M12, k=1 for M13
-                // Calculate M12 or m13
-                for (size_t i = 0; i < numBands; i++) {
-                    float &result = (k == 0 ? l1bM12[i][m][l] : l1bM13[i][m][l]);
-                    result = 0.0;
-                    for (size_t j = 0; j < numInsBands; j++) {
-                        // Calculate sum
-                        float sum = 0.0;
-                        for (size_t n = 0; n < NUM_CCD_WAVELENGTHS; n++) {
-                            sum += (k == 0 ? m12Coefs[n][m][l] : m13Coefs[n][m][l]) * gainAggMat[n][j];
-                        }
-                        result += insAggMat[j][i] * sum;
-                    }
-                }
-            }
-        }
-    }
-
-    sensorBandParameters.getVar(color + "_solar_irradiance").putVar({0}, {numBands}, irradiances.data());
-
-    vector<size_t> start(3, 0);
-    vector<size_t> count(3, 0);
-    count[0] = numBands;
-    count[1] = 2;
-    count[2] = 3;
-
-    if (deviceType == SWIR) {
-        sensorBandParameters.getVar(color + "_wavelength").putVar({0}, {numBands}, l1aWavelengths.data());
-        sensorBandParameters.getVar("SWIR_bandpass").putVar({0}, {NUM_SWIR_WAVELENGTHS}, SWIR_BANDPASS);
-        sensorBandParameters.getVar(color + "_m12_coef").putVar(start, count, &m12Coefs[0][0][0]);
-        sensorBandParameters.getVar(color + "_m13_coef").putVar(start, count, &m13Coefs[0][0][0]);
-    } else {
-        sensorBandParameters.getVar(color + "_wavelength").putVar({0}, {numBands}, l1bWavelengths.data());
-        sensorBandParameters.getVar(color + "_m12_coef").putVar(start, count, &l1bM12[0][0][0]);
-        sensorBandParameters.getVar(color + "_m13_coef").putVar(start, count, &l1bM13[0][0][0]);
-    }
-
-    free3d_float(l1bM12);
-    free3d_float(l1bM13);
-
-    return EXIT_SUCCESS;
-}
-
 Level1bFile::Level1bFile() {
     cout << "Level1bFile::Level1bFile() - Empty constructor will not work" << endl;
     exit(EXIT_FAILURE);
@@ -612,4 +563,81 @@ Level1bFile::~Level1bFile() {
         exit(EXIT_FAILURE);
     }
     delete l1bFile;
+}
+
+void Level1bFile::writeProcessingControl(oel::L1bOptions options) {
+    try {
+        netCDF::NcGroup processCtrlGrp = l1bFile->addGroup("processing_control");
+
+        processCtrlGrp.putAtt("software_name", "l1bgen_oci");
+        processCtrlGrp.putAtt("software_version", options.processingVersion);
+
+        netCDF::NcGroup inputParaGrp = processCtrlGrp.addGroup("input_parameters");
+
+        inputParaGrp.putAtt("ifile", options.l1aFilename);
+        inputParaGrp.putAtt("ofile", options.l1bFilename);
+
+        if (clo_isSet(options.optionList, "par")) {
+            inputParaGrp.putAtt("par", clo_getString(options.optionList, "par"));
+        }
+
+        string tmpStr = options.calibrationLutFilename;
+        replaceOCroots(tmpStr);
+        inputParaGrp.putAtt("cal_lut", tmpStr);
+
+        tmpStr = options.geolocationLutFilename;
+        replaceOCroots(tmpStr);
+        inputParaGrp.putAtt("geo_lut", tmpStr);
+
+        inputParaGrp.putAtt("doi", options.digitalObjectId);
+
+        tmpStr = options.xtalkLutFilename;
+        replaceOCroots(tmpStr);
+        inputParaGrp.putAtt("crosstalk_lut", tmpStr);
+
+        inputParaGrp.putAtt("pversion", options.processingVersion);
+
+        tmpStr = options.demFile;
+        replaceOCroots(tmpStr);
+        inputParaGrp.putAtt("demfile", tmpStr);
+
+        if (options.radianceGenerationEnabled) {
+            inputParaGrp.putAtt("radiance", "true");
+        } else {
+            inputParaGrp.putAtt("radiance", "false");
+        }
+
+        if (options.disableGeolocation) {
+            inputParaGrp.putAtt("disable_geo", "true");
+        } else {
+            inputParaGrp.putAtt("disable_geo", "false");
+        }
+
+        inputParaGrp.putAtt("ephfile", options.ephFile);
+
+        inputParaGrp.putAtt("sline", ncInt, static_cast<unsigned int>(options.startingLine + 1));
+        if (options.endingLine == -1) {
+            inputParaGrp.putAtt("eline", ncInt, options.endingLine);
+        } else {
+            inputParaGrp.putAtt("eline", ncInt, options.endingLine + 1);
+        }
+
+        if (options.enableCrosstalk) {
+            inputParaGrp.putAtt("enable_crosstalk", "true");
+        } else {
+            inputParaGrp.putAtt("enable_crosstalk", "false");
+        }
+
+        if (options.aggregationOff) {
+            inputParaGrp.putAtt("disable_aggregation", "true");
+        } else {
+            inputParaGrp.putAtt("disable_aggregation", "false");
+        }
+
+        inputParaGrp.putAtt("deflate", ncInt, options.deflateLevel);
+
+    } catch (std::exception &e) {
+        cerr << "--Error-- writing processing control group. what: " << e.what() << endl;
+        exit(EXIT_FAILURE);
+    }
 }

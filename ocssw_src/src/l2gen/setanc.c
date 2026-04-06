@@ -2,6 +2,8 @@
 #include "anc_acq.h"
 #include <ancproto.h>
 #include "hdf5.h"
+#include "netcdf.h"
+
 /* ============================================================================ */
 /* no2conc() - retrieve no2 concentration from ancillary file                   */
 /*                                                                              */
@@ -13,6 +15,328 @@
 #define NYNO2 720
 #define NXANC 180
 #define NYANC 90
+
+void handle_error(int status) {
+    if (status != NC_NOERR) {
+        fprintf(stderr, "-E-: %s:%d NetCDF Error: %s\n",__FILE__,__LINE__, nc_strerror(status));
+        exit(EXIT_FAILURE);
+    }
+}
+
+void no2_reader(char *no2file, int32_t doy, float **no2_tropo_ptr, float **no2_strat_ptr,float **no2_total_ptr, size_t *nlat,
+                size_t *nlon, float *dlat_step, float *dlon_step, float *lat_start, float *lon_start) {
+    static float *no2_tropo = NULL;
+    static float *no2_strat = NULL;
+    static float *no2_total = NULL;
+    static int gmao_geoscf = 0;
+    size_t total_size = 1;
+    int ncid;
+    int status = nc_open(no2file, NC_NOWRITE, &ncid);
+    if (status != NC_NOERR) {
+        fprintf(stderr, "-E-:%s:%d file %s can't be open", __FILE__, __LINE__, no2file);
+        exit(EXIT_FAILURE);
+    }
+    // checking if tot_no2 and trop_no2 exist
+    int tot_no2_id = -1;
+    int tropo_no2_id = -1;
+    int strat_no2_id = -1;
+    int month = (int)doy / 31;
+    char mstr[4] = "";
+    char sdsname[H4_MAX_NC_NAME];
+    sprintf(mstr, "_%2.2i", month + 1);
+    strcpy(sdsname, "tot_no2");
+    strcat(sdsname, mstr);
+    status = nc_inq_varid(ncid, sdsname, &tot_no2_id);
+    if (status == NC_NOERR) {
+        strcpy(sdsname, "trop_no2");
+        strcat(sdsname, mstr);
+        status = nc_inq_varid(ncid, sdsname, &tropo_no2_id);
+        if (status != NC_NOERR) {
+            fprintf(stderr, "-E-:%s:%d trop_no2 doesn't exist in %s", __FILE__, __LINE__, no2file);
+            exit(EXIT_FAILURE);
+        }
+    } else {
+        // check if it gmao_geoscf
+        gmao_geoscf = 1;
+        status =nc_inq_varid(ncid, "TROPCOL_NO2", &tropo_no2_id);
+        if (status != NC_NOERR) {
+            fprintf(stderr, "-E-:%s:%d  %s is an unknown ancillary format", __FILE__, __LINE__, no2file);
+            exit(EXIT_FAILURE);
+        }
+        status =
+            nc_inq_varid(ncid,"STRATCOL_NO2", &strat_no2_id);
+        if (status != NC_NOERR) {
+            fprintf(stderr, "-E-:%s:%d STRATCOL_NO2 doesn't exist in %s", __FILE__, __LINE__, no2file);
+            exit(EXIT_FAILURE);
+        }
+    }
+    // reading GEOS files
+    if (gmao_geoscf) {
+        int ndims;
+        int dimids[NC_MAX_DIMS];
+        handle_error(nc_inq_varndims(ncid, tropo_no2_id, &ndims));
+        handle_error(nc_inq_vardimid(ncid, tropo_no2_id, dimids));
+        size_t dim_sizes[NC_MAX_DIMS];
+        for (int i = 0; i < ndims; ++i) {
+            handle_error(nc_inq_dimlen(ncid, dimids[i], &dim_sizes[i]));
+            int padding = 0;  //
+            if (i == 1) {     // +1 is padding if for longitude, -180.0, 179.75
+                padding = 1;
+            }
+            dim_sizes[i] += padding;
+            total_size *= dim_sizes[i];
+        }
+        no2_tropo = malloc(total_size * sizeof(float));
+        no2_strat = malloc(total_size * sizeof(float));
+        float *no2_tropo_temp = malloc(total_size * sizeof(float));
+        float *no2_strat_temp = malloc(total_size * sizeof(float));
+        for (size_t ip = 0; ip < total_size; ++ip) {
+            no2_strat_temp[ip] = BAD_FLT;
+            no2_tropo_temp[ip] = BAD_FLT;
+            no2_tropo[ip] = BAD_FLT;
+            no2_strat[ip] = BAD_FLT;
+        }
+        handle_error(nc_get_var_float(ncid, tropo_no2_id, no2_tropo_temp));
+        handle_error(nc_get_var_float(ncid, strat_no2_id, no2_strat_temp));
+        for (size_t ilat = 0; ilat < dim_sizes[0]; ilat++) {
+            for (size_t ilon = 0; ilon < dim_sizes[1] - 1; ilon++) {
+                size_t index_shifted = ilat * dim_sizes[1] + ilon;
+                size_t index_original = ilat * (dim_sizes[1] - 1) + ilon;
+                if (no2_tropo_temp[index_original] == BAD_FLT) {
+                    fprintf(stderr, "Error: no2_tropo_temp[%zu] is fill value\n", index_original);
+                    exit(1);
+                }
+                if (no2_strat_temp[index_original] == BAD_FLT) {
+                    fprintf(stderr, "Error: no2_strat_temp[%zu] is fill value\n", index_original);
+                    exit(1);
+                }
+                if (no2_tropo[index_shifted] != BAD_FLT) {
+                    fprintf(stderr, "Error: no2_tropo_temp[%zu] is NOT fill value\n", index_shifted);
+                    exit(1);
+                }
+                if (no2_strat[index_shifted] != BAD_FLT) {
+                    fprintf(stderr, "Error: no2_strat_temp[%zu] is NOT fill value\n", index_shifted);
+                    exit(1);
+                }
+                no2_tropo[index_shifted] = no2_tropo_temp[index_original];
+                no2_strat[index_shifted] = no2_strat_temp[index_original];
+            }
+        }
+        for (size_t ilat = 0; ilat < dim_sizes[0]; ilat++) {
+            size_t index_start = ilat * dim_sizes[1];
+            size_t index_end = index_start + dim_sizes[1] - 1;
+            if (no2_tropo[index_start] == BAD_FLT) {
+                fprintf(stderr, "Error: no2_tropo[%zu] is fill value\n", index_start);
+                exit(1);
+            }
+            if (no2_strat[index_start] == BAD_FLT) {
+                fprintf(stderr, "Error: no2_strat[%zu] is fill value\n", index_start);
+                exit(1);
+            }
+
+            if (no2_tropo[index_end] != BAD_FLT) {
+                fprintf(stderr, "Error: no2_tropo[%zu] is NOT fill value\n", index_end);
+                exit(1);
+            }
+            if (no2_strat[index_end] != BAD_FLT) {
+                fprintf(stderr, "Error: no2_strat[%zu] is NOT fill value\n", index_end);
+                exit(1);
+            }
+            no2_tropo[index_end] = no2_tropo[index_start];
+            no2_strat[index_end] = no2_strat[index_start];
+        }
+        *nlat = dim_sizes[0];
+        *nlon = dim_sizes[1];
+        *dlat_step = 180.0 / (dim_sizes[0] - 1.);
+        *dlon_step = 360.0 / (dim_sizes[1] - 1);
+        *lat_start = -90.0;
+        *lon_start = -180.0;
+        free(no2_tropo_temp);
+        free(no2_strat_temp);
+    }
+    // Reading NO2 climatology files
+    else {
+        int ndims;
+        int dimids[NC_MAX_DIMS];
+        handle_error(nc_inq_varndims(ncid, tropo_no2_id, &ndims));
+        handle_error(nc_inq_vardimid(ncid, tropo_no2_id, dimids));
+        size_t dim_sizes[NC_MAX_DIMS];
+
+        for (int i = 0; i < ndims; ++i) {
+            handle_error(nc_inq_dimlen(ncid, dimids[i], &dim_sizes[i]));
+            int padding = 2;  //
+            dim_sizes[i] += padding;
+            total_size *= dim_sizes[i];
+        }
+
+        no2_tropo = malloc(total_size * sizeof(float));
+        no2_strat = malloc(total_size * sizeof(float));
+        no2_total = malloc(total_size * sizeof(float));
+        float *no2_tropo_temp = malloc(total_size * sizeof(float));
+        float *no2_total_temp = malloc(total_size * sizeof(float));
+        for (size_t ip = 0; ip < total_size; ++ip) {
+            no2_tropo_temp[ip] = BAD_FLT;
+            no2_total_temp[ip] = BAD_FLT;
+            no2_tropo[ip] = BAD_FLT;
+            no2_strat[ip] = BAD_FLT;
+            no2_total[ip] = BAD_FLT;
+        }
+        handle_error(nc_get_var_float(ncid, tropo_no2_id, no2_tropo_temp));
+        handle_error(nc_get_var_float(ncid, tot_no2_id, no2_total_temp));
+
+        // the latitude array goes from 89.875 to -89.875
+        // the longitude array goes from -179.875 to 179.875
+        for (size_t ilat = 0; ilat < dim_sizes[0] - 2; ilat++) {
+            for (size_t ilon = 0; ilon < dim_sizes[1] - 2; ilon++) {
+                size_t index_original = (dim_sizes[0] - ilat - 3) * (dim_sizes[1] - 2) + ilon;
+                size_t index_shifted = (ilat + 1) * dim_sizes[1] + ilon + 1;
+                if (no2_tropo_temp[index_original] == BAD_FLT) {
+                    fprintf(stderr, "Error: no2_tropo_temp[%zu] is fill value\n", index_original);
+                    exit(1);
+                }
+                if (no2_total_temp[index_original] == BAD_FLT) {
+                    fprintf(stderr, "Error: no2_total_temp[%zu] is fill value\n", index_original);
+                    exit(1);
+                }
+                if (no2_tropo[index_shifted] != BAD_FLT) {
+                    fprintf(stderr, "Error: no2_tropo_temp[%zu] is NOT fill value\n", index_shifted);
+                    exit(1);
+                }
+                if (no2_total[index_shifted] != BAD_FLT) {
+                    fprintf(stderr, "Error: no2_total_temp[%zu] is NOT fill value\n", index_shifted);
+                    exit(1);
+                }
+                no2_tropo[index_shifted] = no2_tropo_temp[index_original];
+                no2_total[index_shifted] = no2_total_temp[index_original];
+            }
+        }
+        // set -180.125 to 179.875, set 180.125 to -179.875
+        for (size_t ilat = 1; ilat < dim_sizes[0] - 1; ilat++) {
+            size_t index_start = ilat * dim_sizes[1];
+            size_t index_end = index_start + dim_sizes[1] - 2;
+
+            if (no2_tropo[index_end] == BAD_FLT) {
+                fprintf(stderr, "Error: no2_tropo[%zu] is fill value\n", index_end);
+                exit(1);
+            }
+            if (no2_total[index_end] == BAD_FLT) {
+                fprintf(stderr, "Error: no2_total[%zu] is fill value\n", index_end);
+                exit(1);
+            }
+            if (no2_tropo[index_start] != BAD_FLT) {
+                fprintf(stderr, "Error: no2_tropo[%zu] is NOT fill value\n", index_start);
+                exit(1);
+            }
+            if (no2_total[index_start] != BAD_FLT) {
+                fprintf(stderr, "Error: no2_total[%zu] is NOT fill value\n", index_start);
+                exit(1);
+            }
+            no2_tropo[index_start] = no2_tropo[index_end];
+            no2_total[index_start] = no2_total[index_end];
+
+            index_start = ilat * dim_sizes[1] + 1;
+            index_end = index_start + dim_sizes[1] - 2;
+
+            if (no2_tropo[index_start] == BAD_FLT) {
+                fprintf(stderr, "Error: no2_tropo[%zu] is fill value\n", index_start);
+                exit(1);
+            }
+            if (no2_total[index_start] == BAD_FLT) {
+                fprintf(stderr, "Error: no2_total[%zu] is fill value\n", index_start);
+                exit(1);
+            }
+
+            if (no2_tropo[index_end] != BAD_FLT) {
+                fprintf(stderr, "Error: no2_tropo[%zu] is NOT fill value\n", index_end);
+                exit(1);
+            }
+            if (no2_total[index_end] != BAD_FLT) {
+                fprintf(stderr, "Error: no2_total[%zu] is NOT fill value\n", index_end);
+                exit(1);
+            }
+
+            no2_tropo[index_end] = no2_tropo[index_start];
+            no2_total[index_end] = no2_total[index_start];
+        }
+        // set -90.125 to -89.875, set 90.125 to 89.875
+        for (size_t ilon = 0; ilon < dim_sizes[1]; ilon++) {
+            size_t index_start = ilon;
+            size_t index_end = dim_sizes[1] + ilon;
+
+            if (no2_tropo[index_end] == BAD_FLT) {
+                fprintf(stderr, "Error: no2_tropo[%zu] is fill value\n", index_end);
+                exit(1);
+            }
+            if (no2_total[index_end] == BAD_FLT) {
+                fprintf(stderr, "Error: no2_total[%zu] is fill value\n", index_end);
+                exit(1);
+            }
+            if (no2_tropo[index_start] != BAD_FLT) {
+                fprintf(stderr, "Error: no2_tropo[%zu] is NOT fill value\n", index_start);
+                exit(1);
+            }
+            if (no2_total[index_start] != BAD_FLT) {
+                fprintf(stderr, "Error: no2_total[%zu] is NOT fill value\n", index_start);
+                exit(1);
+            }
+
+            no2_tropo[index_start] = no2_tropo[index_end];
+            no2_total[index_start] = no2_total[index_end];
+
+            index_start = ilon + dim_sizes[1] * (dim_sizes[0] - 2);
+            index_end = ilon + dim_sizes[1] * (dim_sizes[0] - 1);
+
+            if (no2_tropo[index_start] == BAD_FLT) {
+                fprintf(stderr, "Error: no2_tropo[%zu] is fill value\n", index_start);
+                exit(1);
+            }
+            if (no2_total[index_start] == BAD_FLT) {
+                fprintf(stderr, "Error: no2_total[%zu] is fill value\n", index_start);
+                exit(1);
+            }
+
+            if (no2_tropo[index_end] != BAD_FLT) {
+                fprintf(stderr, "Error: no2_tropo[%zu] is NOT fill value\n", index_end);
+                exit(1);
+            }
+            if (no2_total[index_end] != BAD_FLT) {
+                fprintf(stderr, "Error: no2_total[%zu] is NOT fill value\n", index_end);
+                exit(1);
+            }
+
+            no2_tropo[index_end] = no2_tropo[index_start];
+            no2_total[index_end] = no2_total[index_start];
+        }
+        free(no2_tropo_temp);
+        free(no2_total_temp);
+        *nlat = dim_sizes[0];
+        *nlon = dim_sizes[1];
+        // check dimensions match predefined values
+        assert(NXNO2 == dim_sizes[1] - 2);
+        assert(NYNO2 == dim_sizes[0] - 2);
+        *dlat_step = 180.0 / NYNO2;
+        *dlon_step = 360.0 / NXNO2;
+        *lat_start = -90.0 - *dlat_step / 2;
+        *lon_start = -180.0 - *dlon_step / 2;
+        for (size_t ip = 0; ip < total_size; ++ip) {
+            no2_strat[ip] = no2_total[ip] - no2_tropo[ip];
+        }
+        *no2_total_ptr = no2_total;
+    }
+    for (size_t ip = 0; ip < total_size; ++ip) {
+        if (no2_tropo[ip] == BAD_FLT) {
+            fprintf(stderr, "Error: no2_tropo[%zu] is fill value\n", ip);
+            exit(1);
+        }
+        if (no2_strat[ip] == BAD_FLT) {
+            fprintf(stderr, "Error: no2_strat[%zu] is fill value\n", ip);
+            exit(1);
+        }
+    }
+    *no2_tropo_ptr = no2_tropo;
+    *no2_strat_ptr = no2_strat;
+    nc_close(ncid);
+}
 
 void no2_frac(float lon, float lat, float *no2_frac_200) {
     static int firstCall = 1;
@@ -148,302 +472,63 @@ void no2_frac(float lon, float lat, float *no2_frac_200) {
     return;
 }
 
-void no2concGeosCf(char *no2file, float lon, float lat, float *no2_tropo, float *no2_strat) {
-    static int firstCall = 1;
-    static int nx;
-    static int ny;
-    static float dx;
-    static float dy;
-
-    static float *mapTropo;
-    static float *mapStrato;
-
-    int i, j;
-    float xx, yy;
-    float t, u;
-
-    float strato;
-    float tropo;
-
-    *no2_tropo = 0.0;
-    *no2_strat = 0.0;
-
-    if (firstCall) {
-        firstCall = 0;
-
-        hid_t file_id, set_id, space_id;
-        hsize_t dims[2], maxdims[2];
-        hid_t mem_space_id;
-
-        hsize_t start[2] = {(hsize_t)0, (hsize_t)0};
-        hsize_t stride[2] = {(hsize_t)1, (hsize_t)1};
-        hsize_t count[2] = {(hsize_t)1, (hsize_t)1};
-
-        if ((file_id = H5Fopen(no2file, H5F_ACC_RDONLY, H5P_DEFAULT)) == -1) {
-            printf("error in opening -%s-\n", no2file);
-            exit(FATAL_ERROR);
-        }
-
-        set_id = H5Dopen(file_id, "STRATCOL_NO2", H5P_DEFAULT);
-        space_id = H5Dget_space(set_id);
-        H5Sget_simple_extent_dims(space_id, dims, maxdims);
-
-        mapTropo=(float *)malloc(dims[0]*dims[1]*sizeof(float));
-        mapStrato=(float *)malloc(dims[0]*dims[1]*sizeof(float)); 
-
-        count[0]=dims[0];count[1]=dims[1];
-
-        mem_space_id=H5Screate_simple(2,count, NULL);
-        H5Sselect_hyperslab(space_id, H5S_SELECT_SET, start, stride, count, NULL);
-        H5Dread(set_id,H5T_NATIVE_FLOAT, mem_space_id, space_id, H5P_DEFAULT, (void *)mapStrato);
-
-        H5Sclose(space_id);
-        H5Dclose(set_id);
-
-
-        set_id = H5Dopen(file_id, "TROPCOL_NO2", H5P_DEFAULT);
-        space_id = H5Dget_space(set_id);
-        mem_space_id=H5Screate_simple(2,count, NULL);
-        H5Sselect_hyperslab(space_id, H5S_SELECT_SET, start, stride, count, NULL);
-        H5Dread(set_id,H5T_NATIVE_FLOAT, mem_space_id, space_id, H5P_DEFAULT, (void *)mapTropo);
-
-        H5Sclose(space_id);
-        H5Dclose(set_id);
-
-        nx=dims[1];
-        ny=dims[0]-1;
-        dx = 360.0 / nx;
-        dy = 180.0 / ny;
-
-        H5Fclose(file_id);
-    }
-
-    /* interpolate to pixel location */
-
-    i = MAX(MIN((int)((lon + 180.0 + dx / 2) / dx), nx), 0);
-    j = MAX(MIN((int)((lat + 90.0 + dy / 2) / dy), ny), 0);
-
-    xx = i * dx - 180.0 - dx / 2;
-    yy = j * dy - 90.0 - dy / 2;
-
-    t = (lon - xx) / dx;
-    u = (lat - yy) / dy;
-
-    strato = (1 - t) * (1 - u) * mapStrato[j*nx+i] + t * (1 - u) * mapStrato[j*nx+i + 1] +
-            t * u * mapStrato[(j + 1)*nx+i + 1] + (1 - t) * u * mapStrato[(j + 1)*nx+i];
-
-    tropo = (1 - t) * (1 - u) * mapTropo[j*nx+i] + t * (1 - u) * mapTropo[j*nx+i + 1] +
-            t * u * mapTropo[(j + 1)*nx+i + 1] + (1 - t) * u * mapTropo[(j + 1)*nx+i];
-
-    /* return components of stratospheric and tropospheric no2  */
-
-    *no2_strat = MAX(strato, 0.0);
-    *no2_tropo = MAX(tropo, 0.0);
-
-    return;
-}
-
 void no2conc(char *no2file, float lon, float lat, int32_t doy, float *no2_tropo, float *no2_strat) {
     static int firstCall = 1;
-    static int nx = NXNO2;
-    static int ny = NYNO2;
-    static float dx = 360.0 / NXNO2;
-    static float dy = 180.0 / NYNO2;
-
-    typedef float map_t[NXNO2 + 2];
-    static map_t *map_total;
-    static map_t *map_tropo;
-
     int i, j;
     float xx, yy;
     float t, u;
 
     float total;
     float tropo;
-
+    float strato;
+    static float *no2_tropo_ptr = NULL;
+    static float *no2_strat_ptr = NULL;
+    static float *no2_total_ptr = NULL;
+    static size_t nlat, nlon;
+    static float dlat, dlon, lat_start, lon_start;
     *no2_tropo = 0.0;
     *no2_strat = 0.0;
 
-    if (!Hishdf(no2file)) {
-        no2concGeosCf(no2file, lon, lat, no2_tropo, no2_strat);
-        return;
-    }
-
     if (firstCall) {
-        int32 sd_id;
-        int32 sds_id;
-        int32 status;
-        int32 sds_index;
-        int32 rank;
-        int32 nt;
-        int32 dims[H4_MAX_VAR_DIMS];
-        int32 nattrs;
-        int32 start[2];
-        int32 edges[2];
-        char name[H4_MAX_NC_NAME];
-        char sdsname[H4_MAX_NC_NAME];
-        float **map;
-        char title[255];
-        int16 month;
-        char mstr[4] = "";
-
+        no2_reader(no2file, doy, &no2_tropo_ptr, &no2_strat_ptr,&no2_total_ptr, &nlat, &nlon, &dlat, &dlon, &lat_start,
+                   &lon_start);
         firstCall = 0;
+    }
+    i = MAX(MIN((int)((lon - lon_start) / dlon), (int)nlon), 0);
+    j = MAX(MIN((int)((lat - lat_start) / dlat), (int)nlat), 0);
+    if (i == nlon -1) {
+        fprintf(stderr,"-E- %s:  Error in no2conc:  lon = %f\n", __FILE__, lon);
+        exit(1);
+    }
+    if (j == nlat -1) {
+        fprintf(stderr,"-E- %s:  Error in no2conc:  lat = %f\n", __FILE__, lat);
+        exit(1);
+    }
+    xx = i * dlon + lon_start;
+    yy = j * dlat + lat_start;
 
-        // allocate data
-        map_total = (map_t *)allocateMemory((NYNO2 + 2) * sizeof(map_t), "map_total");
-        map_tropo = (map_t *)allocateMemory((NYNO2 + 2) * sizeof(map_t), "map_tropo");
+    t = (lon - xx) / dlon;
+    u = (lat - yy) / dlat;
 
-        map = (float **)allocate2d_float(NYNO2, NXNO2);
-        if (map == NULL) {
-            printf("-E- %s:  Error allocating space for %s.\n", __FILE__, no2file);
-            exit(1);
-        }
-
-        sd_id = SDstart(no2file, DFACC_RDONLY);
-        if (sd_id == -1) {
-            printf("-E- %s:  Error opening NO2 file %s.\n", __FILE__, no2file);
-            exit(1);
-        }
-
-        printf("\nOpening NO2 file %s\n\n", no2file);
-
-        if (SDreadattr(sd_id, SDfindattr(sd_id, "Title"), (VOIDP)title) == 0) {
-            if (strstr(title, "NO2 Climatology") != NULL) {
-                month = (int)doy / 31;
-                sprintf(mstr, "_%2.2i", month + 1);
-            }
-        }
-
-        strcpy(sdsname, "tot_no2");
-        strcat(sdsname, mstr);
-        sds_index = SDnametoindex(sd_id, sdsname);
-        if (sds_index == -1) {
-            printf("-E- %s:  Error seeking %s SDS from %s.\n", __FILE__, sdsname, no2file);
-            exit(1);
-        }
-        sds_id = SDselect(sd_id, sds_index);
-
-        status = SDgetinfo(sds_id, name, &rank, dims, &nt, &nattrs);
-        if (status != 0) {
-            printf("-E- %s:  Error reading SDS info for %s from %s.\n", __FILE__, sdsname, no2file);
-            exit(1);
-        }
-        if (dims[0] != ny || dims[1] != nx) {
-            printf("-E- %s:  Dimension mis-match on %s array from %s.\n", __FILE__, sdsname, no2file);
-            printf("  Expecting %d x %d\n", nx, ny);
-            printf("  Reading   %d x %d\n", dims[1], dims[0]);
-            exit(1);
-        }
-
-        start[0] = 0;
-        start[1] = 0;
-        edges[0] = ny;
-        edges[1] = nx;
-
-        status = SDreaddata(sds_id, start, NULL, edges, (VOIDP)&map[0][0]);
-        if (status != 0) {
-            printf("-E- %s:  Error reading SDS %s from %s.\n", __FILE__, sdsname, no2file);
-            exit(1);
-        }
-
-        for (j = 0; j < ny; j++) {
-            for (i = 0; i < nx; i++) {
-                map_total[j + 1][i + 1] = map[ny - j - 1][i];
-            }
-        }
-
-        status = SDendaccess(sds_id);
-        if (status != 0) {
-            printf("-E- %s:  Error closing SDS %s from %s.\n", __FILE__, sdsname, no2file);
-            exit(1);
-        }
-
-        strcpy(sdsname, "trop_no2");
-        strcat(sdsname, mstr);
-        sds_index = SDnametoindex(sd_id, sdsname);
-        if (sds_index == -1) {
-            printf("-E- %s:  Error seeking %s SDS from %s.\n", __FILE__, sdsname, no2file);
-            exit(1);
-        }
-        sds_id = SDselect(sd_id, sds_index);
-
-        status = SDgetinfo(sds_id, name, &rank, dims, &nt, &nattrs);
-        if (status != 0) {
-            printf("-E- %s:  Error reading SDS info for %s from %s.\n", __FILE__, sdsname, no2file);
-            exit(1);
-        }
-        if (dims[0] != ny || dims[1] != nx) {
-            printf("-E- %s:  Dimension mis-match on %s array from %s.\n", __FILE__, sdsname, no2file);
-            printf("  Expecting %d x %d\n", nx, ny);
-            printf("  Reading   %d x %d\n", dims[1], dims[0]);
-            exit(1);
-        }
-
-        start[0] = 0;
-        start[1] = 0;
-        edges[0] = ny;
-        edges[1] = nx;
-
-        status = SDreaddata(sds_id, start, NULL, edges, (VOIDP)&map[0][0]);
-        if (status != 0) {
-            printf("-E- %s:  Error reading SDS %s from %s.\n", __FILE__, sdsname, no2file);
-            exit(1);
-        }
-
-        status = SDendaccess(sds_id);
-        if (status != 0) {
-            printf("-E- %s:  Error closing SDS %s from %s.\n", __FILE__, sdsname, no2file);
-            exit(1);
-        }
-
-        for (j = 0; j < ny; j++) {
-            for (i = 0; i < nx; i++) {
-                map_tropo[j + 1][i + 1] = map[ny - j - 1][i];
-            }
-        }
-
-        /* add boarders to simplify interpolation */
-
-        for (j = 0; j < ny; j++) {
-            map_total[j + 1][0] = map_total[j + 1][nx];
-            map_total[j + 1][nx + 1] = map_total[j + 1][1];
-            map_tropo[j + 1][0] = map_tropo[j + 1][nx];
-            map_tropo[j + 1][nx + 1] = map_tropo[j + 1][1];
-        }
-        for (i = 0; i < nx + 2; i++) {
-            map_total[0][i] = map_total[1][i];
-            map_total[ny + 1][i] = map_total[ny][i];
-            map_tropo[0][i] = map_tropo[1][i];
-            map_tropo[ny + 1][i] = map_tropo[ny][i];
-        }
-
-        free2d_float(map);
-        SDend(sd_id);
+    tropo = (1 - t) * (1 - u) * no2_tropo_ptr[j * nlon + i] + t * (1 - u) * no2_tropo_ptr[j * nlon + i + 1] +
+            t * u * no2_tropo_ptr[(j + 1) * nlon + i + 1] + (1 - t) * u * no2_tropo_ptr[(j + 1) * nlon + i];
+    // the only purpose to make sure that ctests will pass (avoid floating point error)
+    if (no2_total_ptr) {
+        total =
+            (1 - t) * (1 - u) * no2_total_ptr[j * nlon + i] + t * (1 - u) * no2_total_ptr[j * nlon + i + 1] +
+            t * u * no2_total_ptr[(j + 1) * nlon + i + 1] + (1 - t) * u * no2_total_ptr[(j + 1) * nlon + i];
+        strato = total - tropo;
+    } else {
+        strato =
+            (1 - t) * (1 - u) * no2_strat_ptr[j * nlon + i] + t * (1 - u) * no2_strat_ptr[j * nlon + i + 1] +
+            t * u * no2_strat_ptr[(j + 1) * nlon + i + 1] + (1 - t) * u * no2_strat_ptr[(j + 1) * nlon + i];
     }
 
-    /* interpolate to pixel location */
-
-    i = MAX(MIN((int)((lon + 180.0 + dx / 2) / dx), nx), 0);
-    j = MAX(MIN((int)((lat + 90.0 + dy / 2) / dy), ny), 0);
-
-    xx = i * dx - 180.0 - dx / 2;
-    yy = j * dy - 90.0 - dy / 2;
-
-    t = (lon - xx) / dx;
-    u = (lat - yy) / dy;
-
-    total = (1 - t) * (1 - u) * map_total[j][i] + t * (1 - u) * map_total[j][i + 1] +
-            t * u * map_total[j + 1][i + 1] + (1 - t) * u * map_total[j + 1][i];
-
-    tropo = (1 - t) * (1 - u) * map_tropo[j][i] + t * (1 - u) * map_tropo[j][i + 1] +
-            t * u * map_tropo[j + 1][i + 1] + (1 - t) * u * map_tropo[j + 1][i];
 
     /* return components of stratospheric and tropospheric no2  */
 
-    *no2_strat = MAX(total - tropo, 0.0);
+    *no2_strat = MAX(strato, 0.0);
     *no2_tropo = MAX(tropo, 0.0);
-
-    return;
 }
 
 /* ============================================================================ */

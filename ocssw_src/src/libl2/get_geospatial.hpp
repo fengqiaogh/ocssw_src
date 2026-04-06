@@ -11,13 +11,13 @@
 class Geospatialbounds {
    private:
     std::unordered_map<std::string, std::vector<float>> scan_line_vars;
-    float min_lon = NAN;
-    float max_lon = NAN;
+    float min_lon = BAD_FLT;
+    float max_lon = BAD_FLT;
     std::string geospatial_bounds_wkt{};
     std::string platform{};
     std::string instrument{};
     std::string day_night_flag{};
-    std::string time_coverage_start{},time_coverage_end{};
+    std::string time_coverage_start{}, time_coverage_end{};
     std::vector<float> gringpointlatitude{}, gringpointlongitude{};
     std::vector<float> lat, lon;
 
@@ -27,6 +27,13 @@ class Geospatialbounds {
     std::string geospatial_lon_min;
 
     std::string get_day_night_flag(const netCDF::NcFile &nc_file);
+
+    /**
+     * @brief Returns a 1D index given scan and pixel
+     * @param is scan/line number 
+     * @param ip pixel number
+     */
+    size_t get_index(size_t is, size_t ip);
 
    public:
     Geospatialbounds();
@@ -151,14 +158,12 @@ class Geospatialbounds {
 
     /**
      * @brief Calculate scan line boundaries
-     * @param[in] First vector of coordinate data
-     * @param[in] Second vector of coordinate data
-     * @param[in] Number of lines
-     * @param[in] Pixels per line
-     * @param[out] Map to store calculated boundary vectors
+     * @param[in] First vector of lats
+     * @param[in] Second vector of lons
+     * @param[out] Map to store calculated boundaries for lat/lon
      */
-    static void calc_scan_line(const std::vector<float> &, const std::vector<float> &, size_t, size_t,
-                               std::unordered_map<std::string, std::vector<float>> &);
+    void calc_scan_line(const std::vector<float> &, const std::vector<float> &,
+                        std::unordered_map<std::string, std::vector<float>> &);
 };
 
 #endif

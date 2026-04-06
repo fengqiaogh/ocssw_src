@@ -1,4 +1,4 @@
-"""This class hold the implementation of the converter system, which applies 
+"""This class hold the implementation of the converter system, which applies
 post-process to decoded packet fields. This post-processing includes applying
 linear/polynomial calibration curves, dictionary replacement, and time parsing.
 """
@@ -83,6 +83,7 @@ class PolyConverter(Converter):
             converted form of the decoded packet field values
         """
         converted = np.zeros(field_array.shape, dtype=np.float64)
+        field_array = field_array.astype(float)
 
         for power, coeff in enumerate(reversed(self._coeffs)):
             converted += coeff * field_array**power

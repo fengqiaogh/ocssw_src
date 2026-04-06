@@ -26,7 +26,7 @@ extern "C" int l2extractInitOptions(clo_optionList_t* list, const char* software
 
     clo_setHelpStr(
         "Usage: l2extract argument-list"
-        "\n   or: l2extract ifile spix epix sline eline pix_sub sc_sub ofile <prodlist>"
+        "\n   or: l2extract ifile spixl epixl sline eline pix_sub sc_sub ofile <prodlist>"
         "\n"
         "\n  This program takes a product (or products if netCDF output) from an L2 file"
         "\n  and does the extraction"
@@ -45,8 +45,8 @@ extern "C" int l2extractInitOptions(clo_optionList_t* list, const char* software
     // data, projection, coverage
     clo_addOption(list, "product", CLO_TYPE_STRING, NULL,
                   "comma separated list of products, empty string outputs all\n        all products");
-    clo_addOption(list, "spix", CLO_TYPE_INT, "1", "start pixel number (1-based).");
-    clo_addOption(list, "epix", CLO_TYPE_INT, "-1", "end pixel number. -1 = last pixel (1-based).");
+    clo_addOption(list, "spixl", CLO_TYPE_INT, "1", "start pixel number (1-based).");
+    clo_addOption(list, "epixl", CLO_TYPE_INT, "-1", "end pixel number. -1 = last pixel (1-based).");
     clo_addOption(list, "sline", CLO_TYPE_INT, "1", "start line (1-based).");
     clo_addOption(list, "eline", CLO_TYPE_INT, "-1", "end line.  -1 = last line (1-based).");
     clo_addOption(list, "suite", CLO_TYPE_STRING, NULL, "suite for default parameters");
@@ -55,6 +55,9 @@ extern "C" int l2extractInitOptions(clo_optionList_t* list, const char* software
                   "comma separated list of 3D wavelengths and/or colon\n"
                   "        separated nnn:nnn range of wavelengths, empty string outputs all\n"
                   "        3D wavelengths (i.e. wavelist=353,355,358,360,360:370,450:600,700)");
+
+    clo_addAlias(list, "spixl", "spix");
+    clo_addAlias(list, "epixl", "epix");
     return 0;
 }
 

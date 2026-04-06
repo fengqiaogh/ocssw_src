@@ -67,23 +67,10 @@ namespace {
 // bands
     std::unordered_map<std::string, int> ibands;
     size_t n_bands;
-// variables needed for quality flags setting
-    const boost::unordered_map<std::pair<std::string, std::string>,
-            std::set<std::string>>
-            needed_stats_for_cloud_mask = {
-            {{"viirs", "SST3"},
-                    {"BT37_MAXMIN", "BT12_MAXMIN", "BT11_MAXMIN", "BT40", "d_BT37_BT12",
-                            "d_BT11_BT12"}},
-            {{"viirs", "SST"},
-                    {"BT12_MAXMIN", "BT11_MAXMIN", "BT40",        "CLDRHred_MAXMIN"}},
-            {{"modis", "SST"},
-                    {"BT12_MAXMIN", "BT11_MAXMIN", "BT40_MAXMIN", "BT39_MAXMIN",
-                                                                          "CLDRHred_MAXMIN"}},
-            {{"modis", "SST4"},
-                    {"BT12_MAXMIN", "BT11_MAXMIN", "BT40_MAXMIN", "BT39_MAXMIN",
-                                                                          "d_BT39_BT40"}}};
+
 
 }  // namespace
+
 
 /**
  * @brief *
@@ -181,30 +168,41 @@ private:
     float elecor_terra = 0.0f;
     bool is_aqua = false;
     bool is_terra = false;
-
+    // variables needed for quality flags setting
+    const boost::unordered_map<std::pair<std::string, std::string>, std::set<std::string>>
+        needed_stats_for_cloud_mask = {
+            {{"viirs", "SST3"},
+             {"BT37_MAXMIN", "BT12_MAXMIN", "BT11_MAXMIN", "BT40", "d_BT37_BT12", "d_BT11_BT12"}},
+            {{"viirs", "SST"}, {"BT12_MAXMIN", "BT11_MAXMIN", "BT40", "CLDRHred_MAXMIN"}},
+            {{"modis", "SST"},
+             {"BT12_MAXMIN", "BT11_MAXMIN", "BT40_MAXMIN", "BT39_MAXMIN", "CLDRHred_MAXMIN"}},
+            {{"modis", "SST4"}, {"BT12_MAXMIN", "BT11_MAXMIN", "BT40_MAXMIN", "BT39_MAXMIN", "d_BT39_BT40"}}};
+    // functions to get the data solz/senz/lat/lon and pass it to the ADT/Cloud masking calculations
     /**
      * @brief Set the correction to the modis 4 micron BT for detector #0
-     * @param l1rec - l1 record
      * @param l1qrec - l1 queue
      * @param input - input struct
      * @param product_type - product type
      */
-    void set_modis_a_bt_40_data(l1str *l1rec, l1qstr *l1qrec, instr *input,
+    void set_modis_a_bt_40_data(l1qstr *l1qrec, instr *input,
                                 const std::string &product_type) {
         if (!is_aqua) return;
         std::vector<float> &var_box = StatsBTs.at("40").var_box;
-        const size_t center = StatsBTs.at("40").center;
-        if (l1rec->detnum == 0 && l1qrec->r[i_center].detnum == 0 && i_center > 0) {
+        std::vector<int> &mask_box = StatsBTs.at("40").mask_box;
+        size_t center = StatsBTs.at("40").center ;
+        int bad_line = i_center;
+        l1str * l1rec = &l1qstr_modis_a->r[i_center];
+        if (l1qstr_modis_a->r[bad_line].detnum == 0 && bad_line > 0) {
             modis_a_bt40 = std::vector<float>(npix, BAD_FLT);
-            const size_t index_prev = (i_center - 1) * npix;
-            const size_t index_next = (i_center + 1) * npix;
+            const size_t index_prev = (bad_line - 1) * npix;
+            const size_t index_next = (bad_line + 1) * npix;
             for (size_t i_p = 0; i_p < npix; i_p++) {
                 float sum = 0.0f;
                 int count = 0;
                 const float prev_val = var_box.at(index_prev + i_p);
                 const float next_val = var_box.at(index_next + i_p);
-                const int mask_prev = cldmsk::bt_mask(l1qstr_modis_a->r[i_center - 1], i_p, NBANDSIR, ib40);
-                const int mask_next = cldmsk::bt_mask(l1qstr_modis_a->r[i_center + 1], i_p, NBANDSIR, ib40);
+                const int mask_prev = cldmsk::bt_mask(l1qstr_modis_a->r[bad_line - 1], i_p, NBANDSIR, ib40);
+                const int mask_next = cldmsk::bt_mask(l1qstr_modis_a->r[bad_line + 1], i_p, NBANDSIR, ib40);
                 if (mask_prev) {
                     count++;
                     sum += prev_val;
@@ -216,14 +214,20 @@ private:
                 if (count > 0) {
                     modis_a_bt40.at(i_p) = sum / count;
                 } else {
-                    const int mask_cur = cldmsk::bt_mask(l1qstr_modis_a->r[i_center], i_p, NBANDSIR, ib40);
+                    const int mask_cur = cldmsk::bt_mask(l1qstr_modis_a->r[bad_line], i_p, NBANDSIR, ib40);
                     if (mask_cur) {
                         modis_a_bt40.at(i_p) =
-                            cldmsk::bt_mask(l1qstr_modis_a->r[i_center], i_p, NBANDSIR, ib40);
+                            cldmsk::bt_mask(l1qstr_modis_a->r[bad_line], i_p, NBANDSIR, ib40);
                     }
                 }
             }
-            StatsBTs.at("40").return_vals.at("VAR") = modis_a_bt40.data();
+            for (size_t i_p = 0; i_p < npix; i_p++) {
+                var_box[i_p + center * npix] = modis_a_bt40[i_p];
+                mask_box[i_p + center * npix] = 1;
+                if(modis_a_bt40[i_p] == BAD_FLT) {
+                    mask_box[i_p + center * npix] = 0;
+                }
+            }
             for (auto &pair_bt : PairOfVarsBTs) {
                 if (pair_bt.first.first == "40") {
                     const auto ib_pair = ibands.at("ib" + pair_bt.first.second);
@@ -241,9 +245,24 @@ private:
                 }
             }
         } else {
-            StatsBTs.at("40").return_vals.at("VAR") =
-                    var_box.data() + npix * center;
+            bad_line = i_e;
+            if (l1qstr_modis_a->r[bad_line].detnum == 0) {
+                int i_q = StatsBTs.at("40").i_e;
+                for (size_t i_p = 0; i_p < npix; i_p++) {
+                    var_box[i_p + i_q * npix] = BAD_FLT;
+                    mask_box[i_p + i_q * npix] = 0;
+                }
+            }
+            bad_line = i_s;
+            if (l1qstr_modis_a->r[bad_line].detnum == 0) {
+                int i_q = StatsBTs.at("40").i_s;
+                for (size_t i_p = 0; i_p < npix; i_p++) {
+                    var_box[i_p + i_q * npix] = BAD_FLT;
+                    mask_box[i_p + i_q * npix] = 0;
+                }
+            }
         }
+        StatsBTs.at("40").reset_stats();
     };
 
     void modis_dust_correction(const l1str &q_ref, size_t i_q) {
@@ -931,26 +950,13 @@ private:
                         qual_sst[i_p] = std::max(qual_sst[i_p], (int8_t) 2);
                     }
                 };
-                if (night) {
-                    if (std::abs(dt_analysis) > cldmsk::SSTdiff) {
-                        flags_sst[i_p] |= SSTF_SSTREFDIFF;
-                        qual_sst[i_p] = std::max(qual_sst[i_p], (int8_t) 2);
-                    }
-                    if (std::abs(dt_analysis) > cldmsk::SSTvdiff) {
-                        flags_sst[i_p] |= SSTF_SSTREFVDIFF;
-                        qual_sst[i_p] = std::max(qual_sst[i_p], (int8_t) 3);
-                    }
-                } else {
-                    if (dt_analysis < -cldmsk::SSTdiff ||
-                        q_ref.sstref[i_p] < cldmsk::invalid_val) {
-                        flags_sst[i_p] |= SSTF_SSTREFDIFF;
-                        qual_sst[i_p] = std::max(qual_sst[i_p], (int8_t) 2);
-                    }
-                    if (dt_analysis < -cldmsk::SSTvdiff ||
-                        q_ref.sstref[i_p] < cldmsk::invalid_val) {
-                        flags_sst[i_p] |= SSTF_SSTREFVDIFF;
-                        qual_sst[i_p] = std::max(qual_sst[i_p], (int8_t) 3);
-                    }
+                if (dt_analysis < -cldmsk::SSTdiff || q_ref.sstref[i_p] < cldmsk::invalid_val) {
+                    flags_sst[i_p] |= SSTF_SSTREFDIFF;
+                    qual_sst[i_p] = std::max(qual_sst[i_p], (int8_t)2);
+                }
+                if (dt_analysis < -cldmsk::SSTvdiff || q_ref.sstref[i_p] < cldmsk::invalid_val) {
+                    flags_sst[i_p] |= SSTF_SSTREFVDIFF;
+                    qual_sst[i_p] = std::max(qual_sst[i_p], (int8_t)3);
                 }
             }
             // difference between sst
@@ -1048,8 +1054,9 @@ private:
                 // normalize rho test
                 if (case_switcher == cldmsk::SST) {
                     {
+                        const std::unordered_map<std::string, float> cldthresh_list = cldmsk::cldthresh_list();
                         const float cldthreshold =
-                                cldmsk::cldthresh_list.at(sensor);
+                                cldthresh_list.at(sensor);
                         const float val_to_threshold =
                                 StatsBTs.at("RHred")("MAXMIN")[i_p];
                         if (glint) {
@@ -1113,10 +1120,10 @@ private:
                             cldmsk::Bt39unif2)
                             flags_sst[i_p] |= SSTF_BTVNONUNIF;
                         if (StatsBTs.at("40")("MAXMIN")[i_p] >
-                            cldmsk::Bt40unif1)
+                            cldmsk::Bt40unif1 && (is_terra || (q_ref.detnum != 0 )))
                             flags_sst[i_p] |= SSTF_BTNONUNIF;
                         if (StatsBTs.at("40")("MAXMIN")[i_p] >
-                            cldmsk::Bt40unif2)
+                            cldmsk::Bt40unif2 && (is_terra || (q_ref.detnum != 0 )))
                             flags_sst[i_p] |= SSTF_BTVNONUNIF;
                         break;
                     default:
@@ -1144,7 +1151,7 @@ private:
                                 (StatsBTs.at("39")("MAXMIN")[i_p] >
                                  cldmsk::Bt39unif1) ||
                                 (StatsBTs.at("40")("MAXMIN")[i_p] >
-                                 cldmsk::Bt40unif1);
+                                 cldmsk::Bt40unif1 && (is_terra || (q_ref.detnum != 0 )));
                         if (decrease_night_qual_non_uniform) {
                             qual_sst[i_p] =
                                     std::min((int8_t) 3, ++qual_sst[i_p]);
@@ -1444,12 +1451,12 @@ private:
                                 PairOfVarsBTs.at({bt1, bt2}).get_Tdeflong();
                     continue;
                 } else {
-                    if (cldmsk::get_non_BT_vars.count(name) == 0)
+                    if (cldmsk::get_non_BT_vars().count(name) == 0)
                         adt::print_error_message_for_adt(
                                 path_to_cloud_mask_config, name);
                 }
                 if (set_adt_data)
-                    test_data[name] = cldmsk::get_non_BT_vars.at(name)(*l1rec);
+                    test_data[name] = cldmsk::get_non_BT_vars().at(name)(*l1rec);
             }
         }
     }
@@ -1487,8 +1494,9 @@ private:
         { std::cout << "Product type to ini " << this_product << std::endl; }
         npix = l1rec->npix;
         const int sensor_id_int = l1rec->l1file->sensorID;
-        auto it_s = cldmsk::platforms.find(sensor_id_int);
-        if (it_s != cldmsk::platforms.end())
+        std::unordered_map<int, std::string> platforms =  cldmsk::platforms();
+        auto it_s = platforms.find(sensor_id_int);
+        if (it_s != platforms.end())
             platform = it_s->second;
         else {
             std::cerr << "Platform is not found. Exiting ... " << sensor_id_int
@@ -1508,9 +1516,12 @@ private:
         }
         {
             // set sensor
-            if (cldmsk::modis_sensors.count(sensor_id_int) > 0) {
-                sensor = "modis";
-                bt_box = cldmsk::bt_box_sizes.at(sensor);
+            const std::unordered_set<int> modis_sensors = cldmsk::modis_sensors();
+            const std::unordered_set<int> viirs_sensors = cldmsk::viirs_sensors();
+            const std::unordered_map<std::string, size_t> bt_box_sizes = cldmsk::bt_box_sizes();
+            if (modis_sensors.count(sensor_id_int) > 0) {
+                sensor = "modis";                
+                bt_box = bt_box_sizes.at(sensor);
                 if (l1_input->resolution == 250) {
                     fullscanpix = 5416;
                 } else if (l1_input->resolution == 500) {
@@ -1531,9 +1542,9 @@ private:
                         }
                     }
                 }
-            } else if (cldmsk::viirs_sensors.count(sensor_id_int) > 0) {
+            } else if (viirs_sensors.count(sensor_id_int) > 0) {
                 sensor = "viirs";
-                bt_box = cldmsk::bt_box_sizes.at(sensor);
+                bt_box = bt_box_sizes.at(sensor);
                 fullscanpix = 3200;
                 if (this_product == "SST") {
                     if (platform == "npp") {
@@ -1583,7 +1594,7 @@ private:
         { desicion_tree_ini(product_type); }
         {
             const std::string sst_coef_file =
-                    envset::get_sst_coeffs_path.at(product_type)(input);
+                   envset::get_sst_coeff_file(product_type,input);
             {
                 std::cout << "SST Coefficients file for product "
                           << product_type << " " << sst_coef_file << std::endl;
@@ -1708,7 +1719,7 @@ private:
                 // reading the SSES bias
                 {
                     const std::string sses_luts_path =
-                            envset::get_sses_coeffs_path.at(product_type)(input);
+                            envset::get_sst_sses_file(product_type,input);
                     sses_bias_data = std::make_unique<cldmsk::SSESData>(
                             sses_luts_path, npix);
                 }
@@ -1843,7 +1854,7 @@ private:
                     }
                 }
                 {
-                    set_modis_a_bt_40_data(l1rec, l1qrec, input, product_type);
+                    set_modis_a_bt_40_data(l1qrec, input, product_type);
                     set_treesum(iscan);
                     cloud_mask(*l1rec, input);
                 }
@@ -1876,7 +1887,7 @@ private:
                 statBT.second.rearrange();
             }
             {
-                set_modis_a_bt_40_data(l1rec, l1qrec, input, product_type);
+                set_modis_a_bt_40_data(l1qrec, input, product_type);
                 set_treesum(iscan);
                 cloud_mask(*l1rec, input);
             }
@@ -1932,6 +1943,10 @@ private:
  */
 class SST {
 public:
+ SST() {
+     adt::init_parameters();
+     cldmsk::init_parameters();
+ }
     std::unordered_map<std::string,
             std::unique_ptr<SeaSurfaceTemperatureCalcuations>>
             sst;
@@ -1955,6 +1970,10 @@ public:
                 auto it_e = entry.find(cldmsk::get_sensor(sensorId));
                 if (it_e != entry.end()) {
                     needed_products = it_e->second;
+                }
+                else{
+                    fprintf(stderr,"-E-: sensor id %d  not found\n",sensorId);
+                    exit(EXIT_FAILURE);
                 }
             }
         }
@@ -2036,37 +2055,53 @@ public:
     }
 };
 namespace cld_mask_sst {
-    SST sst_obj;
+   std::unique_ptr<SST> sst_obj = nullptr;
 }
 
-void call_sst(l1str *l1rec, l1qstr *l1qrec, instr *input, const char *product_type, float **sst_out_2) {
-    *sst_out_2 = cld_mask_sst::sst_obj.get_sst(l1rec, l1qrec, input, product_type);
+void call_sst(l1str* l1rec, l1qstr* l1qrec, instr* input, const char* product_type, float** sst_out_2) {
+    if (!cld_mask_sst::sst_obj)
+        cld_mask_sst::sst_obj = std::make_unique<SST>();
+    *sst_out_2 = cld_mask_sst::sst_obj->get_sst(l1rec, l1qrec, input, product_type);
 }
-void call_sses_bias(l1str *l1rec, l1qstr *l1qrec, instr *input, const char *product_type,
-                    float **sses_bias_out) {
-    *sses_bias_out = cld_mask_sst::sst_obj.get_sst_bias(l1rec, l1qrec, input, product_type);
+void call_sses_bias(l1str* l1rec, l1qstr* l1qrec, instr* input, const char* product_type,
+                    float** sses_bias_out) {
+    if (!cld_mask_sst::sst_obj)
+        cld_mask_sst::sst_obj = std::make_unique<SST>();
+    *sses_bias_out = cld_mask_sst::sst_obj->get_sst_bias(l1rec, l1qrec, input, product_type);
 }
-void call_sses_std(l1str *l1rec, l1qstr *l1qrec, instr *input, const char *product_type,
-                   float **sses_std_out) {
-    *sses_std_out = cld_mask_sst::sst_obj.get_sst_stdev(l1rec, l1qrec, input, product_type);
+void call_sses_std(l1str* l1rec, l1qstr* l1qrec, instr* input, const char* product_type,
+                   float** sses_std_out) {
+    if (!cld_mask_sst::sst_obj)
+        cld_mask_sst::sst_obj = std::make_unique<SST>();
+    *sses_std_out = cld_mask_sst::sst_obj->get_sst_stdev(l1rec, l1qrec, input, product_type);
 }
-void call_sst_flags(l1str *l1rec, l1qstr *l1qrec, instr *input, const char *product_type,
-                    int16_t **sst_flags) {
-    *sst_flags = cld_mask_sst::sst_obj.get_flags_sst(l1rec, l1qrec, input, product_type);
+void call_sst_flags(l1str* l1rec, l1qstr* l1qrec, instr* input, const char* product_type,
+                    int16_t** sst_flags) {
+    if (!cld_mask_sst::sst_obj)
+        cld_mask_sst::sst_obj = std::make_unique<SST>();
+    *sst_flags = cld_mask_sst::sst_obj->get_flags_sst(l1rec, l1qrec, input, product_type);
 }
-void call_qual_flags(l1str *l1rec, l1qstr *l1qrec, instr *input, const char *product_type,
-                     int8_t **qual_flags) {
-    *qual_flags = cld_mask_sst::sst_obj.get_qual_flags(l1rec, l1qrec, input, product_type);
+void call_qual_flags(l1str* l1rec, l1qstr* l1qrec, instr* input, const char* product_type,
+                     int8_t** qual_flags) {
+    if (!cld_mask_sst::sst_obj)
+        cld_mask_sst::sst_obj = std::make_unique<SST>();
+    *qual_flags = cld_mask_sst::sst_obj->get_qual_flags(l1rec, l1qrec, input, product_type);
 }
-void call_sses_bias_mean(l1str *l1rec, l1qstr *l1qrec, instr *input, const char *product_type,
-                         float **sses_bias_mean_out) {
-    *sses_bias_mean_out = cld_mask_sst::sst_obj.get_sst_mean_bias(l1rec, l1qrec, input, product_type);
+void call_sses_bias_mean(l1str* l1rec, l1qstr* l1qrec, instr* input, const char* product_type,
+                         float** sses_bias_mean_out) {
+    if (!cld_mask_sst::sst_obj)
+        cld_mask_sst::sst_obj = std::make_unique<SST>();
+    *sses_bias_mean_out = cld_mask_sst::sst_obj->get_sst_mean_bias(l1rec, l1qrec, input, product_type);
 }
-void call_dust_correction(l1str *l1rec, l1qstr *l1qrec, instr *input, const char *product_type,
-                          float **dust_correction) {
-    *dust_correction = cld_mask_sst::sst_obj.get_sst_mean_bias(l1rec, l1qrec, input, product_type);
+void call_dust_correction(l1str* l1rec, l1qstr* l1qrec, instr* input, const char* product_type,
+                          float** dust_correction) {
+    if (!cld_mask_sst::sst_obj)
+        cld_mask_sst::sst_obj = std::make_unique<SST>();
+    *dust_correction = cld_mask_sst::sst_obj->get_sst_mean_bias(l1rec, l1qrec, input, product_type);
 }
-void call_sses_counts(l1str *l1rec, l1qstr *l1qrec, instr *input, const char *product_type,
-                      int16_t **sses_counts) {
-    *sses_counts = cld_mask_sst::sst_obj.get_counts(l1rec, l1qrec, input, product_type);
+void call_sses_counts(l1str* l1rec, l1qstr* l1qrec, instr* input, const char* product_type,
+                      int16_t** sses_counts) {
+    if (!cld_mask_sst::sst_obj)
+        cld_mask_sst::sst_obj = std::make_unique<SST>();
+    *sses_counts = cld_mask_sst::sst_obj->get_counts(l1rec, l1qrec, input, product_type);
 }

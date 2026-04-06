@@ -125,9 +125,11 @@ def getArch():
     """
     Return the system arch string.
     """
-    (sysname, _, _, _, machine) = os.uname()
+    (sysname, _, _, osVersion, machine) = os.uname()
     if sysname == 'Darwin':
         if machine == 'arm64':
+            return 'macosx_arm64'
+        if 'ARM64' in osVersion:
             return 'macosx_arm64'
         print("unsupported Mac machine =", machine)
         exit(1)
@@ -814,6 +816,8 @@ def run():
         options.luts = True
         options.common = True
         options.ocrvc = True
+        if hasattr(options, "python"):
+            options.python = True
 
     if options.odps:
         options.root = True
@@ -822,6 +826,8 @@ def run():
         options.common = True
         options.ocrvc = True
         options.all = True
+        if hasattr(options, "python"):
+            options.python = True
 
     if options.all:
         for bundleInfo in bundleList:
@@ -898,10 +904,7 @@ def run():
         options.bin = False
         options.opt = False
         options.viirs_l1_bin = False
-
-    # always install the python bundle if it exists
-    if hasattr(options, "python"):
-        options.python = True
+        options.python = False
 
     # count the things we are going to install
     totalNumThings = 0

@@ -12,6 +12,28 @@
 extern "C" {
 #endif
 
+/** @brief Allocate a four-dimensional array of type unsigned char of a given size.
+
+    The order of the parameters are (now) the same as when the data is being accessed.
+        E.g., this is valid (ignoring the printf type specifier):
+
+    unsigned char ****array = allocate4d_uchar(1,7, 5, 1);
+    printf("%d\n", array[0][6][4][0]);
+    @param[in] nr slowest incrimenting dimension of array in memory.
+    @param[in] nz slow incrimenting dimension of array in memory.
+    @param[in] ny fast dimension of array.
+    @param[in] nx fastest incrimenting dimension of array.
+
+    @return A malloc'd array or NULL if any malloc fails.
+*/
+unsigned char ****allocate4d_uchar(size_t nr,size_t nz, size_t ny, size_t nx);
+
+/** @brief Free a four-dimensional array created by allocate4d_uchar.
+
+    @param[in] p Pointer to array created by allocate4d_uchar.
+*/
+void free4d_uchar(unsigned char ****p);
+
 /** @brief Allocate a four-dimensional array of type int of a given size.
 
     The order of the parameters are (now) the same as when the data is being accessed.

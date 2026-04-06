@@ -160,15 +160,15 @@ def get_band_dims(apacket):
     lag = 1
     
     for i in range(15,-1,-1):
-        btaps[i] = np.bitwise_and(btap, ken)/ken
+        btaps[i] = np.bitwise_and(btap, ken) // ken
         if (btaps[i]):
-            baggs[i] = nagg[int(np.bitwise_and(bagg, kag)/lag)]
-            nbb = nbb + 32/baggs[i]
+            baggs[i] = nagg[int(np.bitwise_and(bagg, kag) // lag)]
+            nbb = nbb + 32 // baggs[i]
         
         rtaps[i] = np.bitwise_and(rtap, ken)/ken
         if (rtaps[i]):
-            raggs[i] = nagg[int(np.bitwise_and(ragg, kag)/lag)]
-            nrb = nrb + 32/raggs[i]
+            raggs[i] = nagg[int(np.bitwise_and(ragg, kag) // lag)]
+            nrb = nrb + 32 // raggs[i]
         
         ken = ken*2
         kag = kag*4
@@ -227,7 +227,7 @@ def get_oci_data_type(fpacket):
     apid = read_apid(fpacket)
     if (apid != 636): return -1
 
-    dtypes = np.zeros(10)-1
+    dtypes = np.full(10, -1, dtype=np.int32)
     ioff = 36
     for i in range(0,10):
         dtypes[i] = fpacket[ioff+3] % 16

@@ -164,18 +164,17 @@ stringstream makeTimeCoverageString(AncillaryPktTimeStamp &time) {
 
 int main(int argc, char *argv[]) {
     // version of l1agen_oci
-    const string VERSION = "02.13.00_2025-08-20";
+    const string VERSION = "2.17.1";
 
-    cout << "l1agen_oci " << VERSION << " (" << __DATE__ << " " << __TIME__ << ")" << endl;
+    cout << "l1agen_oci " << VERSION << " (" << __DATE__ << ")" << endl;
 
     // Set up buffer to read in command line options
     clo_optionList_t *commandLineOptionsList = clo_createList();
     clo_setHelpStr(
         "\nUsage: l1agen_oci [options] \n\nRetuns status codes:\n\
-        0 - good\n\
+        0   - good\n\
         110 - no ancillary packets found in file\n\
-        120 - no L1A file was generated\n\
-        130 - duplicate l1a file being generated\n"
+        120 - no L1A file was generated\n"
     );
 
     // L0 file list and granule length, no alias.
@@ -450,8 +449,22 @@ int main(int argc, char *argv[]) {
      * using the non standard spectral config. 
      * 
      */
-    string const DATA_TYPES[] = {"",      "",      "_DARK", "_SOL", "_SPCA",   "_LIN",    "_LUN",
-                                 "_DIAG", "_STAT", "_SPEC", "",     "_SNAP-X", "_SNAP-I", "_NBSB"};
+    string const DATA_TYPES[] = {
+        "",
+        "",      
+        "_DARK", 
+        "_SOL", 
+        "_SPCA",   
+        "_LIN",    
+        "_LUN",                  
+        "_DIAG", 
+        "_STAT", 
+        "_SPEC", 
+        "",     
+        "_SNAP-X", 
+        "_SNAP-I", 
+        "_NBSB"
+    };
 
     string const SWIR_DATA_MODES[] = {"", "_SDIAG", "_SRAW", "_STEST"};
 
@@ -471,7 +484,10 @@ int main(int argc, char *argv[]) {
     uint16_t swirMode = 0;
 
     // l1afile manager so if there's a data type change, dont close the files
+    // also tracks time for each data type to prevent merging files that have too large of a gap
     L1aFileManager l1aFileManager = L1aFileManager();
+    // get reference to the navigation time frame struct so it can be passed later
+    NavigationTimeFrame *navTimeFrame = l1aFileManager.getNavTimeFrameRef();
 
     // Before processing, find the next good spin number that contains an ancillary index
     // Using "next" ancilliary packet var because we have not started processessing
@@ -487,15 +503,22 @@ int main(int argc, char *argv[]) {
         exit(110);  // ver 0.99.21
     }
 
-    // time variables
-    int32_t granuleStartTime = -1;  // time used to name the file
-    int32_t granuleMaxTime = -1;
-    uint16_t maxScans;
-    double prevAncillaryPktTime = 0.0;
+    ///////////////////////////////////////
+    // time variables to track packet time/
+    ///////////////////////////////////////
+
+    // start time of the l1a file. also used to determine the l1a files max time before it should
+    // close the l1a and go to the next one 
+    double granuleStartTimeUnix = -1.0;
+    double granuleMaxTimeUnix   = -1.0;
+    double ancillaryPktTimeUnix = -1.0;
+    double prevAncillaryPktTimeUnix = -1.0;
 
     // Each granule is ~5 mins = 300 seconds and it has ~1710 scans or lines.
     // 1710/300 ~= 5.7 scans per second. 1/5.7 ~= 0.1755 seconds per scan.
     const double SECONDS_PER_SCAN = 0.1755;
+    uint16_t maxScans = 0;
+
 
     /** Max swir pixels allowed  */
     uint16_t maxNumOfSwirPixels = 4060;
@@ -518,9 +541,6 @@ int main(int argc, char *argv[]) {
     // Packets will continue to be read as long as the ancillary data collection fields did not change.
     // Resets to 1 when processing scans for a new packet. Initializes to 1 in the main loop.
     int ancillaryDataTbleNotModified; 
-
-    // records the time of each new ancillary packet
-    double lastAncillaryPktTime = 0.0; 
 
     ////////////////////// Main Loop ///////////////////
     while (!isEndFile) {
@@ -563,39 +583,34 @@ int main(int argc, char *argv[]) {
         // get the first scan time of the current packet and save it to prevAncillaryPktTime
         getAncillaryPacketTime(currAncillaryPkt, ancillaryPktYear, ancillaryPktDay, ancillaryPktTime);
 
+        // convert it into unix time 
+        ancillaryPktTimeUnix = yds2unix(ancillaryPktYear, ancillaryPktDay, ancillaryPktTime);
+
         // Assign the first ancillary packet time
-        prevAncillaryPktTime = ancillaryPktTime - SECONDS_PER_SCAN;
+        prevAncillaryPktTimeUnix = ancillaryPktTimeUnix - SECONDS_PER_SCAN;
 
         // make object to hold all time info so this object can be passed instead of 3+ variables
         AncillaryPktTimeStamp ancillaryPktStartTime, ancillaryPktEndTime;
         ancillaryPktStartTime.year = ancillaryPktYear;
         ancillaryPktStartTime.day = ancillaryPktDay;
         ancillaryPktStartTime.second = ancillaryPktTime;
-
+    
         /*
-            --start_time was given, set the file time name (ltime) to be this time.
+            --start_time was given, set the file time name to be this time.
             granuleStartTime string will be cleared after so that if there's a non-science
             data inbetween the science data, the non-science data won't use --start_time
             and the next science data file will also not use it
 
         */
         if (isGranuleStartTimeGiven) {
-            granuleStartTime =
-                (int32_t)(granuleStartTimeIntStruct.tm_hour * 3600 + granuleStartTimeIntStruct.tm_min * 60 +
-                          granuleStartTimeIntStruct.tm_sec);
+            granuleStartTimeUnix = yds2unix(granuleStartTimeIntStruct.tm_year+1900, granuleStartTimeIntStruct.tm_yday + 1, 0)+ ((int32_t)(granuleStartTimeIntStruct.tm_hour * 3600 + granuleStartTimeIntStruct.tm_min * 60 +
+                          granuleStartTimeIntStruct.tm_sec));
 
-            // adjust for different dates
-
-            // passed in day is Day of Year (DOY), so ignore month ie: 229 DOY = Aug 17th
-            int32_t startTimeAsJulianDay = jday(granuleStartTimeIntStruct.tm_year + 1900, 1, granuleStartTimeIntStruct.tm_yday + 1);
-            int32_t ancillaryPktTimeAsJulianDay = jday(ancillaryPktYear, 1, ancillaryPktDay);
-            int32_t julianDayDiff = startTimeAsJulianDay - ancillaryPktTimeAsJulianDay;
-            granuleStartTime += julianDayDiff * 86400;
 
             // set max time for the L0 files and max scans depending on granule length.
             // if minutes is 0, then max time is +600 by default to read the entire file.
             // else, add (granule length * 60) to start_time to get max time for this file.
-            granuleMaxTime = granuleMins > 0 ? granuleStartTime + granuleMins * 60 : granuleStartTime + 600;
+            granuleMaxTimeUnix = granuleMins > 0 ? granuleStartTimeUnix + granuleMins * 60 : granuleStartTimeUnix + 600;
 
             // update max scans based on granule's duration in minutes
             maxScans = granuleMins > 0 ? (uint16_t)((granuleMins * 60 / SECONDS_PER_SCAN) + 2) : 3600;
@@ -603,35 +618,27 @@ int main(int argc, char *argv[]) {
             // **flip so this does not run again **
             isGranuleStartTimeGiven = false;
 
-            // moves packet pointer forward if the packets actual start time is less than what we want our
-            // granule start time to be.
-            while (((ancillaryPktTime < granuleStartTime) || (numCcdPixels == 1)) && !isEndFile) {
-
-                // note previous packet time
-                lastAncillaryPktTime = ancillaryPktTime;
+            // if the current ancillary packet is too early, find the first instance where the packets time is 
+            // at least the given start time or later 
+            while (((ancillaryPktTimeUnix < granuleStartTimeUnix) || (numCcdPixels == 1)) && !isEndFile) {
 
                 readScanPackets(&tfileStream, packetBuffer,
                                 (uint8_t(*)[MAX_PACKET_SIZE]) & nextOciPacketBuffer[0][0], nextNumPackets,
                                 nextSpinNum, nextPktAncillaryIndex, nextTelemetryIndices, noSequenceErrorFlag,
                                 isEndFile, isSPW);
+
                 if (nextPktAncillaryIndex != -1) {
                     memcpy(currAncillaryPkt, &nextOciPacketBuffer[nextPktAncillaryIndex][0], ANCSIZE);
                     getAncillaryPacketTime(currAncillaryPkt, ancillaryPktYear, ancillaryPktDay,
                                            ancillaryPktTime);
+                    // new ancillary time, update the current ancillary time 
+                    ancillaryPktTimeUnix = yds2unix(ancillaryPktYear, ancillaryPktDay, ancillaryPktTime);
 
                     getBandDimensions(currAncillaryPkt, numCcdPixels, numBlueBands, numRedBands,
                                       numSwirPixels, numDarkCcdPixels, numDarkSwirPixels,
                                       isBlueCcdTapsEnabled, isRedCcdTapsEnabled, spatialAggList);
                     if (numCcdPixels == 1)
                         cout << "Ancillary packet has zero science pixels at spin " << nextSpinNum << endl;
-                }
-
-                // check for crossing date line (ancillary time becomes smaller bc of a new day) and if the 
-                // granuleStartTime > 86400 (max seconds in a day). when the adjusted granuleStartTime via jday()
-                // is > 86400, then the start of the ancillary packet time is in the previous day by 
-                // (granduleStartTime - 86400) seconds. 
-                if (ancillaryPktTime < lastAncillaryPktTime && granuleStartTime > 86400) {
-                    granuleStartTime = granuleStartTime % 86400;
                 }
             }
 
@@ -641,7 +648,11 @@ int main(int argc, char *argv[]) {
                 return 110;
             }
 
+            // update for next packet for any non-science data that is in the l0
+            ancillaryPktStartTime.year = ancillaryPktYear;
+            ancillaryPktStartTime.day = ancillaryPktDay;
             ancillaryPktStartTime.second = ancillaryPktTime;
+
         }
 
         /*  --start_time is not set, use the first scantime of the packet.
@@ -660,18 +671,18 @@ int main(int argc, char *argv[]) {
         */
         else {
             // no start time given by user, use packet's first ancillary packet time 
-            granuleStartTime = (int32_t)ancillaryPktTime;
+            granuleStartTimeUnix = yds2unix(ancillaryPktStartTime.year, ancillaryPktStartTime.day, ancillaryPktStartTime.second);
             
             // user did not speciify how long the granuel is suppose to be for the set of L0 files,
             // so  process everything. When there is a switch in the data type, update the granule
             // max time for every new ancillary packet
             if (granuleMins == 0) {
-                granuleMaxTime = granuleStartTime + (15 * 60); // 15 mins
+                granuleMaxTimeUnix = granuleStartTimeUnix + (15 * 60);
             }
             // otherwise, the granule length is specified. Only calculate the max time once
             // so the program ends when that time is reached even if a new ancillary packet is read
-            else if (granuleMins > 0 && granuleMaxTime == -1) {
-                granuleMaxTime = granuleStartTime + (granuleMins * 60);
+            else if (granuleMins > 0 && granuleMaxTimeUnix == -1) {
+                granuleMaxTimeUnix = granuleStartTimeUnix + (granuleMins * 60);
             }
             // update max scans based on granule_len
             maxScans = granuleMins > 0 ? (uint16_t)((granuleMins * 60 / SECONDS_PER_SCAN) + 2) : 3600;
@@ -721,7 +732,6 @@ int main(int argc, char *argv[]) {
                          swirBandDarkLineIndices, swirLineOffset);
 
         // Get SWIR band data mode
-        // uint16_t smode = 0;      // LH, 09/10/2020
         getSwirMode((uint8_t(*)[MAX_PACKET_SIZE]) & nextOciPacketBuffer[0][0], nextNumPackets, swirMode);
         uint16_t initialSwirMode = swirMode;
         int isSameSwirMode = 1;
@@ -729,18 +739,14 @@ int main(int argc, char *argv[]) {
         // (0 = enabled, 1 = reset, 2 = video)
         uint16_t cdsMode;
 
-        // Determine start and end time of granule
-        uint32_t jd0 = jday(ancillaryPktYear, 1, ancillaryPktDay);
-        int16_t yr16 = (int16_t)ancillaryPktYear;
-        int16_t doy = (int16_t)ancillaryPktDay;
-        int16_t month, day;
-        yd2md(yr16, doy, &month, &day);
-
         // ---- SETTING TIME NAMING ----
-        int32_t granuelStartTimeHour = (int32_t)(granuleStartTime / 3600);
-        int32_t granuelStartTimeMins = (int32_t)((granuleStartTime - granuelStartTimeHour * 3600) / 60);
-        int32_t granuelStartTimeSecs =
-            (int32_t)(granuleStartTime - granuelStartTimeHour * 3600 - granuelStartTimeMins * 60);
+        int16_t granuelStartTimeHour = 0;
+        int16_t granuelStartTimeMins = 0;
+        int16_t granuelStartTimeSecs = 0;
+        int16_t year = 0;
+        int16_t day = 0;
+        int16_t month = 0;
+        unix2ymdhms(granuleStartTimeUnix, year, month, day, granuelStartTimeHour, granuelStartTimeMins, granuelStartTimeSecs);
 
         stringstream timeString, dateString;
 
@@ -774,6 +780,7 @@ int main(int argc, char *argv[]) {
         }
 
         // data type mod for ETU before June 2020
+        uint32_t jd0 = jday(ancillaryPktYear, 1, ancillaryPktDay);
         if ((jd0 < 2459000) && dataType == 11)
             dataType = 9;
 
@@ -900,17 +907,28 @@ int main(int argc, char *argv[]) {
 
         // file manager has the file, but the time gap between this packet and last is larger than requested
         // close the current one and create a new 
-        else if (l1aFileManager.contains(dataType) && (ancillaryPktTime - lastAncillaryPktTime > maxFileGap)) {
-            currentL1aFile = l1aFileManager.getL1aFile(dataType);
+        else if (l1aFileManager.contains(dataType) && (ancillaryPktTimeUnix - l1aFileManager.getPrevAncillaryPktTimeFor(dataType) > maxFileGap)) {
 
+            // grab current l1a file opened of dataType to close
+            currentL1aFile = l1aFileManager.getL1aFile(dataType);
             cout << "Closing: " << currentL1aFile->getFileName() << " because max gap between packets exceeds " << maxFileGap/60 << " mins" << endl;
             l1aFileManager.closeAndRemoveFile(dataType);
 
             // update the outlist buffer. removed to prevent outlist merging
-            l1aFileManager.processPrevFile();
+            l1aFileManager.processOutlistFor(dataType);
 
+            // new file, update the ancillary time to close the gap
+            l1aFileManager.updatePrevAncillaryPktTimeFor(dataType, ancillaryPktTimeUnix);
+
+            // reset navigation time frame if science file bc the next science file will be 
+            // its own file 
+            if (dataType == SCIENCE_FILE) {
+                navTimeFrame->reset();
+            }
+
+            // new file creation
             cout << "Creating: " << l1aFileName.c_str() << endl;
-            cout << "Starting at spin number " << nextSpinNum << endl;
+            cout << "Starting at spin number " << nextSpinNum << endl;  
 
             // create a new l1a file and initialize it
             currentL1aFile = l1aFileManager.createL1aOutputFile(dataType);
@@ -926,6 +944,7 @@ int main(int argc, char *argv[]) {
         // if file manager has the file, then switch the current working l1afile to be the current dataType
         else {
             cout << "Creating: " << l1aFileName.c_str() << endl;
+            currentL1aFile = l1aFileManager.getL1aFile(dataType);
             cout << "          " << l1aFileName.c_str() << " will be appened into " << currentL1aFile->getFileName() 
                 << " because it shares the same data-type:  " << DATA_TYPES[dataType] << "." << endl;
             cout << "Starting at spin number " << nextSpinNum << endl;
@@ -961,7 +980,7 @@ int main(int argc, char *argv[]) {
         // ---------------------------------------------------------------------
         // ---------------------------------------------------------------------
 
-        while (ancillaryPktTime < granuleMaxTime && ancillaryDataTbleNotModified && !endData &&
+        while (ancillaryPktTimeUnix < granuleMaxTimeUnix && ancillaryDataTbleNotModified && !endData &&
                isSameSwirMode && (spinGap <= maxGap) && currScan < maxScans) {
             // sometimes, data contain more scans than possible, set currScan<maxsc to avoid overflow, LH
             // 8/26/2020
@@ -1120,12 +1139,10 @@ int main(int argc, char *argv[]) {
                     //  Check for instrument HKT packets in scan (placeholder for now)
 
                     currScan++;
-                    prevAncillaryPktTime = ancillaryPktTime;
+                    prevAncillaryPktTimeUnix = ancillaryPktTimeUnix;
                     ancillaryPktEndTime.year = ancillaryPktYear;
                     ancillaryPktEndTime.day = ancillaryPktDay;
                     ancillaryPktEndTime.second = ancillaryPktTime;
-                    while (ancillaryPktEndTime.second > 86400)
-                        ancillaryPktEndTime.second -= 86400;
                     lastGoodSpinNum = currSpinNum;
                     lastGoodSpinNum = currSpinNum;
                 }
@@ -1139,7 +1156,7 @@ int main(int argc, char *argv[]) {
 
                 // if the current ancillary packet time is less than the previous,
                 // then the scans are out of order
-                if (ancillaryPktTime <= prevAncillaryPktTime && currPktAncillaryIndex != -1) {
+                if (ancillaryPktTimeUnix <= prevAncillaryPktTimeUnix && currPktAncillaryIndex != -1) {
                     cout << "Scan " << currSpinNum << " out of order at" << packetHour << " " << packetMins
                          << " " << packetSecs << endl;
                 }
@@ -1149,8 +1166,7 @@ int main(int argc, char *argv[]) {
             if (!endData && nextPktAncillaryIndex != -1) {
                 memcpy(nextAncillaryPkt, &nextOciPacketBuffer[nextPktAncillaryIndex][0], ANCSIZE);
                 getAncillaryPacketTime(nextAncillaryPkt, ancillaryPktYear, ancillaryPktDay, ancillaryPktTime);
-                uint32_t jd = jday(ancillaryPktYear, 1, ancillaryPktDay);
-                ancillaryPktTime += (jd - jd0) * 86400;
+                ancillaryPktTimeUnix = yds2unix(ancillaryPktYear, ancillaryPktDay, ancillaryPktTime);
 
                 getSwirMode((uint8_t(*)[MAX_PACKET_SIZE]) & nextOciPacketBuffer[0][0], nextNumPackets,
                             swirMode);
@@ -1175,8 +1191,8 @@ int main(int argc, char *argv[]) {
             if (spinGap > maxGap)
                 cout << "Spin number gap at spin  " << lastGoodSpinNum << endl;
 
-        }  // while (ancillaryPktTime < mtime && acomp && !endData && isSameSwirMode && (dspn <= maxGap) &&
-           // currScan < maxsc)
+        } 
+    
 
         if (granuleMins > 0 && currScan < (size_t)(maxScans - 10) && ancillaryDataTbleNotModified) {
             completeFlag = completeFlag | 1;
@@ -1185,6 +1201,7 @@ int main(int argc, char *argv[]) {
         cout << "Scans in file: " << currScan << endl;
         cout << "Complete flag: " << completeFlag << endl;
 
+        // this packet contains good scans
         if (currScan > 0) {
             // Need to include ancillary packet from next scan
             if (nextPktAncillaryIndex != -1)
@@ -1203,7 +1220,7 @@ int main(int argc, char *argv[]) {
                 spinID[i] = BAD_INT;
 
 
-            currentL1aFile->writeScanMetaData(currFileDimShape, currScan, ancillaryData[0], sciPacketSequenceError, ccdLineError,
+            currentL1aFile->writeScanMetaData(currFileDimShape, navTimeFrame, dataType, currScan, ancillaryData[0], sciPacketSequenceError, ccdLineError,
                                          spinID, ancillaryPktStartTime);
 
             currentL1aFile->writeAncillaryData(currFileDimShape, currScan, ancillaryData[0]);
@@ -1231,7 +1248,7 @@ int main(int argc, char *argv[]) {
 
             // Locate navigation data and write to file
             if (hktList.compare("") != 0) {
-                currentL1aFile->writeNavigationData(currFileDimShape, hktList, ancillaryPktStartTime, ancillaryPktEndTime);
+                currentL1aFile->writeNavigationData(currFileDimShape, navTimeFrame, dataType, hktList, ancillaryPktStartTime, ancillaryPktEndTime);
             }
 
             // Generate granule metadata and write to file
@@ -1272,8 +1289,6 @@ int main(int argc, char *argv[]) {
                 );
             }
 
-            // note the last datatype used
-            l1aFileManager.updateLastDataTypeSeen(dataType);
 
             // Write common global metadata
             currentL1aFile->writeGlobalAttributes(history, doi, pversion);
@@ -1281,8 +1296,10 @@ int main(int argc, char *argv[]) {
             // update the number_of_scans dim. This is used in multiple write methods
             // so it is done outside the write method, unlike the other dims.
             currFileDimShape->incrementNumScansShape(currScan);
+        }
 
-        } else {
+        // file contains no good scans and this file is its own file, remove it since it will be empty
+        else if (!isFileBeingAppended) {
             // Remove 0-scan file
             int status = remove(l1aFileName.c_str());
             if (status == 0) {
@@ -1291,6 +1308,13 @@ int main(int argc, char *argv[]) {
                 cout << "Error removing " << l1aFileName.c_str() << endl;
                 exit(EXIT_FAILURE);
             }
+
+        }
+
+        // file contains no good scans and it is being appended into an earlier one,
+        // issue a message and dont remove anything
+        else {
+            cout << l1aFileName.c_str() << " has 0 scans. It will not be merged into " << currentL1aFile->getFileName() << endl; 
         }
 
         // after writing all the data, increment each UNLIMITED dimensions so the next
@@ -1307,8 +1331,6 @@ int main(int argc, char *argv[]) {
         if (DATA_TYPES[dataType] == "_LUN") {
             l1aFileManager.closeAndRemoveFile(dataType);
         }
-
-
 
 
         delete[] blueDarkCalibrationData[0];
@@ -1363,9 +1385,11 @@ int main(int argc, char *argv[]) {
 
         // update last seen time for the next packet to make sure the gap is
         // not too big
-        lastAncillaryPktTime = ancillaryPktTime;
+        l1aFileManager.updatePrevAncillaryPktTimeFor(dataType, ancillaryPktTimeUnix);
 
-        if (ancillaryPktTime > granuleMaxTime)
+        // time limit reached. >= bc the main loop that unpacks the data is: ancillaryPktTimeUnix < granuleMaxTimeUnix
+        // infinite loop when ancillaryPktTimeUnix == granuleMaxTimeUnix 
+        if (ancillaryPktTimeUnix >= granuleMaxTimeUnix)
             break;
 
     }  // while (!isEndFile) main loop end curly brace

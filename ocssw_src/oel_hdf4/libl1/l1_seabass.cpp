@@ -28,6 +28,8 @@
 #include <limits>
 #include <vector>
 
+int linelen=0;
+
 int open_seabass(filehandle *l1file){
     l1file->private_data = malloc(sizeof(seabass));
     seabass *priv = (seabass*)(l1file->private_data);
@@ -40,10 +42,18 @@ int open_seabass(filehandle *l1file){
     priv->hour_index = -1;
     priv->minute_index = -1;
     priv->second_index = -1;
+    priv->solz_index = -1;
+    priv->sola_index = -1;
+    priv->senz_index = -1;
+    priv->sena_index = -1;
 
     std::vector<int32_t>  sensor_lambdas;
     for(int32_t i=0; i<l1file->nbands + l1file->nbandsir; i++) {
         sensor_lambdas.push_back(l1file->iwave[i]);
+       
+        /* vicarious calibration should be turned off for seabass*/
+        l1_input->gain[i]=1.0;
+        l1_input->offset[i]=0.0;
     }
 
     int status = 0;
@@ -51,10 +61,33 @@ int open_seabass(filehandle *l1file){
     l1file->npix = 1;
     priv->field_indexes = (int*)calloc(l1file->nbands + l1file->nbandsir, sizeof(int));
 
-    char buffer[2048];
-    buffer[2047] = '\0';  // make sure the buffer is string terminated
+    char *buffer=(char *) malloc(1000*sizeof(char));
+    char ch;
     priv->fp = fopen(l1file->name, "r");
-    while (fgets(buffer, 2047, priv->fp)){
+
+    while (fgets(buffer, 999, priv->fp)) {
+        if (strncmp(buffer, "/end_header", 11) == 0) {
+            while (ch != '\n') {
+                ch = getc(priv->fp);
+                linelen++;
+            }
+            break;
+        }
+    }
+
+    // make sure we found a line of decent size after "/end_header"
+    if(linelen < 5) {
+        printf("-E- /end_header not found or next line too short\n");
+        exit(EXIT_FAILURE);
+    }
+
+    rewind(priv->fp);
+    free(buffer);
+    linelen+=300; // provide buffer zone
+    buffer=(char *) malloc(linelen*sizeof(char));
+    buffer[linelen-1] = '\0';  // make sure the buffer is string terminated
+
+    while (fgets(buffer, linelen-1, priv->fp)){
         if (strncmp(buffer, "/delimiter=", 11) == 0) {
             char *delim = &buffer[11];
             if (!strncmp(delim, "comma", 5)){
@@ -92,6 +125,14 @@ int open_seabass(filehandle *l1file){
                     priv->minute_index = field_i;
                 } else if (!strcmp(token, "second")){
                     priv->second_index = field_i;
+                }else if (!strcmp(token, "solz")){
+                    priv->solz_index = field_i;
+                }else if (!strcmp(token, "sola")){
+                    priv->sola_index = field_i;
+                }else if (!strcmp(token, "senz")){
+                    priv->senz_index = field_i;
+                }else if (!strcmp(token, "sena")){
+                    priv->sena_index = field_i;
                 } else if (regexec(&regx, token, 2, matches, 0) == 0) {
                     char value[matches[1].rm_eo - matches[1].rm_so + 1];
                     memcpy(value, &token[matches[1].rm_so], matches[1].rm_eo - matches[1].rm_so);
@@ -128,7 +169,7 @@ int open_seabass(filehandle *l1file){
     priv->data_start = ftell(priv->fp);
 
     l1file->nscan = 0;
-    while (fgets(buffer, 2047, priv->fp)) {
+    while (fgets(buffer, linelen-1, priv->fp)) {
         if ((int32_t)strlen(buffer) > l1file->nbands){
             l1file->nscan++;
         }
@@ -137,11 +178,19 @@ int open_seabass(filehandle *l1file){
     fseek(priv->fp, priv->data_start, SEEK_SET);
     priv->current_row = 0;
 
+    free(buffer);
     return status;
 }
 
 int read_seabass(filehandle *file, l1str *l1rec) {
-    char buffer[2048];
+    
+    static int firstcall=1;
+    static char *buffer; 
+    
+    if(firstcall){
+        firstcall=0;
+        buffer=(char *)malloc(linelen*sizeof(char));
+    }
 
     seabass *priv = (seabass*)(file->private_data);
     l1rec->is_l2 = true;
@@ -152,7 +201,7 @@ int read_seabass(filehandle *file, l1str *l1rec) {
         priv->current_row = 0;
     }
     while (l1rec->iscan < priv->current_row){
-        if (!fgets(buffer, 2047, priv->fp)){
+        if (!fgets(buffer, linelen-1, priv->fp)){
             priv->current_row++;
             break;
         }
@@ -171,7 +220,7 @@ int read_seabass(filehandle *file, l1str *l1rec) {
     int minute = 0;
     double second = 0;
 
-    if (fgets(buffer, 2047, priv->fp)) {
+    if (fgets(buffer, linelen-1, priv->fp)) {
         priv->current_row++;
 
         int32_t field_i = 0;
@@ -197,6 +246,14 @@ int read_seabass(filehandle *file, l1str *l1rec) {
                 minute = atoi(value);
             } else if (field_i == priv->second_index) {
                 second = atoi(value);
+            } else if (field_i == priv->solz_index) {
+                l1rec->solz[0] = atof(value);
+            } else if (field_i == priv->sola_index) {
+                l1rec->sola[0] = atof(value);
+            } else if (field_i == priv->senz_index) {
+                l1rec->senz[0] = atof(value);
+            } else if (field_i == priv->sena_index) {
+                l1rec->sena[0] = atof(value);
             } else {
                 for (int i=0;i<file->nbands;i++) {
                     if (priv->field_indexes[i] == field_i) {

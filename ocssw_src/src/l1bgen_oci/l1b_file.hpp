@@ -11,7 +11,9 @@
 #define __L1B_FILE_H__
 
 #include <netcdf>
+#include "clo.h"
 #include "device.hpp"
+#include "l1b_options.hpp"
 
 #define NUM_BLUE_WAVELENGTHS 512
 #define NUM_RED_WAVELENGTHS 512
@@ -60,9 +62,11 @@ class Level1bFile {
      *
      * @return int Status code (0 for success, non-zero for error)
      */
-    int createFile(size_t numScans, size_t numBlueBands, size_t numRedBands, size_t numHyperSciPix,
-                   size_t numSwirPixels, size_t numSwirBands, int32_t *pprOffset,
-                   bool radianceGenerationEnabled, LocatingContext locatingContext, int deflateLevel);
+    int createFile(size_t numScans, size_t numBlueBands, size_t numRedBands, size_t numSwirBands,
+                   size_t numHyperSciPix, size_t numSwirPixels, int32_t* pprOffset,
+                   const std::vector<int16_t>& blueSpectralMode, const std::vector<int16_t>& redSpectralMode,
+                   const int16_t spatialAggregationFactor, LocatingContext locatingContext,
+                   oel::L1bOptions options);
 
     /**
      * @brief Parse dimension string and populate a vector with corresponding NetCDF dimensions
@@ -122,36 +126,7 @@ class Level1bFile {
      */
     std::vector<int8_t> parseFlagValues(std::string flagMasks);
 
-    /**
-     * @brief Write spectral band information.
-     * Calculate band centers for aggregated hyperspectral bands and write them out to an NcFile. Takes care
-     * of red and blue, not SWIR
-     */
-    /**
-     * @brief Writes band information to the L1B file
-     *
-     * @param l1bFile Reference to the Level 1B output file
-     * @param deviceType Enum indicating the device type (BLUE or RED)
-     * @param l1aWavelengths Vector of L1A wavelengths
-     * @param irradiances Vector of solar irradiance values
-     * @param numL1aBands Number of L1A bands
-     * @param numInsBands Number of instrument bands
-     * @param gainAggMat Gain aggregation matrix
-     * @param insAggMat Instrument aggregation matrix
-     * @param calLut Calibration lookup table
-     *
-     * @return int Status code (EXIT_SUCCESS or EXIT_FAILURE)
-     *
-     * This function calculates and writes band-specific information to the L1B file, including:
-     * - Wavelengths
-     * - Solar irradiances
-     * - Mueller matrix coefficients (m12 and m13)
-     */
-
-    int writeBandInfo(Device deviceType, const std::vector<float> &l1aWavelengths,
-                      const std::vector<double> &irradiances, const size_t numL1aBands,
-                      const size_t numInsBands, float **gainAggMat, float **insAggMat, float ***m12Coefs,
-                      float ***m13Coefs);
+    void writeProcessingControl(oel::L1bOptions options);
 };
 
 #endif

@@ -16,6 +16,8 @@
 
 #include "l12_proto.h"
 
+static float  *awv_storage;
+static int current_scan = -1;
 
 float avw_cal_hypspectral(float *Rrs, float *wave, int nwave){
 
@@ -82,7 +84,7 @@ void get_avw(l2str *l2rec, float avw[]){
 
     int32_t ip,ib;
     int32_t ipb;
-    
+
     int32_t sensorID = l1file->sensorID;
     int32_t nbands = l1file->nbands;
     int32_t npix = l2rec->l1rec->npix;
@@ -95,9 +97,15 @@ void get_avw(l2str *l2rec, float avw[]){
     int32_t negative=0;
     static int ifhyper=0;
     static  int ib400=0,ib700=0;
-
+    if (current_scan != -1 && current_scan == l2rec->l1rec->iscan) {
+        for (ip = 0; ip < npix; ip++) {
+            avw[ip] = awv_storage[ip];
+        }
+        return;
+    }
     if(firstcall){
         firstcall=0;
+        awv_storage = calloc(npix,sizeof(float));
         Rrs_avw =(float *)malloc(nbands*sizeof(float));
         wave_avw=(float *)malloc(nbands*sizeof(float));
         switch (sensorID){
@@ -172,6 +180,10 @@ void get_avw(l2str *l2rec, float avw[]){
         }
 
     }
+    for (ip = 0; ip < npix; ip++) {
+        awv_storage[ip] = avw[ip];
+    }
+    current_scan = l2rec->l1rec->iscan;
 }
 void get_Rrs_brightness(l2str *l2rec, float Rrs_brightness[]){
 

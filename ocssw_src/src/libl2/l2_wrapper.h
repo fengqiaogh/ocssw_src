@@ -46,8 +46,8 @@ typedef struct l2prod_struct {
     float **l2_data;           // 2D array of product data values
     int32_t *l2_flags;         // Quality control flags
 
-    uint8_t *mside;            // Mirror side identifier
-    uint8_t *detnum;           // Detector number
+    int8_t *mside;            // Mirror side identifier
+    int8_t *detnum;           // Detector number
     int32_t *pixnum;           // Pixel number within scan
 
 } l2_prod;

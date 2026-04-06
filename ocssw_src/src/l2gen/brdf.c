@@ -10,6 +10,8 @@ void dtran_brdf(l2str *l2rec, int32_t ip, float wave[], int32_t nwave, float Fo[
         float brdf[]);
 void diff_tran_corr_(int *iphase, float *solz, float *senz, float *phi,
         float *chl, float *taua, float *correct);
+void foq_lee(l2str *l2rec, float wave[], int32_t nwave, float nLw[],
+        float Fo[], float solz, float senz, float phi, float brdf[]);
 int32_t getncDimensionLength(int ncid, int dimId);
 int getncFQdim(int ncid, char *file, char *sdsname, int sds_id, int nexp, float *bdat);
 
@@ -59,6 +61,8 @@ int ocbrdf(l2str *l2rec, int32_t ip, int32_t brdf_opt, float wave[], int32_t nwa
             printf("    Morel Q\n");
         if ((brdf_opt & DTBRDF) > 0)
             printf("    Gordon diffuse transmittance effect.\n");
+        if ((brdf_opt & FOQLEE) > 0)
+            printf("    Lee f/Q\n");
     }
 
     if ((temp = (float *) calloc(nwave, sizeof (float))) == NULL) {
@@ -102,6 +106,14 @@ int ocbrdf(l2str *l2rec, int32_t ip, int32_t brdf_opt, float wave[], int32_t nwa
     /* Gordon correction of diffuse transmittance */
     if ((brdf_opt & DTBRDF) > 0) {
         dtran_brdf(l2rec, ip, wave, nwave, Fo, nLw, chl, temp);
+        for (iw = 0; iw < nwave; iw++) {
+            brdf[iw] *= temp[iw];
+        }
+    }
+
+    /* Lee f/Q correction */
+    if ((brdf_opt & FOQLEE) > 0) {
+        foq_lee(l2rec, wave, nwave, nLw, Fo, solz, senz, phi, temp);
         for (iw = 0; iw < nwave; iw++) {
             brdf[iw] *= temp[iw];
         }
@@ -920,4 +932,129 @@ void dtran_brdf(l2str *l2rec, int32_t ip, float wave[], int32_t nwave, float Fo[
     free(correct);
     freeArrayf(cbrdf, 2);
     return;
+}
+
+/* ---------------------------------------------------------------------------- */
+/* foq_lee() - computes f/Q correction of Lee et al. (2011)                     */
+/*                                                                              */
+/* wave[] - list of input wavelengths (nm)                                      */
+/* nwave  - number of input wavelengths                                         */
+/* nLw[]  - normalize water-leaving radiances per wave (mW/cm^2/um/sr)          */
+/* Fo[]   - solar irradiance per wave (mW/cm^2/um/sr)                           */
+/* solz   - solar zenith angle of observation (deg)                             */
+/* senzp  - view  zenith angle of observation, below surface (deg)              */
+/* phi    - relative azimuth of observation, 0=<--> (deg)                       */
+/* brdf[] - band-indexed array of f/Q corrections per wavelength (f0/Q0)/(f/Q)  */
+
+/* ---------------------------------------------------------------------------- */
+void foq_lee(l2str *l2rec, float wave[], int32_t nwave, float nLw[],
+        float Fo[], float solz, float senz, float phi, float brdf[]){
+
+    float *Rrs;
+    int32_t iw;
+    static float *bbw; /* pure-water backscattering               */
+    static float *aw; /* pure-water total absorption             */
+
+    static double acoefs[3];
+    float rho, numer, denom;
+    int32_t idx440, idx490, idx555, idx670;
+    float aref;
+    float bbpref;
+
+    float G0w, G1w, G0p, G1p;
+    float A, B, C;
+    float *X, *Y;
+
+    float xm, xp;
+    float rat, Yb;
+    float *bbp, *kappa, *RrsN;
+
+    if ((Rrs = (float *) calloc(nwave, sizeof (float))) == NULL) {
+        printf("-E- : Error allocating memory to Rrs\n");
+        exit(FATAL_ERROR);
+    }
+
+    bbw = (float*) calloc(nwave, sizeof (float));
+    aw =  (float*) calloc(nwave, sizeof (float));
+    bbp =  (float*) calloc(nwave, sizeof (float));
+    kappa =  (float*) calloc(nwave, sizeof (float));
+    X =  (float*) calloc(nwave, sizeof (float));
+    Y =  (float*) calloc(nwave, sizeof (float));
+    RrsN =  (float*) calloc(nwave, sizeof (float));
+
+    get_aw_bbw(l2rec, wave, nwave, aw, bbw);
+
+    for (iw = 0; iw < nwave; iw++) {
+        Rrs[iw] = nLw[iw] / Fo[iw];
+    }
+
+    acoefs[0] = -1.146;
+    acoefs[1] = -1.366;
+    acoefs[2] = -0.469;
+
+    idx440 = windex(440, wave, nwave); //Find index of 440nm in sensor
+    idx490 = windex(490, wave, nwave);
+    idx555 = windex(555, wave, nwave);
+    idx670 = windex(670, wave, nwave);
+
+    numer = Rrs[idx440] + Rrs[idx490];
+    denom = Rrs[idx555] + 5.0 * Rrs[idx670]*(Rrs[idx670] / Rrs[idx490]);
+    rho = log10f(numer / denom);
+    rho = acoefs[0] + acoefs[1] * rho + acoefs[2] * rho*rho;
+    aref = aw[idx555] + powf(10.0, rho);
+    //idxref = idx555;
+
+    G0w = 0.0604;
+    G1w = 0.0406;
+    G0p = 0.0402;
+    G1p = 0.1310;
+
+    A = G0p + G1p -Rrs[idx555];
+    B = G0w * bbw[idx555] + G0p*(aref + bbw[idx555]) -2*Rrs[idx555]*(aref + bbw[idx555]);
+    C = G0w * bbw[idx555] * (aref + bbw[idx555]) - Rrs[idx555] * (aref + bbw[idx555]) * (aref + bbw[idx555])
+       +G1w * bbw[idx555] * bbw[idx555];
+
+    if((B*B - 4*A*C) >= 0){
+        xm = (-B -sqrt(B*B - 4*A*C))/(2*A);
+        xp = (-B +sqrt(B*B - 4*A*C))/(2*A);
+    } else {
+      //printf("non-real solution for bbpref. Exiting\n");
+        return;
+      //exit(1);
+    }
+
+    if(xp > xm && xp > 0){
+        bbpref = xp;
+    } else {
+      //printf("negative solution for bbpref. Exiting\n");
+        return;
+      //exit(1);
+    }
+
+    rat = Rrs[idx440] / Rrs[idx555];
+    Yb = 2.0 * (1.0 - 1.2 * exp(-0.9 * rat));
+
+    for (int i = 0; i < nwave; i++) {
+        bbp[i] = bbpref * pow((wave[idx555] / wave[i]), Yb) + bbw[i];
+        X[i] = G0w * bbw[i] + G0p * bbp[i];
+        Y[i] = G1w * bbw[i]*bbw[i] + G1p * bbp[i]*bbp[i];
+
+        xm = (X[i] -sqrt(X[i]*X[i]  + 4*Rrs[i]*Y[i]))/(2*Rrs[i]);
+        xp = (X[i] +sqrt(X[i]*X[i]  + 4*Rrs[i]*Y[i]))/(2*Rrs[i]);
+
+        if(xp > xm && xp >0){
+            kappa[i] = xp;
+        } else {
+          //printf("negative solution for kappa. Exiting\n");
+            brdf[i]=1.;
+            continue;
+          //exit(1);
+        }
+
+        RrsN[i] = (G0w + G1w*bbw[i]/kappa[i])*bbw[i]/kappa[i]
+                 +(G0p + G1p*bbp[i]/kappa[i])*bbp[i]/kappa[i];
+
+        brdf[i] = RrsN[i]/Rrs[i];
+    }
+
 }

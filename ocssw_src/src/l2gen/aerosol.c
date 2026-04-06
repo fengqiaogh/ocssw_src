@@ -1522,6 +1522,7 @@ void get_pc_rhoa(int modnum, geom_str *geom, float **pc_rhoa)
 
     }
 
+    /* interpolate PCA score based on the geometry*/
     im = modnum;
 
     if (!computed[modnum]) {
@@ -1546,8 +1547,6 @@ void get_pc_rhoa(int modnum, geom_str *geom, float **pc_rhoa)
                             + (1. - px) * rx * as001 + px * (1. - rx) * as100;
                 }
         } else {
-            /*       printf("coeffs: as000,ai000,ac000,ad000,ae000\n");   */
-
             for(itau=0;itau<ntau_870;itau++)
                 for(ipc=0;ipc<npc;ipc++){
                     as000 = aertab->model[im]->pc_rhoa[itau][isolz1[ig]][iphi1[ig]][isenz1[ig]][ipc];
@@ -1567,20 +1566,10 @@ void get_pc_rhoa(int modnum, geom_str *geom, float **pc_rhoa)
         }
     }
 
-    /* return pointers to coeffs for this geometry */
-    //  *pc_rhoa=&pc_coef[modnum][0][0];
     for(itau=0;itau<ntau_870;itau++)
         for(ipc=0;ipc<npc;ipc++){
             pc_rhoa[itau][ipc]=pc_coef[modnum][itau][ipc];
         }
-
-    /*FILE *fp=fopen("/accounts/mzhang11/Rsdata/OCI/20220321/pc.txt","w");
-
-    for(ipc=0;ipc<npc;ipc++){
-       fprintf(fp,"%f %f\n",aertab->model[modnum]->pc_rhoa[0][0][0][0][ipc],aertab->model[modnum]->pc_components_rhoa[ipc][176]);
-    }
-
-    fclose(fp);*/
 
     return;
 }
@@ -1739,13 +1728,7 @@ int comp_rhoa_pca(int32_t nwave, float wave[], geom_str *geom,
         for(itau=0;itau<ntau_870;itau++)
             pc_rhoa[itau]=(float *)malloc(aertab->npc*sizeof(float));
     }
-
-    /*  if(tau_iwnir_l<aermod->tau_870[0]|| tau_iwnir_l>aermod->tau_870[ntau_870-1]){
-          printf("tau_870 is out of the range in LUTs\n");
-          return -1;
-      }*/
-
-
+    /* find the upper and lower boundary based on taua[nir_l], which are itau1 and itau2*/
     for(itau=0;itau<ntau_870;itau++){
         if(tau_iwnir_l<aermod->tau_870[itau])
             break;
@@ -1758,8 +1741,10 @@ int comp_rhoa_pca(int32_t nwave, float wave[], geom_str *geom,
     if(itau2==ntau_870-1)
         itau1=itau2-1;
 
+    /*get the PCA score based on the geometry */
     get_pc_rhoa(modl,geom,pc_rhoa);
 
+    /* calculate rhoa for the upper and lower boundary, itau1 and itau2 */
     for (iw = 0; iw < nwave; iw++) {
         rhoa1[iw] = 0.f;
         rhoa2[iw] = 0.f;
@@ -1771,6 +1756,7 @@ int comp_rhoa_pca(int32_t nwave, float wave[], geom_str *geom,
         }
     }
 
+    /*interpolate rhoa based on the rhoa corresponding to itau1 and itau2*/
     float rhoa1_sum = 0.f;
     float rhoa2_sum = 0.f;
     for (iw = 0; iw < nwave; iw++) {
@@ -1790,20 +1776,18 @@ int comp_rhoa_pca(int32_t nwave, float wave[], geom_str *geom,
 }
 
 /*------------------------------------------------------------------------------------------*/
-/* ahmad_atm_corr_pca() - compute aerosol reflectance at all wavelengths using pca LUTs     */
+/* ahmadaer_pca() - compute aerosol reflectance at all wavelengths using pca LUTs     */
 /*                                                                                          */
 /* M. Zhang, Oct. 2022                                                                       */
 
 /*----------------------------------------------------------------------------------------  */
 
-int ahmad_atm_corr_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int32_t iwnir_l,
-        int32_t nmodels, int32_t mindx[],
-        geom_str *geom, float wv, float rhoa[],
-        int32_t *modmin, int32_t *modmax, float *modrat, float *epsnir,
-        float tau_pred_max[], float tau_pred_min[], float rho_pred_max[], float rho_pred_min[],
-        float tau_aer[], float rho_aer[],int ip,uncertainty_t *uncertainty) {
-
-    static int firstcall=1;
+int ahmadaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int32_t iwnir_l,
+                 int32_t nmodels, int32_t mindx[], geom_str *geom, float wv, float rhoa[], int32_t *modmin,
+                 int32_t *modmax, float *modrat, float *epsnir, float tau_pred_max[], float tau_pred_min[],
+                 float rho_pred_max[], float rho_pred_min[], float rho_aer[], int ip,
+                 uncertainty_t *uncertainty) {
+    static int firstcall = 1;
     static float **pc_rhoa;
     static int npc, ntau_870;
     aermodstr *aermod;
@@ -1821,7 +1805,7 @@ int ahmad_atm_corr_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iw
     float *derv_taua_min=NULL,*derv_taua_max=NULL;  //derivative of taua[]to taua[aer_l] for aermodmin and aermodmax
     float derv_mwt_rhoa_s=0., derv_mwt_rhoa_l=0.,derv_mwt_taua_l=0.,derv_mwt_rhow_l=0.;
 
-    float eps_obs;//,deps_obs;
+    float eps_obs;
 
     float derv_eps_Lrc_s,derv_eps_Lrc_l,derv_eps_taua_l,derv_eps_rhow_l,derv_Lg_taua_l;
     float derv_eps_mod[4][nmodels]; //derivative of modeled eps to 0: rhorc_s, 1: rhorc_l, 2: taua_l and 3: t_sen*t_sol*rhow[aer_l]
@@ -1857,26 +1841,22 @@ int ahmad_atm_corr_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iw
             pc_rhoa[itau]=(float *)malloc(aertab->npc*sizeof(float));
     }
 
-
     /* compute the observed epsilon */
-
     eps_obs = rhoa[iwnir_s] / rhoa[iwnir_l];
 
-    /*             printf("rho_869,rho_748,eps_obs\n");                    */
-    /*    printf("%10.5f %10.5f %10.5f\n",rhoa[iwnir_l],rhoa[iwnir_s],eps_obs);   */
 
-
-    // compute MS epsilon for all nmodels.  note that nmodels may be only a subset of
-    // the full model suite.  mindx maps from subset index to full index in suite
-
-
+    /* compute MS epsilon for all nmodels.  note that nmodels may be only a subset of */
+    /* the full model suite.  mindx maps from subset index to full index in suite */
     for (im = 0; im < nmodels; im++) {
 
-        modl = mindx[im]; // index in full model suite, needed for coefficient look-up
+        /* index in full model suite for coefficient look-up*/
+        modl = mindx[im]; 
         aermod=aertab->model[modl];
 
+        /*get the PCA score based on the geometry */
         get_pc_rhoa(modl,geom,pc_rhoa);
 
+        /* compute modeled rhoa at bands iwnir_s and iwnir_l for each optical depth */
         for(itau=0;itau<ntau_870;itau++){
             rhoa_modl_l[itau]=0;
             rhoa_modl_s[itau]=0;
@@ -1903,7 +1883,6 @@ int ahmad_atm_corr_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iw
         tau_iwnir_l[im]=aermod->tau_870[itau]+(aermod->tau_870[itau]-aermod->tau_870[itau-1])*(rhoa[iwnir_l]-rhoa_modl_l[itau])/(rhoa_modl_l[itau]-rhoa_modl_l[itau-1]);
         rho_iwnir_s_pred[im]=rhoa_modl_s[itau]+(rhoa_modl_s[itau]-rhoa_modl_s[itau-1])*(tau_iwnir_l[im]-aermod->tau_870[itau])/(aermod->tau_870[itau]-aermod->tau_870[itau-1]);
 
-        // rho_iwnir_s_pred[im]=exp(rho_iwnir_s_pred[im]);
         eps_pred[im] = rho_iwnir_s_pred[im] / rhoa[iwnir_l];
 
         ///!!!! TBD: should include the tlw[nir] in the future  zhang
@@ -1920,13 +1899,12 @@ int ahmad_atm_corr_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iw
 
     *epsnir = eps_obs;
 
-
     /* now, find the bounding models, but skip this if we only have one */
     /* model (as when vicariously calibrating)                          */
 
     if (nmodels > 1) {
 
-        /* locate two model_epsilons that bracket the observed epsilon */
+        /* locate two model_epsilon that bracket the observed epsilon */
         /* this will return the model numbers for the subset of models */
 
         model_select_ahmad(nmodels, mindx, eps_pred, eps_obs, &im1, &im2, &mwt);
@@ -1940,8 +1918,6 @@ int ahmad_atm_corr_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iw
             else {
                 derv_mwt_rhoa_s = 1 / (eps_pred[im2] - eps_pred[im1])
                         * derv_eps_Lrc_s;
-                //derv_mwt_taua_s = 1 / (eps_pred[im2] - eps_pred[im1])
-                //        * derv_eps_taua_s;
 
                 derv_mwt_rhoa_l = 1 / (eps_pred[im2] - eps_pred[im1])
                         * derv_eps_Lrc_l;
@@ -1982,25 +1958,21 @@ int ahmad_atm_corr_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iw
         mwt = 0.0;
     }
 
-    /* map selection to full suite for subsequent processing and return */
-
+    /* map slected aerosol models to full suite for subsequent processing and return */
     *modmin = mindx[im1];
     *modmax = mindx[im2];
     *modrat = mwt;
 
-    /* compute tau_pred and rho_predicted */
-
+    /* compute tau_pred and rho_pred for two selected aerosol models */
     if(comp_rhoa_pca(nwave, wave, geom, tau_iwnir_l[im1], *modmin, tau_pred_min, rho_pred_min,derv_rhoa_min,derv_taua_min) !=0)
         return -1;
     if(comp_rhoa_pca(nwave, wave, geom, tau_iwnir_l[im2], *modmax, tau_pred_max, rho_pred_max,derv_rhoa_max,derv_taua_max) !=0)
         return -1;
 
     /* compute weighted tau_aer and rho_aer */
-
     for (iw = 0; iw < nwave; iw++) {
-        tau_aer[iw] = (1.0 - mwt) * tau_pred_min[iw] + mwt * tau_pred_max[iw];
+        //tau_aer[iw] = (1.0 - mwt) * tau_pred_min[iw] + mwt * tau_pred_max[iw];
         rho_aer[iw] = (1.0 - mwt) * rho_pred_min[iw] + mwt * rho_pred_max[iw];
-
 
         if(uncertainty){
             uncertainty->derv_La_rhorc[iw][nbands_ac-1] = (1.0 - mwt) * derv_rhoa_min[iw]
@@ -2018,8 +1990,6 @@ int ahmad_atm_corr_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iw
                     * derv_taua_rhoa[im1]
                     - mwt * derv_rhoa_max[iw] * derv_taua_rhoa[im2]
                     + (rho_pred_max[iw] - rho_pred_min[iw]) * derv_mwt_rhow_l;
-            // uncertainty->derv_taua_s[iw] = (rho_pred_max[iw] - rho_pred_min[iw])
-            //        * derv_mwt_taua_s;
 
             uncertainty->derv_taua_rhorc[iw][nbands_ac-1]= (1.0 - mwt) * derv_taua_min[iw]
                     * derv_taua_rhoa[im1]
@@ -2036,22 +2006,16 @@ int ahmad_atm_corr_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iw
                     * derv_taua_rhoa[im1]
                     - mwt * derv_taua_max[iw] * derv_taua_rhoa[im2]
                     + (tau_pred_max[iw] - tau_pred_min[iw]) * derv_mwt_rhow_l;
-            //uncertainty->derv_taua_taua_s[iw] = (tau_pred_max[iw] - tau_pred_min[iw])
-            //        * derv_mwt_taua_s;
 
-            // derv_taua[0][iw][0] = 0.;
             uncertainty->derv_taua_min_rhorc_l[iw] = derv_taua_min[iw] * derv_taua_rhoa[im1];
             uncertainty->derv_taua_min_taua_l[iw] = -derv_taua_min[iw] * derv_taua_rhoa[im1]
                     * derv_Lg_taua_l;
             uncertainty->derv_taua_min_rhow_l[iw] = -derv_taua_min[iw] * derv_taua_rhoa[im1];
-            // derv_taua[0][iw][4] = 0.;
 
-            // derv_taua[1][iw][0] = 0.;
             uncertainty->derv_taua_max_rhorc_l[iw]= derv_taua_max[iw] * derv_taua_rhoa[im2];
             uncertainty->derv_taua_max_taua_l [iw]= -derv_taua_max[iw] * derv_taua_rhoa[im2]
                     * derv_Lg_taua_l;
             uncertainty->derv_taua_max_rhow_l [iw]= -derv_taua_max[iw] * derv_taua_rhoa[im2];
-            //derv_taua[1][iw][4] = 0.;
         }
     }
 
@@ -2064,27 +2028,34 @@ int ahmad_atm_corr_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iw
 
     return (status);
 }
-/*------------------------------------------------------------------------------------------*/
-/* ahmad_atm_corr() - compute aerosol reflectance at all wavelengths                        */
+/* ---------------------------------------------------------------------------------------- */
+/* ahmadaer() - compute aerosol reflectance using MSEPS approach of Ahmad                   */
 /*                                                                                          */
-/* Z Ahmad. July 2014                                                                       */
+/* Z. Ahmad, August 2014.                                                                   */
+/* M. Zhang,    SAIC,  July 2021,  adding the uncertainty propagation                       */
 
-/*----------------------------------------------------------------------------------------  */
-int ahmad_atm_corr(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int32_t iwnir_l,
+/* ---------------------------------------------------------------------------------------- */
+int ahmadaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int32_t iwnir_l,
         int32_t nmodels, int32_t mindx[],
         geom_str *geom, float wv, float rhoa[],
         int32_t *modmin, int32_t *modmax, float *modrat, float *epsnir,
-        float tau_pred_max[], float tau_pred_min[], float rho_pred_max[], float rho_pred_min[],
-        float tau_aer[], float rho_aer[],int ip,uncertainty_t *uncertainty) {
+        float tau_pred_min[], float tau_pred_max[],int ip,uncertainty_t *uncertainty) {
 
+    float rho_pred_min[nwave], rho_pred_max[nwave];
+
+    if (!have_ms && !use_pca_lut) {
+        printf("\nThe multi-scattering epsilon atmospheric correction method requires\n");
+        printf("ams_all, bms_all, cms_all, dms_all, ems in the aerosol model tables.\n");
+        exit(1);
+    }
 
     int status = 0.0;
     float eps_obs;  //,deps_obs;
 
     /* compute the observed epsilon */
-
     eps_obs = rhoa[iwnir_s] / rhoa[iwnir_l];
 
+    /*switch to AC based on the PCA LUT */
     if (use_pca_lut) {
         if (uncertainty) {
             uncertainty->derv_eps_Lrc_s = 1 / rhoa[iwnir_l];
@@ -2096,9 +2067,9 @@ int ahmad_atm_corr(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
                 uncertainty->derv_eps_rhow_l += eps_obs / rhoa[iwnir_l];
             }
         }
-        status = ahmad_atm_corr_pca(sensorID,wave, nwave, iwnir_s, iwnir_l, nmodels, mindx, geom, wv, rhoa,
+        status = ahmadaer_pca(sensorID,wave, nwave, iwnir_s, iwnir_l, nmodels, mindx, geom, wv, rhoa,
                                     modmin, modmax, modrat, epsnir, tau_pred_max, tau_pred_min, rho_pred_max,
-                                    rho_pred_min, tau_aer, rho_aer, ip, uncertainty);
+                                    rho_pred_min, rhoa, ip, uncertainty);
         return status;
     }
     float *ac, *bc, *cc, *dc, *ec;
@@ -2126,11 +2097,6 @@ int ahmad_atm_corr(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
     int iw;
     static int firstcall=1, nbands_ac;
 
-    /*             printf("rho_869,rho_748,eps_obs\n");                    */
-    /*    printf("%10.5f %10.5f %10.5f\n",rhoa[iwnir_l],rhoa[iwnir_s],eps_obs);   */
-
-    // compute MS epsilon for all nmodels.  note that nmodels may be only a subset of
-    // the full model suite.  mindx maps from subset index to full index in suite
     if(firstcall){
         firstcall=0;
         nbands_ac=input->nbands_ac;
@@ -2148,16 +2114,13 @@ int ahmad_atm_corr(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
         derv_Lg_taua_l = uncertainty->derv_Lg_taua[iwnir_l];
     }
 
+    /* compute MS epsilon for all nmodels.  note that nmodels may be only a subset of */
+    /* the full model suite.  mindx maps from subset index to full index in suite */
     for (im = 0; im < nmodels; im++) {
 
         modl = mindx[im]; // index in full model suite, needed for coefficient look-up
 
-        /* compute AOT at longest aerosol wavelength (iwnir_l) */
-
-        // Zia's function ---> something is wrong
-        //ms_eps_coef(modl,iwnir_l,wave,solz,senz,phi,&ac,&bc,&cc,&dc,&ec);
-
-        //        ms_eps_coef_cal(modl,nwave,solz,senz,phi,&ac,&bc,&cc,&dc,&ec);
+        /* compute AOT at band iwnir_l */
         ms_eps_coef(modl, iwnir_l, wave, geom, &ac, &bc, &cc, &dc, &ec);
         iwtab_l = iwatab[iwnir_l];
         iwtab_s = iwatab[iwnir_s];
@@ -2180,8 +2143,7 @@ int ahmad_atm_corr(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
             break;    // TODO: need to think about it
         }
 
-        /* compute AOT at shortest aerosol wavelength (iwnir_s) */
-
+        /* compute AOT at band iwnir_s */
         ext_iwnir_l = aertab->model[modl]->extc[iwtab_l];
         ext_iwnir_s = aertab->model[modl]->extc[iwtab_s];
 
@@ -2192,8 +2154,7 @@ int ahmad_atm_corr(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
             derv_eps_rhoa_l[im]=1/tau_iwnir_s[im]*(ext_iwnir_s / ext_iwnir_l)*derv_taua_rhoa[im];
 
 
-        /* compute reflectance at (iwnir_s) */
-
+        /* compute reflectance at band iwnir_s */
         lg_rho_iwnir_s_pred[im] = ac[iwtab_s] + bc[iwtab_s] * lg_tau_iwnir_s[im] +
                 cc[iwtab_s] * pow(lg_tau_iwnir_s[im], 2) +
                 dc[iwtab_s] * pow(lg_tau_iwnir_s[im], 3) +
@@ -2208,7 +2169,6 @@ int ahmad_atm_corr(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
             derv_eps_rhoa_l[im]=rho_iwnir_s_pred[im]*derv_eps_rhoa_l[im];
 
         /* compute model epsilon */
-
         eps_pred[im] = rho_iwnir_s_pred[im] / rhoa[iwnir_l];
 
         ///!!!! TBD: should include the tlw[nir] in the future  zhang
@@ -2220,9 +2180,7 @@ int ahmad_atm_corr(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
         }
     }
 
-
     *epsnir = eps_obs;
-
 
     /* now, find the bounding models, but skip this if we only have one */
     /* model (as when vicariously calibrating)                          */
@@ -2243,8 +2201,6 @@ int ahmad_atm_corr(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
             else {
                 derv_mwt_rhoa_s = 1 / (eps_pred[im2] - eps_pred[im1])
                         * derv_eps_Lrc_s;
-                //derv_mwt_taua_s = 1 / (eps_pred[im2] - eps_pred[im1])
-                //        * derv_eps_taua_s;
 
                 derv_mwt_rhoa_l = 1 / (eps_pred[im2] - eps_pred[im1])
                         * derv_eps_Lrc_l;
@@ -2286,22 +2242,18 @@ int ahmad_atm_corr(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
     }
 
     /* map selection to full suite for subsequent processing and return */
-
     *modmin = mindx[im1];
     *modmax = mindx[im2];
     *modrat = mwt;
 
-    /* compute tau_pred and rho_predicted */
-
+    /* compute tau_pred and rhoa_pred for two selected aerosol models respectively */
     comp_rhoa_ms_eps(nwave, wave, geom, tau_iwnir_l[im1], *modmin, tau_pred_min, rho_pred_min,derv_rhoa_min,derv_taua_min);
     comp_rhoa_ms_eps(nwave, wave, geom, tau_iwnir_l[im2], *modmax, tau_pred_max, rho_pred_max,derv_rhoa_max,derv_taua_max);
 
-    /* compute weighted tau_aer and rho_aer */
-
+    /* compute weighted rhoa */
     for (iw = 0; iw < nwave; iw++) {
-        tau_aer[iw] = (1.0 - mwt) * tau_pred_min[iw] + mwt * tau_pred_max[iw];
-        rho_aer[iw] = (1.0 - mwt) * rho_pred_min[iw] + mwt * rho_pred_max[iw];
-
+        //tau_aer[iw] = (1.0 - mwt) * tau_pred_min[iw] + mwt * tau_pred_max[iw];
+        rhoa[iw] = (1.0 - mwt) * rho_pred_min[iw] + mwt * rho_pred_max[iw];
 
         if(uncertainty){
             uncertainty->derv_La_rhorc[iw][nbands_ac-1] = (1.0 - mwt) * derv_rhoa_min[iw]
@@ -2319,8 +2271,6 @@ int ahmad_atm_corr(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
                     * derv_taua_rhoa[im1]
                     - mwt * derv_rhoa_max[iw] * derv_taua_rhoa[im2]
                     + (rho_pred_max[iw] - rho_pred_min[iw]) * derv_mwt_rhow_l;
-            // uncertainty->derv_taua_s[iw] = (rho_pred_max[iw] - rho_pred_min[iw])
-            //        * derv_mwt_taua_s;
 
             uncertainty->derv_taua_rhorc[iw][nbands_ac-1]= (1.0 - mwt) * derv_taua_min[iw]
                     * derv_taua_rhoa[im1]
@@ -2337,22 +2287,16 @@ int ahmad_atm_corr(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
                     * derv_taua_rhoa[im1]
                     - mwt * derv_taua_max[iw] * derv_taua_rhoa[im2]
                     + (tau_pred_max[iw] - tau_pred_min[iw]) * derv_mwt_rhow_l;
-            //uncertainty->derv_taua_taua_s[iw] = (tau_pred_max[iw] - tau_pred_min[iw])
-            //        * derv_mwt_taua_s;
 
-            // derv_taua[0][iw][0] = 0.;
             uncertainty->derv_taua_min_rhorc_l[iw] = derv_taua_min[iw] * derv_taua_rhoa[im1];
             uncertainty->derv_taua_min_taua_l[iw] = -derv_taua_min[iw] * derv_taua_rhoa[im1]
                     * derv_Lg_taua_l;
             uncertainty->derv_taua_min_rhow_l[iw] = -derv_taua_min[iw] * derv_taua_rhoa[im1];
-            // derv_taua[0][iw][4] = 0.;
-
-            // derv_taua[1][iw][0] = 0.;
+       
             uncertainty->derv_taua_max_rhorc_l[iw]= derv_taua_max[iw] * derv_taua_rhoa[im2];
             uncertainty->derv_taua_max_taua_l [iw]= -derv_taua_max[iw] * derv_taua_rhoa[im2]
                     * derv_Lg_taua_l;
             uncertainty->derv_taua_max_rhow_l [iw]= -derv_taua_max[iw] * derv_taua_rhoa[im2];
-            //derv_taua[1][iw][4] = 0.;
         }
     }
 
@@ -3019,6 +2963,7 @@ int model_taua_mseps_pca(int32_t modl, float wave[], int32_t nwave, int32_t iwni
         rhoa_l=(float *)malloc(ntau_870*sizeof(float));
     }
 
+    /*get the PCA score based on the geometry */
     get_pc_rhoa(modl,geom,pc_rhoa);
 
     for(itau=0;itau<ntau_870;itau++){
@@ -3157,9 +3102,9 @@ void model_transmittance_pca(int modnum, float wave[], int32_t nwave,
         float *theta, int gmult, float taua[], float dtran[], float dt[]) {
 
     static int firstcall=1;
-    static float *pc_td, *solz;
+    static float *pc_td, *senz;
     static float *deriv_pc; //derivative of pc_td to taua[npc]
-    static int npc, ntau_870,nsolz,nir_base;
+    static int npc, ntau_870,nsenz,nir_base;
     aermodstr *aermod=aertab->model[modnum];
     float a00,a01,a10,a11;
 
@@ -3169,8 +3114,8 @@ void model_transmittance_pca(int modnum, float wave[], int32_t nwave,
     if(firstcall){
         firstcall=0;
         nir_base=windex(input->aer_wave_base,wave,nwave);
-        solz=aertab->senz;
-        nsolz=aertab->nsenz;
+        senz=aertab->senz;
+        nsenz=aertab->nsenz;
         ntau_870=aertab->ntau_870;
         npc=aertab->npc;
         pc_td=(float *)malloc(aertab->npc*sizeof(float));
@@ -3178,8 +3123,7 @@ void model_transmittance_pca(int modnum, float wave[], int32_t nwave,
             deriv_pc=(float *)malloc(npc*sizeof(float));
     }
 
-    /// interpolate the pc_td using tau_870 and *theta
-
+    /* find bracketing taua[nir_base] */
     if(taua[nir_base]<aermod->tau_870[0]){
         itau1=0;
         itau2=1;
@@ -3201,16 +3145,18 @@ void model_transmittance_pca(int modnum, float wave[], int32_t nwave,
     else
         r=0.0;
 
-    for(itheta=0;itheta<nsolz;itheta++)
-        if(*theta<solz[itheta])
+    /* find bracketing angle */
+    for(itheta=0;itheta<nsenz;itheta++)
+        if(*theta<senz[itheta])
             break;
     itheta1=MAX(itheta-1,0);
-    itheta2=MIN(itheta,nsolz-1);
+    itheta2=MIN(itheta,nsenz-1);
     if(itheta1!=itheta2)
-        p=(*theta-solz[itheta1])/(solz[itheta2]-solz[itheta1]);
+        p=(*theta-senz[itheta1])/(senz[itheta2]-senz[itheta1]);
     else
         p=0.0;
 
+    /*interpolating PCA score */
     for(ipc=0;ipc<npc;ipc++){
         a00=aermod->pc_td[itau1][itheta1][ipc];
         a01=aermod->pc_td[itau1][itheta2][ipc];
@@ -3227,6 +3173,7 @@ void model_transmittance_pca(int modnum, float wave[], int32_t nwave,
         if (dt)
             dt[iw] = 0.f;
     }
+    /* computing diffuse transmittance */
     for (ipc = 0; ipc < npc; ipc++) {
         for (iw = 0; iw < nwave; iw++) {
             dtran[iw] += pc_td[ipc] * aermod->pc_components_td[ipc][iw];
@@ -3264,7 +3211,6 @@ void diff_tran_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
         acbands_index=input->acbands_index;
     }
 
-
     if ((tsolmin = (float *) calloc(nwave, sizeof (float))) == NULL) {
         printf("Unable to allocate space for tsolmin.\n");
         exit(1);
@@ -3284,7 +3230,6 @@ void diff_tran_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
 
     if(uncertainty){
         iwnir_s=bindex_get(input->aer_wave_short);
-        //dmodrat=uncertainty->dmodrat;
         if ((dtmin = (float *) calloc(nwave, sizeof(float))) == NULL) {
             printf("Unable to allocate space for dtmin.\n");
             exit(1);
@@ -3295,20 +3240,17 @@ void diff_tran_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
         }
     }
 
-
     gmult = geom->gmult;
 
     /* get AOT per band for each model, if not already computed */
     if (taua_opt == 0) {
-        // using single scattering approximation space (Gordan and Wang)
+        /* using single scattering approximation space (Gordan and Wang) */
         model_taua(sensorID, modmin, wave, nwave, iwnir_l, rhoa, geom, wv, tauamin);
         model_taua(sensorID, modmax, wave, nwave, iwnir_l, rhoa, geom, wv, tauamax);
-    //printf("%d %d %d %f %f %f\n",taua_opt,modmin, iwnir_l, rhoa[iwnir_l], tauamin[0], tauamin[iwnir_l]);
     } else if (taua_opt == 2) {
-        // using multi-scattering relationship between rhoa and taua (Ahmad)
+        /* using multi-scattering relationship between rhoa and taua (Ahmad) */
         model_taua_mseps_pca(modmin, wave, nwave, iwnir_l, rhoa, geom, tauamin);
         model_taua_mseps_pca(modmax, wave, nwave, iwnir_l, rhoa, geom, tauamax);
-    //printf("%d %d %d %f %f %f\n",taua_opt,modmin, iwnir_l, rhoa[iwnir_l], tauamin[0], tauamin[iwnir_l]);
     }
 
     /* get diff trans sun to ground, per band for each model */
@@ -3316,9 +3258,9 @@ void diff_tran_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
     model_transmittance_pca(modmax, wave, nwave, geom->solz, gmult, tauamax, tsolmax, dtmax);
 
     for (iw = 0; iw < nwave; iw++) {
-        ig = iw * geom->gmult; /* geom used for sensor wavelengths */
+        /* geom used for sensor wavelengths */
+        ig = iw * geom->gmult; 
         tsol[iw] = tsolmin[iw]*(1.0 - modrat) + tsolmax[iw] * modrat;
-        //uncertainty->dt_sol[ip*nwave+iw]=sqrt( pow((1.0-modrat)*dtmin[iw],2) + pow(modrat*dtmax[iw],2) + pow((tsolmax[iw]-tsolmin[iw])*dmodrat[ip],2) );
 
         if(uncertainty){
             for(ib=0;ib<nbands_ac;ib++){
@@ -3340,8 +3282,6 @@ void diff_tran_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
         /* correct for pressure difference from standard pressure */
         double tmp_pressure_diff = exp(-0.5 * taur[iw] / geom->csolz[ig]*(pr / p0 - 1));
         tsol[iw] = tsol[iw] * tmp_pressure_diff;
-
-        //uncertainty->dt_sol[ip*nwave+iw]*=tmp_pressure_diff;
 
         if(uncertainty){
             for(ib=0;ib<nbands_ac;ib++){
@@ -3365,9 +3305,10 @@ void diff_tran_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
     model_transmittance_pca(modmin, wave, nwave, geom->senz, gmult, tauamin, tsenmin, dtmin);
     model_transmittance_pca(modmax, wave, nwave, geom->senz, gmult, tauamax, tsenmax, dtmax);
 
-    /* interpolate and pressure correct */
+    /* interpolate taua and tsen */
     for (iw = 0; iw < nwave; iw++) {
-        ig = iw * geom->gmult; /* geom used for sensor wavelengths */
+         /* geom used for sensor wavelengths */
+        ig = iw * geom->gmult;
         taua[iw] = tauamin[iw]*(1.0 - modrat) + tauamax[iw] * modrat;
         tsen[iw] = tsenmin[iw]*(1.0 - modrat) + tsenmax[iw] * modrat;
 
@@ -3387,6 +3328,7 @@ void diff_tran_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
             uncertainty->derv_tsen_rhow_l[iw]+=(1.0 - modrat)*dtmin[iw]*uncertainty->derv_taua_min_rhow_l[iw];
             uncertainty->derv_tsen_rhow_l[iw]+=modrat        *dtmax[iw]*uncertainty->derv_taua_max_rhow_l[iw];
         }
+
         /* correct for pressure difference from standard pressure */
         double tmp_pressure_diff = exp(-0.5 * taur[iw] / geom->csenz[ig] *(pr / p0 - 1));
         tsen[iw] = tsen[iw] * tmp_pressure_diff;
@@ -3439,6 +3381,7 @@ void diff_tran(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_l,
     int iwnir_s;
     int inir;
 
+    /*switch to PCA based algorithm if PCA LUT is detected */
     if(use_pca_lut){
         diff_tran_pca(sensorID,wave,nwave,iwnir_l,geom,wv,pr,taur,modmin,modmax,modrat,rhoa,taua,tsol,tsen,\
                 tauamin,tauamax,taua_opt,ip,uncertainty);
@@ -3464,7 +3407,6 @@ void diff_tran(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_l,
 
     if(uncertainty){
         iwnir_s=bindex_get(input->aer_wave_short);
-        //dmodrat=uncertainty->dmodrat;
         if ((dtmin = (float *) calloc(nwave, sizeof(float))) == NULL) {
             printf("Unable to allocate space for dtmin.\n");
             exit(1);
@@ -3480,15 +3422,13 @@ void diff_tran(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_l,
 
     /* get AOT per band for each model, if not already computed */
     if (taua_opt == 0) {
-        // using single scattering approximation space (Gordan and Wang)
+        /* using single scattering approximation space (Gordan and Wang) */
         model_taua(sensorID, modmin, wave, nwave, iwnir_l, rhoa, geom, wv, tauamin);
         model_taua(sensorID, modmax, wave, nwave, iwnir_l, rhoa, geom, wv, tauamax);
-	//printf("%d %d %d %f %f %f\n",taua_opt,modmin, iwnir_l, rhoa[iwnir_l], tauamin[0], tauamin[iwnir_l]);
     } else if (taua_opt == 2) {
-        // using multi-scattering relationship between rhoa and taua (Ahmad)
+        /* using multi-scattering relationship between rhoa and taua (Ahmad) */
         model_taua_mseps(modmin, wave, nwave, iwnir_l, rhoa, geom, tauamin);
         model_taua_mseps(modmax, wave, nwave, iwnir_l, rhoa, geom, tauamax);
-	//printf("%d %d %d %f %f %f\n",taua_opt,modmin, iwnir_l, rhoa[iwnir_l], tauamin[0], tauamin[iwnir_l]);
     }
 
     /* get diff trans sun to ground, per band for each model */
@@ -3496,10 +3436,10 @@ void diff_tran(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_l,
     model_transmittance(modmax, wave, nwave, geom->solz, gmult, tauamax, tsolmax, dtmax);
 
     for (iw = 0; iw < nwave; iw++) {
-        ig = iw * geom->gmult; /* geom used for sensor wavelengths */
+        /* geom used for sensor wavelengths */
+        ig = iw * geom->gmult; 
     	tsol[iw] = tsolmin[iw]*(1.0 - modrat) + tsolmax[iw] * modrat;
-    	//uncertainty->dt_sol[ip*nwave+iw]=sqrt( pow((1.0-modrat)*dtmin[iw],2) + pow(modrat*dtmax[iw],2) + pow((tsolmax[iw]-tsolmin[iw])*dmodrat[ip],2) );
-
+    
     	if(uncertainty){
     	    for(inir=iwnir_s;inir<=iwnir_l;inir++){
     	        uncertainty->derv_tsol_rhorc[iw][inir-iwnir_s]=(tsolmax[iw]-tsolmin[iw])*uncertainty->derv_modrat_rhorc[inir-iwnir_s];
@@ -3520,8 +3460,6 @@ void diff_tran(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_l,
         /* correct for pressure difference from standard pressure */
         double tmp_pressure_diff = exp(-0.5 * taur[iw] / geom->csolz[ig]*(pr / p0 - 1));
         tsol[iw] = tsol[iw] * tmp_pressure_diff;
-
-    	//uncertainty->dt_sol[ip*nwave+iw]*=tmp_pressure_diff;
 
     	if(uncertainty){
     	    for(inir=iwnir_s;inir<=iwnir_l;inir++)
@@ -3623,9 +3561,10 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
 
     int im, modl;
 
-    float diff_2 = 0.0,diff_1=0.0;
+    float diff_1=0.0;
     float mbac_wsum = 0.0;
-    static float *chi_old;
+    float eps_obs=0.0;  /* mean epsilon for all the AC bands based on observation*/
+    static float *eps_mod; /*mean epsilon for all the AC bands based on modeled rhoa*/
 
     float *noise=&noise_global[ip*nwave];
 
@@ -3642,8 +3581,8 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
     float *derv_taua_max_taua_l;
     float *derv_taua_max_rhow_l;
     static float *derv_taua_rhorc_l;//[nmodels], derivative of modeled taua[nir_l] to rhorc_l
-    static float *derv_chi_obs_rhorc; //[nbands_ac], derivative of chi_obs to rhorc at nbands_ac
-    float derv_chi_obs_taua_l; // derivative of chi_obs to taua_l
+    static float *derv_eps_obs_rhorc; //[nbands_ac], derivative of eps_obs to rhorc at nbands_ac
+    float derv_eps_obs_taua_l; // derivative of eps_obs to taua_l
 
     static float *derv_rhoa_min=NULL,*derv_rhoa_max=NULL;  //derivative of rhoa[]to taua[aer_l] for aermodmin and aermodmax
     static float *derv_taua_min=NULL,*derv_taua_max=NULL;  //derivative of taua[]to taua[aer_l] for aermodmin and aermodmax
@@ -3654,8 +3593,9 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
 
     static float **rhoa_modl; //[ntau_870][nwave]
     cmpstr chi_struct[nmodels];
-    static int interp = 1;
-    // matrix matrix multiplication intermediate arrays
+    static int interp = 1;  /*0-no interpoloation for rhoa, 1-interpolation of rhoa*/
+    
+    /* matrix matrix multiplication intermediate arrays */
     static float *rhoa_modl_flattened, *pc_rhoa_flattened, *pc_components_rhoa_flattened;
     static int32_t nbands_ac, *acbands_index;
 
@@ -3678,12 +3618,13 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
         rho_all_wav_pred = (float*) malloc(nwave * sizeof (float));
         rho_pred_min = (float*) malloc(nwave * sizeof (float));
         rho_pred_max = (float*) malloc(nwave * sizeof (float));
-        chi_old=(float*) malloc((nmodels) * sizeof (float));
         tau_iwnir_l=(float*) malloc((nmodels) * sizeof (float));
+        eps_mod=(float*) malloc((nmodels) * sizeof (float));
 
         nbands_ac=input->nbands_ac;
         acbands_index=input->acbands_index;
-        // allocate intermediate arrays
+
+        /* allocate intermediate arrays */ 
         rhoa_modl_flattened = (float*) malloc(ntau_870 * nbands_ac * sizeof (float));
         pc_rhoa_flattened = (float *) malloc(ntau_870 * npc * sizeof (float));
         pc_components_rhoa_flattened = (float *) malloc(nbands_ac * npc * sizeof (float));
@@ -3704,7 +3645,7 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
                 derv_chi_rhorc[im]   =(float *)malloc(nbands_ac*sizeof(float));
                 derv_rhoa_rhorc_l[im]=(float *)malloc(nwave*sizeof(float));
             }
-            derv_chi_obs_rhorc=(float *)malloc(nbands_ac*sizeof(float));
+            derv_eps_obs_rhorc=(float *)malloc(nbands_ac*sizeof(float));
             derv_rhoa_min=(float *)malloc(nwave*sizeof(float));
             derv_rhoa_max=(float *)malloc(nwave*sizeof(float));
             derv_taua_min=(float *)malloc(nwave*sizeof(float));
@@ -3722,11 +3663,10 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
         derv_taua_max_rhow_l=uncertainty->derv_taua_max_rhow_l;
     }
 
-    float chi_obs=0.0;
     if(uncertainty){
         for(iw = 0; iw <nbands_ac; iw++)
-            derv_chi_obs_rhorc[iw]=0.;
-        derv_chi_obs_taua_l=0.;
+            derv_eps_obs_rhorc[iw]=0.;
+        derv_eps_obs_taua_l=0.;
     }
 
     for (ib = 0; ib <nbands_ac; ib++) {
@@ -3734,19 +3674,19 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
         iw=acbands_index[ib];
         if(iw==nir_l)
             continue;
-        chi_obs += rhoa[iw]/rhoa[nir_l];
+        eps_obs += rhoa[iw]/rhoa[nir_l]*mbac_w[iw];
         mbac_wsum += mbac_w[iw];
         if(uncertainty){
-            derv_chi_obs_rhorc[ib]=1/rhoa[nir_l];
-            derv_chi_obs_rhorc[wave_base_index]+=(-rhoa[iw]/rhoa[nir_l]/rhoa[nir_l]);
-            derv_chi_obs_taua_l+=(-1/rhoa[nir_l]*uncertainty->derv_Lg_taua[iw]+rhoa[iw]/rhoa[nir_l]/rhoa[nir_l]*uncertainty->derv_Lg_taua[nir_l]);
+            derv_eps_obs_rhorc[ib]=1/rhoa[nir_l];
+            derv_eps_obs_rhorc[wave_base_index]+=(-rhoa[iw]/rhoa[nir_l]/rhoa[nir_l]);
+            derv_eps_obs_taua_l+=(-1/rhoa[nir_l]*uncertainty->derv_Lg_taua[iw]+rhoa[iw]/rhoa[nir_l]/rhoa[nir_l]*uncertainty->derv_Lg_taua[nir_l]);
         }
     }
-    chi_obs/=mbac_wsum;
+    eps_obs/=mbac_wsum;
     if(uncertainty){
-        derv_chi_obs_taua_l/=mbac_wsum;
+        derv_eps_obs_taua_l/=mbac_wsum;
         for (ib = 0; ib <nbands_ac; ib++)
-            derv_chi_obs_rhorc[ib]/=mbac_wsum;
+            derv_eps_obs_rhorc[ib]/=mbac_wsum;
     }
 
     for (im = 0; im < nmodels; im++) {
@@ -3755,9 +3695,10 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
         aermod=aertab->model[modl];
         //ext_iwnir_l=aermod->extc[nir_l];
 
+        /*get the PCA score of rhoa*/
         get_pc_rhoa(modl,geom,pc_rhoa);
 
-        // populate intermediate arrays
+        /* populate intermediate arrays */
         for(ipc=0;ipc<npc;ipc++)
             for (ib = 0; ib <nbands_ac; ib++) {
                 iw=acbands_index[ib];
@@ -3771,7 +3712,7 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
             for (ib = 0; ib <nbands_ac; ib++) {
                 rhoa_modl_flattened[itau * nbands_ac + ib] = 0;
             }
-        // perform matrix x matrix using CBLAS : C = alpha * A * B + beta * C
+        /* perform matrix x matrix using CBLAS : C = alpha * A * B + beta * C */
         cblas_sgemm(CblasRowMajor,                 // Row-major storage
                     CblasNoTrans,                  // A not transposed: (ntau_870 x npc)
                     CblasNoTrans,                  // B not transposed: (npc x nbands_ac)
@@ -3796,7 +3737,7 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
             }
 
 
-        /* compute model epsilon */
+        /* interpolate taua[nir_l] using observed and modeled rhoa [nir_l]  */
         if(rhoa[nir_l]<=rhoa_modl[0][nir_l])
             itau=1;
         else if (rhoa[nir_l]>= rhoa_modl[ntau_870-1][nir_l])
@@ -3813,28 +3754,32 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
         if(uncertainty)
             derv_taua_rhorc_l[im]=(aermod->tau_870[itau]-aermod->tau_870[itau-1])/(rhoa_modl[itau][nir_l]-rhoa_modl[itau-1][nir_l]);
 
-        /* compute reflectance at all wavelength */
-        for (ib = 0; ib <nbands_ac; ib++){
-            iw=acbands_index[ib];
-            rho_all_wav_pred[iw]=rhoa_modl[itau][iw]+(rhoa_modl[itau][iw]-rhoa_modl[itau-1][iw])*(tau_iwnir_l[im]-aermod->tau_870[itau])/(aermod->tau_870[itau]-aermod->tau_870[itau-1]);
+        /* interpolate rhoa at all AC bands */
+        for (ib = 0; ib < nbands_ac; ib++) {
+            iw = acbands_index[ib];
+            rho_all_wav_pred[iw] =
+                rhoa_modl[itau][iw] + (rhoa_modl[itau][iw] - rhoa_modl[itau - 1][iw]) *
+                                          (tau_iwnir_l[im] - aermod->tau_870[itau]) /
+                                          (aermod->tau_870[itau] - aermod->tau_870[itau - 1]);
 
-            //  ext_coef = aermod->extc[iw];
-            if(uncertainty){
-                derv_rhoa_rhorc_l[im][iw]=derv_taua_rhorc_l[im]*(rhoa_modl[itau][iw]-rhoa_modl[itau-1][iw])/(aermod->tau_870[itau]-aermod->tau_870[itau-1]);
-                // derv_taua_rhorc_l[im][iw]=(ext_coef / ext_iwnir_l)*derv_temp_rhorc;
-            }
+            if (uncertainty)
+                derv_rhoa_rhorc_l[im][iw] = derv_taua_rhorc_l[im] *
+                                            (rhoa_modl[itau][iw] - rhoa_modl[itau - 1][iw]) /
+                                            (aermod->tau_870[itau] - aermod->tau_870[itau - 1]);
         }
         if(uncertainty){
             derv_chi_rhorc[im][wave_base_index]=0.;
             derv_chi_taua_l[im]=0.;
         }
         mbac_wsum=0.;
+        eps_mod[im]=0.;
+        diff_1 = 0.0;
         for (ib = 0; ib <nbands_ac; ib++){
             iw=acbands_index[ib];
             if(iw==nir_l)
                 continue;
 
-            diff_2 += rho_all_wav_pred[iw]/rhoa[nir_l];
+            eps_mod[im] += rho_all_wav_pred[iw]/rhoa[nir_l]*mbac_w[iw];
             diff_1 +=pow((rhoa[iw] - rho_all_wav_pred[iw])/noise[iw], 2)*mbac_w[iw];//
             mbac_wsum += mbac_w[iw];
 
@@ -3845,46 +3790,47 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
             }
         }
 
-        chi[im] = diff_2 / mbac_wsum;
-        chi_old[im]=diff_1/mbac_wsum;
+        eps_mod[im] /=  mbac_wsum;
+        chi[im]=diff_1/mbac_wsum;
         if(uncertainty){
             derv_chi_rhorc[im][wave_base_index]/=mbac_wsum;
             derv_chi_taua_l [im]/=mbac_wsum;
         }
-
-        diff_2 = 0.0;
-        diff_1 = 0.0;
-        mbac_wsum = 0.0;
-        chi_struct[im].value=chi_old[im];
+        chi_struct[im].value=chi[im];
         chi_struct[im].index=im;
     }
 
+    /* step 1: two aerosol models with the smallest chi are selected for rhoa interpolation */
+    /* step 2: mean epsilon are used to interpolate rhoa from the two selected models*/
+
     qsort(chi_struct,nmodels,sizeof(chi_struct[0]),cmpfunc);
 
-    /* for (im = 0; im < nmodels; im++)
-           if(chi_obs<chi_struct[im].value)
-               break;
-     *modmin = MAX(MIN(im - 1, nmodels - 1), 0);
-     *modmax = MAX(MIN(im, nmodels - 1), 0);*/
-
     if (interp) {
-        *modrat = chi_struct[0].value / (chi_struct[0].value + chi_struct[1].value);
-        chi_old[0] = chi_struct[0].value * (1 - *modrat) +
-                     chi_struct[1].value *
-                         (*modrat);  // temporary keeping the chi2 value from two closest aerosol models
-    }
-    else{
-        chi_old[0]=chi_struct[0].value;
-    }
+        *modmin=chi_struct[0].index;
+        *modmax=chi_struct[1].index;
 
-    /*chi_struc is switched back to the ratio after selecting the model using the chi based on difference*/
-    for(im=0;im<nmodels;im++)
-        chi_struct[im].value=chi[chi_struct[im].index];
+        /* make sure for the two selected models, modmin has the smaller eps_mod than that of modmax*/
+        if(eps_mod[chi_struct[0].index]>eps_mod[chi_struct[1].index]){
+            *modmin=chi_struct[1].index;
+            *modmax=chi_struct[0].index;
+        }
+
+        /*modrat here is used to interpolate the chisqr_mbac product kept in chi[0]*/
+        *modrat = chi_struct[0].value / (chi_struct[0].value + chi_struct[1].value);
+        chi[0] = chi_struct[0].value * (1 - *modrat) +
+                     chi_struct[1].value *
+                         (*modrat);
+    }
+    else
+        chi[0]=chi_struct[0].value;
+
 
     if (!interp) {
-        *modrat = 1.0;  // need to flag as the uncertainty is possibly underestimated
+        *modrat = 1.0;
         *modmin = chi_struct[0].index;
         *modmax = *modmin;
+
+        /* need to flag as the uncertainty is possibly underestimated */
         if(uncertainty){
              for (ib = 0; ib <nbands_ac; ib++){
                 derv_modrat_rhorc[ib]=0.;
@@ -3895,50 +3841,51 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
         }
        
     } else {
-        if(chi_obs>chi_struct[1].value){
-            im=chi_struct[0].index;
-            diff_1=chi_struct[0].value;
+        /*modrat here is used to interpolate rhoa*/
+        /*problem will arise when modrat is negative or bigger than 1 */
+        /* TBD: method is needed to resolve this problem */
+        *modrat=(eps_obs-eps_mod[*modmin])/(eps_mod[*modmax]-eps_mod[*modmin]);
 
-            chi_struct[0].value=chi_struct[1].value;
-            chi_struct[0].index=chi_struct[1].index;
-
-            chi_struct[1].value=diff_1;
-            chi_struct[1].index=im;
+        /* if no lower or upper bounding aerosol, select the one with eps_mod close to eps_obs for rhoa calculation */
+        /* may need to flag here !!!!!!! */
+        if (*modrat < -0.1 ){
+            *modrat=0.0;
+        } 
+        else if (*modrat > 1.2){
+            *modrat=1.0;
         }
-        *modmin=chi_struct[0].index;
-        *modmax=chi_struct[1].index;
-
-        *modrat=(chi_obs-chi_struct[0].value)/(chi_struct[1].value-chi_struct[0].value);
+            
         if(uncertainty){
-            derv_modrat_chi0= (chi_obs-chi_struct[1].value)/pow(chi_struct[1].value-chi_struct[0].value,2);
-            derv_modrat_chi1=-(chi_obs-chi_struct[0].value)/pow(chi_struct[1].value-chi_struct[0].value,2);
+            derv_modrat_chi0= (eps_obs-eps_mod[*modmax])/pow(eps_mod[*modmax]-eps_mod[*modmin],2);
+            derv_modrat_chi1=-(eps_obs-eps_mod[*modmin])/pow(eps_mod[*modmax]-eps_mod[*modmin],2);
 
             for (ib = 0; ib <nbands_ac; ib++){
                 iw=acbands_index[ib];
                 if(iw!=nir_l){
-                    derv_modrat_rhorc[ib]=derv_chi_obs_rhorc[ib]/(chi_struct[1].value-chi_struct[0].value);
+                    derv_modrat_rhorc[ib]=derv_eps_obs_rhorc[ib]/(eps_mod[*modmax]-eps_mod[*modmin]);
                     derv_modrat_rhow_l+=-derv_modrat_rhorc[ib]*uncertainty->ratio_rhow[ib];
                 }
             }
 
             derv_modrat_rhorc[wave_base_index]=derv_modrat_chi0*derv_chi_rhorc[*modmin][wave_base_index]+derv_modrat_chi1*derv_chi_rhorc[*modmax][wave_base_index];
-            derv_modrat_rhorc[wave_base_index]+=derv_chi_obs_rhorc[wave_base_index]/(chi_struct[1].value-chi_struct[0].value);
+            derv_modrat_rhorc[wave_base_index]+=derv_eps_obs_rhorc[wave_base_index]/(eps_mod[*modmax]-eps_mod[*modmin]);
             derv_modrat_rhow_l+=-derv_modrat_rhorc[wave_base_index];
 
             derv_modrat_taua_l =derv_modrat_chi0*derv_chi_taua_l [*modmin]+derv_modrat_chi1*derv_chi_taua_l [*modmax];
-            derv_modrat_taua_l +=derv_chi_obs_taua_l/(chi_struct[1].value-chi_struct[0].value);
+            derv_modrat_taua_l +=derv_eps_obs_taua_l/(eps_mod[*modmax]-eps_mod[*modmin]);
 
             uncertainty->derv_modrat_rhow_l=derv_modrat_rhow_l;
             uncertainty->derv_modrat_taua_l=derv_modrat_taua_l;
         }
     }
 
-
+    /* compute rhoa at all bands for the two aerosol models selected */
     if(comp_rhoa_pca(nwave, wave, geom, tau_iwnir_l[*modmin], mindx[*modmin], tau_pred_min, rho_pred_min,derv_rhoa_min,derv_taua_min) !=0)
         return -1;
     if(comp_rhoa_pca(nwave, wave, geom, tau_iwnir_l[*modmax], mindx[*modmax], tau_pred_max, rho_pred_max,derv_rhoa_max,derv_taua_max) !=0)
         return -1;
 
+    /* interpolate rhoa from that for the two selected aerosol models */
     for (iw = 0; iw <nwave; iw++) {
 
         rhoa[iw]=rho_pred_min[iw]*(1-*modrat)+rho_pred_max[iw]*(*modrat);
@@ -3972,9 +3919,6 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
 
     *modmin=mindx[*modmin];
     *modmax=mindx[*modmax];
-    chi[0]=chi_old[0];
-
-
 
     return (status);
 }
@@ -4002,6 +3946,7 @@ int smaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
 
     int status = 0;
 
+    /* switch to PCA */
     if(use_pca_lut){
         status=smaer_pca(sensorID,wave,nwave,iwnir_s,nmodels,mindx,geom,wv,rhoa,
                 modmin,modmax,modrat,tau_pred_min,tau_pred_max,ip,chi,mbac_w,uncertainty);
@@ -4021,17 +3966,19 @@ int smaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
 
     int iwtab, im, modl;
 
-    float diff_2 = 0.0, diff_1 = 0.0;
+    float diff_1=0.0;
     float mbac_wsum = 0.0;
-    static float *chi_old;
+    float eps_obs=0.0;  /* mean epsilon for all the AC bands based on observation*/
+    static float *eps_mod; /*mean epsilon for all the AC bands based on modeled rhoa*/
+    static int interp = 1;  /*0-no interpoloation for rhoa, 1-interpolation of rhoa*/
 
     float *noise;
     int iwtab_l;
     static int32_t nbands_ac, *acbands_index,wave_base_index;
 
-    float **derv_chi_rhorc;//dimension: [nmodels][nbands_ac], deivative of chi to rhorc
-    float *derv_chi_taua_l; //dimension: [nmodels], deivative of chi to taua_l
-    float **derv_rhoa_rhorc_l;// derivative of modeled rhoa[nwave] to rhorc[iwnir_l]
+    static float **derv_chi_rhorc;//dimension: [nmodels][nbands_ac], deivative of chi to rhorc
+    static float *derv_chi_taua_l; //dimension: [nmodels], deivative of chi to taua_l
+    static float **derv_rhoa_rhorc_l;// derivative of modeled rhoa[nwave] to rhorc[iwnir_l]
     float *derv_modrat_rhorc;// dimension: [nbands_ac], deivative of modrat to rhorc[iwnir_s to iwnir_l]
     float derv_modrat_taua_l=0.; // deivative of modrat to taua [iwnir_l]
     float derv_modrat_rhow_l=0.;
@@ -4041,50 +3988,24 @@ int smaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
     float *derv_taua_max_rhorc_l;
     float *derv_taua_max_taua_l;
     float *derv_taua_max_rhow_l;
-    float **derv_taua_rhorc_l;//[nmodels][nwave], derivative of modeled taua[nwave] to rhorc_l
-    float *derv_chi_obs_rhorc;  //[nbands_ac], derivative of chi_obs to rhorc at nbands_ac
-    float derv_chi_obs_taua_l;  // derivative of chi_obs to taua_l
+    static float **derv_taua_rhorc_l;//[nmodels][nwave], derivative of modeled taua[nwave] to rhorc_l
+    static float *derv_eps_obs_rhorc;  //[nbands_ac], derivative of eps_obs to rhorc at nbands_ac
+    float derv_eps_obs_taua_l;  // derivative of eps_obs to taua_l
 
     float derv_temp_rhorc;
     float derv_modrat_chi0,derv_modrat_chi1;
 
-    if(uncertainty){
-        derv_modrat_rhorc=uncertainty->derv_modrat_rhorc;
-        derv_taua_min_rhorc_l=uncertainty->derv_taua_min_rhorc_l;
-        derv_taua_min_taua_l=uncertainty->derv_taua_min_taua_l;
-        derv_taua_min_rhow_l=uncertainty->derv_taua_min_rhow_l;
-        derv_taua_max_rhorc_l=uncertainty->derv_taua_max_rhorc_l;
-        derv_taua_max_taua_l=uncertainty->derv_taua_max_taua_l;
-        derv_taua_max_rhow_l=uncertainty->derv_taua_max_rhow_l;
-
-        derv_chi_taua_l =(float *)malloc(nmodels*sizeof(float));
-        derv_chi_rhorc  =(float **)malloc(nmodels*sizeof(float *));
-        derv_rhoa_rhorc_l=(float **)malloc(nmodels*sizeof(float*));
-        derv_taua_rhorc_l=(float **)malloc(nmodels*sizeof(float*));
-
-        for(im=0;im<nmodels;im++){
-            derv_chi_rhorc[im]   =(float *)malloc(nbands_ac*sizeof(float));
-            derv_rhoa_rhorc_l[im]=(float *)malloc(nwave*sizeof(float));
-            derv_taua_rhorc_l[im]=(float *)malloc(nwave*sizeof(float));
-        }
-        for(im=0;im<nmodels;im++)
-            for(iw=0;iw<nbands_ac;iw++)
-                derv_chi_rhorc[im][iw]=0.;  
-
-        for (iw = 0; iw < nbands_ac; iw++)
-            derv_modrat_rhorc[iw] = 0.;
-
-        derv_chi_obs_rhorc = (float *)malloc(nbands_ac * sizeof(float));
-    }
-
     if(firstcall){
         firstcall=0;
+        if (nmodels == 1)
+            interp = 0;
+
         nir_l=bindex_get(input->aer_wave_base);
 
         tau_all_wav = (float**) malloc(nwave * sizeof (float*));
         rho_all_wav_pred = (float**) malloc(nwave * sizeof (float*));
 
-        chi_old = (float *)malloc((nmodels) * sizeof(float));
+        eps_mod = (float *)malloc((nmodels) * sizeof(float));
 
         for (i = 0; i < nwave; i++) {
             tau_all_wav[i] = (float*) malloc((nmodels) * sizeof (float));
@@ -4100,48 +4021,79 @@ int smaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
 
         wave_base_index=windex(input->aer_wave_base*1.,tempwave,nbands_ac);
         free(tempwave);
+
+        if (uncertainty) {
+            derv_chi_taua_l = (float *)malloc(nmodels * sizeof(float));
+            derv_chi_rhorc = (float **)malloc(nmodels * sizeof(float *));
+            derv_rhoa_rhorc_l = (float **)malloc(nmodels * sizeof(float *));
+            derv_taua_rhorc_l = (float **)malloc(nmodels * sizeof(float *));
+
+            for (im = 0; im < nmodels; im++) {
+                derv_chi_rhorc[im] = (float *)malloc(nbands_ac * sizeof(float));
+                derv_rhoa_rhorc_l[im] = (float *)malloc(nwave * sizeof(float));
+                derv_taua_rhorc_l[im] = (float *)malloc(nwave * sizeof(float));
+            }
+            derv_eps_obs_rhorc = (float *)malloc(nbands_ac * sizeof(float));
+        }
     }
+
+     if(uncertainty){
+        derv_modrat_rhorc=uncertainty->derv_modrat_rhorc;
+        derv_taua_min_rhorc_l=uncertainty->derv_taua_min_rhorc_l;
+        derv_taua_min_taua_l=uncertainty->derv_taua_min_taua_l;
+        derv_taua_min_rhow_l=uncertainty->derv_taua_min_rhow_l;
+        derv_taua_max_rhorc_l=uncertainty->derv_taua_max_rhorc_l;
+        derv_taua_max_taua_l=uncertainty->derv_taua_max_taua_l;
+        derv_taua_max_rhow_l=uncertainty->derv_taua_max_rhow_l;
+
+        for(im=0;im<nmodels;im++)
+            for(iw=0;iw<nbands_ac;iw++)
+                derv_chi_rhorc[im][iw]=0.;  
+
+        for (iw = 0; iw < nbands_ac; iw++){
+            derv_modrat_rhorc[iw] = 0.;
+            derv_eps_obs_rhorc[iw ] = 0.;
+        }    
+        derv_eps_obs_taua_l = 0.;
+    }
+
 
     noise= &noise_global[ip*nwave];
 
-    // sorting in ascending way elements of chi-squared --  will need clean-up
     cmpstr chi_struct[nmodels];
 
     iwtab_l = iwatab[nir_l];
 
-    float chi_obs = 0.0;
-    if (uncertainty) {
-        for (iw = 0; iw <nbands_ac; iw++)
-            derv_chi_obs_rhorc[iw ] = 0.;
-        derv_chi_obs_taua_l = 0.;
-    }
-
+    /*calculate the mean epsilon from observation data*/
     for (ib = 0; ib <nbands_ac; ib++) {
 
         iw=acbands_index[ib];
         if (mbac_w[iw] == 0. || iw == nir_l)
             continue;
-        chi_obs +=rhoa[iw] / rhoa[nir_l];  // pow((rhoa[iw] - rho_all_wav_pred[iw][im])/noise[iw], 2)*mbac_w[iw];//
+        eps_obs +=rhoa[iw] / rhoa[nir_l]*mbac_w[iw];
         mbac_wsum += mbac_w[iw];
         if (uncertainty) {
-            derv_chi_obs_rhorc[wave_base_index] = 1 / rhoa[nir_l];
-            derv_chi_obs_rhorc[wave_base_index] += (-rhoa[iw] / rhoa[nir_l] / rhoa[nir_l]);
-            derv_chi_obs_taua_l += (-1 / rhoa[nir_l] * uncertainty->derv_Lg_taua[iw] +rhoa[iw] / rhoa[nir_l] / rhoa[nir_l] * uncertainty->derv_Lg_taua[nir_l]);
+            derv_eps_obs_rhorc[ib] = 1 / rhoa[nir_l];
+            derv_eps_obs_rhorc[wave_base_index] += (-rhoa[iw] / rhoa[nir_l] / rhoa[nir_l]);
+            derv_eps_obs_taua_l += (-1 / rhoa[nir_l] * uncertainty->derv_Lg_taua[iw] +rhoa[iw] / rhoa[nir_l] / rhoa[nir_l] * uncertainty->derv_Lg_taua[nir_l]);
         }
     }
-    chi_obs /= mbac_wsum;
+    eps_obs /= mbac_wsum;
+
     if (uncertainty) {
-        derv_chi_obs_taua_l /= mbac_wsum;
+        derv_eps_obs_taua_l /= mbac_wsum;
         for (ib = 0; ib <nbands_ac; ib++)
-            derv_chi_obs_rhorc[ib] /= mbac_wsum;
+            derv_eps_obs_rhorc[ib] /= mbac_wsum;
     }
 
     for (im = 0; im < nmodels; im++) {
 
         modl = mindx[im];
 
+        /*get the coeficients of the model rhoa=f(taua) */
         ms_eps_coef(modl, nir_l, wave, geom, &ac, &bc, &cc, &dc, &ec);
 
+        /* calculate taua[nir_l]*/
         ax = (double) ac[iwtab_l] - log((double) rhoa[nir_l]);
         bx = (double) bc[iwtab_l];
         cx = (double) cc[iwtab_l];
@@ -4158,11 +4110,9 @@ int smaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
         } else {
             status = 1;
             return(status);
-            //break;
         }
 
         /* compute reflectance at all wavelength */
-
         ext_iwnir_l = aertab->model[modl]->extc[iwtab_l];
         for (iw = 0; iw <nwave ; iw++) {
             iwtab = iwatab[iw];
@@ -4186,7 +4136,6 @@ int smaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
 
             if(uncertainty){
                 derv_rhoa_rhorc_l[im][iw]*= rho_all_wav_pred[iw][im];
-                // derv_rhoa_taua_l [im][iw] =
             }
         }
 
@@ -4194,13 +4143,16 @@ int smaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
             derv_chi_rhorc[im][wave_base_index]=0.;
             derv_chi_taua_l[im]=0.;
         }
+
+        /*calculate the average epsilon and chi */
         mbac_wsum = 0.;
+        eps_mod[im]=0.;
+        diff_1=0.;
         for (ib = 0; ib <nbands_ac; ib++) {
             iw=acbands_index[ib];
             if(mbac_w[iw]==0.|| iw==nir_l)
                 continue;
-            //noise[iw]=uncertainty->dsensor[ip*nwave+iw];
-            diff_2 += rho_all_wav_pred[iw][im] / rhoa[nir_l];
+            eps_mod[im] += rho_all_wav_pred[iw][im] / rhoa[nir_l]*mbac_w[iw];
             diff_1 += pow((rhoa[iw] - rho_all_wav_pred[iw][im]) / noise[iw], 2) * mbac_w[iw];  //
             mbac_wsum += mbac_w[iw];
 
@@ -4212,83 +4164,87 @@ int smaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
             }
         }
 
-        chi[im] = diff_2 / mbac_wsum;
-        chi_old[im] = diff_1 / mbac_wsum;  // diff_1
+        eps_mod[im]/= mbac_wsum;
+        chi[im] = diff_1 / mbac_wsum;
         if (uncertainty) {
             derv_chi_rhorc[im][wave_base_index] /= mbac_wsum;
             derv_chi_taua_l[im] /= mbac_wsum;
         }
 
-        diff_2 = 0.;
-        diff_1 = 0.;
-        mbac_wsum = 0.0;
-        chi_struct[im].value = chi_old[im];
+        chi_struct[im].value = chi[im];
         chi_struct[im].index = im;
     }
 
+    /* step 1: two aerosol models with the smallest chi are selected for rhoa interpolation */
+    /* step 2: mean epsilon are used to interpolate rhoa from the two selected models*/
+
+    /* sorting chi from low to high */
     qsort(chi_struct,nmodels,sizeof(chi_struct[0]),cmpfunc);
 
-    *modrat = chi_struct[0].value / (chi_struct[0].value + chi_struct[1].value);
-    chi_old[0] =
-        chi_struct[0].value * (1 - *modrat) +
-        chi_struct[1].value * (*modrat);  // temporary keeping the chi2 value from two closest aerosol models
+    if (interp) {
+        *modmin=chi_struct[0].index;
+        *modmax=chi_struct[1].index;
 
-    /*chi_struc is switched back to the ratio after selecting the model using the chi based on
-     * difference*/
-    for (im = 0; im < nmodels; im++)
-        chi_struct[im].value = chi[chi_struct[im].index];
+        /* make sure for the two selected models, modmin has the smaller eps_mod than that of modmax*/
+        if(eps_mod[chi_struct[0].index]>eps_mod[chi_struct[1].index]){
+            *modmin=chi_struct[1].index;
+            *modmax=chi_struct[0].index;
+        }
 
-    if ((chi_obs - chi_struct[0].value) * (chi_obs - chi_struct[1].value) > 0) {
-        *modrat = 1.0;  // need to flag
+        /*modrat here is used to interpolate the chisqr_mbac product which is kept at chi[0]*/
+        *modrat = chi_struct[0].value / (chi_struct[0].value + chi_struct[1].value);
+        chi[0] = chi_struct[0].value * (1 - *modrat) +
+                     chi_struct[1].value *
+                         (*modrat);
+    }
+    else
+        chi[0]=chi_struct[0].value;
+
+    if (!interp) {
+        *modrat = 1.0;  
         *modmin = chi_struct[0].index;
         *modmax = *modmin;
-        return (1);
-    } else {
-        if (chi_obs > chi_struct[1].value) {
-            im = chi_struct[0].index;
-            diff_1 = chi_struct[0].value;
+        
+        /* need to flag as the uncertainty is possibly underestimated */
+        if(uncertainty){
+             for (ib = 0; ib <nbands_ac; ib++){
+                derv_modrat_rhorc[ib]=0.;
 
-            chi_struct[0].value = chi_struct[1].value;
-            chi_struct[0].index = chi_struct[1].index;
-
-            chi_struct[1].value = diff_1;
-            chi_struct[1].index = im;
+             }
+             uncertainty->derv_modrat_rhow_l=0.;
+             uncertainty->derv_modrat_taua_l=0.;
         }
-        *modmin = chi_struct[0].index;
-        *modmax = chi_struct[1].index;
+       
+    } else {
+        /*modrat here is used to interpolate rhoa*/
+        /*problem will arise when modrat is negative or bigger than 1 */
+        /* TBD: method is needed to resolve this problem */
+        *modrat=(eps_obs-eps_mod[*modmin])/(eps_mod[*modmax]-eps_mod[*modmin]);
+        if(uncertainty){
+            derv_modrat_chi0= (eps_obs-eps_mod[*modmax])/pow(eps_mod[*modmax]-eps_mod[*modmin],2);
+            derv_modrat_chi1=-(eps_obs-eps_mod[*modmin])/pow(eps_mod[*modmax]-eps_mod[*modmin],2);
 
-        *modrat = (chi_obs - chi_struct[0].value) / (chi_struct[1].value - chi_struct[0].value);
-        if (uncertainty) {
-            derv_modrat_chi0 =
-                (chi_obs - chi_struct[1].value) / pow(chi_struct[1].value - chi_struct[0].value, 2);
-            derv_modrat_chi1 =
-                -(chi_obs - chi_struct[0].value) / pow(chi_struct[1].value - chi_struct[0].value, 2);
-
-            for (ib = 0; ib < nbands_ac; iw++) {
+            for (ib = 0; ib <nbands_ac; ib++){
                 iw=acbands_index[ib];
-                if (iw != nir_l) {
-                    derv_modrat_rhorc[ib] =
-                        derv_chi_obs_rhorc[ib] / (chi_struct[1].value - chi_struct[0].value);
-                    derv_modrat_rhow_l +=
-                        -derv_modrat_rhorc[ib] * uncertainty->ratio_rhow[ib];
+                if(iw!=nir_l){
+                    derv_modrat_rhorc[ib]=derv_eps_obs_rhorc[ib]/(eps_mod[*modmax]-eps_mod[*modmin]);
+                    derv_modrat_rhow_l+=-derv_modrat_rhorc[ib]*uncertainty->ratio_rhow[ib];
                 }
             }
 
-            derv_modrat_rhorc[wave_base_index] = derv_modrat_chi0 * derv_chi_rhorc[*modmin][wave_base_index] +
-                                                 derv_modrat_chi1 * derv_chi_rhorc[*modmax][wave_base_index];
-            derv_modrat_rhorc[wave_base_index] +=
-                derv_chi_obs_rhorc[wave_base_index] / (chi_struct[1].value - chi_struct[0].value);
-            derv_modrat_rhow_l += -derv_modrat_rhorc[wave_base_index];
+            derv_modrat_rhorc[wave_base_index]=derv_modrat_chi0*derv_chi_rhorc[*modmin][wave_base_index]+derv_modrat_chi1*derv_chi_rhorc[*modmax][wave_base_index];
+            derv_modrat_rhorc[wave_base_index]+=derv_eps_obs_rhorc[wave_base_index]/(eps_mod[*modmax]-eps_mod[*modmin]);
+            derv_modrat_rhow_l+=-derv_modrat_rhorc[wave_base_index];
 
-            derv_modrat_taua_l =
-                derv_modrat_chi0 * derv_chi_taua_l[*modmin] + derv_modrat_chi1 * derv_chi_taua_l[*modmax];
-            derv_modrat_taua_l += derv_chi_obs_taua_l / (chi_struct[1].value - chi_struct[0].value);
+            derv_modrat_taua_l =derv_modrat_chi0*derv_chi_taua_l [*modmin]+derv_modrat_chi1*derv_chi_taua_l [*modmax];
+            derv_modrat_taua_l +=derv_eps_obs_taua_l/(eps_mod[*modmax]-eps_mod[*modmin]);
 
             uncertainty->derv_modrat_rhow_l=derv_modrat_rhow_l;
             uncertainty->derv_modrat_taua_l=derv_modrat_taua_l;
         }
     }
 
+    /* interpolate rhoa at all bands */
     for (iw = 0; iw <nwave; iw++) {
 
         tau_pred_min[iw] = tau_all_wav[iw][*modmin];
@@ -4330,15 +4286,7 @@ int smaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
 
     *modmin = mindx[*modmin];
     *modmax = mindx[*modmax];
-    chi[0] = chi_old[0];
-
-    /* for (i = 0; i < nwave; i++) {
-         free(tau_all_wav[i]);
-         free(rho_all_wav_pred[i]);
-     }
-     free(tau_all_wav);
-     free(rho_all_wav_pred);*/
-
+    
     if(uncertainty){
         for(im=0;im<nmodels;im++){
             free(derv_chi_rhorc[im]);
@@ -4349,49 +4297,11 @@ int smaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
         free(derv_chi_taua_l);
         free(derv_rhoa_rhorc_l);
         free(derv_taua_rhorc_l);
-        free(derv_chi_obs_rhorc);
+        free(derv_eps_obs_rhorc);
     }
 
     return (status);
 }
-
-/* ---------------------------------------------------------------------------------------- */
-/* ahmadaer() - compute aerosol reflectance using MSEPS approach of Ahmad                   */
-/*                                                                                          */
-/* Z. Ahmad, August 2014.                                                                   */
-/* M. Zhang,    SAIC,  July 2021,  adding the uncertainty propagation                       */
-
-/* ---------------------------------------------------------------------------------------- */
-int ahmadaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int32_t iwnir_l,
-        int32_t nmodels, int32_t mindx[],
-        geom_str *geom, float wv, float rhoa[],
-        int32_t *modmin, int32_t *modmax, float *modrat, float *epsnir,
-        float tau_pred_min[], float tau_pred_max[],int ip,uncertainty_t *uncertainty) {
-    int iw;
-
-    float rho_pred_min[nwave], rho_pred_max[nwave];
-    float rho_aer[nwave], tau_aer[nwave];
-
-    if (!have_ms && !use_pca_lut) {
-        printf("\nThe multi-scattering epsilon atmospheric correction method requires\n");
-        printf("ams_all, bms_all, cms_all, dms_all, ems in the aerosol model tables.\n");
-        exit(1);
-    }
-
-    /* use the ms_epsilon method to get rhoa */
-    if (ahmad_atm_corr(sensorID, wave, nwave, iwnir_s, iwnir_l, nmodels, mindx, geom, wv,
-            rhoa, modmin, modmax, modrat, epsnir, tau_pred_max, tau_pred_min, rho_pred_max, rho_pred_min, 
-            tau_aer, rho_aer,ip,uncertainty) != 0) {
-        return (1);
-    }
-
-    for (iw = 0; iw < nwave; iw++) {
-        rhoa[iw] = rho_aer[iw];
-    }
-
-    return (0);
-}
-
 
 /* ---------------------------------------------------------------------------------------- */
 /* wangaer() - compute aerosol reflectance using Gordon & Wang 1994 algorithm               */
@@ -4647,8 +4557,6 @@ int rhaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int32_
     float *tsen2;
     float eps1=1.0;
     float eps2=1.0;
-    //float modrat1;
-    //float modrat2;
     int nmodels;
     float *chi1, *chi2;
 
@@ -4660,7 +4568,6 @@ int rhaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int32_
     int32_t mindx1[MAXAERMOD];
     int32_t mindx2[MAXAERMOD];
     int irh1, irh2, irh;
-    //int irh3; // Third RH index --> Amir
     int isd;
     float wt;
     static uncertainty_t *uncertainty1=NULL, *uncertainty2=NULL;
@@ -4814,14 +4721,9 @@ int rhaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int32_
         rhoa [iw] = BAD_FLT;
     }
 
-
     // adjust rh for spectral matching
-    if (aer_opt == AERRHSM) {
-        if (rh >= 95) {
-            //printf("Warning rh is greater than 95%%. Reset to 94%% rh=%f\n", rh);
-            rh = 94;
-        }
-    }
+    if (aer_opt == AERRHSM && rh >= 95)
+        rh = 94;
 
     // find RH index and wts
     if (nrh == 1 || rhtab[0] > rh) { // actual RH < smallest model RH or only one model RH
@@ -4847,7 +4749,6 @@ int rhaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int32_
     }
 
     // set indices of active model sets
-
     for (im = 0; im < nsd; im++) {
         mindx1[im] = irh1 * nsd + im;
         mindx2[im] = irh2 * nsd + im;
@@ -4857,11 +4758,9 @@ int rhaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int32_
     }
 
     // compute aerosol reflectances, aot, diffuse trans, eps from first model set
-
     if (aer_opt == AERRHSM) {
 
-        /* Spectral Matching */
-
+        /* MBAC algorithm */
         if (smaer(sensorID, wave, nwave, iwnir_s, iwnir_l, nmodels, mindx1,geom, wv, rhoa1, modmin1, modmax1, modrat1, tau_pred_min1, tau_pred_max1,ip, chi1, mbac_w,uncertainty1) != 0) {
 
             free(taua1);

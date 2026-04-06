@@ -43,7 +43,6 @@ def env(self):
         self.dirs['bin3'] = Path(os.getenv("LIB3_BIN"))
 
     self.dirs['log'] = self.dirs['var'] / "log"
-    Path(self.dirs['log']).mkdir(parents=True, exist_ok=True)
 
     if os.getenv("OCSSW_DEBUG") is not None and int(os.getenv("OCSSW_DEBUG")) > 0:
         if not os.path.exists(self.dirs['bin']):

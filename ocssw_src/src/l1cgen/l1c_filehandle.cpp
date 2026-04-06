@@ -33,7 +33,7 @@ l1c_filehandle::l1c_filehandle() {
     for (int j = 0; j < 10; j++) {
         selgran[j] = -1;
     }
-    verbose=0;
+    verbose = 0;
     l1c_pflag = 0;
     l1b_name = "";
     version = "";
@@ -97,7 +97,7 @@ l1c_filehandle::l1c_filehandle() {
     eqt = -999.0;
     tswt_ini = "";  // metadata string for initial time
     tswt_end = "";  // metadata string for final time
-    tswt_mid="";
+    tswt_mid = "";
     tswt_ini_file = "";
     tunix_start = -999.;  // start utc time for the swath,
     tg_s = -999.;
@@ -110,7 +110,7 @@ l1c_filehandle::l1c_filehandle() {
     end_dir = "";
     binstr = "";
     date_created = "";
-    norb_rec=-1;//number of orbital records total for swath
+    norb_rec = -1;  // number of orbital records total for swath
     // telemetry stauff----L1A--HKT
     fileix = 0;
     gransize = 5;  // granule size in minutes
@@ -152,7 +152,7 @@ l1c_filehandle::l1c_filehandle() {
     // multi  attributes (view, pol, bands)
     view_agg = nullptr;  // views to be aggregated for later products such as vsfs etc
     pol_agg = nullptr;   // polarization states to be aggregated for post-processing products, linear
-                        // depolarization ratio etc
+                         // depolarization ratio etc
     band_agg = nullptr;  // specific bands for future merged products
     overlap_vflag = 0;   // tells if we want merged views
     overlap_pflag = 0;   // tells if we want merged polarizations

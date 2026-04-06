@@ -20,6 +20,12 @@
 #include <fstream>
 #include <string>
 
+#include <l1_oci_private.h>
+#include <l1_oci.h>
+
+#include <l1_oci_private.h>
+#include <l1_oci.h>
+
 using namespace std;
 using namespace netCDF;
 using namespace netCDF::exceptions;
@@ -40,6 +46,7 @@ bin_str::bin_str() {
     nbinx = -1;
     num_pixels = -1;
     nscans = -1;
+    scan = -1;
     verbose = 0;
     // geo
     gdshift = -1;
@@ -53,20 +60,19 @@ bin_str::bin_str() {
 
     nrec_2D = nullptr;  // row/col
     nrec_3D = nullptr;
-    nrec_3D_view = nullptr;
     nrec_4D_band = nullptr;  // row/col/view
     alt_mean = nullptr;
     alt_rmse = nullptr;
     alt_2D = nullptr;
     alt_diff2 = nullptr;  // row/col
     i_diff2 = nullptr;
-    sca_3D = nullptr;     // row/col/view
+    sca_3D = nullptr;  // row/col/view
     rot_angle = nullptr;
     QC_bitwise_4D = nullptr;  // row/col/view/bands
     QC_4D = nullptr;          // row/col/view
     I_4D = nullptr;           // row/col/view/bands
     I_noise_4D = nullptr;     // #pixels
- 
+
     // OCIS line by line
     obs_per_view = nullptr;
     QC = nullptr;
@@ -96,7 +102,8 @@ bin_str::bin_str() {
     l1c_anc[0] = '\0';
     cloudem_flag = 0;
     cloud_type = 0;  // 0 water, 1 ice
-    dem_flag=0;//dem 0 geoid height or L1C grid height between ellipsoid and geoid wgs84 in m, 1 orthometric height or dem
+    dem_flag = 0;    // dem 0 geoid height or L1C grid height between ellipsoid and geoid wgs84 in m, 1
+                   // orthometric height or dem
 }
 
 bin_str::~bin_str() {
@@ -157,9 +164,6 @@ int bin_str::close_bin(bin_str *binl1c) {
     if (binl1c->nrec_3D != nullptr)
         free3d_short(binl1c->nrec_3D);
     binl1c->nrec_3D = nullptr;
-    if (binl1c->nrec_3D_view != nullptr)
-        free3d_short(binl1c->nrec_3D_view);
-    binl1c->nrec_3D_view = nullptr;
     if (binl1c->nrec_4D_band != nullptr)
         free4d_float(binl1c->nrec_4D_band);
     binl1c->nrec_4D_band = nullptr;
@@ -169,7 +173,15 @@ int bin_str::close_bin(bin_str *binl1c) {
     if (binl1c->I_noise_4D != nullptr)
         free4d_float(binl1c->I_noise_4D);
     binl1c->I_noise_4D = nullptr;
-
+    if (binl1c->QC_bitwise_4D != nullptr)
+        free4d_uchar(binl1c->QC_bitwise_4D);
+    binl1c->QC_bitwise_4D = nullptr;
+    if (binl1c->scan_quality_flags != nullptr)
+        free(binl1c->scan_quality_flags);
+    if (binl1c->tilt_angle != nullptr)
+        free(binl1c->tilt_angle);
+    if (binl1c->count_1d != nullptr)
+        free(binl1c->count_1d);
     return 0;
 }
 
@@ -201,7 +213,6 @@ int bin_str::alloc_bin(bin_str *binl1c) {
     binl1c->sca_3D = allocate3d_float(binl1c->num_gridlines, binl1c->nbinx, binl1c->nviews);
     binl1c->rot_angle = allocate3d_float(binl1c->num_gridlines, binl1c->nbinx, binl1c->nviews);
     binl1c->nrec_3D = allocate3d_short(binl1c->num_gridlines, binl1c->nbinx, binl1c->nviews);
-    binl1c->nrec_3D_view = allocate3d_short(binl1c->num_gridlines, binl1c->nbinx, binl1c->nviews);
 
     binl1c->nrec_4D_band =
         allocate4d_float(binl1c->num_gridlines, binl1c->nbinx, binl1c->nviews, binl1c->nbands);
@@ -209,7 +220,10 @@ int bin_str::alloc_bin(bin_str *binl1c) {
     binl1c->I_noise_4D =
         allocate4d_float(binl1c->num_gridlines, binl1c->nbinx, binl1c->nviews, binl1c->nbands);
     binl1c->i_diff2 = allocate4d_float(binl1c->num_gridlines, binl1c->nbinx, binl1c->nviews, binl1c->nbands);
-
+    binl1c->QC_bitwise_4D = allocate4d_uchar(binl1c->num_gridlines, binl1c->nbinx, binl1c->nviews, binl1c->nbands);
+    binl1c->scan_quality_flags = (unsigned char * )calloc(binl1c->num_gridlines, sizeof(unsigned char));
+    binl1c->tilt_angle = (float *)calloc(binl1c->num_gridlines, sizeof(float));
+    binl1c->count_1d = (size_t * )calloc(binl1c->num_gridlines, sizeof(size_t));
     // init
     for (int i = 0; i < binl1c->num_gridlines; i++) {
         binl1c->time_gd[i] = 0;
@@ -234,12 +248,12 @@ int bin_str::alloc_bin(bin_str *binl1c) {
                 binl1c->sca_3D[i][j][v] = 0.;
                 binl1c->rot_angle[i][j][v] = 0.;
                 binl1c->nrec_3D[i][j][v] = 0;
-                binl1c->nrec_3D_view[i][j][v] = 0;
                 for (int sb = 0; sb < binl1c->nbands; sb++) {
                     binl1c->nrec_4D_band[i][j][v][sb] = 0.;
-                    binl1c->I_4D[i][j][v][sb] = 0.;
+                    binl1c->I_4D[i][j][v][sb] = BAD_FLT;
                     binl1c->I_noise_4D[i][j][v][sb] = 0.;
-                    binl1c->i_diff2[i][j][v][sb] = 0;
+                    binl1c->i_diff2[i][j][v][sb] = BAD_FLT;
+                    binl1c->QC_bitwise_4D[i][j][v][sb] = 0;//l1rec->hilt=0 saturation at index ip
                 }
             }
         }
@@ -254,20 +268,17 @@ int rmse_l1c_alt(filehandle *l1file, bin_str *binl1c, l1str *l1rec, short **gdin
     short fill_height = BAD_FLT;
     int npix = l1file->npix;
 
-    for (int pix = 0; pix < npix; pix++) 
-   {
+    for (int pix = 0; pix < npix; pix++) {
         gd_row = gdindex[pix][0] - 1;
         gd_col = gdindex[pix][1] - 1;
 
         if (l1rec->height[pix] != fill_height && l1rec->tilt != fill_tilt && gd_row >= 0 && gd_col >= 0 &&
-            l1rec->lat[pix] != binl1c->fillval2 && l1rec->lon[pix] != binl1c->fillval2)
-       {
-
+            l1rec->lat[pix] != binl1c->fillval2 && l1rec->lon[pix] != binl1c->fillval2) {
             binl1c->alt_diff2[gd_row][gd_col] =
                 binl1c->alt_diff2[gd_row][gd_col] + (l1rec->height[pix] - binl1c->alt[gd_row][gd_col]) *
-                                                        (l1rec->height[pix] - binl1c->alt[gd_row][gd_col]);        
-       }   
-   }
+                                                        (l1rec->height[pix] - binl1c->alt[gd_row][gd_col]);
+        }
+    }
 
     return 0;
 }
@@ -292,17 +303,16 @@ int meta_l1c_altvar(bin_str *binl1c, NcFile *nc_output) {
     }
     v1.putVar(&binl1c->alt_rmse[0][0]);
 
-
- //i_stdev
-   float ****temp2 = allocate4d_float(binl1c->num_gridlines, binl1c->nbinx, binl1c->nviews, binl1c->nbands);
+    // i_stdev
+    float ****temp2 = allocate4d_float(binl1c->num_gridlines, binl1c->nbinx, binl1c->nviews, binl1c->nbands);
 
     for (int i = 0; i < binl1c->num_gridlines; i++) {
         for (int j = 0; j < binl1c->nbinx; j++) {
             for (int v = 0; v < binl1c->nviews; v++) {
                 for (int sb = 0; sb < binl1c->nbands; sb++) {
-                    if (binl1c->nrec_4D_band[i][j][v][sb] > 0) { 
-                        binl1c->i_diff2[i][j][v][sb]-=0.01;                                     
-                        temp2[i][j][v][sb] = sqrt(binl1c->i_diff2[i][j][v][sb]/binl1c->nrec_4D_band[i][j][v][sb]);
+                    if (binl1c->nrec_4D_band[i][j][v][sb] > 1) {
+                        temp2[i][j][v][sb] =
+                            sqrt(binl1c->i_diff2[i][j][v][sb] / binl1c->nrec_4D_band[i][j][v][sb]);
                     } else {
                         temp2[i][j][v][sb] = binl1c->fillval2;
                     }
@@ -312,7 +322,7 @@ int meta_l1c_altvar(bin_str *binl1c, NcFile *nc_output) {
     }
 
     NcGroup od_grp = nc_output->getGroup("observation_data");
-    v1 = od_grp.getVar("i_stdev"); 
+    v1 = od_grp.getVar("i_stdev");
     if (binl1c->bintype == 0) {
         v1 = od_grp.getVar("i_stdev");
         v1.putVar(&temp2[0][0][0][0]);
@@ -341,7 +351,6 @@ int meta_l1c_bin(filehandle *l1file, bin_str *binl1c, NcFile *nc_output) {
     // time_offsets
 
     double ***time_offsets = nullptr, toff, toff_fill, toff_min, toff_max;
-
 
     time_offsets = allocate3d_double(binl1c->num_gridlines, binl1c->nbinx, binl1c->nviews);
 
@@ -388,6 +397,21 @@ int meta_l1c_bin(filehandle *l1file, bin_str *binl1c, NcFile *nc_output) {
 
     free3d_double(time_offsets);
 
+    // add scan quality and tilt
+    for (int16_t i = 0; i < binl1c->num_gridlines; i++) {
+        if (binl1c->count_1d[i] == 0) {
+            binl1c->tilt_angle[i] = binl1c->fillval2;
+            binl1c->scan_quality_flags[i] = 255;
+        }
+    }
+
+    NcGroup svb_grp = nc_output->getGroup("sensor_views_bands");
+    v1 = svb_grp.getVar("sensor_view_angle");
+    v1.putVar(binl1c->tilt_angle);
+    v1 = ba_grp.getVar("scan_quality_flags");
+    v1.putVar(binl1c->scan_quality_flags);
+
+
     v1 = geo_grp.getVar("sensor_azimuth_angle");
 
     short ***temp;
@@ -415,7 +439,7 @@ int meta_l1c_bin(filehandle *l1file, bin_str *binl1c, NcFile *nc_output) {
         for (int j = 0; j < binl1c->nbinx; j++) {
             for (int v = 0; v < binl1c->nviews; v++) {
                 if (binl1c->nrec_3D[i][j][v] > 0) {
-                    temp[i][j][v] = (binl1c->senz_3D[i][j][v] / binl1c->nrec_3D[i][j][v] )* angleScale;
+                    temp[i][j][v] = (binl1c->senz_3D[i][j][v] / binl1c->nrec_3D[i][j][v]) * angleScale;
                 } else {
                     temp[i][j][v] = binl1c->fillval1;
                 }
@@ -431,7 +455,7 @@ int meta_l1c_bin(filehandle *l1file, bin_str *binl1c, NcFile *nc_output) {
         for (int j = 0; j < binl1c->nbinx; j++) {
             for (int v = 0; v < binl1c->nviews; v++) {
                 if (binl1c->nrec_3D[i][j][v] > 0) {
-                    temp[i][j][v] = (binl1c->suna_3D[i][j][v] / binl1c->nrec_3D[i][j][v] )* angleScale;
+                    temp[i][j][v] = (binl1c->suna_3D[i][j][v] / binl1c->nrec_3D[i][j][v]) * angleScale;
                 } else {
                     temp[i][j][v] = binl1c->fillval1;
                 }
@@ -447,7 +471,7 @@ int meta_l1c_bin(filehandle *l1file, bin_str *binl1c, NcFile *nc_output) {
         for (int j = 0; j < binl1c->nbinx; j++) {
             for (int v = 0; v < binl1c->nviews; v++) {
                 if (binl1c->nrec_3D[i][j][v] > 0) {
-                    temp[i][j][v] = (binl1c->sunz_3D[i][j][v] / binl1c->nrec_3D[i][j][v] )* angleScale;
+                    temp[i][j][v] = (binl1c->sunz_3D[i][j][v] / binl1c->nrec_3D[i][j][v]) * angleScale;
                 } else {
                     temp[i][j][v] = binl1c->fillval1;
                 }
@@ -492,36 +516,20 @@ int meta_l1c_bin(filehandle *l1file, bin_str *binl1c, NcFile *nc_output) {
     free3d_short(temp);
 
     NcGroup od_grp = nc_output->getGroup("observation_data");
-    v1 = od_grp.getVar("number_of_observations");  // ONLY 1 BAND!!!!!! NO QUALITY CONTROL,constrained no fillvalues,
-                                         // and withing min/max Lt
+    v1 = od_grp.getVar("number_of_observations");  // ONLY 1 BAND!!!!!! NO QUALITY CONTROL,constrained no
+                                                   // fillvalues, and withing min/max Lt
 
     if (binl1c->bintype == 0) {
         v1.putVar(&binl1c->nrec_3D[0][0][0]);
     }
 
-    // I/reflectance
-    float ****temp2 = allocate4d_float(binl1c->num_gridlines, binl1c->nbinx, binl1c->nviews, binl1c->nbands);
-    for (int i = 0; i < binl1c->num_gridlines; i++) {
-        for (int j = 0; j < binl1c->nbinx; j++) {
-            for (int v = 0; v < binl1c->nviews; v++) {
-                for (int sb = 0; sb < binl1c->nbands; sb++) {
-                    if (binl1c->nrec_4D_band[i][j][v][sb] > 0) {
-                        temp2[i][j][v][sb] = binl1c->I_4D[i][j][v][sb] / binl1c->nrec_4D_band[i][j][v][sb];                        
-//                                                cout<<"v "<<v+1<<"sb "<<sb+1<<"row "<<i+1<<"col.."<<j+1<<"MEAN radiance.. OCI = "<<temp2[i][j][v][sb]<<endl;                                                                   
-                    } else {
-                        temp2[i][j][v][sb] = binl1c->fillval2;
-                    }
-                }
-            }
-        }
-    }
-
     if (binl1c->bintype == 0) {
         v1 = od_grp.getVar("i");
-        v1.putVar(&temp2[0][0][0][0]);
-    }
+        v1.putVar(binl1c->I_4D[0][0][0]);
 
-    free4d_float(temp2);
+        v1 = od_grp.getVar("qc");
+        v1.putVar(binl1c->QC_bitwise_4D[0][0][0]);
+    }
 
     return 0;
 }
@@ -579,14 +587,14 @@ int meta_l1c_full(filehandle *l1file, bin_str *binl1c, const char *l1c_grid, NcF
         senstr = "OCI";
         titlestr = "PACE OCI Level-1C Data";
         xbins = 519;
-        NVIEWS = 2;
+        NVIEWS = 1;
         NBANDS = 286;
     } else  // OCI
     {
         senstr = "OCI";
         titlestr = "PACE OCI Level-1C Data";
         xbins = 519;
-        NVIEWS = 2;
+        NVIEWS = 1;
         NBANDS = 286;
     }
 
@@ -617,7 +625,7 @@ int meta_l1c_full(filehandle *l1file, bin_str *binl1c, const char *l1c_grid, NcF
 
     //   NcDim idim=nc_l1cgrid->getDim("intensity_bands_per_view");
 
-    meta_l1c_global(ifile_char, binl1c,num_gridlines, nc_output);
+    meta_l1c_global(ifile_char, binl1c, num_gridlines, nc_output);
 
     NcDim idim = nc_output->getDim("intensity_bands_per_view");
 
@@ -640,9 +648,9 @@ int meta_l1c_full(filehandle *l1file, bin_str *binl1c, const char *l1c_grid, NcF
     binl1c->fillval2 = value2;
 
     // global attributes
-    if(!binl1c->pversion.empty())
+    if (!binl1c->pversion.empty())
         nc_output->putAtt("processing_version", binl1c->pversion);
-    if(!binl1c->doi.empty()) {
+    if (!binl1c->doi.empty()) {
         nc_output->putAtt("identifier_product_doi", binl1c->doi);
         nc_output->putAtt("identifier_product_doi_authority", "http://dx.doi.org");
     }
@@ -732,7 +740,7 @@ int meta_l1c_full(filehandle *l1file, bin_str *binl1c, const char *l1c_grid, NcF
     string datetimestr1 =
         yearstr + "-" + monstr + "-" + daystr + "T" + hstr + ":" + mistr + ":" + secstr.substr(0, 2);
     // time coevrage end----
- 
+
     secstr = std::to_string(sec_end);
     mistr = std::to_string(mi_end);
     hstr = std::to_string(h_end);
@@ -785,7 +793,7 @@ int meta_l1c_full(filehandle *l1file, bin_str *binl1c, const char *l1c_grid, NcF
     ba_grp = nc_output->getGroup("bin_attributes");
     v1 = ba_grp.getVar("nadir_view_time");
     v1.putVar(&time_nad[0]);
-    if(!tmpUnits.empty())
+    if (!tmpUnits.empty())
         v1.putAtt("units", tmpUnits);
     if (time_nad != nullptr)
         free(time_nad);
@@ -818,7 +826,7 @@ int meta_l1c_full(filehandle *l1file, bin_str *binl1c, const char *l1c_grid, NcF
 
     // GRING----
     string gs_bounds, crs;
-    float gs_lat_max=-999, gs_lat_min=-999, gs_lon_max=-999, gs_lon_min=-999;
+    float gs_lat_max = -999, gs_lat_min = -999, gs_lon_max = -999, gs_lon_min = -999;
     i1 = nc_l1cgrid->getAtt("geospatial_bounds");
     i1.getValues(gs_bounds);
     nc_output->putAtt("geospatial_bounds", gs_bounds);
@@ -892,7 +900,7 @@ int meta_l1c_full(filehandle *l1file, bin_str *binl1c, const char *l1c_grid, NcF
     v1.putAtt("long_name", longName);
     units = "W m^-2 um^-1";
     v1.putAtt("units", units);
-    v1.putAtt("_FillValue", ncFloat,binl1c->fillval2);
+    v1.putAtt("_FillValue", ncFloat, binl1c->fillval2);
     valid_min = 0;
     v1.putAtt("valid_min", ncFloat, valid_min);
     valid_max = 4000;
@@ -933,15 +941,14 @@ int meta_l1c_grid(char *gridname, bin_str *binl1c, int16_t num_gridlines, NcFile
         titlestr = "PACE OCI Level-1C Data";
         nadir_bin_index = 259;
         xbins = 519;
-        NVIEWS = 2;
+        NVIEWS = 1;
         NBANDS = 239;  // 249 originally no polarization bands
-    } else
-    {
+    } else {
         senstr = "OCI";
         titlestr = "PACE OCI Level-1C Data";
-        nadir_bin_index =259;
+        nadir_bin_index = 259;
         xbins = 519;
-        NVIEWS = 2;
+        NVIEWS = 1;
         NBANDS = 239;  // 249 ORIGINALLY no polarization bands
     }
 
@@ -976,7 +983,7 @@ int meta_l1c_grid(char *gridname, bin_str *binl1c, int16_t num_gridlines, NcFile
     nc_output->putAtt("product_name", prodstr);
     nc_output->putAtt("date_created", date_created);
     nc_output->putAtt("sun_earth_distance", ncFloat, BAD_FLT);
-    nc_output->putAtt("nadir_bin", NC_INT,nadir_bin_index);
+    nc_output->putAtt("nadir_bin", NC_INT, nadir_bin_index);
     nc_output->putAtt("bin_size_at_nadir", "5.2km2");
 
     NcDim ydim = nc_output->addDim("bins_along_track", ybins);
@@ -1018,7 +1025,7 @@ int meta_l1c_grid(char *gridname, bin_str *binl1c, int16_t num_gridlines, NcFile
         dimvec4b.push_back(pdim);
     }
 
-    NcVar v1 = ba_grp.addVar("nadir_view_time", ncDouble, ydim); 
+    NcVar v1 = ba_grp.addVar("nadir_view_time", ncDouble, ydim);
     string longName = "Time bin was viewed at nadir view";
     v1.putAtt("long_name", longName);
     string units = "seconds since date";
@@ -1058,18 +1065,18 @@ int meta_l1c_grid(char *gridname, bin_str *binl1c, int16_t num_gridlines, NcFile
     v1.putAtt("units", units);
     v1.putAtt("_FillValue", ncShort, binl1c->fillval1);
     // use min/max from gebco file
-  //  short valid_min_s = -10952;
+    //  short valid_min_s = -10952;
     short valid_min_s = -10000;
     v1.putAtt("valid_min", ncShort, valid_min_s);
-//    short valid_max_s = 8627;
+    //    short valid_max_s = 8627;
     short valid_max_s = 10000;
     v1.putAtt("valid_max", ncShort, valid_max_s);
 
     return 0;
 }
 
-int meta_l1c_global(char *gridname, bin_str *binl1c,int16_t num_gridlines, NcFile *nc_output) {
-    string senstr, GATT_VAL1, prodstr,ifile_str;
+int meta_l1c_global(char *gridname, bin_str *binl1c, int16_t num_gridlines, NcFile *nc_output) {
+    string senstr, GATT_VAL1, prodstr, ifile_str;
     string date_created;
     int NVIEWS, NBANDS, NBANDS_POL;
     int32_t xbins, ybins;
@@ -1085,7 +1092,7 @@ int meta_l1c_global(char *gridname, bin_str *binl1c,int16_t num_gridlines, NcFil
     if (format.type == FT_SPEXONE) {
         senstr = "SPEXONE";
         GATT_VAL1 = "PACE SPEXone Level-1C Data";
-        nadir_bin_index =14;
+        nadir_bin_index = 14;
         xbins = 29;
         NVIEWS = 5;
         NBANDS = 400;
@@ -1093,7 +1100,7 @@ int meta_l1c_global(char *gridname, bin_str *binl1c,int16_t num_gridlines, NcFil
     } else if (format.type == FT_HARP2) {
         senstr = "HARP2";
         GATT_VAL1 = "PACE HARP2 Level-1C Data";
-        nadir_bin_index =228;
+        nadir_bin_index = 228;
         xbins = 457;
         NVIEWS = 90;
         NBANDS = 1;
@@ -1101,42 +1108,22 @@ int meta_l1c_global(char *gridname, bin_str *binl1c,int16_t num_gridlines, NcFil
     } else if (format.type == FT_OCIL1B) {
         senstr = "OCI";
         GATT_VAL1 = "PACE OCI Level-1C Data";
-        nadir_bin_index =259;
+        nadir_bin_index = 259;
         xbins = 519;
-        NVIEWS = 2;
+        NVIEWS = 1;
         NBANDS = 286;  // 249 originally no polarization bands
-    } else
-    {
+    } else {
         senstr = "OCI";
         GATT_VAL1 = "PACE OCI Level-1C Data";
-        nadir_bin_index =259;
+        nadir_bin_index = 259;
         xbins = 519;
-        NVIEWS = 2;
+        NVIEWS = 1;
         NBANDS = 286;  // 249 ORIGINALLY no polarization bands
-    }
-
-    // views
-    float views[NVIEWS];
-    if (format.type == FT_SPEXONE) {
-        views[0] = -58;
-        views[1] = -20;
-        views[2] = 0;
-        views[3] = 20;
-        views[4] = 58;
-    } else if (format.type == FT_OCIL1B) {
-        views[0] = -20;  // OCI
-        views[1] = 20;
-    } else if (format.type == FT_HARP2) {
-        cout << "# views TBD.....ERROR.." << endl;
-        exit(1);
-    } else {             // OCI default in HKT---
-        views[0] = -20;  // OCI
-        views[1] = 20;
     }
 
     // creation date---
     date_created = unix2isodate(now(), 'G');
-   
+
     // global attributes---
 
     nc_output->putAtt("title", GATT_VAL1);
@@ -1160,7 +1147,7 @@ int meta_l1c_global(char *gridname, bin_str *binl1c,int16_t num_gridlines, NcFil
     nc_output->putAtt("product_name", prodstr);
     nc_output->putAtt("date_created", date_created);
     nc_output->putAtt("sun_earth_distance", ncFloat, BAD_FLT);
-    nc_output->putAtt("nadir_bin",NC_INT,nadir_bin_index);
+    nc_output->putAtt("nadir_bin", NC_INT, nadir_bin_index);
     nc_output->putAtt("bin_size_at_nadir", "5.2km2");
 
     NcDim ydim = nc_output->addDim("bins_along_track", ybins);
@@ -1191,20 +1178,27 @@ int meta_l1c_global(char *gridname, bin_str *binl1c,int16_t num_gridlines, NcFil
     NcGroup geo_grp = nc_output->addGroup("geolocation_data");
     NcGroup od_grp = nc_output->addGroup("observation_data");
 
-
     // vars
-    NcVar v1 = svb_grp.addVar("sensor_view_angle", ncFloat, vdim);
-    string longName = "Along-track view angles for sensor";
+
+    NcVar v1 = svb_grp.addVar("sensor_view_angle", ncFloat, ydim);
+    string longName = "Tilt angle along track";
     v1.putAtt("long_name", longName);
     string units = "degrees";
-    v1.putAtt("units", units);    
-    v1.putAtt("_FillValue", ncFloat,binl1c->fillval2);
-    float valid_min = -89;
+    v1.putAtt("units", units);
+    v1.putAtt("_FillValue", ncFloat, binl1c->fillval2);
+    float valid_min = -22.5;
     v1.putAtt("valid_min", ncFloat, valid_min);
-    float valid_max = 89;
+    float valid_max = 22.5;
     v1.putAtt("valid_max", ncFloat, valid_max);
-    v1.putVar(views);
 
+    // Add scan_quality_flags variable
+    v1 = ba_grp.addVar("scan_quality_flags", ncUbyte, ydim);
+    longName = "Scan quality flags";
+    v1.putAtt("long_name", longName);
+    v1.putAtt("_FillValue", ncUbyte, (unsigned char)255);
+    v1.putAtt("flag_meanings", "tilt_change");
+    unsigned char flag_values[] =  {1};
+    v1.putAtt("flag_masks", ncUbyte, 1, flag_values);
 
     if (format.type == FT_HARP2 || format.type == FT_SPEXONE) {
         NcDim pdim = nc_output->addDim("polarization_bands_per_view", NBANDS_POL);
@@ -1245,7 +1239,7 @@ int meta_l1c_global(char *gridname, bin_str *binl1c,int16_t num_gridlines, NcFil
     v1.putAtt("long_name", longName);
     units = "degrees_north";
     v1.putAtt("units", units);
-    v1.putAtt("_FillValue", ncFloat,binl1c->fillval2);
+    v1.putAtt("_FillValue", ncFloat, binl1c->fillval2);
     valid_min = -90;
     v1.putAtt("valid_min", ncFloat, valid_min);
     valid_max = 90;
@@ -1267,13 +1261,13 @@ int meta_l1c_global(char *gridname, bin_str *binl1c,int16_t num_gridlines, NcFil
     v1.putAtt("long_name", longName);
     units = "meters";
     v1.putAtt("units", units);
-    v1.putAtt("_FillValue", ncShort,binl1c->fillval1);
+    v1.putAtt("_FillValue", ncShort, binl1c->fillval1);
     // use min/max from gebco file
- //   short valid_min_s = -10952;
+    //   short valid_min_s = -10952;
     short valid_min_s = -10000;
     v1.putAtt("valid_min", ncShort, valid_min_s);
-//    short valid_max_s = 8627;
-    short valid_max_s=10000;
+    //    short valid_max_s = 8627;
+    short valid_max_s = 10000;
     v1.putAtt("valid_max", ncShort, valid_max_s);
 
     v1 = geo_grp.addVar("height_stdev", ncShort, dimvec2_geo);
@@ -1307,7 +1301,7 @@ int meta_l1c_global(char *gridname, bin_str *binl1c,int16_t num_gridlines, NcFil
     v1.putAtt("long_name", longName);
     units = "degrees";
     v1.putAtt("units", units);
-    v1.putAtt("_FillValue", ncShort,binl1c->fillval1);
+    v1.putAtt("_FillValue", ncShort, binl1c->fillval1);
     valid_min_s = 0;
     v1.putAtt("valid_min", ncShort, valid_min_s);
     valid_max_s = 18000;
@@ -1322,7 +1316,7 @@ int meta_l1c_global(char *gridname, bin_str *binl1c,int16_t num_gridlines, NcFil
     v1.putAtt("long_name", longName);
     units = "degrees";
     v1.putAtt("units", units);
-    v1.putAtt("_FillValue", ncShort,binl1c->fillval1);
+    v1.putAtt("_FillValue", ncShort, binl1c->fillval1);
     valid_min_s = -18000;
     v1.putAtt("valid_min", ncShort, valid_min_s);
     valid_max_s = 18000;
@@ -1337,7 +1331,7 @@ int meta_l1c_global(char *gridname, bin_str *binl1c,int16_t num_gridlines, NcFil
     v1.putAtt("long_name", longName);
     units = "degrees";
     v1.putAtt("units", units);
-    v1.putAtt("_FillValue", ncShort,binl1c->fillval1);
+    v1.putAtt("_FillValue", ncShort, binl1c->fillval1);
     valid_min_s = 0;
     v1.putAtt("valid_min", ncShort, valid_min_s);
     valid_max_s = 18000;
@@ -1352,7 +1346,7 @@ int meta_l1c_global(char *gridname, bin_str *binl1c,int16_t num_gridlines, NcFil
     v1.putAtt("long_name", longName);
     units = "degrees";
     v1.putAtt("units", units);
-    v1.putAtt("_FillValue", ncShort,binl1c->fillval1);
+    v1.putAtt("_FillValue", ncShort, binl1c->fillval1);
     valid_min_s = 0;
     v1.putAtt("valid_min", ncShort, valid_min_s);
     valid_max_s = 18000;
@@ -1361,21 +1355,6 @@ int meta_l1c_global(char *gridname, bin_str *binl1c,int16_t num_gridlines, NcFil
     v1.putAtt("scale_factor", ncFloat, scale_factor);
     add_offset = 0;
     v1.putAtt("add_offset", ncFloat, add_offset);
-
-    // v1 = geo_grp.addVar("rotation_angle", ncShort, dimvec3);
-    // longName = "Rotation angle at bin locations";
-    // v1.putAtt("long_name", longName);
-    // units = "degrees";
-    // v1.putAtt("units", units);
-    // v1.putAtt("_FillValue", ncShort, binl1c->fillval1);
-    // valid_min_s = 0;
-    // v1.putAtt("valid_min", ncShort, valid_min_s);
-    // valid_max_s = 18000;
-    // v1.putAtt("valid_max", ncShort, valid_max_s);
-    // scale_factor = 0.01;
-    // v1.putAtt("scale_factor", ncFloat, scale_factor);
-    // add_offset = 0;
-    // v1.putAtt("add_offset", ncFloat, add_offset);
 
     v1 = od_grp.addVar("number_of_observations", ncShort, dimvec3);
     longName = "Observations contributing to bin from each view";
@@ -1386,19 +1365,17 @@ int meta_l1c_global(char *gridname, bin_str *binl1c,int16_t num_gridlines, NcFil
     v1.putAtt("valid_max", ncShort, valid_max_s);
     v1.putAtt("coordinates", "geolocation_data/longitude geolocation_data/latitude");
 
-    if (format.type == FT_OCIL1B  || format.type == FT_HARP2) {
-        uint8_t FillValue3, valid_min2, valid_max2;
+    if (format.type == FT_OCIL1B || format.type == FT_HARP2) {
+        uint8_t FillValue3;
 
         v1 = od_grp.addVar("qc", ncUbyte, dimvec4);
         longName = "quality indicator";
         v1.putAtt("long_name", longName);
         FillValue3 = 255;
         v1.putAtt("_FillValue", ncUbyte, FillValue3);
-        valid_min2 = 0;
-        v1.putAtt("valid_min", ncUbyte, valid_min2);
-        valid_max2 = 10;
-        v1.putAtt("valid_max", ncUbyte, valid_max2);
         v1.putAtt("coordinates", "geolocation_data/longitude geolocation_data/latitude");
+        v1.putAtt("flag_masks", ncUbyte, 1);
+        v1.putAtt("flag_meanings", "saturation");
 
         v1 = od_grp.addVar("i", ncFloat, dimvec4);
         longName = "I Stokes vector component";
@@ -1417,7 +1394,7 @@ int meta_l1c_global(char *gridname, bin_str *binl1c,int16_t num_gridlines, NcFil
         v1.putAtt("long_name", longName);
         units = "W m^-2 sr^-1 um^-1";
         v1.putAtt("units", units);
-        v1.putAtt("_FillValue", ncFloat,binl1c->fillval2);
+        v1.putAtt("_FillValue", ncFloat, binl1c->fillval2);
         valid_min = 0;
         v1.putAtt("valid_min", ncFloat, valid_min);
         valid_max = 800;
@@ -1454,42 +1431,30 @@ int bintime_l1c(filehandle *l1file, l1str *l1rec, bin_str *binstr, short **gdind
         gd_row = gdindex[pix][0] - 1;
         gd_col = gdindex[pix][1] - 1;
         tilt = l1rec->tilt;
-        view = BAD_FLT;
+        view = 0;
 
         // 1 view at the time for OCI!!!!
         if (l1rec->tilt != fill_tilt && l1rec->tilt < -18) {  //-19.9 previous
-            view = 0;
             tilt = l1rec->tilt;
         } else if (l1rec->tilt != fill_tilt && l1rec->tilt > 18) {  // 19.9 previous
-            view = 1;
             tilt = l1rec->tilt;
         }
 
         if (gd_row >= 2000) {
             tilt = 22;
-            view = 1;
-            //           if(binstr->verbose) cout<<"pix # "<<pix+1<<"pos tilt beyond L1C
-            //           grid"<<tilt<<"gd_row"<<gd_row<<endl;
             tilt = fill_tilt;
         }
         if (gd_row <= -1) {
             tilt = -22;
             view = 0;
-            //         if(binstr->verbose)  cout<<"pix # "<<pix+1<<"neg tilt beyond L1C
-            //         grid"<<tilt<<"gd_row"<<gd_row<<endl;
             tilt = fill_tilt;
         }
 
-        //                  if(binstr->verbose)  cout<<"pix # "<<pix+1<<"scantime "<<scantime<<"min scantime
-        //                  "<<mintime<<"max scantime "<<maxtime<<"gd_row "<<gd_row<<"gd_col "<<gd_col<<"tilt
-        //                  "<<tilt<<endl;
         // Cumulative values---
-        if (view != BAD_FLT && tilt != fill_tilt && gd_row >= 0 && gd_col >= 0 &&
+        if (tilt != fill_tilt && gd_row >= 0 && gd_col >= 0 &&
             gd_row <= binstr->num_gridlines - 1 && gd_col <= binstr->nbinx - 1 && scantime != timefill &&
             scantime >= mintime && scantime <= maxtime) {  // and row<=ybin and col<xbin, I need time counter
             binstr->time_l1b[gd_row][gd_col][view] = binstr->time_l1b[gd_row][gd_col][view] + scantime;
-            //                    if(binstr->verbose)  cout<<"pix # "<<pix+1<<"binning time at row
-            //                    "<<gd_row+1<<"col "<<gd_col+1<<endl;
         }
 
     }  // end pixel
@@ -1498,7 +1463,7 @@ int bintime_l1c(filehandle *l1file, l1str *l1rec, bin_str *binstr, short **gdind
 }
 
 int parallax(filehandle *l1file, const char *l1c_anc, const char *l1c_grid, l1str *l1rec, bin_str *binl1c,
-             short **gdindex, NcFile *nc_output,int32_t sline,int firstcall) {
+             short **gdindex, NcFile *nc_output, int32_t sline, int firstcall) {
     short gd_row = -1, gd_col = -1;
     string l1c_str = l1c_grid;
     string l1c_str2 = l1c_anc;
@@ -1507,26 +1472,30 @@ int parallax(filehandle *l1file, const char *l1c_anc, const char *l1c_grid, l1st
     float **cth = nullptr, **height = nullptr;
     float scale_factor;
     short sena_min, sena_max, senz_min, senz_max;
-    int result = 0,status;
-    float look_angle,*scan_angle=nullptr;//in addition to ccd bands also there is scan angle swir
-    int navGrp,scangId;
-    size_t start[] = { 0, 0,};
-    size_t count[] = { 1, 1 };
-    start[0]=sline;
-    start[1]=0;
-    count[0]=1;
-    count[1]=l1file->npix;
+    int result = 0, status;
+    float look_angle, *scan_angle = nullptr;  // in addition to ccd bands also there is scan angle swir
+    int navGrp, scangId;
+    size_t start[] = {
+        0,
+        0,
+    };
+    size_t count[] = {1, 1};
+    start[0] = sline;
+    start[1] = 0;
+    count[0] = 1;
+    count[1] = l1file->npix;
 
-    if(firstcall==0){ scan_angle = (float*)calloc(l1file->npix,sizeof(float));firstcall=1;}
-    
-    
+    if (firstcall == 0) {
+        scan_angle = (float *)calloc(l1file->npix, sizeof(float));
+        firstcall = 1;
+    }
 
     status = nc_inq_grp_ncid(l1file->sd_id, "navigation_data", &navGrp);
-        check_err(status, __LINE__, __FILE__);
+    check_err(status, __LINE__, __FILE__);
     status = nc_inq_varid(navGrp, "CCD_scan_angles", &scangId);
-        check_err(status, __LINE__, __FILE__);
+    check_err(status, __LINE__, __FILE__);
     status = nc_get_vara_float(navGrp, scangId, start, count, scan_angle);
-        check_err(status, __LINE__, __FILE__);
+    check_err(status, __LINE__, __FILE__);
 
     NcFile *nc_l1cgrid;
     try {
@@ -1546,29 +1515,29 @@ int parallax(filehandle *l1file, const char *l1c_anc, const char *l1c_grid, l1st
     v1.getVar(&height[0][0]);
 
     // anc file
-   NcFile *nc_l1canc;
-   if (binl1c->cloudem_flag == 1){
-    try {
-        nc_l1canc = new NcFile(l1c_anc, NcFile::read);
-    } catch (NcException &e) {
-        e.what();
-        cerr << "l1cgen l1c_pflag= 8:: Failure reading L1C-ANCfile: " + l1c_str2 << endl;
-        exit(1);
-    }
+    NcFile *nc_l1canc;
+    if (binl1c->cloudem_flag == 1) {
+        try {
+            nc_l1canc = new NcFile(l1c_anc, NcFile::read);
+        } catch (NcException &e) {
+            e.what();
+            cerr << "l1cgen l1c_pflag= 8:: Failure reading L1C-ANCfile: " + l1c_str2 << endl;
+            exit(1);
+        }
 
-    // 2-d as L1C grid but different nlines, get cth_ice_cloud, cth_water_cloud vars
-    NcDim yd2 = nc_l1canc->getDim("bins_along_track");
-    NcDim xd2 = nc_l1canc->getDim("bins_across_track");
-    cth = allocate2d_float(yd2.getSize(), xd2.getSize());
-    if (binl1c->cloud_type == 0) {
-        v1 = nc_l1canc->getVar("cth_water_cloud");
-        v1.getVar(&cth[0][0]);
+        // 2-d as L1C grid but different nlines, get cth_ice_cloud, cth_water_cloud vars
+        NcDim yd2 = nc_l1canc->getDim("bins_along_track");
+        NcDim xd2 = nc_l1canc->getDim("bins_across_track");
+        cth = allocate2d_float(yd2.getSize(), xd2.getSize());
+        if (binl1c->cloud_type == 0) {
+            v1 = nc_l1canc->getVar("cth_water_cloud");
+            v1.getVar(&cth[0][0]);
+        }
+        if (binl1c->cloud_type == 1) {
+            v1 = nc_l1canc->getVar("cth_ice_cloud");
+            v1.getVar(&cth[0][0]);
+        }
     }
-    if (binl1c->cloud_type == 1) {
-        v1 = nc_l1canc->getVar("cth_ice_cloud");
-        v1.getVar(&cth[0][0]);
-    }
-   }
     // compute displacement and new lat/lon for each pixel and 1 LINE!
     // compute new lat and lon
 
@@ -1612,7 +1581,8 @@ int parallax(filehandle *l1file, const char *l1c_anc, const char *l1c_grid, l1st
                     Hsat * 0.001 * l1rec->height[pix] * tan(look_angle) / (Hsat - 0.001 * l1rec->height[pix]);
             }
 
-            lat_new[pix] = l1rec->lat[pix] * OEL_DEGRAD - dv * cos(l1rec->sena[pix] * OEL_DEGRAD + OEL_PI) / Re;
+            lat_new[pix] =
+                l1rec->lat[pix] * OEL_DEGRAD - dv * cos(l1rec->sena[pix] * OEL_DEGRAD + OEL_PI) / Re;
             lon_new[pix] = l1rec->lon[pix] * OEL_DEGRAD - dv * sin((l1rec->sena[pix] * OEL_DEGRAD + OEL_PI)) /
                                                               (Re * cos(lat_new[pix] * OEL_DEGRAD));
 
@@ -1638,7 +1608,8 @@ int parallax(filehandle *l1file, const char *l1c_anc, const char *l1c_grid, l1st
     result = search_l1c_parallax(l1file, lat_new, lon_new, binl1c, gdindex);
 
     nc_l1cgrid->close();
-    if (binl1c->cloudem_flag == 1) nc_l1canc->close();
+    if (binl1c->cloudem_flag == 1)
+        nc_l1canc->close();
     if (cth != nullptr)
         free2d_float(cth);
     if (height != nullptr)
@@ -1648,7 +1619,10 @@ int parallax(filehandle *l1file, const char *l1c_anc, const char *l1c_grid, l1st
     if (lon_new != nullptr)
         free(lon_new);
 
-   if(sline==l1file->nscan-1){  if (scan_angle != nullptr) free(scan_angle);}
+    if (sline == l1file->nscan - 1) {
+        if (scan_angle != nullptr)
+            free(scan_angle);
+    }
 
     return result;
 }
@@ -1668,9 +1642,86 @@ int bin_l1c(filehandle *l1file, l1str *l1rec, bin_str *binl1c, short **gdindex, 
     short fill_height = binl1c->fillval2;
     float tilt = binl1c->fillval2;
     double rotangle;
-    float seed_mean;
+
     NcGroup geo_grp = nc_output->getGroup("geolocation_data");
     NcGroup od_grp = nc_output->getGroup("observation_data");
+
+    int status = 0;
+
+    // get access to OCI L1B QC varaibles
+    static int observation_data_group;
+    static int qual_blue_id;
+    static int qual_red_id;
+    static int qual_swir_id;
+
+    static uint8_t **qual_swir;
+    static size_t num_SWIR_bands;
+    static uint8_t **qual_red;
+    static size_t num_red_bands;
+    static uint8_t **qual_blue;
+    static size_t num_blue_bands;
+
+    static bool firstCall = true;
+    if(firstCall) {
+        firstCall = false;
+
+        int dimid;
+
+        //  PolcorOciData *oci_private = (PolcorOciData*) l1rec->private_data;
+        status = nc_inq_grp_ncid(l1file->sd_id, "observation_data", &observation_data_group);
+        check_err(status, __LINE__, __FILE__);
+        status = nc_inq_varid(observation_data_group, "qual_blue", &qual_blue_id);
+        check_err(status, __LINE__, __FILE__);
+        status = nc_inq_varid(observation_data_group, "qual_red", &qual_red_id);
+        check_err(status, __LINE__, __FILE__);
+        status = nc_inq_varid(observation_data_group, "qual_SWIR", &qual_swir_id);
+        check_err(status, __LINE__, __FILE__);
+
+        status = nc_inq_dimid(l1file->sd_id, "SWIR_bands", &dimid);
+        if (status != NC_NOERR) {
+            fprintf(stderr, "-E- Error reading num_SWIR_bands.\n");
+            exit(EXIT_FAILURE);
+        };
+        nc_inq_dimlen(l1file->sd_id, dimid, &num_SWIR_bands);
+        qual_swir = allocate2d_uchar(num_SWIR_bands, npix);
+
+        status = nc_inq_dimid(l1file->sd_id, "red_bands", &dimid);
+        if (status != NC_NOERR) {
+            fprintf(stderr, "-E- Error reading num_red_bands.\n");
+            exit(EXIT_FAILURE);
+        };
+        nc_inq_dimlen(l1file->sd_id, dimid, &num_red_bands);
+        qual_red = allocate2d_uchar(num_red_bands, npix);
+
+        status = nc_inq_dimid(l1file->sd_id, "blue_bands", &dimid);
+        if (status != NC_NOERR) {
+            fprintf(stderr, "-E- Error reading num_blue_bands.\n");
+            exit(EXIT_FAILURE);
+        };
+        nc_inq_dimlen(l1file->sd_id, dimid, &num_blue_bands);
+        qual_blue = allocate2d_uchar(num_blue_bands, npix);
+
+    }
+
+    size_t start[] = {0, 0, 0};
+    size_t count[] = {1, 1, 1};
+
+    start[0] = 0;
+    start[1] = binl1c->scan;
+    start[2] = 0;
+    count[0] = num_SWIR_bands;
+    count[1] = 1;  // 1 line at a time
+    count[2] = npix;
+    status = nc_get_vara_ubyte(observation_data_group, qual_swir_id, start, count, qual_swir[0]);
+    check_err(status, __LINE__, __FILE__);
+
+    count[0] = num_red_bands;
+    status = nc_get_vara_ubyte(observation_data_group, qual_red_id, start, count, qual_red[0]);
+    check_err(status, __LINE__, __FILE__);
+
+    count[0] = num_blue_bands;
+    status = nc_get_vara_ubyte(observation_data_group, qual_blue_id, start, count, qual_blue[0]);
+    check_err(status, __LINE__, __FILE__);
 
     // altitude
     NcVar v1 = geo_grp.getVar("height");
@@ -1744,50 +1795,60 @@ int bin_l1c(filehandle *l1file, l1str *l1rec, bin_str *binl1c, short **gdindex, 
     a1.getValues(&minval2_all[0]);
     a1 = v1.getAtt("valid_max");  // root group
     a1.getValues(&maxval2_all[0]);
-  
+
+    // need these to map into the L1B file red, blue and SWIR planes
+    int32_t max_blue_index = expected_num_blue_bands - skipped_blue_bands;
+    int32_t max_red_index = max_blue_index + expected_num_red_bands;
     for (int pix = 0; pix < npix; pix++) {
         gd_row = gdindex[pix][0] - 1;
         gd_col = gdindex[pix][1] - 1;
         tilt = l1rec->tilt;
-        view = BAD_FLT;
+        view = 0;
 
         if (l1rec->tilt != fill_tilt && l1rec->tilt < -18) {  //-19.9 previous
-            view = 0;
             tilt = l1rec->tilt;
         } else if (l1rec->tilt != fill_tilt && l1rec->tilt > 18) {  // 19.9 previous
-            view = 1;
             tilt = l1rec->tilt;
         }
         if (gd_row >= 2000) {
             tilt = 22;
-            view = 1;
             tilt = fill_tilt;
         }
         if (gd_row <= -1) {
             tilt = -22;
-            view = 0;
             tilt = fill_tilt;
         }
+        // 1 d arrays
+
+        if (tilt != fill_tilt && gd_row >= 0 && gd_col >= 0 && gd_row <= binl1c->num_gridlines - 1 &&
+            gd_col <= binl1c->nbinx - 1 && l1rec->lat[pix] != binl1c->fillval2 &&
+            l1rec->lon[pix] != binl1c->fillval2) {
+            binl1c->tilt_angle[gd_row] =
+                (binl1c->tilt_angle[gd_row] * binl1c->count_1d[gd_row] + l1rec->tilt) /
+                (binl1c->count_1d[gd_row] + 1);
+            binl1c->count_1d[gd_row]++;
+            binl1c->scan_quality_flags[gd_row] |= l1rec->navwarn[pix];
+        }
+
 
         // 2-D arrays---needing to add fillvalue != for l1rec->alt[pix]
-        if (view != BAD_FLT && tilt != fill_tilt && gd_row >= 0 && gd_col >= 0 &&
+        if (tilt != fill_tilt && gd_row >= 0 && gd_col >= 0 &&
             gd_row <= binl1c->num_gridlines - 1 && gd_col <= binl1c->nbinx - 1 &&
             l1rec->lat[pix] != binl1c->fillval2 && l1rec->lon[pix] != binl1c->fillval2) {
             if (l1rec->height[pix] != fill_height)  // ADD MIN/MAX CONSTRAINT
             {
                 binl1c->nrec_2D[gd_row][gd_col] += 1;
-                binl1c->alt_2D[gd_row][gd_col] =
-                    binl1c->alt_2D[gd_row][gd_col] + l1rec->height[pix]; 
+                binl1c->alt_2D[gd_row][gd_col] = binl1c->alt_2D[gd_row][gd_col] + l1rec->height[pix];
             }
             binl1c->inpix++;
-         
+
         } else {
             binl1c->outpix++;
         }
 
         // Cumulative values---
         // geometry
-        if (view != BAD_FLT && tilt != fill_tilt && gd_row >= 0 && gd_col >= 0 &&
+        if (tilt != fill_tilt && gd_row >= 0 && gd_col >= 0 &&
             gd_row <= binl1c->num_gridlines - 1 && gd_col <= binl1c->nbinx - 1 &&
             l1rec->senz[pix] != binl1c->fillval1 && l1rec->senz[pix] >= minval1_all[2] &&
             l1rec->senz[pix] <= maxval1_all[2]) {
@@ -1812,21 +1873,26 @@ int bin_l1c(filehandle *l1file, l1str *l1rec, bin_str *binl1c, short **gdindex, 
 
         ibp = pix * nbands;
 
-        for (sb = 0; sb < nbands; sb++) {
-           if (view != BAD_FLT && tilt != fill_tilt && gd_row >= 0 && gd_col >= 0 &&
-                gd_row <= binl1c->num_gridlines - 1 && gd_col <= binl1c->nbinx - 1 && l1rec->Lt[ibp] != binl1c->fillval2 && l1rec->Lt[ibp] >= minval2_all[0] && 10 * l1rec->Lt[ibp] <= maxval2_all[0]){
-                binl1c->I_4D[gd_row][gd_col][view][sb] =
-                    binl1c->I_4D[gd_row][gd_col][view][sb] + 10 * l1rec->Lt[ibp];    
-                binl1c->nrec_4D_band[gd_row][gd_col][view][sb] += 1;
-                binl1c->nrec_3D_view[gd_row][gd_col][view] += 1;
+        int32_t red_index = 0;
+        int32_t swir_index = 0;
 
-                if(binl1c->i_diff2[gd_row][gd_col][view][sb]==0)
-                {  
-                     seed_mean=10 * l1rec->Lt[ibp];
-                     binl1c->i_diff2[gd_row][gd_col][view][sb]=0.01;//offset substracted before stdev
-                }
-                else{
-                 binl1c->i_diff2[gd_row][gd_col][view][sb]+=(10 * l1rec->Lt[ibp]-seed_mean)*(10 * l1rec->Lt[ibp]-seed_mean);
+        for (sb = 0; sb < nbands; sb++) {
+            if (tilt != fill_tilt && gd_row >= 0 && gd_col >= 0 &&
+                gd_row <= binl1c->num_gridlines - 1 && gd_col <= binl1c->nbinx - 1 &&
+                l1rec->Lt[ibp] != binl1c->fillval2 && l1rec->Lt[ibp] * 10 >= minval2_all[0] &&
+                10 * l1rec->Lt[ibp] <= maxval2_all[0]) {
+
+                // use Welford's algorithm for mean and variance
+                binl1c->nrec_4D_band[gd_row][gd_col][view][sb] += 1;
+                float count = binl1c->nrec_4D_band[gd_row][gd_col][view][sb];
+                float new_value = 10 * l1rec->Lt[ibp];
+                if(count == 1) {
+                    binl1c->I_4D[gd_row][gd_col][view][sb] = new_value;
+                } else {
+                    float delta1 = new_value - binl1c->I_4D[gd_row][gd_col][view][sb];
+                    binl1c->I_4D[gd_row][gd_col][view][sb] += delta1 / count;
+                    float delta2 = new_value - binl1c->I_4D[gd_row][gd_col][view][sb];
+                    binl1c->i_diff2[gd_row][gd_col][view][sb] += delta1 * delta2;
                 }
 
                 if (gd_row > binl1c->num_gridlines - 1 || gd_col > binl1c->nbinx - 1) {
@@ -1835,7 +1901,30 @@ int bin_l1c(filehandle *l1file, l1str *l1rec, bin_str *binl1c, short **gdindex, 
                         cout << "row.." << gd_row << "gd_col.." << gd_col << endl;
                     }
                 }
-                // missing QC an QC_bitwise variables
+
+                // read qual data in for the line, pixel.
+                // remember that the whole red plane is used and only some of the blue.
+
+                // For SWIR bands just use the saturation flag for the low gain channels
+                // since the low gain band is used if either high gain saturates
+                // band index 2 low gain
+                // band index 3 high gain
+                // band index 5 low gain
+                // band index 6 high gain
+
+                if (sb < max_blue_index) {
+                    binl1c->QC_bitwise_4D[gd_row][gd_col][view][sb] |= qual_blue[sb][pix];
+                } else if (max_blue_index <= sb && sb < max_red_index) {
+                    binl1c->QC_bitwise_4D[gd_row][gd_col][view][sb] |= qual_red[red_index][pix];
+                    red_index++;
+                } else { // max_red_index <= sb && sb < max_swir_index (which is nbands)
+                    binl1c->QC_bitwise_4D[gd_row][gd_col][view][sb] |= qual_swir[swir_index][pix];
+                    swir_index++;
+
+                    // skip over high gain SWIR bands
+                    if(swir_index == 3 || swir_index == 6)
+                        swir_index++;
+                }
             }
             ibp++;
         }  // bands
@@ -1890,9 +1979,9 @@ int check_l1c_time(const char *l1b_file, const char *l1c_grid, bin_str *binl1c) 
         }
     } else {
         yd = nc_l1b->getDim("scans");
-        if(yd.isNull()) {
+        if (yd.isNull()) {
             yd = nc_l1b->getDim("number_of_scans");
-            if(yd.isNull()) {
+            if (yd.isNull()) {
                 cerr << "ERROR - could not read number of scans dimension" << endl;
                 exit(EXIT_FAILURE);
             }
@@ -2024,7 +2113,6 @@ int open_l1c_grid(const char *ifile_l1c, bin_str *binl1c, float **lat_gd, float 
     return 0;
 }
 
-
 double search_calc_dotprod(bin_str *binl1c, float bvec[3], int32_t gridline) {
     int32_t nbinx = binl1c->nbinx;
     float gnvec[3];
@@ -2037,29 +2125,32 @@ double search_calc_dotprod(bin_str *binl1c, float bvec[3], int32_t gridline) {
             cout << "lat lon for L1C GRID out of the boundaries.." << endl;
         exit(1);
     }
-    if (binl1c->lat_gd[gridline][0] > 90 || binl1c->lat_gd[gridline][0] < -90 || binl1c->lon_gd[gridline][0] < -180 ||
-        binl1c->lon_gd[gridline][0] > 180) {
+    if (binl1c->lat_gd[gridline][0] > 90 || binl1c->lat_gd[gridline][0] < -90 ||
+        binl1c->lon_gd[gridline][0] < -180 || binl1c->lon_gd[gridline][0] > 180) {
         if (binl1c->verbose)
             cout << "lat lon for L1C GRID out of the boundaries.." << endl;
         exit(1);
     }
 
     gnvec[0] = sin(binl1c->lon_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
-                    cos(binl1c->lat_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
-                    sin(binl1c->lat_gd[gridline][0] * OEL_DEGRAD) -
-                sin(binl1c->lat_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
-                    sin(binl1c->lon_gd[gridline][0] * OEL_DEGRAD) * cos(binl1c->lat_gd[gridline][0] * OEL_DEGRAD);
+                   cos(binl1c->lat_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
+                   sin(binl1c->lat_gd[gridline][0] * OEL_DEGRAD) -
+               sin(binl1c->lat_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
+                   sin(binl1c->lon_gd[gridline][0] * OEL_DEGRAD) *
+                   cos(binl1c->lat_gd[gridline][0] * OEL_DEGRAD);
     gnvec[1] = sin(binl1c->lat_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
-                    cos(binl1c->lon_gd[gridline][0] * OEL_DEGRAD) * cos(binl1c->lat_gd[gridline][0] * OEL_DEGRAD) -
-                cos(binl1c->lon_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
-                    cos(binl1c->lat_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
-                    sin(binl1c->lat_gd[gridline][0] * OEL_DEGRAD);
-    gnvec[2] = cos(binl1c->lon_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
-                    cos(binl1c->lat_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
-                    sin(binl1c->lon_gd[gridline][0] * OEL_DEGRAD) * cos(binl1c->lat_gd[gridline][0] * OEL_DEGRAD) -
-                sin(binl1c->lon_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
-                    cos(binl1c->lat_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
-                    cos(binl1c->lon_gd[gridline][0] * OEL_DEGRAD) * cos(binl1c->lat_gd[gridline][0] * OEL_DEGRAD);
+                   cos(binl1c->lon_gd[gridline][0] * OEL_DEGRAD) *
+                   cos(binl1c->lat_gd[gridline][0] * OEL_DEGRAD) -
+               cos(binl1c->lon_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
+                   cos(binl1c->lat_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
+                   sin(binl1c->lat_gd[gridline][0] * OEL_DEGRAD);
+    gnvec[2] =
+        cos(binl1c->lon_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
+            cos(binl1c->lat_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
+            sin(binl1c->lon_gd[gridline][0] * OEL_DEGRAD) * cos(binl1c->lat_gd[gridline][0] * OEL_DEGRAD) -
+        sin(binl1c->lon_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
+            cos(binl1c->lat_gd[gridline][nbinx - 1] * OEL_DEGRAD) *
+            cos(binl1c->lon_gd[gridline][0] * OEL_DEGRAD) * cos(binl1c->lat_gd[gridline][0] * OEL_DEGRAD);
 
     // vector norm
     gnvm = sqrt(gnvec[0] * gnvec[0] + gnvec[1] * gnvec[1] + gnvec[2] * gnvec[2]);
@@ -2082,14 +2173,11 @@ double search_calc_dotprod(bin_str *binl1c, float bvec[3], int32_t gridline) {
     return gnvec[0] * bvec[0] + gnvec[1] * bvec[1] + gnvec[2] * bvec[2];
 }
 
-
-
-
 int search_l1c_parallax(filehandle *l1file, float *lat_new, float *lon_new, bin_str *binl1c,
                         short **gdindex) {
-    int32_t num_gridlines, nbinx;   
+    int32_t num_gridlines, nbinx;
     int flag_out = -1;
-    size_t pix,badpix;
+    size_t pix, badpix;
     int32_t i;
     size_t num_pixels;
     int irow = -1, col = -1;
@@ -2103,7 +2191,7 @@ int search_l1c_parallax(filehandle *l1file, float *lat_new, float *lon_new, bin_
 
     num_gridlines = binl1c->num_gridlines;
     nbinx = binl1c->nbinx;
-    num_pixels = l1file->npix; 
+    num_pixels = l1file->npix;
     db = (5.2) / 6371 / 2;  // Half of bin size in radians, resolution in km
     double db_fudge = db * 1.5;
 
@@ -2128,18 +2216,18 @@ int search_l1c_parallax(filehandle *l1file, float *lat_new, float *lon_new, bin_
         bvec[2] = sin(lat_new[pix] * OEL_DEGRAD);
 
         last_dotprod = search_calc_dotprod(binl1c, bvec, last_dotprod_index);
-        if(last_dotprod < 0)
+        if (last_dotprod < 0)
             last_dotprod = 0 - last_dotprod;
         double min_dotprod = last_dotprod;
         int min_dotprod_index = last_dotprod_index;
-	    bool found_new = false;
+        bool found_new = false;
 
         // look right
-        for (i = last_dotprod_index+1; i < num_gridlines; i++) {
+        for (i = last_dotprod_index + 1; i < num_gridlines; i++) {
             dotprod = search_calc_dotprod(binl1c, bvec, i);
-            if(dotprod < 0)
+            if (dotprod < 0)
                 dotprod = 0 - dotprod;
-            if(dotprod > last_dotprod)
+            if (dotprod > last_dotprod)
                 break;
             if (dotprod < min_dotprod) {
                 found_new = true;
@@ -2151,12 +2239,12 @@ int search_l1c_parallax(filehandle *l1file, float *lat_new, float *lon_new, bin_
         }  // end lines
 
         // look left
-        if(!found_new && last_dotprod_index > 0) {
-            for (i = last_dotprod_index-1; i >= 0; i--) {
+        if (!found_new && last_dotprod_index > 0) {
+            for (i = last_dotprod_index - 1; i >= 0; i--) {
                 dotprod = search_calc_dotprod(binl1c, bvec, i);
-                if(dotprod < 0)
+                if (dotprod < 0)
                     dotprod = 0 - dotprod;
-                if(dotprod > last_dotprod)
+                if (dotprod > last_dotprod)
                     break;
                 if (dotprod < min_dotprod) {
                     min_dotprod = dotprod;
@@ -2165,7 +2253,7 @@ int search_l1c_parallax(filehandle *l1file, float *lat_new, float *lon_new, bin_
                     last_dotprod_index = i;
                 }
             }  // end lines
-        } // not found_new
+        }  // not found_new
 
         if (min_dotprod <= db_fudge) {
             gdindex[pix][0] = min_dotprod_index + 1;
@@ -2183,7 +2271,8 @@ int search_l1c_parallax(filehandle *l1file, float *lat_new, float *lon_new, bin_
             irow = gdindex[pix][0] - 1;
 
             if (irow < 0) {
-                if (binl1c->verbose)cout << "ERROR irow<0 in search_l1c..." << irow << "at pix#.." << pix + 1 << endl;
+                if (binl1c->verbose)
+                    cout << "ERROR irow<0 in search_l1c..." << irow << "at pix#.." << pix + 1 << endl;
                 flag_out = 110;
                 return flag_out;
             }
@@ -2235,14 +2324,13 @@ int search_l1c_parallax(filehandle *l1file, float *lat_new, float *lon_new, bin_
 
     if (badpix == num_pixels) {
         flag_out = 110;
-		 } else
+    } else
         flag_out = 0;
 
     if (binl1c->verbose && flag_out == 110)
         cout << "THIS LINE WILL BE SKIPPED -- NO PIXELS BINNED.............." << endl;
 
-   return flag_out;
-
+    return flag_out;
 }
 
 int search_l1c(filehandle *l1file, l1str *l1rec, bin_str *binl1c, short **gdindex) {
@@ -2293,18 +2381,18 @@ int search_l1c(filehandle *l1file, l1str *l1rec, bin_str *binl1c, short **gdinde
         bvec[2] = sin(l1rec->lat[pix] * OEL_DEGRAD);
 
         last_dotprod = search_calc_dotprod(binl1c, bvec, last_dotprod_index);
-        if(last_dotprod < 0)
+        if (last_dotprod < 0)
             last_dotprod = 0 - last_dotprod;
         double min_dotprod = last_dotprod;
         int min_dotprod_index = last_dotprod_index;
         bool found_new = false;
 
         // look right
-        for (i = last_dotprod_index+1; i < num_gridlines; i++) {
+        for (i = last_dotprod_index + 1; i < num_gridlines; i++) {
             dotprod = search_calc_dotprod(binl1c, bvec, i);
-            if(dotprod < 0)
+            if (dotprod < 0)
                 dotprod = 0 - dotprod;
-            if(dotprod > last_dotprod)
+            if (dotprod > last_dotprod)
                 break;
             if (dotprod < min_dotprod) {
                 found_new = true;
@@ -2316,12 +2404,12 @@ int search_l1c(filehandle *l1file, l1str *l1rec, bin_str *binl1c, short **gdinde
         }  // end lines
 
         // look left
-        if(!found_new && last_dotprod_index > 0) {
-            for (i = last_dotprod_index-1; i >= 0; i--) {
+        if (!found_new && last_dotprod_index > 0) {
+            for (i = last_dotprod_index - 1; i >= 0; i--) {
                 dotprod = search_calc_dotprod(binl1c, bvec, i);
-                if(dotprod < 0)
+                if (dotprod < 0)
                     dotprod = 0 - dotprod;
-                if(dotprod > last_dotprod)
+                if (dotprod > last_dotprod)
                     break;
                 if (dotprod < min_dotprod) {
                     min_dotprod = dotprod;
@@ -2330,7 +2418,7 @@ int search_l1c(filehandle *l1file, l1str *l1rec, bin_str *binl1c, short **gdinde
                     last_dotprod_index = i;
                 }
             }  // end lines
-        } // not found_new
+        }  // not found_new
 
         if (min_dotprod <= db_fudge) {
             gdindex[pix][0] = min_dotprod_index + 1;
@@ -2539,13 +2627,11 @@ double rot_angle(double senz, double solz, double sena, double suna) {
         double cosenz = cos(senz * OEL_DEGRAD);
         double term1 = -1 * cosunz + cosenz * cos(senz * OEL_DEGRAD + OEL_DEGRAD);
         double cos2 = 0.5 * (cos(2 * senz * OEL_DEGRAD) + 1);
-        double term3 =
-            sqrt(1 - cos(senz * OEL_DEGRAD + OEL_DEGRAD) * cos(senz * OEL_DEGRAD + OEL_DEGRAD));
+        double term3 = sqrt(1 - cos(senz * OEL_DEGRAD + OEL_DEGRAD) * cos(senz * OEL_DEGRAD + OEL_DEGRAD));
 
-        if ((sena - suna) < 2 * 180. && (sena - suna) > 180.)
-            term2 = sqrt(1 - cos2) * term3;
+        term2 = sqrt(1 - cos2) * term3;
         if ((sena - suna) < 180. && (sena - suna) > 0.)
-            term2 = -1 * sqrt(1 - cos2) * term3;
+            term2 = -term2;
 
         double cos_alpha = term1 / term2;
 

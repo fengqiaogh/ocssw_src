@@ -26,6 +26,7 @@ typedef struct l1_input_struct {
     char pversion[1024];
     char input_parms[64000];  // lim is 65K, just do this
     char input_files[6144];
+    char f0file[FILENAME_MAX]; // solar irradiance filename
 
     int32_t rad_opt; /* radcor switch for MERIS smile correction */
     int32_t geom_per_band; /* 0 - use nominal geometry sen/sol_a/a
@@ -44,7 +45,6 @@ typedef struct l1_input_struct {
     float cirrus_thresh[2]; /* cirrus reflectance thresholds    */
     float albedo; /* cloud reflectance threshold      */
     float cloud_wave; /* cloud test wavelength            */
-    float cloud_eps; /* cloud reflectance ratio          */
     float glint; /* glint threshold                  */
     float extreme_glint;/* extreme glint threshold   */
     float sunzen; /* solar zenith angle threshold     */

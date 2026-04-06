@@ -117,9 +117,11 @@ int32_t l2_str::openl2_ocis_l1c(L1C_input *l1cinput, l2_str *l2str, l1c_filehand
     boost::trim_if(l2prod_str, boost::is_any_of(delim1));
     vector<string> prodparam;
     boost::algorithm::split(prodparam, l2prod_str, boost::is_any_of(delim1));
-    if(l1cinput->verbose) cout << "number of L2 products to be processed...................#:..." << prodparam.size() << endl;
+    if (l1cinput->verbose)
+        cout << "number of L2 products to be processed...................#:..." << prodparam.size() << endl;
     for (size_t iprod = 0; iprod < prodparam.size(); iprod++) {
-       if(l1cinput->verbose) cout << "selected L2 ----------- prodparam...." << prodparam[iprod] << endl;
+        if (l1cinput->verbose)
+            cout << "selected L2 ----------- prodparam...." << prodparam[iprod] << endl;
     }
 
     // nl2prod member of l2_str
@@ -267,7 +269,8 @@ int32_t l2_str::openl2_ocis_l1c(L1C_input *l1cinput, l2_str *l2str, l1c_filehand
     check_err(status, __LINE__, __FILE__);
 
     for (size_t iprod = 0; iprod < nl2prod; iprod++) {
-        if(l1cinput->verbose) cout << "getting sds id for product.." << prodparam[iprod].c_str() << endl;
+        if (l1cinput->verbose)
+            cout << "getting sds id for product.." << prodparam[iprod].c_str() << endl;
         status = nc_inq_varid(observationGrp, prodparam[iprod].c_str(), &prodims[iprod]);
         check_err(status, __LINE__, __FILE__);
     }
@@ -349,17 +352,17 @@ int32_t l2_str::closel2_ocis_l1c(l2_str *l2str, l1c_filehandle *l1cfile) {
     // Free memory
 
     if (l2str->latpix != nullptr)
-        free (l2str->latpix);
+        free(l2str->latpix);
     if (l2str->lonpix != nullptr)
-        free (l2str->lonpix);
+        free(l2str->lonpix);
     if (l2str->slopeprod != nullptr)
-        free (l2str->slopeprod);
+        free(l2str->slopeprod);
     if (l2str->offsetprod != nullptr)
-        free (l2str->offsetprod);
+        free(l2str->offsetprod);
     if (l2str->tilt != nullptr)
-        free (l2str->tilt);
+        free(l2str->tilt);
     if (l2str->l2prod != nullptr)
-        free (l2str->l2prod);
+        free(l2str->l2prod);
 
     if (tmpShort)
         free(tmpShort);

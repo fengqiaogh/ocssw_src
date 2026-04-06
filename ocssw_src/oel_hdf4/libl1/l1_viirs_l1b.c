@@ -425,6 +425,12 @@ int init_viirs_geofile(viirs_file geoinfo) {
 int openl1_viirs_l1b(filehandle *l1file) {
     viirs_file l1binfo, geoinfo;
     int iscan;
+    int latlon = 0;
+
+    if(l1file->format == FT_VIIRSGEONC) {
+        latlon = 1;
+        l1file->geofile = l1file->name;
+    }
 
     // make sure a GEO file was passed in
     if(!l1file->geofile || !l1file->geofile[0]) {
@@ -487,15 +493,16 @@ int openl1_viirs_l1b(filehandle *l1file) {
         }
 
     /*----- Load L1B and GEO info into global variables -----*/
-    init_viirs_l1bfile(l1binfo); // l1b, l1bq
+    if (latlon == 0)
+        init_viirs_l1bfile(l1binfo); // l1b, l1bq
     init_viirs_geofile(geoinfo); // scn, nav, geo
 
     /*----- Ancillary Data -----*/
     // TODO: remove this?
     rdsensorinfo(l1file->sensorID, l1_input->evalmask,
             "Fobar", (void **) &Fobar);
-
-    free(l1binfo.scan_start_time); // free memory allocated
+    if (latlon == 0)
+        free(l1binfo.scan_start_time); // free memory allocated
     free(geoinfo.scan_start_time); //  by init_viirs_file()
     return SUCCESS;
 }
@@ -757,12 +764,14 @@ int readl1_viirs_l1b(filehandle *l1file,
     l1rec->fsol = pow(1.0 / esdist, 2);
 
     /* TO DO: check SCN_MODE, SCN_QUAL for both GEO and L1B */
-    int8_t scanqual = ((int8_t*) l1bscn[L1BSCN_QUAL]->data)[iscan];
+    int8_t scanqual  = 0;
+    if (lonlat == 0) {
+        scanqual = ((int8_t *)l1bscn[L1BSCN_QUAL]->data)[iscan];
 
-    if (scanqual & 1) {
-        l1file->sv_with_moon = 1;
+        if (scanqual & 1) {
+            l1file->sv_with_moon = 1;
+        }
     }
-
     // if lonlat mode, read only lon, lat and solz
     if (lonlat) {
         read_var_1line(geo[GEO_LAT], iline);

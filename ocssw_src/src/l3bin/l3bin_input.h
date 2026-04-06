@@ -4,14 +4,15 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "clo.h"
+#include "meta_l3b.h"
 
 typedef struct input_struct {
     char infile[FILENAME_MAX];
     char ofile[FILENAME_MAX];
     char pfile[FILENAME_MAX];
-    char out_parm[16384];
+    char out_parm[LG_ATTRSZ];
     char tflag;
-    char parms[16384];
+    char parms[LG_ATTRSZ];
     char pversion[16];
 
     int32_t syear;
@@ -41,7 +42,7 @@ typedef struct input_struct {
 
     uint32_t deflate;
     char oformat[20];
-
+    char suite [32];                  ///< Processing suite
     char composite_prod[1024];
     char composite_scheme[1024];
     char doi[1024];

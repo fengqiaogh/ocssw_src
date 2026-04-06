@@ -32,6 +32,7 @@
 #include "l1_octs.h"
 #include "l1_octs_netcdf.h"
 #include "l1_modis.h"
+#include "l1_modis_h5.h"
 #include "l1_czcs.h"
 #include "l1_czcs_netcdf.h"
 #include "l1_xcal.h"
@@ -106,6 +107,9 @@ void closel1(filehandle *l1file) {
     case FT_MODISL1B:
         closel1_modis();
         break;
+    case FT_MODISL1BH5:
+        closel1_modis_h5();
+        break;
 #ifdef BUILD_HISTORICAL
     case FT_CLASSAVHRR:
         closel1_aci(l1file);
@@ -133,6 +137,7 @@ void closel1(filehandle *l1file) {
         closel1_viirs_h5(l1file);
         break;
     case FT_VIIRSL1BNC:
+    case FT_VIIRSGEONC:
         closel1_viirs_l1b();
         break;
     case FT_HICOL1B:
@@ -244,9 +249,18 @@ int openl1(filehandle *l1file) {
         exit(EXIT_FAILURE);
     }
     int i;
+    status = set_solar_irradiance(l1_input->f0file);
     for (i = 0; i < l1file->nbands; i++) {
         if (l1_input->outband_opt >= 2) {
-            get_f0_thuillier_ext(l1file->iwave[i], BANDW, l1file->Fonom + i);
+            if (status) {
+                printf("-E- %s:%d : error reading solar_irradiance LUT \"%s\".\n", __FILE__, __LINE__, l1_input->f0file);
+                exit(EXIT_FAILURE);
+            }
+            status = get_f0(l1file->iwave[i], BANDW, l1file->Fonom + i);
+            if (status) {
+                printf("-E- %s:%d : error setting Fonom.\n", __FILE__, __LINE__);
+                exit(EXIT_FAILURE);
+            }
         } else {
             l1file->Fonom[i] = l1file->Fobar[i];
         }
@@ -291,6 +305,9 @@ int openl1(filehandle *l1file) {
         case FT_MODISL1B:
             status = openl1_modis(l1file);
             break;
+        case FT_MODISL1BH5:
+            status = openl1_modis_h5(l1file);
+            break;
 #ifdef BUILD_HISTORICAL
         case FT_CLASSAVHRR:
             status = openl1_aci(l1file);
@@ -312,6 +329,7 @@ int openl1(filehandle *l1file) {
             status = openl1_viirs_h5(l1file);
             break;
         case FT_VIIRSL1BNC:
+        case FT_VIIRSGEONC:
             status = openl1_viirs_l1b(l1file);
             break;
         case FT_HICOL1B:
@@ -466,6 +484,9 @@ int readl1(filehandle *l1file, int32_t recnum, l1str *l1rec) {
     case FT_MODISL1B:
         status = readl1_modis(l1file, recnum, l1rec, 0);
         break;
+    case FT_MODISL1BH5:
+        status = readl1_modis_h5(l1file, recnum, l1rec, 0);
+        break;
 #ifdef BUILD_HISTORICAL
     case FT_CLASSAVHRR:
         status = readl1_aci(l1file, recnum, l1rec);
@@ -506,6 +527,9 @@ int readl1(filehandle *l1file, int32_t recnum, l1str *l1rec) {
         break;
     case FT_OCIL1B:
         status = readl1_oci(l1file, recnum, l1rec, 0);
+        break;
+    case FT_L1C:
+        status = readl1_l1c(l1file, recnum, l1rec);
         break;
     case FT_AVIRIS:
         if (data->isnetcdf)
@@ -550,7 +574,6 @@ int readl1(filehandle *l1file, int32_t recnum, l1str *l1rec) {
         break;
     };
 
-
     if (status != 0) {
         fprintf(stderr,
                 "-E- %s Line %d: Error reading L1B.\n",
@@ -559,9 +582,17 @@ int readl1(filehandle *l1file, int32_t recnum, l1str *l1rec) {
     }
 
     for (ip = 0; ip < l1file->npix; ip++) {
-        if (l1rec->lon[ip] <= -180.0 || l1rec->lon[ip] >= 180.0 || isnan(l1rec->lon[ip]) ||
-                l1rec->lat[ip] <= -90.0 || l1rec->lat[ip] >= 90.0 || isnan(l1rec->lat[ip])) {
+        if (fabs(l1rec->lon[ip]) > 180.0 || fabs(l1rec->lat[ip]) > 90.0 || isnan(l1rec->lon[ip]) ||
+            isnan(l1rec->lat[ip])) {
             l1rec->navfail[ip] = 1;
+            l1rec->lon[ip] = BAD_FLT;
+            l1rec->lat[ip] = BAD_FLT;
+        }
+        if (fabs(l1rec->lat[ip]) == 90.0) {
+            l1rec->navwarn[ip] = 1;
+        }
+        if (fabs(l1rec->lon[ip]) == 180.0) {
+            l1rec->navwarn[ip] = 1;
         }
     }
 
@@ -615,6 +646,9 @@ int readl1_lonlat(filehandle *l1file, int32_t recnum, l1str *l1rec) {
     case FT_MODISL1B:
         status = readl1_modis(l1file, recnum, l1rec, 1);
         break;
+    case FT_MODISL1BH5:
+        status = readl1_modis_h5(l1file, recnum, l1rec, 1);
+        break;
     case FT_MERISL1B:
         status = readl1_lonlat_meris_N1(l1file, recnum, l1rec);
         break;
@@ -622,6 +656,7 @@ int readl1_lonlat(filehandle *l1file, int32_t recnum, l1str *l1rec) {
         status = readl1_viirs_h5(l1file, recnum, l1rec, 1);
         break;
     case FT_VIIRSL1BNC:
+    case FT_VIIRSGEONC:
         status = readl1_viirs_l1b(l1file, recnum, l1rec, 1);
         break;
     case FT_HICOL1B:

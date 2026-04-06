@@ -1,24 +1,26 @@
 #ifndef AREA_WEIGHTING_H
 #define AREA_WEIGHTING_H
+
 #include <vector>
 #include <optional>
 #include <l2_reader.hpp>
+
 class AreaWeighting {
     // area weighting variables
     enum L2PixelMode_t { L2PixelOff, L2PixelCorner, L2PixelDelta };
     L2PixelMode_t mode{L2PixelOff};
-    std::vector<float> delta_lat;           // delta lat for corner of pixel
-    std::vector<float> delta_lon;           // delta lon for corner of pixel
-    std::vector<float> upperCornerLat;           // lat1 for corner of pixel
-    std::vector<float> upperCornerLon;           // lon1 for corner of pixel
-    std::vector<float> lowerCornerLat;           // lat2 for corner of pixel
-    std::vector<float> lowerCornerLon;           // lon2 for corner of pixel
-    bool lat2Valid{false};             // does lat2 and lon2 contain valid coordinates
-    std::optional<size_t> lastLine;  // if no value the last line does not have good lat/lon
+    std::vector<float> delta_lat;       // delta lat for corner of pixel
+    std::vector<float> delta_lon;       // delta lon for corner of pixel
+    std::vector<float> upperCornerLat;  // lat1 for corner of pixel
+    std::vector<float> upperCornerLon;  // lon1 for corner of pixel
+    std::vector<float> lowerCornerLat;  // lat2 for corner of pixel
+    std::vector<float> lowerCornerLon;  // lon2 for corner of pixel
+    bool lat2Valid{false};              // does lat2 and lon2 contain valid coordinates
+    std::optional<size_t> lastLine;     // if no value the last line does not have good lat/lon
     size_t nsamp{0};
     std::vector<float> lastLat;
     std::vector<float> lastLon;
-    L2_Reader *l2file{nullptr};
+    L2_Reader* l2file{nullptr};
     float median_start_value{1000000};
     std::vector<float> dlat;
     std::vector<float> dlon;
@@ -29,25 +31,26 @@ class AreaWeighting {
     float scale_factor_max_2{60.0f};
     float *latitude{nullptr}, *longitude{nullptr};
     int area_mode{0};
+    float pixel_size{BAD_FLT};
     /**
      * @brief Sets scan line data by reading latitude and longitude values
      * @param iscan Index of the scan line to read
      * @param mask Vector of mask values for the scan line
      */
-    void set_scan(size_t iscan, std::vector<uint8_t> &mask);
+    void set_scan(size_t iscan, std::vector<uint8_t>& mask);
 
     /**
      * @brief Calculates pixel delta values for latitude and longitude
      * @param lat0 First row latitude values
-     * @param lon0 First row longitude values  
+     * @param lon0 First row longitude values
      * @param lat1 Second row latitude values
      * @param lon1 Second row longitude values
      * @param latOut Output latitude delta values
      * @param lonOut Output longitude delta values
      * @param numPoints Number of points in each row
      */
-    void calculatePixelDeltas(float *lat0, float *lon0, float *lat1, float *lon1, float *latOut,
-                              float *lonOut, int32_t numPoints);
+    void calculatePixelDeltas(float* lat0, float* lon0, float* lat1, float* lon1, float* latOut,
+                              float* lonOut, int32_t numPoints);
 
     /**
      * @brief Extrapolates pixel corner coordinates
@@ -59,8 +62,8 @@ class AreaWeighting {
      * @param lonOut Output longitude corner values (has one more element than input)
      * @param numPoints Number of points in each input row
      */
-    void extrapolatePixelCorners(float *lat0, float *lon0, float *lat1, float *lon1, float *latOut,
-                                 float *lonOut, int32_t numPoints);
+    void extrapolatePixelCorners(float* lat0, float* lon0, float* lat1, float* lon1, float* latOut,
+                                 float* lonOut, int32_t numPoints);
 
     /**
      * @brief Interpolates pixel corner coordinates
@@ -72,20 +75,19 @@ class AreaWeighting {
      * @param lonOut Output longitude corner values (has one more element than input)
      * @param numPoints Number of points in each input row
      */
-    void interpolatePixelCorners(float *lat0, float *lon0, float *lat1, float *lon1, float *latOut,
-                                 float *lonOut, int32_t numPoints);
+    void interpolatePixelCorners(float* lat0, float* lon0, float* lat1, float* lon1, float* latOut,
+                                 float* lonOut, int32_t numPoints);
 
    public:
     AreaWeighting() = default;
     AreaWeighting(int area_mode);
-    
+
     /**
      * @brief Sets the l2 reader pointer
      * @param reference to an L2 reader
      */
-    void set_l2_reader(L2_Reader &l2file) {
-        this->l2file = &l2file;
-    }
+    void set_l2_reader(L2_Reader& l2file);
+
     /**
      * @brief Get the current pixel mode
      * @return The pixel mode as an integer (0=Off, 1=Corner, 2=Delta)
@@ -104,7 +106,7 @@ class AreaWeighting {
      * @param iscan Index of the scan line
      * @param mask Vector of mask values for the scan line
      */
-    void set_corners(size_t iscan, std::vector<uint8_t> &mask);
+    void set_corners(size_t iscan, std::vector<uint8_t>& mask);
 
     /**
      * @brief Get the latitude value for a pixel
@@ -167,4 +169,5 @@ class AreaWeighting {
      */
     void reset();
 };
+
 #endif  // AREA_WEIGHTING_H

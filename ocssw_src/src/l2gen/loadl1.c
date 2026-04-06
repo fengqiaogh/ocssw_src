@@ -238,7 +238,7 @@ int loadl1(filehandle *l1file, l1str *l1rec) {
     }
     
     if (input->pixel_anc_file[0])
-        read_pixel_anc_file(input->pixel_anc_file, l1rec);
+        read_pixel_anc_file(input->pixel_anc_file, l1rec, input->pixel_anc_vars);
 
     if (input->windspeed > -999)
         for (ip = 0; ip < l1rec->npix; ip++)

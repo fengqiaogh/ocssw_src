@@ -11,8 +11,9 @@ from typing import List, Dict,Set
 import sys
 import netCDF4 as nc
 import os
+import numpy as np
 
-__version__ = "1.2"
+__version__ = "2.0"
 verbose = False
 
 l3_merge_attributes_exclude: Set[str] = {"l2_flag_names", "suggested_image_scaling_minimum",
@@ -22,6 +23,9 @@ l3_merge_attributes_exclude: Set[str] = {"l2_flag_names", "suggested_image_scali
                                          "processing_version","date_created"}
 l3_merge_input_attrs = ["ifile","ofile","pversion","doi","product"]
 l3_merge_processing_attrs = ["software_name","software_version", "l3map_files"]
+first_wavelength = None
+first_num_y = None
+first_num_x = None
 
 def get_compression(var):
     # Set default compression parameters:
@@ -30,29 +34,64 @@ def get_compression(var):
     chunk_sizes = None
     # check for compression:
     if 'zlib' in var.filters():
-    # Get the deflate level
+        # Get the deflate level
         comp_zlib = True
         deflate_level = var.filters()['zlib']
         if var.chunking() != "contiguous":
             chunk_sizes = tuple(var.chunking())
     return comp_zlib,deflate_level,chunk_sizes
 
-    
-def get_variables(nc_handle):
-    var_names = nc_handle.variables
+def check_variable(nc_handle, var_name):
+    global first_wavelength
+    global first_num_y
+    global first_num_x
+
+    var_nc: nc.Variable = nc_handle[var_name]
+
+    # l3 var condition
+    if len(var_nc.dimensions) == 2 or len(var_nc.dimensions) == 3:
+        if (var_nc.dimensions[0] == "lat" or var_nc.dimensions[0] == "y") and (var_nc.dimensions[1] == "lon" or var_nc.dimensions[1] == "x"):
+            if first_num_y == None:
+                first_num_y = var_nc.shape[0]
+            else:
+                if first_num_y != var_nc.shape[0]:
+                    print(f"--Error--: Y (lat) dimensions mismatch for {var_name} in {nc_handle.filepath()}")
+                    exit(1)
+            if first_num_x == None:
+                first_num_x = var_nc.shape[1]
+            else:
+                if first_num_x != var_nc.shape[1]:
+                    print(f"--Error--: X (lon) dimensions mismatch for {var_name} in {nc_handle.filepath()}")
+                    exit(1)
+
+            if len(var_nc.dimensions) == 3:
+                if var_nc.dimensions[2] == "wavelength":
+                    wavelength = nc_handle["wavelength"][:]
+                    if first_wavelength is None:
+                        first_wavelength = wavelength
+                    else:
+                        if not np.array_equal(first_wavelength, wavelength):
+                            print(f"--Error--: wavelength variable mismatch for {var_name} in {nc_handle.filepath()}")
+                            exit(1)
+                else:
+                    return False
+            return True
+    return False
+
+def get_variables(nc_handle, products : List[str] = None):
     all_variables : List[str] = list()
-    for var in var_names:
-        var_nc: nc.Variable = nc_handle[var]
-        # l3 var condition
-        if len(var_nc.dimensions) == 2:
-            if var_nc.dimensions[0] == "lat" and var_nc.dimensions[1] == "lon":
-                all_variables.append(var)
-    groups = nc_handle.groups
-    for grp in groups:
+    for var_name in nc_handle.variables:
+        # skip lat and lon variables
+        if var_name == "lat" or var_name == "lon" or var_name == "wavelength":
+            continue
+        if products and var_name not in products:
+            continue
+        if check_variable(nc_handle, var_name):
+            all_variables.append(var_name)
+    for grp in nc_handle.groups:
         grp_nc: nc.Group = nc_handle[grp]
         all_variables += get_variables(grp_nc)
     return all_variables
-
 
 def merge(idatasets,ofile, products : List[str],l3mapmerge_attrs : Dict[str,str] ):
         # delete output file if it exists
@@ -60,9 +99,10 @@ def merge(idatasets,ofile, products : List[str],l3mapmerge_attrs : Dict[str,str]
         os.remove(ofile)
     except OSError as e:
         pass
-    pass
-        # Create output file 
+
+    # Create output file 
     orootgrp :  nc.Dataset = nc.Dataset(ofile, "w", format="NETCDF4")
+
     # Create dimensions for output file. Note all L2 files will/should have the same dimensions.
     for name, dim in idatasets[0].dimensions.items():
         orootgrp.createDimension(name, len(dim) if not dim.isunlimited() else None)
@@ -89,20 +129,26 @@ def merge(idatasets,ofile, products : List[str],l3mapmerge_attrs : Dict[str,str]
             continue       
         orootgrp.setncattr(attr_merge, val)
 
-
-
     dims = orootgrp.dimensions
-    nlat : int = dims["lat"].size
-    nlon : int = dims["lon"].size
+    dim_y_name = "lat"
+    dim_x_name = "lon"
+
+    if dim_y_name not in dims:
+        dim_y_name = "y"
+        dim_x_name = "x"
+     
+    num_y : int = dims[dim_y_name].size
+    num_x : int = dims[dim_x_name].size
+
     if verbose:
         print("copying variables from the file roots:")
     for ds in idatasets:
         dims = ds.dimensions
-        if dims["lat"].size != nlat:
-            print(f"--Error--: latitude dimenstions mismatch for {ds.product_name}")
+        if dims[dim_y_name].size != num_y:
+            print(f"--Error--: Y (lat) dimenstions mismatch for {ds.product_name}")
             exit(1)
-        if dims["lon"].size != nlon:
-            print(f"--Error--: longitude dimenstions mismatch for {ds.product_name}")
+        if dims[dim_x_name].size != num_x:
+            print(f"--Error--: X (lon) dimenstions mismatch for {ds.product_name}")
             exit(1)
         for name, ivariable in ds.variables.items(): 
             if name in products: 
@@ -124,10 +170,16 @@ def merge(idatasets,ofile, products : List[str],l3mapmerge_attrs : Dict[str,str]
                         if attr != "_FillValue":
                             ovariable.setncattr(attr, ivariable.getncattr(attr)) 
 
-                    ovariable[:] = ivariable[:]
-    
-    orootgrp.close()
+                    if len(ivariable.dimensions) == 3:
+                        if orootgrp.dimensions["wavelength"].size != first_wavelength.size:
+                            print(f"--Error--: wavelength dimensions mismatch for {name} in {ds.filepath()}")
+                            exit(1)
 
+                        for i in range(0, ivariable.shape[0], chunk_sizes[0]):
+                            ovariable[i:i+chunk_sizes[0],:,:] = ivariable[i:i+chunk_sizes[0],:,:]
+                    else:
+                        ovariable[:] = ivariable[:]
+    orootgrp.close()
 
 if __name__ == "__main__":
         # parse command line
@@ -190,6 +242,20 @@ if __name__ == "__main__":
             products.append(fprod)
     else: 
         products = args.product.split(",")
+        for product in products:
+            found = False
+            for inp_file, idataset in zip(input_files,idatasets):
+                file_prods = get_variables(idataset, products)
+                if product in file_prods:
+                    found_products[product] = inp_file
+                    found = True
+                    break
+            if not found:
+                print(f"--Error--: product {product} is not found in any input files")
+                sys.exit(1)
+
+    if first_wavelength is not None:
+        products = ['wavelength'] + products
     products = ['lat', 'lon'] + products
     # l3merge attributes
     # history

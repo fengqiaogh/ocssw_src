@@ -58,7 +58,7 @@ class AquariusNextLevelNameFinder(next_level_name_finder.NextLevelNameFinder):
         if len(self.data_files) == 1:
             base_name = os.path.basename(self.data_files[0].name)
             if base_name.count('.') > 1:
-                aq_ver = re.findall('(\_V\d*\.\d*.*$)', base_name)[-1]
+                aq_ver = re.findall(r'(\_V\d*\.\d*.*$)', base_name)[-1]
         return aq_ver
 
     def _get_l2_extension(self):

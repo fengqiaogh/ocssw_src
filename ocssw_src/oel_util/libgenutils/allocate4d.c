@@ -9,6 +9,50 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+unsigned char ****allocate4d_uchar(size_t nr, size_t nz, size_t ny, size_t nx) {
+    unsigned char *x_ptr = (unsigned char*) malloc(nr * nz * ny * nx * sizeof(unsigned char));
+    if (x_ptr == NULL) {
+        fprintf(stderr, "-E- %s line %d: Memory allocation of data block failed.n", __FILE__, __LINE__);
+        return NULL;
+    }
+    unsigned char **y_ptr = (unsigned char**) malloc(nr * nz * ny * sizeof(unsigned char*));
+    if (y_ptr == NULL) {
+        fprintf(stderr, "-E- %s line %d: Memory allocation of y array failed.n", __FILE__, __LINE__);
+        return NULL;
+    }
+    unsigned char ***z_ptr = (unsigned char***) malloc(nr * nz * sizeof(unsigned char**));
+    if (z_ptr == NULL) {
+        fprintf(stderr, "-E- %s line %d: Memory allocation of z array failed.n", __FILE__, __LINE__);
+        return NULL;
+    }
+    unsigned char ****r_ptr = (unsigned char****) malloc(nr * sizeof(unsigned char***));
+    if (r_ptr == NULL) {
+        fprintf(stderr, "-E- %s line %d: Memory allocation of r array failed.n", __FILE__, __LINE__);
+        return NULL;
+    }
+
+    for(size_t r=0; r<nr; r++) {
+        for(size_t z=0; z<nz; z++) {
+            for(size_t y=0; y<ny; y++) {
+                y_ptr[y] = x_ptr;
+                x_ptr += nx;
+            }
+            z_ptr[z] = y_ptr;
+            y_ptr += ny;
+	    }
+        r_ptr[r] = z_ptr;
+        z_ptr += nz;
+    }
+    return r_ptr;
+}
+
+void free4d_uchar(unsigned char ****p) {
+    free(p[0][0][0]);
+    free(p[0][0]);
+    free(p[0]);
+    free(p);
+}
+
 int ****allocate4d_int(size_t nr, size_t nz, size_t ny, size_t nx) {
     int *x_ptr = (int*) malloc(nr * nz * ny * nx * sizeof(int));
     if (x_ptr == NULL) {

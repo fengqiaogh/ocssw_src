@@ -21,7 +21,7 @@ from seadasutils.setupenv import env
 from seadasutils.netcdf_utils import nccopy, nccopy_grp, ncsubset_vars
 #import seadasutils.ProcUtils as ProcUtils
 
-versionStr = "1.3 (2024-09-23)"
+versionStr = "1.3.1_2025-10-20"
 
 class extract:
 
@@ -83,29 +83,22 @@ class extract:
             #                                                                                 |
             # Add extract_pixel/line_start/stop:                                              |
             #_________________________________________________________________________________|
-            
-            if 'extract_pixel_start' in infile.ncattrs():
-                outfile.extract_pixel_start = np.dtype('int32').type(infile.extract_pixel_start + self.spixl + 1)
-                outfile.extract_pixel_stop  =  np.dtype('int32').type(infile.extract_pixel_stop + self.epixl + 1)
-                outfile.extract_line_start  =  np.dtype('int32').type(infile.extract_line_start + self.sline + 1)
-                outfile.extract_line_stop   =  np.dtype('int32').type(infile.extract_line_stop + self.eline + 1)
-            else:
-                outfile.extract_pixel_start = np.dtype('int32').type(self.spixl + 1)
-                outfile.extract_pixel_stop  =  np.dtype('int32').type(self.epixl + 1)
-                
-                outfile.extract_line_start  =  np.dtype('int32').type(self.sline + 1)
-                outfile.extract_line_stop   =  np.dtype('int32').type(self.eline + 1)
-            
+
+            outfile.extract_pixel_start = np.int32(self.spixl + 1)
+            outfile.extract_pixel_stop = np.int32(self.epixl + 1)
+            outfile.extract_line_start = np.int32(self.sline + 1)
+            outfile.extract_line_stop = np.int32(self.eline + 1)
+            if "extract_pixel_start" in infile.ncattrs():
+                outfile.extract_pixel_start += np.int32(infile.extract_pixel_start - 1)
+                outfile.extract_pixel_stop += np.int32(infile.extract_pixel_start - 1)
+                outfile.extract_line_start += np.int32(infile.extract_line_start - 1)
+                outfile.extract_line_stop += np.int32(infile.extract_line_start - 1)
+
             #_____________________________________________________________________________________________________________________________________
             #                                                                                 |
             # Modify time_coverage_start/end of output file:                                  |
             #_________________________________________________________________________________|
 
-            # Read infile as netCDF dataset
-            infile = netCDF4.Dataset(srcfile, 'r')
-            # Read and write outfile as netCDF4 dataset
-            outfile = netCDF4.Dataset(dstfile, 'r+')
-        
             # Account for different file formats
             token = 0
             try:
@@ -349,7 +342,7 @@ if __name__ == "__main__":
 
     # parse command line
     parser = argparse.ArgumentParser(
-        description='Extract specified area from OLCI Level 1C files.',
+        description='Extract specified area from Level 1C files.',
         epilog='Specify either geographic limits or pixel/line ranges, not both.')
     parser.add_argument('-v', '--verbose', help='print status messages',
                         action='store_true')

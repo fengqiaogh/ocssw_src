@@ -43,8 +43,18 @@ class TimeInterpolator {
         if (times.size() != interpolators.size()) {
             EXIT_LOG(std::cerr << "--Error--: size of the time vector and interpolatros vector are different. ")
         }
-        for (double &t : times) {
-            weights.push_back(std::abs(1.0 / (t - current_time)));
+        weights = std::vector<double>(times.size(), 0.0);
+        bool exact_match = false;
+        for (size_t i = 0; i < times.size(); ++i) {
+            if (current_time == times[i]) {
+                weights[i] = 1.0;
+                exact_match = true;
+            }
+        }
+        if (!exact_match) {
+            for (size_t i = 0; i < times.size(); ++i) {
+                weights[i] = std::abs(1.0 / (times[i] - current_time));
+            }
         }
         first = 0;
         second = times.size() - 1;

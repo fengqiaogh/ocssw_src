@@ -11,9 +11,81 @@
 #define KD_MAX  6.4
 #define KD_MIN  0.016
 
+#define KD_WAVE_MIN 350
+#define KD_WAVE_MAX 701
+
 static float kdbad = BAD_FLT;
 static float *Kd_spectral;
 
+/*---------------------------------------------------------------------*/
+/* set_warn_Kd()- utility function checks if valid Kd is out of range. */
+/*                                                                     */
+/* Simple IOP-based model used to estimate upper and low Kd range.     */
+/* Kd = (a + bb)/cos(solz)                                             */
+/*                                                                     */
+/* Upper IOP range defined in flags_iop.c.                             */
+/* Lower IOP range defined from seawater IOPs                          */
+/*                                                                     */
+/* Inputs:                                                             */
+/*     l2rec - level-2 structure containing one complete scan after    */
+/*             atmospheric correction (struct).                        */
+/*     band -  sensor band number (int)                                */
+/*     Kd   -  calculated Kd for given band (*float).                  */
+/*                                                                     */
+/* Outputs:                                                            */
+/*     return: 0 or 1 (int)                                            */
+/*                                                                     */
+/* Implementation: L. McKinna, July 2025                               */
+/*---------------------------------------------------------------------*/
+
+int set_warn_Kd(l2str *l2rec, int band, int ip, float *Kd) {
+
+    l1str *l1rec = l2rec->l1rec;
+
+    int ipb, kd_warn;
+    float aw, bbw, cossolz, kd_min, kd_max;
+
+    //Use max absorption and backscattering range per flags_iop.c
+    float a_hi = 5.0;
+    float bb_hi = 0.05;
+
+    //get wavelength
+    float *wave = l1rec->l1file->fwave;
+    int32 nbands = l1rec->l1file->nbands;
+    int32 npix = l1rec->l1file->npix;
+
+    //Compute index
+    ipb = nbands*npix;
+
+    //Compute cosine of solar zenith angle
+    cossolz = cos(deg2rad(l1rec->solz[ip]));
+
+    //intilize kd_warn to 0
+    kd_warn = 0;
+
+    //Check visible range (400 - 700) for valid range
+    if ((wave[band] >= KD_WAVE_MIN) && (wave[band] <= KD_WAVE_MAX)) {
+
+        aw = l2rec->l1rec->sw_a[ipb + band];
+        bbw = l2rec->l1rec->sw_bb[ipb + band];
+
+        //Compute Kd_max: constant function of solar zenith
+        kd_max = (aw + a_hi + bbw + bb_hi) / cossolz;
+    
+        //Estimate Kd_min from aw and bbw
+        kd_min = (aw + bbw)/cossolz;
+
+        //Check if Kd is BAD_FLT, if not continue with range check
+        if (*Kd != BAD_FLT) {
+            //Check if computed Kd is out of range
+            if ((*Kd > kd_max) || (*Kd < kd_min)){
+                kd_warn = 1;
+            } 
+        }
+    } 
+    return kd_warn;
+}
+ 
 /* ------------------------------------------------------------------- */
 /* Kd490_KD2 -  diffuse attenuation at 490nm (2-band polynomial).      */
 /*                                                                     */
@@ -565,7 +637,7 @@ void Kd_lee(l2str *l2rec, int band, float *Kd)
     const float m4 =   0.265;
 
     float m0;
-    int ip, ipb;
+    int ip, ipb,kdwarn;
 
     l1str *l1rec = l2rec->l1rec;
 
@@ -589,14 +661,22 @@ void Kd_lee(l2str *l2rec, int band, float *Kd)
 		                    + m1 * (1.0 - m2 * exp( m3 * l2rec->a[ipb])) * l2rec->bb[ipb]
                             * (1.0 - m4 * (l1rec->sw_bb[ipb] / l2rec->bb[ipb]));
 
-            if (Kd[ip] > KD_MAX) {
-                Kd[ip] = KD_MAX;
+            //Test Kd range and set PRODWARN as necessary               
+            kdwarn = set_warn_Kd(l2rec, band, ip, Kd);
+            if (kdwarn){
                 l1rec->flags[ip] |= PRODWARN;
-	    } else
-            if (Kd[ip] < KD_MIN) {
-                Kd[ip] = KD_MIN;
-                l1rec->flags[ip] |= PRODWARN;
-	    }
+            }
+
+            //Legacy range check
+            //if (Kd[ip] > KD_MAX) {
+            //    Kd[ip] = KD_MAX;
+            //    l1rec->flags[ip] |= PRODWARN;
+	        //} else {
+            //    if (Kd[ip] < KD_MIN) {
+            //        Kd[ip] = KD_MIN;
+            //        l1rec->flags[ip] |= PRODWARN;
+	        //    }
+            //}
         }
     }
 
@@ -635,7 +715,7 @@ void unc_Kd_lee(l2str *l2rec, int band, float *uKd) {
 
     float m0;
     float Kd, dkda, dkdbb;
-    int ip, ipb, iopt_flag;
+    int ip, ipb, iopt_flag, kdwarn;
 
     float *a_unc;
     float *bb_unc;
@@ -689,19 +769,17 @@ void unc_Kd_lee(l2str *l2rec, int band, float *uKd) {
                 dkdbb = m1*(1. - m2*exp( m3 * a_unc[ipb]))*(1. - m4*(l1rec->sw_bb[ipb] / l2rec->bb[ipb]));
 
                 uKd[ip] = sqrt (pow(dkda* a_unc[ipb],2.) + pow(dkdbb*bb_unc[ipb],2));
-                
-                if (Kd > KD_MAX) {
-                    uKd[ip] = 0.0;
+
+                //Test Kd range and set PRODWARN as necessary               
+                kdwarn = set_warn_Kd(l2rec, band, ip, &Kd);
+                if (kdwarn){
                     l1rec->flags[ip] |= PRODWARN;
-                } else 
-                    if (Kd < KD_MIN) {
-                        uKd[ip] = 0.0;
-                        l1rec->flags[ip] |= PRODWARN;
                 }
             }
         }
 
     }
+
 
     return;
 }
@@ -1190,6 +1268,7 @@ void get_spectral_Kd(l2str *l2rec,l2prodstr *p) {
     int32 iw,ip;
     int32 npix = l1rec->npix;
     int32 nwave = l1rec->l1file->nbands;
+    float *wave = l1rec->l1file->fwave;
     
     float temp;
     float *Kd_temp;
@@ -1214,7 +1293,12 @@ void get_spectral_Kd(l2str *l2rec,l2prodstr *p) {
         }
 
         for (ip=0;ip<npix; ip++){
-            temp = Kd_temp[ip];
+            //Set out of range Kd to badval
+            if ((wave[iw] <= KD_WAVE_MIN) || (wave[iw] >= KD_WAVE_MAX)) {
+                temp = kdbad;
+            } else {
+                temp = Kd_temp[ip];
+            }
             Kd_spectral[ip*nwave +iw] = temp;
         }
 
@@ -1244,7 +1328,6 @@ static void extract_band_3d(float *in_buf, float *out_buf, int numPixels, int nu
 
 /* ------------------------------------------------------------------- */
 void get_Kd(l2str *l2rec, l2prodstr *p, float prod[]) {
-
 
     if(p->rank == 3) {
 

@@ -415,14 +415,14 @@ int extractNetCDF(const char *inFile, const char *outFile, int sPixel, int ePixe
         sPixel = 1;
     }
     if (sPixel >= numPixelsRead) {
-        printf("spix needs to be less than number of pixels in file.\n");
+        printf("spixl needs to be less than number of pixels in file.\n");
         exit(BOUNDS_ERROR);
     }
     if (ePixel < 1 || ePixel > numPixelsRead) {
         ePixel = numPixelsRead;
     }
     if (ePixel < sPixel) {
-        printf("ePixel needs to be greater than spix.\n");
+        printf("epixl needs to be greater than spixl.\n");
         exit(BOUNDS_ERROR);
     }
 

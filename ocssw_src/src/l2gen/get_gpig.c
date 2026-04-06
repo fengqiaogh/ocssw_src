@@ -36,7 +36,7 @@ static int ngauss = 8;
 //static int ngauss = 12;
 static int nfree = 15;
 //static int nfree = 19;
-static int n_mc = 10000;
+static int n_mc = 7500;
 
 static int16  *gpigflags;   //Binary quality control flags  
 static float *pigArr;  //Pigment array pointer (this is where we'll store the solutions)
@@ -585,7 +585,7 @@ int run_gpig_saa(gpigstr *gp) {
   
     int iw;
     int statusLM;
-    int maxit = 1500;
+    int maxit = 400;
 
     double rrs_s, urrs_s;
     double temp;

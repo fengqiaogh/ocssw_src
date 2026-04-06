@@ -34,6 +34,7 @@ class bin_str {
     int16_t nbands;
     int32_t num_pixels;
     int32_t nscans;
+    int32_t scan;
     bool verbose;
 
     // geo
@@ -47,7 +48,6 @@ class bin_str {
     // binned vars
     short **nrec_2D;   // row/col
     short ***nrec_3D;  // row/col/view
-    short ***nrec_3D_view;
     float ****nrec_4D_band;  // row/col/view/bands
     float **alt_mean;
     float **alt_rmse;
@@ -59,12 +59,15 @@ class bin_str {
     float ***senz_3D;
     float ***sca_3D;  // row/col/view
     float ***rot_angle;
-    float ****QC_bitwise_4D;  // row/col/view/bands
+    uint8_t ****QC_bitwise_4D;  // row/col/view/bands
     float ***QC_4D;           // row/col/view
     float ****I_4D;           // row/col/view/bands
-    float ****i_diff2; 
-    float ****I_noise_4D;     // #pixels
-
+    float ****i_diff2;
+    float ****I_noise_4D;  // #pixels
+    // quality flag views, oci specific
+    unsigned char *scan_quality_flags;
+    float *tilt_angle;
+    size_t *count_1d;
     // OCIS line by line
     short *obs_per_view;
     float *QC_bitwise;
@@ -81,6 +84,7 @@ class bin_str {
     short fillval1 = -32767;
     float fillval2 = -32767.;
     double fillval3 = -32767.;
+    unsigned char fillval4 = 255;
 
     int32_t inpix;   // in l1c grid
     int32_t outpix;  // out l1c grid
@@ -98,14 +102,14 @@ class bin_str {
     char l1c_anc[FILENAME_MAX];
     int cloudem_flag;
     int cloud_type;  // 0 water and 1 ice
-    int dem_flag;//geoid or orthometric =  dem height flag
+    int dem_flag;    // geoid or orthometric =  dem height flag
 };
 
 int close_bin(bin_str *binstr);
 int alloc_bin(bin_str *binstr);
 
 int meta_l1c_grid(char *gridname, bin_str *binstr, int16_t num_gridlines, netCDF::NcFile *nc_output);
-int meta_l1c_global(char *gridname, bin_str *binl1c,int16_t num_gridlines, netCDF::NcFile *nc_output);
+int meta_l1c_global(char *gridname, bin_str *binl1c, int16_t num_gridlines, netCDF::NcFile *nc_output);
 int meta_l1c_full(filehandle *l1file, bin_str *binstr, const char *l1c_grid, netCDF::NcFile *nc_output);
 int meta_l1c_bin(filehandle *l1file, bin_str *binstr, netCDF::NcFile *nc_output);
 int meta_l1c_altvar(bin_str *binstr, netCDF::NcFile *nc_output);  // computes rmse for height
@@ -127,7 +131,7 @@ int rmse_l1c_alt(filehandle *l1file, bin_str *binstr, l1str *l1rec,
                  short **gdindex);  // computes diff squared for rmse for height
 double rot_angle(double senz, double solz, double sena, double suna);
 int parallax(filehandle *l1file, const char *l1c_anc, const char *l1c_grid, l1str *l1rec, bin_str *binl1c,
-             short **gdindex, netCDF::NcFile *nc_output,int32_t sline,int firstcall);
+             short **gdindex, netCDF::NcFile *nc_output, int32_t sline, int firstcall);
 int interp2d_l1c(netCDF::NcFile *nc_output);
 
 #ifdef __cplusplus

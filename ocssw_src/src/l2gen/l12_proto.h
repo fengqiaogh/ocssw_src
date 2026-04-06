@@ -464,7 +464,7 @@ void get_Cphyt_unc(l2str *l2rec, float cphyt_unc[]);
 
 void get_sdp(l2str *l2rec, l2prodstr *p, float prod[]);
 void get_gpig(l2str *l2rec, l2prodstr *p, float prod[]);
-
+void get_qwip(l2str *l2rec, float prod[]);
 #ifdef __cplusplus
 }
 #endif

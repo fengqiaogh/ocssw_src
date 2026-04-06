@@ -119,24 +119,53 @@ std::string L2_Reader::get_instrument() const {
 };
 
 void L2_Reader::get_escan_bscan_row(std::vector<int>& bscan_row, std::vector<int>& escan_row, float dlat) {
-    std::vector<float> slat(first_dimension);
-    std::copy(geo_bounds.get_slat(), geo_bounds.get_slat() + first_dimension, slat.begin());
-    std::vector<float> elat(first_dimension);
-    std::copy(geo_bounds.get_elat(), geo_bounds.get_elat() + first_dimension, elat.begin());
+    if (file_nc.isNull()) {
+        reopenL2();
+    }
+
+    const float DEFAULT_MAX = std::numeric_limits<float>::lowest(); // All values will be higher than this
+    const float DEFAULT_MIN = std::numeric_limits<float>::max(); // All values will be lower than this
+
+    std::vector<float> max_lat_scan(first_dimension, DEFAULT_MAX);
+    std::vector<float> min_lat_scan(first_dimension, DEFAULT_MIN);
     escan_row.resize(first_dimension);
     bscan_row.resize(first_dimension);
-    for (size_t jsrow = 0; jsrow < first_dimension; jsrow++) {
-        escan_row[jsrow] = (int32_t)((90 + elat[jsrow]) / dlat);
-        bscan_row[jsrow] = (int32_t)((90 + slat[jsrow]) / dlat);
 
-        if (escan_row[jsrow] > bscan_row[jsrow]) {
-            int k = escan_row[jsrow];
-            escan_row[jsrow] = bscan_row[jsrow];
-            bscan_row[jsrow] = k;
+    for(size_t scan = 0; scan < first_dimension; scan++) {
+        float* lat_temp;
+        readLatitudeScan(&lat_temp, scan);
+
+        for (size_t pixel = 0; pixel < second_dimension; pixel++) {
+            if (lat_temp[pixel] == BAD_FLT) {
+                continue;
+            }
+
+            max_lat_scan[scan] = std::max(lat_temp[pixel], max_lat_scan[scan]);
+            min_lat_scan[scan] = std::min(lat_temp[pixel], min_lat_scan[scan]);
         }
-        escan_row[jsrow] -= padding;
-        bscan_row[jsrow] += padding;
     }
+
+
+    for (size_t scan = 0; scan < first_dimension; scan++) {
+        // If one of the extrema are unavailable, it doesn't make sense to set the other
+        if (max_lat_scan[scan] == DEFAULT_MAX || min_lat_scan[scan] == DEFAULT_MIN) {
+            escan_row[scan] = -1;
+            bscan_row[scan] = -1;
+            continue;
+        }
+
+        escan_row[scan] = (int32_t)((90 + max_lat_scan[scan]) / dlat);
+        bscan_row[scan] = (int32_t)((90 + min_lat_scan[scan]) / dlat);  
+
+        if (escan_row[scan] > bscan_row[scan]) {
+            std::swap(escan_row[scan], bscan_row[scan]);
+        }
+
+        escan_row[scan] -= padding;
+        bscan_row[scan] += padding;
+    }
+
+    reset_cache();
 }
 
 Geospatialbounds& L2_Reader::get_geospatial() {

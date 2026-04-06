@@ -534,7 +534,7 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
         }
 
 
-        /* calculate error in Ltemp */
+        /* calculate uncertainty in Ltemp */
         if (uncertainty) {
             dLt = (1 - l2rec->l1rec->Lt[ipb] * uncertainty->derv_pol[ipb] / l1rec->polcor[ipb]);
             dLt *= (1 / l1rec->tg_sol[ipb] / l1rec->tg_sen[ipb]  / l1rec->polcor[ipb]);
@@ -616,11 +616,12 @@ NIRSWIR:
     /* Begin iterations for aerosol with corrections for non-zero nLw(NIR) */
     /* -------------------------------------------------------------------- */
 
-    if (aer_opt==AERRHSM ) {//&& tLw_nir[aer_s]>0.
+    if (aer_opt==AERRHSM ) {
         for(ib=0;ib<nbands_ac;ib++)
             mbac_w[acbands_index[ib]]=1.;
     }
 
+    /*compute the uncertainty in TOA radiance */
     if (uncertainty) {
         for (ib = 0; ib < nwave; ib++)
             delta_Lt[ib] = sqrt(dLtemp[ib] + dvc[ib] * dvc[ib]);
@@ -871,10 +872,6 @@ NIRSWIR:
                     derv_rh[ib] +=
                         (-tLw[ib] / (t_sol[ib] * t_sol[ib] * t_sen[ib]) * uncertainty->derv_tsol_rh[ib]);
 
-                    /*  end of vicarious calibration   */
-
-                    /*   end of using a different way to calculate dnLw  */
-
                     dtaua[ib] = pow(uncertainty->derv_taua_taua_l[ib] * last_dtaua_aer_l, 2);
                     for (inir = 0; inir < nbands_ac; inir++) {
                         i = acbands_index[inir];
@@ -1047,6 +1044,7 @@ NIRSWIR:
                 Lw[ib] = badval;
                 nLw[ib] = badval;
                 Rrs[ib] = badval;
+                taua[ib]= badval;
             }
         }
 
@@ -1057,14 +1055,12 @@ NIRSWIR:
                     Rrs[ib] = nLw[ib] / Fobar[ib];
                 }
                 chl = get_default_chl(l2rec, Rrs);
-                //printf("Checking turbidity %d %f %f %f\n",ip,tindx,chl,nLw[nir_l]);
                 if (chl > 0 && (chl <= 1.0 || nLw[nir_l] < 0.08)) {
                     iter_max = aer_iter_max;
                     aer_s = nir_s;
                     aer_l = nir_l;
                     daer = MAX(aer_l - aer_s, 1);
                     want_nirLw = 1;
-                    //printf("Reverting to NIR %d %f %f %f\n",ip,tindx,chl,nLw[nir_l]);
                     goto NIRSWIR;
                 } else
                     l1rec->flags[ip] |= TURBIDW;
@@ -1197,7 +1193,7 @@ NIRSWIR:
     /* Compute final chl from final nLw (needed for flagging) */
     l2rec->chl[ip] = get_default_chl(l2rec, Rrs);
 
-    /* if there is no lower bounding for aerosol selection, the error can't be quantified */
+    /* if there is no lower or upper bounding aerosol, the uncertainty can't be quantified */
     if (uncertainty) {
         if (*aermodmin == *aermodmax || (*aermodrat2!=BAD_FLT && *aermodmin2 == *aermodmax2)) {
             for (ib = 0; ib < nwave; ib++) {
@@ -1206,7 +1202,8 @@ NIRSWIR:
                     covariance_matrix[ib * nwave + iw] = BAD_FLT;
             }
         } else {
-            l2rec->chl_unc[ip] = *dchl;
+            if (*dchl > 0 && l2rec->chl[ip]!=BAD_FLT)
+                l2rec->chl_unc[ip] = *dchl;
         }
     }
 

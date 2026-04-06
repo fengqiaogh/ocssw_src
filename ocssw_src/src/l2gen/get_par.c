@@ -179,10 +179,9 @@ void get_par2(l2str *l2rec, float par[]) {
                         end_ib = MAX(ib, end_ib);
                     }
                 }
-                nwave = 20; // end_ib - start_ib + 1;  // to be changed
+                nwave = OCI_BANDS;
                 bindx = alloc_bindx(nwave, bindx);
                 size_t band_step = (end_ib - start_ib) / (nwave - 1);
-                //printf("Wavelenght band is %d ", (int)(end_ib - start_ib));
                 for (size_t ib = 0; ib < nwave; ib++) {
                     bindx[ib] = ib * band_step + start_ib;
                 }

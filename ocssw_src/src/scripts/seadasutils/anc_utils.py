@@ -1,4 +1,3 @@
-
 import os
 import sys
 import gc
@@ -7,6 +6,7 @@ import subprocess
 import json
 from datetime import datetime
 from datetime import timedelta
+from pathlib import Path
 
 import xml.etree.ElementTree as ElementTree
 from operator import sub
@@ -58,7 +58,8 @@ class getanc:
                  download=True,
                  timeout=60,
                  refreshDB=False,
-                 use_filename=False):
+                 use_filename=False,
+                 scheme=None):
         self.filename = filename
         self.start = start
         self.stop = stop
@@ -80,11 +81,13 @@ class getanc:
         self.db_status = None
         self.proctype = None
         self.use_filename=use_filename
+        self.scheme = scheme
         if self.atteph:
             self.proctype = 'modisGEO'
 
         self.query_site = "oceandata.sci.gsfc.nasa.gov"
         self.data_site = "oceandata.sci.gsfc.nasa.gov"
+        self.subdir = "/api"  # "/api" or "/dev/api" for testing
 
     def chk(self):
         """
@@ -396,6 +399,49 @@ class getanc:
             self.opt_flag = self.opt_flag - optkey[key]
         else:
             self.opt_flag = self.opt_flag + optkey[key]
+    
+    def list_schemes(self):
+        """
+        Query the OBPG server for available ancillary schemes for this mission
+        and print their short names and descriptions.
+        """
+        with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'missionID.json'), 'r') as msn_file:
+            msn = json.load(msn_file)
+
+        msnchar = None
+        if self.sensor and str(self.sensor).lower() in msn:
+            msnchar = msn[str(self.sensor).lower()]
+        elif self.sensor and str(self.sensor).isdigit():
+            msnchar = str(self.sensor)
+        elif self.filename and os.path.exists(self.filename):
+            sensor = ProcUtils.check_sensor(self.filename)
+            if str(sensor).lower() in msn:
+                msnchar = msn[str(sensor).lower()]
+
+        if msnchar is None:
+            print("ERROR: Could not determine mission ID. Please specify --mission.")
+            sys.exit(1)
+
+        url = 'https://' + self.query_site + self.subdir + '/anc/options?mission_id=' + msnchar
+        if self.verbose:
+            print("Querying: " + url)
+
+        session = ProcUtils.getSession(verbose=self.verbose)
+        try:
+            req = session.get(url, timeout=self.timeout)
+            if req.status_code != 200:
+                print("ERROR: Failed to retrieve scheme list. HTTP status: %d" % req.status_code)
+                sys.exit(1)
+            data = req.json()
+            if isinstance(data, dict):
+                width = max(len(item['short_name']) for item in data.values()) + 2
+                for item in data.values():
+                    print((item['short_name'] + ": ").ljust(width) + item['description'])
+            else:
+                print(json.dumps(data, indent=2))
+        except Exception as e:
+            print("ERROR: Failed to retrieve scheme list: %s" % str(e))
+            sys.exit(1)
 
     def finddb(self):
         """
@@ -407,10 +453,7 @@ class getanc:
             self.ancdb = os.path.basename(self.ancdb)
 
         if not os.path.exists(self.dirs['log']):
-            self.ancdb = os.path.basename(self.ancdb)
-            print('''Directory %s does not exist.
-Using current working directory for storing the ancillary database file: %s''' % (self.dirs['log'], self.ancdb))
-            self.dirs['log'] = self.dirs['run']
+            Path(self.dirs['log']).mkdir(parents=True, exist_ok=True)
 
         self.ancdb = os.path.join(self.dirs['log'], self.ancdb)
 
@@ -499,31 +542,33 @@ Using current working directory for storing the ancillary database file: %s''' %
         elif self.sensor and self.sensor.isdigit():
             msnchar = self.sensor
 
+        scheme_str = ('&scheme_name=' + self.scheme) if self.scheme else ''
+        
         if self.stop is None and not self.use_filename:
             start_obj = datetime.strptime(self.start, '%Y-%m-%dT%H:%M:%S')
             time_change = timedelta(minutes=5)
             stop_obj = start_obj + time_change
             self.stop = datetime.strftime(stop_obj,'%Y-%m-%dT%H:%M:%S')
-            anc_str = '?&m=' + msnchar + '&s=' + self.start + '&e=' + self.stop + '&missing_tags=1'
-            dlstat = ProcUtils.httpdl(self.query_site, '/'.join(['/api', anctype, anc_str]),
+            anc_str = '?&m=' + msnchar + '&s=' + self.start + '&e=' + self.stop + '&missing_tags=1' + scheme_str
+            dlstat = ProcUtils.httpdl(self.query_site, '/'.join([self.subdir, anctype, anc_str]),
                                       os.path.abspath(os.path.dirname(self.server_file)),
                                       outputfilename=self.server_file,
                                       timeout=self.timeout,
                                       verbose=self.verbose
                                       )
         elif self.use_filename:
-            anc_str = '?filename=' + os.path.basename(self.filename) + '&missing_tags=1'
+            anc_str = '?filename=' + os.path.basename(self.filename) + '&missing_tags=1' + scheme_str
             dlstat = ProcUtils.httpdl(self.query_site,
-                                      '/'.join(['/api', anctype, anc_str]),
+                                      '/'.join([self.subdir, anctype, anc_str]),
                                       os.path.abspath(os.path.dirname(self.server_file)),
                                       outputfilename=self.server_file,
                                       timeout=self.timeout,
                                       verbose=self.verbose
                                       )
         else: 
-            anc_str = '?&m=' + msnchar + '&s=' + self.start + '&e=' + self.stop + '&missing_tags=1'
+            anc_str = '?&m=' + msnchar + '&s=' + self.start + '&e=' + self.stop + '&missing_tags=1' + scheme_str
             dlstat = ProcUtils.httpdl(self.query_site,
-                                      '/'.join(['/api', anctype, anc_str]),
+                                      '/'.join([self.subdir, anctype, anc_str]),
                                       os.path.abspath(os.path.dirname(self.server_file)),
                                       outputfilename=self.server_file,
                                       timeout=self.timeout,
@@ -582,6 +627,9 @@ Using current working directory for storing the ancillary database file: %s''' %
 
                 # skip if the type is not recognized 
                 if (not AncillaryDataTypes.isValidType(ancillaryType)):
+                    base_type = re.sub(r'\d+$', '', ancillaryType)
+                    if base_type in AncillaryDataTypes.ignoredApiTypes or ancillaryType in AncillaryDataTypes.ignoredApiTypes:
+                        continue
                     print(f"--WARNING-- Update anc_utils.py to handle new API data containing the ancillary type: {ancillaryType}.")
                     print(f"            Ignoring everything for {ancillaryType}...\n")
                     continue
@@ -700,54 +748,54 @@ Using current working directory for storing the ancillary database file: %s''' %
             return year, day      
         
         # For YYYYmmddT or YYmmddHHMMSS
-        if re.search('[\d]{8}T', ancfile) or re.search('[\d]{14}', ancfile): 
-            ymd = re.search('[\d]{8}', ancfile).group()
+        if re.search(r'[\d]{8}T', ancfile) or re.search(r'[\d]{14}', ancfile):
+            ymd = re.search(r'[\d]{8}', ancfile).group()
             dt = datetime.strptime(ymd, '%Y%m%d')
             year = dt.strftime('%Y')
             day = dt.strftime('%j')
             return year, day   
         # For YYYYDDDHHMMSS
-        elif re.search('[\d]{13}', ancfile):
-            ymd = re.search('[\d]{7}', ancfile).group()
+        elif re.search(r'[\d]{13}', ancfile):
+            ymd = re.search(r'[\d]{7}', ancfile).group()
             year = ymd[0:4]
             day = ymd[4:7]
             return year, day
         # For YYYYmmddHHMM
-        elif re.search('[\d]{12}', ancfile):
-            ymd = re.search('[\d]{8}', ancfile).group()
+        elif re.search(r'[\d]{12}', ancfile):
+            ymd = re.search(r'[\d]{8}', ancfile).group()
             dt = datetime.strptime(ymd, '%Y%m%d')
             year = dt.strftime('%Y')
             day = dt.strftime('%j')
             return year, day
         # For YYYYDDDHHMM
-        elif re.search('[\d]{11}', ancfile):
-            ymd = re.search('[\d]{7}', ancfile).group()
+        elif re.search(r'[\d]{11}', ancfile):
+            ymd = re.search(r'[\d]{7}', ancfile).group()
             year = ymd[0:4]
             day = ymd[4:7]
             return year, day
         # For YYYYmmddHH
-        elif re.search('[\d]{10}', ancfile):
-            ymd = re.search('[\d]{8}', ancfile).group()
+        elif re.search(r'[\d]{10}', ancfile):
+            ymd = re.search(r'[\d]{8}', ancfile).group()
             dt = datetime.strptime(ymd, '%Y%m%d')
             year = dt.strftime('%Y')
             day = dt.strftime('%j')
             return year, day
         # For YYYYDDDHH
-        elif re.search('[\d]{9}', ancfile):
-            ymd = re.search('[\d]{7}', ancfile).group()
+        elif re.search(r'[\d]{9}', ancfile):
+            ymd = re.search(r'[\d]{7}', ancfile).group()
             year = ymd[0:4]
             day = ymd[4:7]
             return year, day
         # For YYYYmmdd
-        elif re.search('[\d]{8}', ancfile):
-            ymd = re.search('[\d]{8}', ancfile).group()
+        elif re.search(r'[\d]{8}', ancfile):
+            ymd = re.search(r'[\d]{8}', ancfile).group()
             dt = datetime.strptime(ymd, '%Y%m%d')
             year = dt.strftime('%Y')
             day = dt.strftime('%j')
             return year, day
         # For YYYYDDD
-        elif re.search('[\d]{7}', ancfile):
-            ymd = re.search('[\d]{7}', ancfile).group()
+        elif re.search(r'[\d]{7}', ancfile):
+            ymd = re.search(r'[\d]{7}', ancfile).group()
             year = ymd[0:4]
             day = ymd[4:7]
             return year, day

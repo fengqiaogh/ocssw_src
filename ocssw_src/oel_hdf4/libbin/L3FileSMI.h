@@ -4,6 +4,7 @@
 #include <netcdf>
 #include <L3File.h>
 #include <vector>
+#include <deque>
 
 namespace l3 {
 
@@ -16,6 +17,8 @@ protected:
     netCDF::NcFile *ncFile;
     meta_l3bType metaData;
     std::vector<netCDF::NcVar> prodVarList;
+    size_t wvIdx = 0;
+    std::deque<size_t> wvIdxList;
 
     virtual int initRecordLookup();
 
@@ -24,6 +27,11 @@ protected:
 public:
     L3FileSMI();
     virtual ~L3FileSMI();
+
+    template <typename T>
+    bool getProductAttribute(const std::string& prodName, const std::string& attributeName, T* attrValue) {
+        return false;
+    }
 
     template<typename TheType>
     bool readAttribute(std::string name, TheType &val) {
@@ -94,6 +102,10 @@ public:
     virtual std::string getProductName(size_t index = 0);
     virtual bool setActiveProductList(const char* prodStr);
     virtual bool hasQuality();
+
+    virtual bool getWavelength(std::string name, float& wavelength);
+    virtual bool checkWavelength(const char* wvl);
+    virtual bool getWavelengthList(std::vector<std::string>& wvlist);
 
 };
 

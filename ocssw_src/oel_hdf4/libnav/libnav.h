@@ -36,11 +36,13 @@ extern "C" {
   double deg2rad(double deg);
   double rad2deg(double rad);
 
-
-  
-#ifdef  __cplusplus
+#ifdef __cplusplus
 }
-#endif
 
+  template <typename T>
+  void getUnitRotatingSunVector(int &year, int &dayOfYear, double &secondsOfDay, T rotatingSunVector[3],
+                                T &earthToSunDistance);
+
+#endif
 
 #endif /* LIBNAV_H */

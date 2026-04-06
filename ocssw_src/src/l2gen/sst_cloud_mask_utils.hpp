@@ -30,82 +30,37 @@
 #include <boost/unordered_map.hpp>
 // parameters
 namespace envset {
-    /**
-     * @brief Returns OCDATAROOT
-     */
-    std::string get_ocdata_root();
+/**
+ * @brief Returns OCDATAROOT
+ */
+std::string get_ocdata_root();
 
-    /**
-     * @brief returns the sst coefs paths to netCDF files depending on requested product
-     */
-    const std::unordered_map<std::string, std::string (*)(const instr *)> get_sst_coeffs_path = {{std::string("SST"),
-                                                                                                         [](const instr *input) {
-                                                                                                             return std::string(
-                                                                                                                     input->sstcoeffile);
-                                                                                                         }},
-                                                                                                 {std::string("SST4"),
-                                                                                                         [](const instr *input) {
-                                                                                                             return std::string(
-                                                                                                                     input->sst4coeffile);
-                                                                                                         }},
-                                                                                                 {std::string("SST3"),
-                                                                                                         [](const instr *input) {
-                                                                                                             return std::string(
-                                                                                                                     input->sst3coeffile);
-                                                                                                         }}};
+/**
+ * @brief returns the sst coefs paths to netCDF files depending on requested product
+ */
+std::string get_sst_coeff_file(const std::string& sst_type, const instr* input) ;
 
-    /**
-     * @brief returns the SSES LUTs paths to netCDF files depending on requested product
-     */
-    const std::unordered_map<std::string, std::string (*)(const instr *)> get_sses_coeffs_path = {{std::string("SST"),
-                                                                                                          [](const instr *input) {
-                                                                                                              return std::string(
-                                                                                                                      input->sstssesfile);
-                                                                                                          }},
-                                                                                                  {std::string("SST4"),
-                                                                                                          [](const instr *input) {
-                                                                                                              return std::string(
-                                                                                                                      input->sst4ssesfile);
-                                                                                                          }},
-                                                                                                  {std::string("SST3"),
-                                                                                                          [](const instr *input) {
-                                                                                                              return std::string(
-                                                                                                                      input->sst3ssesfile);
-                                                                                                          }}};
+/**
+ * @brief returns the SSES LUTs paths to netCDF files depending on requested product
+ */
+std::string get_sst_sses_file(const std::string& sst_type, const instr* input);
 
-}
+}  // namespace envset
 /**
  * @brief Contains supportive functions and constants.
  *
  */
 namespace cldmsk {
+    
+    const std::unordered_map<std::string, float> & cldthresh_list (); // threshold for cold SST test
+    const std::unordered_map<std::string, std::unordered_map<std::string, int>> & bands_set ();
+    const std::unordered_map<std::string, size_t> & bt_box_sizes(); // bt box size
+    const std::unordered_set<int> & modis_sensors();  // sensors/platforms INT values and corresponding string values
+    const std::unordered_set<int> & viirs_sensors ();
+    const std::unordered_map<std::string, std::unordered_set<int>> & all_sensors ();
+    const std::unordered_map<int, std::string> & platforms();
+    void init_parameters();
     const float cldthresh = -1.0;
-    const std::unordered_map<std::string, float> cldthresh_list = {{"modis", 0.01},
-                                                                   {"viirs", 0.04}}; // threshold for cold SST test
-    const std::unordered_map<std::string, const std::unordered_map<std::string, int>> bands_set =     // bands WV for VIIRS/MODIS needed to produce SST/Cloud mask
-            {{"modis",
-                     {{"ibred", 678},
-                             {"ib07", 748},
-                             {"ib16", 1640},
-                             {"ib37", 3750},
-                             {"ib39", 3959},
-                             {"ib40", 4050},
-                             {"ib67", 6715},
-                             {"ib73", 7325},
-                             {"ib85", 8550},
-                             {"ib11", 11000},
-                             {"ib12", 12000}}},
-             {"viirs",
-                     {{"ibred", 672},
-                             {"ib07", 748},
-                             {"ib16", 1601},
-                             {"ib37", 3750},
-                             {"ib40", 4050},
-                             {"ib85", 8550},
-                             {"ib11", 11000},
-                             {"ib12", 12000}}}};
-    const std::unordered_map<std::string, size_t> bt_box_sizes = {{"modis", 3},
-                                                                  {"viirs", 5}}; // bt box size
     const float hisenz = 55.0;                                                                 // senz thresholds
     const float vhisenz = 75.0;
     const float vhisenzv2 = 65.0;
@@ -148,16 +103,6 @@ namespace cldmsk {
     const float min_bt = BT_LO + 0.1;
     const float min_lt = BAD_FLT + 1.0;
     const float max_lt = BT_HI - 1.0;
-    const std::unordered_set<int> modis_sensors = {MODIST,
-                                                   MODISA}; // sensors/platforms INT values and corresponding string values
-    const std::unordered_set<int> viirs_sensors = {VIIRSJ1, VIIRSJ2, VIIRSN};
-    const std::unordered_map<std::string, std::unordered_set<int>> all_sensors = {{"modis", modis_sensors},
-                                                                                  {"viirs", viirs_sensors}};
-    const std::unordered_map<int, std::string> platforms = {{MODIST,  "terra"},
-                                                            {MODISA,  "aqua"},
-                                                            {VIIRSN,  "npp"},
-                                                            {VIIRSJ1, "j1"},
-                                                            {VIIRSJ2, "j2"}};
     const double scan_time_modis_t_day1 = 972777600; // 29 Oct 2000, MODIS TERRA correction dates
     const double scan_time_modis_t_day2 = 993945600; //  1 Jul 2001 
     const float el_corr_modis_t_1 = 0.4452; // MODIS TERRA correction values
@@ -215,57 +160,18 @@ namespace cldmsk {
     typedef bool (*get_valid)(const l1str &, int, int, int); //
     typedef float (*get_value)(const l1str &, int, int, int);
 
-    const get_valid cirrus_mask = [](const l1str &l1str_, int pixel, int nbands, int ib) {
-        return l1str_.rho_cirrus[pixel] > invalid_val;
-    };
-    const get_value cirrus_value = [](const l1str &l1str_, int pixel, int nbands,
-                                int ib) { return l1str_.rho_cirrus[pixel]; };
-    // bts
-    const get_valid bt_mask = [](const l1str &l1str_, int pixel, int nbands, int ib) {
-        const float bt = l1str_.Bt[pixel * nbands + ib];
-        return bt > min_bt && bt < max_bt;
-    };
-    const get_value bt_value = [](const l1str &l1str_, int pixel, int nbands, int ib) {
-        return l1str_.Bt[pixel * nbands + ib];
-    };
+    bool cirrus_mask(const l1str&, int, int, int);
+    float cirrus_value(const l1str&, int, int, int);  // bts
+    bool bt_mask(const l1str&, int, int, int);
+    float bt_value(const l1str&, int, int, int);
     // rho (RSMAS)
-    const get_valid rho_mask = [](const l1str &l1str_, int pixel, int nbands, int ib) {
-        const float lt = l1str_.Lt[pixel * nbands + ib];
-        return lt > min_lt && lt < max_lt;
-    };
-    const get_value rho_value = [](const l1str &l1str_, int pixel, int nbands, int ib) {
-        const float lt = l1str_.Lt[pixel * nbands + ib];
-        const float fo = l1str_.Fo[ib];
-        const float csolz = l1str_.csolz[pixel];
-        const float rho = OEL_PI * lt / fo / csolz;
-        return rho;
-    };
-
-    const get_value cldrh_value = [](const l1str &l1str_, int pixel, int nbands, int ib) {
-        const float lt = l1str_.Lt[pixel * nbands + ib];
-        const float fo = l1str_.Fo[ib];
-        // const float csolz = l1str_.csolz[pixel];
-        const float tg_sol = l1str_.tg_sol[pixel * nbands + ib];
-        const float tg_sen = l1str_.tg_sen[pixel * nbands + ib];
-        const float t_sen = l1str_.t_sen[pixel * nbands + ib];
-        const float t_sol = l1str_.t_sol[pixel * nbands + ib];
-        const float cldrh = OEL_PI * lt / fo / tg_sol / tg_sen / t_sol / t_sen; // /csolz
-        return cldrh;
-    };
-    const get_valid cldrh_mask = [](const l1str &l1str_, int pixel, int nbands, int ib) {
-        const float lt = l1str_.Lt[pixel * nbands + ib];
-        return lt > 0.0 && lt < max_lt;
-    };
+    bool rho_mask(const l1str&, int, int, int);
+    float rho_value(const l1str&, int, int, int);
+    float cldrh_value(const l1str&, int, int, int);
+    bool cldrh_mask(const l1str&, int, int, int);
     // other vars (not bandd)
-    const std::unordered_map<std::string, float *(*)(const l1str &)> get_non_BT_vars =
-            {
-                    {"solz",      [](const l1str &l1rec) { return l1rec.solz; }},
-                    {"senz",      [](const l1str &l1rec) { return l1rec.senz; }},
-                    {"wv",        [](const l1str &l1rec) { return l1rec.wv; }},
-                    {"glintcoef", [](const l1str &l1rec) { return l1rec.glint_coef; }},
-                    {"lat",       [](const l1str &l1rec) { return l1rec.lat; }},
-                    {"lon",       [](const l1str &l1rec) { return l1rec.lon; }},
-                    {"month",     [](const l1str &l1rec) { return month_data().data(); }}};
+    const std::unordered_map<std::string, float *(*)(const l1str &)> & get_non_BT_vars();
+
 
     /**
      * @brief Get the mask (line) of a BT
@@ -731,6 +637,32 @@ namespace bstats {
             }
         }
 
+        void reset_stats() {
+            if (!var_max.empty()) {
+                for (size_t i_q = i_s; i_q <= i_e; i_q++) {
+                    const size_t index = npix * i_q;
+                    cldmsk::get_window_1D_max(var_max_box.data() + index, var_box.data() + index,
+                                              mask_box.data() + index, npix, rad_x);
+                }
+                cldmsk::get_total_2d_max(var_max.data(), var_max_box.data(), npix, nscan, center, rad_y);
+            }
+            if(!var_min.empty()) {
+                for (size_t i_q = i_s; i_q <= i_e; i_q++) {
+                    const size_t index = npix * i_q;
+                    cldmsk::get_window_1D_min(var_min_box.data() + index, var_box.data() + index,
+                                              mask_box.data() + index, npix, rad_x);
+                }
+                cldmsk::get_total_2d_min(var_min.data(), var_min_box.data(), npix, nscan, center, rad_y);
+            }
+            if(!var_minmax.empty()) {
+                std::transform(var_max.begin(), var_max.end(), var_min.begin(), var_minmax.begin(),
+                               std::minus<float>());
+            }
+            if(!var_std.empty()) {
+                cldmsk::get_std_box(var_box.data(), mask_box.data(), npix, nscan, rad_x, rad_y, var_std.data(), center,
+                                    l1qrec);
+            }
+        }
         /**
          * @brief when a l1 queue is updated, we need to updated the supporting arrays/queus as well
          *

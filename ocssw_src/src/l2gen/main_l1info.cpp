@@ -480,7 +480,7 @@ int main(int argc, char *argv[]) {
 
     if (show_sdps_info == TRUE || show_standard_info == TRUE) {
         fprintf(fp, "Orbit_Number=%d\n", l1file->orbit_number);
-        if (l1file->format == FT_VIIRSL1A || l1file->format == FT_VIIRSL1BNC) {
+        if (l1file->format == FT_VIIRSL1A) {
             fprintf(fp, "Number_of_Scans=%d\n", filledScans);
         } else {
             fprintf(fp, "Number_of_Scans=%d\n", l1file->nscan);
@@ -555,14 +555,6 @@ int main(int argc, char *argv[]) {
 
     // Before looping on scans, prepare to instantiate Gring
     Gring *gring_helper = new Gring();
-    // Get scan direction for this sensor
-    // Most instruments scan to the left (so, use default scanDirection = -1); however, some exceptions scan to the right. 
-    // Set scanDirection = 1 for these exceptions.
-    if (l1file->sensorID == CZCS || l1file->sensorID == OCI || l1file->sensorID == HARP2 || l1file->sensorID == SPEXONE) {
-        gring_helper->setScanDirection(1);
-    } else {
-        gring_helper->setScanDirection(-1);
-    }
     
     // set the number of lines between direction test
     if (strcmp(sensorId2InstrumentName(l1file->sensorID), "MODIS") == 0) {
@@ -803,8 +795,8 @@ int main(int argc, char *argv[]) {
         }
         
         // gring-related processing (per scan)
-        gring_helper->processScan(l1rec->lat, l1rec->lon, l1rec->l1file->npix,
-                                  iscan, escan, l1rec->flags);
+        gring_helper->tryIncludeScan(l1rec->lat, l1rec->lon, l1rec->l1file->npix,
+                                  iscan, l1rec->flags);
 
         if (iscan < escan - user_defined_increment) {
             iscan += user_defined_increment;
@@ -986,29 +978,21 @@ int main(int argc, char *argv[]) {
     /***************************************************************************************************
      *    Print gring info 
      ***************************************************************************************************/ 
-    int gring_geobox_cnt = gring_helper->getGeoboxCount();
-    if (gring_geobox_cnt > 1) {
-        // Proceed to print gring info
-        // Prep for call to  gring_helper->getGeoboxCount()   
-        std::string gring_lon_string;
-        std::string gring_lat_string;
-        std::string gring_seq_string;
-        // Call gring_helper->getGringStrings
-        if (gring_helper->getGringStrings(gring_lon_string, gring_lat_string, gring_seq_string) == SUCCESS) {
-            // fprintf gring-related strings
-            fprintf(fp, "gringpointlongitude=%s\n",gring_lon_string.c_str());
-            fprintf(fp, "gringpointlatitude=%s\n",gring_lat_string.c_str());
-            fprintf(fp, "gringpointsequence=%s\n",gring_seq_string.c_str());
-        } else {
-            fprintf(stderr, "-W- Could not generate gring\n");
-        }
-        
+    // Proceed to print gring info
+    // Prep for call to  gring_helper->getGeoboxCount()   
+    std::string gring_lon_string;
+    std::string gring_lat_string;
+    std::string gring_seq_string;
+    // Call gring_helper->getGringStrings
+    if (gring_helper->getGringStrings(gring_lon_string, gring_lat_string, gring_seq_string) == SUCCESS) {
+        // fprintf gring-related strings
+        fprintf(fp, "gringpointlongitude=%s\n",gring_lon_string.c_str());
+        fprintf(fp, "gringpointlatitude=%s\n",gring_lat_string.c_str());
+        fprintf(fp, "gringpointsequence=%s\n",gring_seq_string.c_str());
     } else {
-        fprintf(stderr, "-W- Not enough scans to form a gring; number of scans to include in gring = %d\n",gring_geobox_cnt);
+        fprintf(stderr, "-W- Could not generate gring\n");
     }
-    
-    
-
+        
     /* free the dynamically allocated memory */
     delete(gring_helper);
 
@@ -1030,7 +1014,7 @@ int main(int argc, char *argv[]) {
     if (exitflag == 0 && non_nadir) {
         exitflag = NON_NADIR;
     }
-
+    closel1(l1file);
     exit(exitflag);
 }
 

@@ -82,6 +82,14 @@ def httpdl(server, request, localpath='.', outputfilename=None, ntries=5,
 
     global obpgSession
     localpath = Path(localpath)
+
+    # if outfile contains any pathing (ie: anc/myFile.anc), remove it 
+    # and leave only the file name (ie: myFile.anc).
+    #
+    # localpath should already have the path (ie: anc/) 
+    if (outputfilename is not None and "/" in outputfilename):
+        outputfilename = Path(outputfilename).name
+        
     getSession(verbose=verbose, ntries=ntries)
 
     modified_since = None

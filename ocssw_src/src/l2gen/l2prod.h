@@ -586,4 +586,7 @@ in product.xml...but not here?
 
 #define CAT_Rrs_raman               574
 
+#define CAT_qwip                    575
+
+
 #endif

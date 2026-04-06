@@ -152,9 +152,9 @@ class l1c_filehandle {
     float lat0;
 
     // multi  attributes (view, pol, bands)
-    float *view_agg;  // views to be aggregated for later products such as vsfs etc
-    float *pol_agg;   // polarization states to be aggregated for post-processing products, linear
-                     // depolarization ratio etc
+    float *view_agg;       // views to be aggregated for later products such as vsfs etc
+    float *pol_agg;        // polarization states to be aggregated for post-processing products, linear
+                           // depolarization ratio etc
     float *band_agg;       // specific bands for future merged products
     size_t overlap_vflag;  // tells if we want merged views
     size_t overlap_pflag;  // tells if we want merged polarizations

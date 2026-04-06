@@ -11,7 +11,7 @@ import os,fnmatch
 import argparse
 from datetime import datetime, timezone
 
-__version__ = '1.4 (2025-08-13)'
+__version__ = '1.6 (2025-09-03)'
 
 def find(pattern, path):
 # function to find a file matching pattern in path
@@ -100,6 +100,38 @@ def make_red_sender_band(pix1, pix2, iwave, woff, wsig, ipw, ilw, wred, rred, tr
 
     return rredr
   
+def get_line_off_for_tilt(send_line_off, k1, tiltch, tilt):
+
+# program to adjust OCI red band HAM side striping sender line offset for tilt change
+
+#  Name             Type    I/O Description
+#
+#  send_line_off    int     I   Sender line offset from LUT
+#  k1[]             int     I   Line index array for HAM side B
+#  tiltch[]         int     I   Tilt change flags (1 = changing)
+#  tilt[]           float   I   Tilt angle array
+#  line_off_tilt    int     O   Sender line offsets adjusted for tilt change
+
+# Initialize offset array
+    nk1 = k1.size
+    line_off_tilt = np.full(nk1,send_line_off)
+
+# Locate tilt change lines
+    kch = np.array(np.where(tiltch[k1] == 1)[0])
+    nkch = kch.size
+
+# Loop through affected lines and calculate line offset
+    i1 = kch[0] - int(send_line_off/2)
+    i2 = kch[nkch-1] + 1
+    linesperdeg = 11.4# angular line spacing during non-tilting data collection
+    for i in range(i1,i2):
+        delta_tilts = tilt[k1[i]:(k1[i] + send_line_off+1)] - tilt[k1[i]]
+       #print(i,delta_tilts)
+# Convert tilt angle difference to equivalent line offsets over the range of lines
+        delta_lines = delta_tilts*linesperdeg + np.arange(send_line_off+1) - send_line_off
+        line_off_tilt[i] = np.where(abs(delta_lines) == min(abs(delta_lines)))[0]
+    return line_off_tilt
+
 
 # program to compute and perform OCI red band HAM B striping correction
 
@@ -124,10 +156,6 @@ Return value
     parser.add_argument("--lut", dest="lutfile", help="path to non-default lut file")
     args = parser.parse_args()
 
-
-    #l1bfiles=['striping_test/PACE_OCI.20240723T123140.L1B.V3.nc', 'striping_test/PACE_OCI.20240723T123140.L1B.V3.nc']
-    #l1bfiles=['PACE_OCI.20240723T123140.L1B.V3.nc']
-    #l1bfiles = []
     l1bfiles=[args.l1bfile]
 
     if args.lutfile:
@@ -182,8 +210,11 @@ Return value
         print('Striping correction already performed -- exiting')
         exit(100)
 
+    rhot_red_var = l1b_dataset['observation_data']['rhot_red']
+    rhot_red_var.set_auto_mask(False)
+
     try:
-        rhot_red1 = l1b_dataset['observation_data']['rhot_red'][:]
+        rhot_red1 = rhot_red_var[:]
         qred      = l1b_dataset['observation_data']['qual_red'][:]
     except Exception as e:
         print("-E- Could not read observation_data/rhot_red")
@@ -192,15 +223,25 @@ Return value
     print('Reading HAM side and wavelengths')
 
     HAM_side = l1b_dataset['scan_line_attributes']['HAM_side'][:]
+    sflags   = l1b_dataset['scan_line_attributes']['scan_quality_flags'][:]
     red_wave = l1b_dataset['sensor_band_parameters']['red_wavelength'][:]
 
+    #Check for tilt change and read tilt if needed
+    tilt_change = 0
+    tiltch = sflags & 1
+    if np.any(tiltch == 1):
+        tilt_change = 1
+        tilt = l1b_dataset['navigation_data']['tilt_angle'][:]
 
     #Check for spin ID in L1B file
-
-    #; Construct pseudo-spinID
-    stime = l1b_dataset['scan_line_attributes']['time'][:]
-    spinid = np.fix((stime - stime[0])*5.7)
-    nospid = 1
+    if 'spin_ID'  in l1b_dataset['scan_line_attributes'].variables:
+        spinid = l1b_dataset['scan_line_attributes']['spin_ID'][:]
+        nospid = 0
+    else:
+        #Construct pseudo-spinID
+        stime = l1b_dataset['scan_line_attributes']['time'][:]
+        spinid = np.fix((stime - stime[0])*5.7)
+        nospid = 1
 
     # Get band and scan dimensions
     rbands  = l1b_dataset.dimensions['red_bands'].size
@@ -217,7 +258,7 @@ Return value
         # Read additional scans and append to data
         l1b_dataset = nc4.Dataset(l1bfiles[-1], mode='r', format='NETCDF4')
         print('Reading red bands from file ',l1bfiles[-1])
-        ##HERE
+
         num_scans = l1b_dataset['observation_data']['rhot_red'].shape[1]
         if(num_scans < 20):
             print("Accessory file has: ", num_scans, " scans.")
@@ -228,6 +269,17 @@ Return value
         rhot_red  = np.empty((rbands, nscans+send_line_off, npixels), dtype=np.float32)
         rhot_red[:,:nscans,:] = rhot_red1
         rhot_red[:,nscans:,:]    = rhot_red2
+
+        #Get and append spin IDs
+        if nospid:
+            stim2 = l1b_dataset['scan_line_attributes']['time'][:]
+            #Check for day rollover
+            if (stim2[0] < stime[0]):
+                stim2 = stim2 + np.double(864.e2)
+            spinid2 = np.fix((stim2 - stime[0])*5.7)
+        else:
+            spinid2 = l1b_dataset['scan_line_attributes']['spin_ID'][:]
+        spinid = ma.concatenate([spinid, spinid2[0:send_line_off]])
         l1b_dataset.close()
     else:
         # Reduce number of scans by line offset
@@ -242,8 +294,12 @@ Return value
 
     # Get striping pixel profile
     str_prof  = make_striping_profile(npixstr)
-    #str_prof1 = np.tile(str_prof, (nk1,1))  #never used
     str_corr  = np.zeros((rbands, nscans, npixstr), dtype=np.float32)
+
+    # Correct line offset for tilt change if needed
+    if(tilt_change):
+        line_off_tilt = get_line_off_for_tilt(send_line_off, k1, tiltch, tilt)
+        send_line_off = line_off_tilt
 
     # Loop through bands
     fill = -32767.0

@@ -3,6 +3,9 @@ cmake_minimum_required(VERSION 3.12)
 
 set(LIBS genutils piutils)
 
+find_package(Boost REQUIRED)
+include_directories(target_include_directories(${Boost_INCLUDE_DIRS}))
+
 add_library (gring
   gring.cpp
 )

@@ -12,7 +12,7 @@ import pandas as pd
 from telemetry import ccsdspy
 from telemetry.PacketUtils import *
 
-__version__ = "1.2.0 (2025-02-25)"
+__version__ = "1.2.0 (2026-01-09)"
 
 import numpy as np
 
@@ -41,7 +41,6 @@ def assign_dict_values_to_array(data, indices):
     for i, index in enumerate(indices):
         arr[i] = data[index]['value']
     return arr
-
 
 def add_derived_to_dict(dictList, conversions, mnemonic):
     ind_dependee_tlm = [i for i,_ in enumerate(dictList) if _['var'] == mnemonic]
@@ -155,6 +154,7 @@ EXIT Status:
     mnemonics_list = []
     try:
         mnemonics_list = np.loadtxt(mnemonicsfile, dtype=str)
+        #print(f"mnemonics list: {mnemonics_list}\n mnemonicsfile: {mnemonicsfile}") ##debug msg
     except Exception as e:
         print("Error reading list of PACE mnemonics.")
 
@@ -172,11 +172,13 @@ EXIT Status:
         apid = int(
             os.path.basename(csvfile).split(".", maxsplit=1)[0].replace("APID", "")
         )
-        packetDef[apid] = ccsdspy.FixedLength.from_file(csvfile)
+        packetDef[apid] = ccsdspy.FixedLength.from_file(csvfile) 
+        #print(f"packetDef[apid]:  {packetDef[apid]}") ##debug msg
 
         # attach conversion, if present
         for name in [f._name for f in packetDef[apid]._fields]:
             row = conversions.loc[conversions["mnemonic"] == name]
+            #print(f"packetDef[apid]._fields:  {packetDef[apid]._fields}\nrow: {row}") ##debug msg
             if len(row) > 0:
                 packetDef[apid].add_converted_field(
                     name,
@@ -213,6 +215,7 @@ EXIT Status:
     # Step through all input files
     for filename in filelist:
         logging.info(f"Reading {filename}")
+        print(f"Reading {filename}")
         fname = os.path.basename(filename)
         dictList = []
 
@@ -280,6 +283,9 @@ EXIT Status:
                 and data[0] < 192  # before 2060-01-28T16:50:35Z
             ):
                 timestamp = tai58_as_datetime(readTimestamp(data))
+            elif (header['CCSDS_APID']==482) or (header['CCSDS_APID']==488) or (header['CCSDS_APID']==489):
+                # star tracker telemetries
+                timestamp = gps_as_datetime(readTimestamp(data[3:])) # ref. "TM-packets" on page 36 of PACE-GNC-ICD-0079A_09-xx-2021_PreDraft 1.pdf
             else:
                 continue  # done with this packet
 
@@ -299,6 +305,8 @@ EXIT Status:
                         outdict["alert_type"] = ""  # populated later
                         outdict["recorded"] = ""  # database ingest datetime
                         dictList.append(outdict)
+            #else:
+            #    print(f"Did not parse mnemonic apid: {packetDef.keys()}")
 
         # end (for packet in packets)
 
@@ -336,6 +344,6 @@ EXIT Status:
         logging.warning(f"Exiting with status code {status}")
     return status
 
-
 if __name__ == "__main__":
     sys.exit(main())
+

@@ -1,6 +1,5 @@
 #include <iostream>
 #include <cstring>
-using namespace std;
 #include <vector>
 #include <valarray>
 #include <math.h>
@@ -42,7 +41,7 @@ struct interval_struc
 // the hash_entry_struc is the hash table item for a managed intervals 
 struct hash_entry_struc
   {
-  valarray<int> ix_arr;
+  std::valarray<int> ix_arr;
   interval_struc *int_str;
   };
 
@@ -50,7 +49,7 @@ struct hash_entry_struc
 //  to the individual grid points
 struct gpt_hash_struc
   {
-  valarray<int> ix_arr;
+  std::valarray<int> ix_arr;
   data_info_struc *dat_info;
   };
 
@@ -112,9 +111,9 @@ class dim_mgr {
   // help for mng_pt
   int32_t sparse_get_loc( dim_info_struc **, int32_t, double *,
     int32_t *, double *, double * );
-  interval_struc *access( valarray<int>&, int32_t );
-  int32_t gpt_add( valarray<int>, data_info_struc * );
-  int hash_func(valarray<int>, int32_t );
+  interval_struc *access(std::valarray<int>&, int32_t );
+  int32_t gpt_add(std::valarray<int>, data_info_struc * );
+  int hash_func(std::valarray<int>, int32_t );
   int32_t share_gpt( interval_struc *, int32_t * );
   void dump_interval( interval_struc * );
 
@@ -129,9 +128,9 @@ class dim_mgr {
   pt_info_struc pt_info;
   interval_struc *prev_int;  // remember the previous interval here
   dim_info_struc **dim_info;
-  vector <hash_entry_struc> *hash_tbl;  // array of vectors for each hash
+  std::vector <hash_entry_struc> *hash_tbl;  // array of vectors for each hash
                                       // table entry
-  vector <gpt_hash_struc> *gpt_hash_tbl;  // Similar to above but for the 
+  std::vector <gpt_hash_struc> *gpt_hash_tbl;  // Similar to above but for the 
                                           // grid points
 
   };

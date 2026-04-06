@@ -166,6 +166,7 @@ typedef struct input_struct {
     char pro_control[4096];
     char mask_names[1024];
     char rflag[1024];
+    char pixel_anc_vars[1024]; /* per pixel ancillary layers requested by the user*/
 
     /* Vicarious calibration */
     float *vcal_nLw;
@@ -302,14 +303,17 @@ typedef struct input_struct {
     int  nwavelengths_3d;
     int *wavelength_3d_index;
     int *wavelength_3d;
+    float *wavelength_3d_float;
     char wavelength_3d_str[1024];
 
     int32_t *mbac_wave;/*wavelengths used for mbac AC*/
-    int32_t nbands_ac;
-    int32_t *acbands_index;
+    int32_t nbands_ac; /* number of bands used for AC*/
+    int32_t *acbands_index; /* index of bands used for AC*/
 
     int *watervapor_bands; /*bands used to retrieve water vapor based on 3-band depth approach*/
     int nbands_watervapor;
+    char rayleigh_prefix[FILENAME_MAX];
+
 } instr;
 
 #ifdef __cplusplus

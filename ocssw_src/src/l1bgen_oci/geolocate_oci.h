@@ -33,7 +33,7 @@
 #include "types.hpp"
 #include <array>
 #include "l1b_options.hpp"
-#include "processing_tracker.hpp"
+#include <processing_tracker.hpp>
 
 double constexpr RADIANS_TO_ARCSECONDS = OEL_RADEG * 3600;
 const int constexpr MAX_ENC_COUNT = 0x20000;
@@ -59,8 +59,8 @@ enum DataType {
 using namespace netCDF;
 using namespace netCDF::exceptions;
 
-typedef float quaternion[4];
-typedef std::array<float, 3> orbArray;
+typedef double Quaternion[4];
+typedef std::array<double, 3> OrbArray;
 
 /**
  * @brief Expands environment variables in a given string.
@@ -141,32 +141,6 @@ int getEarthView(double comRotRate, int16_t *dataTypes, int16_t *spatialZoneLine
                  double *sciencePixelOffset, double *swirPixelOffset, bool isDark);
 
 /**
- * @brief Generates OCI Earth view vectors for one spin using MCE telemetry and encoder data.
- *
- * This function calculates the Earth view vectors for a single spin of the Ocean Color Instrument (OCI)
- * using Mechanism Control Electronics (MCE) telemetry and encoder data. It applies corrections based on
- * the Half-Angle Mirror (HAM) and Rotating Telescope Assembly (RTA) encoder data to determine accurate
- * pixel line-of-sight vectors.
- *
- * @param geoData Structure containing geolocation data
- * @param geoLut Structure containing geolocation lookup table data
- * @param numPixels Number of pixels in Earth view
- * @param earthViewTimeOffset Time offset from Pulse per revolution (PPR) to center of Earth View
- * @param delt Vector of time offsets in seconds from Earth View time to pixel times
- * @param scanNum The current scan number being processed
- * @param vectors [out] View vectors in the instrument frame (pre-allocated 2D array)
- * @param scanAngles [out] Scan angles for science pixels
- *
- * @return int Returns EXIT_SUCCESS upon success, EXIT_FAILURE if no MCE data for the spin
- *
- * @note This function implements the algorithm described in "Use of OCI Telemetry to Determine Pixel
- * Line-of-Sight" by F. Patt, 2020-05-18
- */
-int getEarthViewVectors(GeoData &geoData, const GeoData::GeoLut &geoLut, const int device,
-                        const double earthViewTimeOffset, const std::vector<double> &delt,
-                        const size_t scanNum, std::vector<std::array<float, 3>> &vectors);
-
-/**
  * @brief Interpolate encoder data to pixel times and add to scan angles
  * @param numPix Number of pixels in the scan
  * @param geoData Structure containing geolocation data
@@ -182,10 +156,11 @@ void getThetaCorrections(const size_t numPix, const GeoData &geoData, const GeoD
 
 /**
  * @brief Check for any missing scan start times and interpolate as necessary.
- * @param scanStartTimes The times that will be checked and modified
+ * @param geoData A struct containing the scan start times and spin IDs
  * @param sfl flag array which also might get modified
  */
-void interpolateMissingScanTimes(std::vector<double> &scanStartTimes, std::vector<short> &sfl);
+// void interpolateMissingScanTimes(std::vector<double> &scanStartTimes, std::vector<short> &sfl);
+void interpolateMissingScanTimes(GeoData &geoData, std::vector<short> &sfl);
 
 /**
  * @brief Get J2000 to ECEF transformation matrix
@@ -240,7 +215,7 @@ int matrixToQuaternion(double rm[3][3], double q[4]);
  * @param result [out] Result quaternion (double precision)
  * @return 0 always
  */
-int multiplyQuaternions(double q1[4], float q2[4], double result[4]);
+// int multiplyQuaternions(double q1[4], Quaternion q2, double result[4]);
 
 /**
  * @brief Multiply two quaternions (float precision * float precision)
@@ -249,7 +224,7 @@ int multiplyQuaternions(double q1[4], float q2[4], double result[4]);
  * @param result [out] Result quaternion (float precision)
  * @return 0 always
  */
-int multiplyQuaternions(float q1[4], float q2[4], float result[4]);
+int multiplyQuaternions(Quaternion q1, Quaternion q2, Quaternion q3);
 
 /**
  * @brief Interpolate orbit position and velocity vectors to scan line times using cubic interpolation.
@@ -263,9 +238,9 @@ int multiplyQuaternions(float q1[4], float q2[4], float result[4]);
  * @param velI Array of interpolated velocities
  */
 void interpolateOrbitVectors(size_t numOrbRec, size_t numScans, const std::vector<double> &orbitTimes,
-                             const std::vector<orbArray> &positions, const std::vector<orbArray> &velocities,
-                             const std::vector<double> &scanTimes, std::vector<orbArray> &posi,
-                             std::vector<orbArray> &veli);
+                             const std::vector<OrbArray> &positions, const std::vector<OrbArray> &velocities,
+                             const std::vector<double> &scanTimes, std::vector<OrbArray> &posi,
+                             std::vector<OrbArray> &veli);
 
 /**
  * @brief Interpolate quaternions to scan line times
@@ -276,8 +251,8 @@ void interpolateOrbitVectors(size_t numOrbRec, size_t numScans, const std::vecto
  * @param scanTimes Array of scan start times
  * @param quatsInterpolated Interpolated quaternions
  */
-int interpolateAttitudeForScanTimes(size_t numAttRec, size_t numScans, double *quatTimes, quaternion *quats,
-                                    double *scanTimes, quaternion *quatsInterpolated);
+int interpolateAttitudeForScanTimes(size_t numAttRec, size_t numScans, double *quatTimes, Quaternion *quats,
+                                    double *scanTimes, Quaternion *quatsInterpolated);
 
 /**
  * @brief Interpolate tilt angles to scan line times
@@ -301,7 +276,7 @@ int interpolateTilt(size_t numTiltRecords, size_t numScans, double *tiltTimes, f
  * @param sunEarthDistance Array of distances between Sun and Earth in astronomical units
  */
 int getEcrSunVector(size_t numScans, int32_t year, int32_t dayOfYear, double *secondsOfDay,
-                    orbArray *sunVector, double *sunEarthDistance);
+                    OrbArray *sunVector, double *sunEarthDistance);
 
 /**
  * @brief Computes the Sun vector in geocentric inertial (equatorial) coordinates.
@@ -320,7 +295,7 @@ int getEcrSunVector(size_t numScans, int32_t year, int32_t dayOfYear, double *se
  * @return int Status code (0 for success, non-zero for error)
  */
 int getInertialSunVector(size_t numScans, int32_t year, int32_t dayOfYear, double *secondsOfDay,
-                         orbArray *sunVector, double *sunEarthDistance);
+                         OrbArray *sunVector, double *sunEarthDistance);
 
 /**
  * @brief Converts a quaternion to a rotation matrix
@@ -331,7 +306,7 @@ int getInertialSunVector(size_t numScans, int32_t year, int32_t dayOfYear, doubl
  * @param rotationMatrix Output rotation matrix (double 3x3 array)
  * @return 0 always
  */
-int quaternionToMatrix(float quaternion[4], double rotationMatrix[3][3]);
+int quaternionToMatrix(Quaternion quaternion, double rotationMatrix[3][3]);
 
 /**
  * @brief Calculate the coefficients which represent the Earth scan track in the sensor frame. Uses an
@@ -342,7 +317,7 @@ int quaternionToMatrix(float quaternion[4], double rotationMatrix[3][3]);
  * @param locatingContext the locating context
  * @param spCoef (O) describing scan path coefficients
  */
-int getEllipsoidScanTrackCoefs(orbArray pos, double sOMat[3][3], LocatingContext locatingContext,
+int getEllipsoidScanTrackCoefs(OrbArray pos, double sOMat[3][3], LocatingContext locatingContext,
                                double spCoefs[10]);
 
 /** @brief This subroutine performs navigation of a scanning sensor on the
@@ -389,14 +364,13 @@ int getEllipsoidScanTrackCoefs(orbArray pos, double sOMat[3][3], LocatingContext
  * @param[out] geoBox Geospatial lat/lon mins/maxes
  * @return int Status code
  */
-int locatePixelsOci(const char *demFile, orbArray position, orbArray velocity,
+int locatePixelsOci(const char *demFile, OrbArray position, OrbArray velocity,
                     double sensorOrientationMatrix[3][3], double scanPathCoefs[10],
-                    LocatingContext locatingContext, orbArray sunUnitVector, bool checkForEclipse,
-                    orbArray earthToMoon, double earthSunDistance,
-                    std::vector<std::array<float, 3>> &sensorViewVectors, size_t numPixels, double *deltaT,
-                    std::vector<uint8_t> &qualityFlags, size_t currScan, float *latitudes, float *longitudes,
-                    float *solarZeniths, float *solarAzimuths, float *sensorZeniths, float *sensorAzimuths,
-                    short *terrainHeights);
+                    LocatingContext locatingContext, OrbArray sunUnitVector, bool checkForEclipse,
+                    OrbArray earthToMoon, double earthSunDistance, std::vector<OrbArray> &sensorViewVectors,
+                    size_t numPixels, double *deltaT, std::vector<uint8_t> &qualityFlags, size_t currScan,
+                    double *latitudes, double *longitudes, double *solarZeniths, double *solarAzimuths,
+                    double *sensorZeniths, double *sensorAzimuths, short *terrainHeights);
 
 /**
  * @brief Calculate the attitude angles given the ECEF orbit vector and attiude matrix. Rotation order is
@@ -409,6 +383,6 @@ int locatePixelsOci(const char *demFile, orbArray position, orbArray velocity,
  * @param rpy (O) Attitude angles (roll, pitch, yaw)
  *
  */
-int getAttitudeAngles(orbArray pos, orbArray vel, double smat[3][3], orbArray &rpy);
+int getAttitudeAngles(OrbArray pos, OrbArray vel, double smat[3][3], OrbArray &rpy);
 
 #endif  // _GEOLOCATE_OCI_H_

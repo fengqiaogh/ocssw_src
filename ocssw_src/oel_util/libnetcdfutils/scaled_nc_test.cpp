@@ -18,6 +18,8 @@ const double TEST_SCALE = 2.0;
 const double TEST_OFFSET = 1.0;
 const int TEST_COMPRESS_VALUE = (TEST_VALUE - TEST_OFFSET) / TEST_SCALE;  // expected raw data value
 const double TEST_UNCOMPRESSED_VALUE = (TEST_COMPRESS_VALUE * TEST_SCALE) + TEST_OFFSET;
+const int TEST_INTEGER_UNCOMPRESSED_VALUE =
+    static_cast<int>((TEST_COMPRESS_VALUE * TEST_SCALE) + TEST_OFFSET);
 const int TEST_SIZE = 50;
 
 void testGetVar(const vector<double> &data) {
@@ -55,6 +57,24 @@ TestsResult testReading() {
             result.first = false;
             result.second +=
                 "Scaled short " + to_string(datum) + " != " + to_string(TEST_UNCOMPRESSED_VALUE) + "\n";
+        }
+    }
+    for (double datum : rawData)
+        if (datum != TEST_COMPRESS_VALUE) {
+            result.first = false;
+            result.second +=
+                "Scaled short raw data " + to_string(datum) + " != " + to_string(TEST_COMPRESS_VALUE) + "\n";
+        }
+
+    // Scale and offset should NOT have been ignored, but ScaledNcVar::getVar() should undo it
+    vector<int32_t> scaledShortIntegerData(TEST_SIZE);
+    scaledShort.getVar(scaledShortIntegerData.data());  // Undo scale and offset
+    scaledShort.NcVar::getVar(rawData.data());   // Get what was actually written
+    for (double datum : scaledShortIntegerData) {
+        if (datum != TEST_INTEGER_UNCOMPRESSED_VALUE) {
+            result.first = false;
+            result.second += "Scaled short " + to_string(datum) +
+                             " != " + to_string(TEST_INTEGER_UNCOMPRESSED_VALUE) + "\n";
         }
     }
     for (double datum : rawData)

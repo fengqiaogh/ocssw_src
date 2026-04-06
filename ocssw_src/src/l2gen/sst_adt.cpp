@@ -1,57 +1,13 @@
 #include "sst_adt.hpp"
+#include <map>
 
 namespace adt {
     std::string config_adt_path;
-    const std::unordered_set<std::string> non_test_keywords = {"true", "false", "thresholds", "addTreesum", "setFlags",
-                                                               "decision_tree"};
+     std::unordered_set<std::string> non_test_keywords;
     /**
      * @brief possible traversal functions.
      */
-    std::map<std::string, Traverse> traversal_functions = {
-            {"single_max",
-                    [](float *treesum, int16_t *flags, const TestParameters &parameters, const VarsAtPixel &vars,
-                       Treenode *node) {
-                        if (vars.vars.at(parameters.test_name) < parameters.max_var &&
-                            vars.masks.at(parameters.test_name)) {
-                            node->children.at(1).second = false;
-                        } else {
-                            node->children.at(0).second = false;
-                        }
-                    }},
-            {"single_min",
-                    [](float *treesum, int16_t *flags, const TestParameters &parameters, const VarsAtPixel &vars,
-                       Treenode *node) {
-                        if (vars.vars.at(parameters.test_name) >= parameters.min_var) {
-                            node->children.at(1).second = false;
-                        } else {
-                            node->children.at(0).second = false;
-                        }
-                    }},
-            {"double_condition",
-                    [](float *treesum, int16_t *flags, const TestParameters &parameters, const VarsAtPixel &vars,
-                       Treenode *node) {
-                        if (vars.vars.at(parameters.test_name) >= parameters.min_var &&
-                            vars.vars.at(parameters.test_name) <= parameters.max_var) {
-                            node->children.at(1).second = false;
-                        } else {
-                            node->children.at(0).second = false;
-                        }
-                    }},
-            {"addTreesum",
-                    [](float *treesum, int16_t *flags, const TestParameters &parameters, const VarsAtPixel &vars,
-                       Treenode *node) {
-                        *treesum += parameters.treesum_increment;
-                    }},
-            {"setFlags",
-                    [](float *treesum, int16_t *flags, const TestParameters &parameters, const VarsAtPixel &vars,
-                       Treenode *node) {
-                        *flags |= parameters.flag;
-                    }},
-            {"default",
-                    [](float *treesum, int16_t *flags, const TestParameters &parameters, const VarsAtPixel &vars,
-                       Treenode *node) {
-                    }},
-    };
+    std::map<std::string, Traverse> traversal_functions;
 
     auto set_node_parameters = [](Treenode *node, const std::string &test_name,
                                   const std::map<std::string, boost::variant<int16_t, float, bool>> &ranges) {
@@ -263,6 +219,48 @@ namespace adt {
         file.close();
         exit(EXIT_FAILURE);
     }
-
-
+    void init_parameters() {
+        non_test_keywords = {"true", "false", "thresholds", "addTreesum", "setFlags", "decision_tree"};
+        /**
+         * @brief possible traversal functions.
+         */
+        traversal_functions = {
+            {"single_max",
+             [](float* treesum, int16_t* flags, const TestParameters& parameters, const VarsAtPixel& vars,
+                Treenode* node) {
+                 if (vars.vars.at(parameters.test_name) < parameters.max_var &&
+                     vars.masks.at(parameters.test_name)) {
+                     node->children.at(1).second = false;
+                 } else {
+                     node->children.at(0).second = false;
+                 }
+             }},
+            {"single_min",
+             [](float* treesum, int16_t* flags, const TestParameters& parameters, const VarsAtPixel& vars,
+                Treenode* node) {
+                 if (vars.vars.at(parameters.test_name) >= parameters.min_var) {
+                     node->children.at(1).second = false;
+                 } else {
+                     node->children.at(0).second = false;
+                 }
+             }},
+            {"double_condition",
+             [](float* treesum, int16_t* flags, const TestParameters& parameters, const VarsAtPixel& vars,
+                Treenode* node) {
+                 if (vars.vars.at(parameters.test_name) >= parameters.min_var &&
+                     vars.vars.at(parameters.test_name) <= parameters.max_var) {
+                     node->children.at(1).second = false;
+                 } else {
+                     node->children.at(0).second = false;
+                 }
+             }},
+            {"addTreesum",
+             [](float* treesum, int16_t* flags, const TestParameters& parameters, const VarsAtPixel& vars,
+                Treenode* node) { *treesum += parameters.treesum_increment; }},
+            {"setFlags", [](float* treesum, int16_t* flags, const TestParameters& parameters,
+                            const VarsAtPixel& vars, Treenode* node) { *flags |= parameters.flag; }},
+            {"default", [](float* treesum, int16_t* flags, const TestParameters& parameters,
+                           const VarsAtPixel& vars, Treenode* node) {}},
+        };
+    }
 }

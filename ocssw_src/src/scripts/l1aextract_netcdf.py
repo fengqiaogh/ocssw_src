@@ -15,7 +15,7 @@ import sys
 from seadasutils.setupenv import env
 from seadasutils.netcdf_utils import ncsubset_vars
 
-versionStr = "1.0.2_2024-12-09"
+versionStr = "1.0.3_2025-10-20"
 
 class extract:
 
@@ -61,28 +61,22 @@ class extract:
             #                                                                                 |
             # Add extract_pixel/line_start/stop:                                              |
             #_________________________________________________________________________________|
-            
-            if 'extract_pixel_start' in infile.ncattrs():
-                outfile.extract_pixel_start = np.dtype('int32').type(infile.extract_pixel_start + self.spixl + 1)
-                outfile.extract_pixel_stop  =  np.dtype('int32').type(infile.extract_pixel_stop + self.epixl + 1)
-                outfile.extract_line_start  =  np.dtype('int32').type(infile.extract_line_start + self.sline + 1)
-                outfile.extract_line_stop   =  np.dtype('int32').type(infile.extract_line_stop + self.eline + 1)
-            else:
-                outfile.extract_pixel_start = np.dtype('int32').type(self.spixl + 1)
-                outfile.extract_pixel_stop  =  np.dtype('int32').type(self.epixl + 1)
-                
-                outfile.extract_line_start  =  np.dtype('int32').type(self.sline + 1)
-                outfile.extract_line_stop   =  np.dtype('int32').type(self.eline + 1)
-            
+
+            outfile.extract_pixel_start = np.int32(self.spixl + 1)
+            outfile.extract_pixel_stop = np.int32(self.epixl + 1)
+            outfile.extract_line_start = np.int32(self.sline + 1)
+            outfile.extract_line_stop = np.int32(self.eline + 1)
+            if "extract_pixel_start" in infile.ncattrs():
+                outfile.extract_pixel_start += np.int32(infile.extract_pixel_start - 1)
+                outfile.extract_pixel_stop += np.int32(infile.extract_pixel_start - 1)
+                outfile.extract_line_start += np.int32(infile.extract_line_start - 1)
+                outfile.extract_line_stop += np.int32(infile.extract_line_start - 1)
+
             #_____________________________________________________________________________________________________________________________________
             #                                                                                 |
             # Modify time_coverage_start/end of output file:                                  |
             #_________________________________________________________________________________|
 
-            # Read infile as netCDF dataset
-            infile = netCDF4.Dataset(srcfile, 'r')
-            # Read and write outfile as netCDF4 dataset
-            outfile = netCDF4.Dataset(dstfile, 'r+')
             utc = tz.tzutc()
             scantime = outfile.variables['time'][:]
             stime = datetime.datetime.fromtimestamp(scantime[0],tz=utc)

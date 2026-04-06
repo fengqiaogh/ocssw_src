@@ -94,7 +94,7 @@ int checkMissingCcdPixels(std::string errorToReport, bool checkCcdLines, uint16_
  * @param redCcdDarkData
  * @param swirDarkData
  * @param ccdLineError
- * @param sciDataStatus
+ * @param sciDataStatus 2 if missing pixels, 4 if invalid scan line
  * @return
  */
 int checkAndLoadScienceData(short dataType, uint16_t numCcdPixels, uint16_t numSwirPixels,

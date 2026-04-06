@@ -48,6 +48,7 @@
 #define FOQMOREL  4     /* bit 3 */
 #define DTBRDF    8     /* bit 4 */
 #define QMOREL   16     /* bit 5 */
+#define FOQLEE   32     /* bit 6 */
 
 #define O3_BIT     1
 #define CO2_BIT    2

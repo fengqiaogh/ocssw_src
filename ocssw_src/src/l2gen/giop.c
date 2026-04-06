@@ -2733,9 +2733,9 @@ void run_giop(l2str *l2rec) {
 
         for (ib = 0; ib < nwave; ib++) {
             a [ipb + ib] = badval;
-            a_unc [ipb + ib] = 0.0;
+            a_unc [ipb + ib] = badval;
             bb [ipb + ib] = badval;
-            bb_unc [ipb + ib] = 0.0;
+            bb_unc [ipb + ib] = badval;
             aph [ipb + ib] = badval;
             adg [ipb + ib] = badval;
             acdom [ipb + ib] = badval;
@@ -2744,15 +2744,15 @@ void run_giop(l2str *l2rec) {
             bbph[ipb + ib] = badval;
             bbnap [ipb + ib] = badval;
             mRrs[ipb + ib] = badval;
-            a [ierr + ib] = 0.0;
-            bb [ierr + ib] = 0.0;
-            aph [ierr + ib] = 0.0;
-            adg [ierr + ib] = 0.0;
-            acdom [ierr + ib] = 0.0;
-            anap [ierr + ib] = 0.0;
-            bbp [ierr + ib] = 0.0;
-            bbph [ierr + ib] = 0.0;
-            bbnap [ierr + ib] = 0.0;
+            a [ierr + ib] = badval;
+            bb [ierr + ib] = badval;
+            aph [ierr + ib] = badval;
+            adg [ierr + ib] = badval;
+            acdom [ierr + ib] = badval;
+            anap [ierr + ib] = badval;
+            bbp [ierr + ib] = badval;
+            bbph [ierr + ib] = badval;
+            bbnap [ierr + ib] = badval;
         }
         chl [ip] = badval;
         iter[ip] = 0;

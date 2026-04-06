@@ -13,6 +13,11 @@
 constexpr size_t maxnfiles = 512;
 
 int main(int argc, char **argv) {
+
+    // make sure log files get updated for each line of output
+    setlinebuf(stdout);
+    setlinebuf(stderr);
+
     // Input parameters struct
     instr input;
     printf("%s %s (%s %s)\n", PROGRAM, VERSION, __DATE__, __TIME__);
@@ -65,11 +70,11 @@ int main(int argc, char **argv) {
     for (size_t ifile = 0; ifile < nfiles; ifile++) {
         // Initialize L2 reader and area weighting
         l2_files[ifile] = L2_Reader(input.files[ifile]);
-        area_weightings[ifile] = AreaWeighting(input.area_weighting);
-        area_weightings[ifile].set_l2_reader(l2_files[ifile]);
-        
+        area_weightings[ifile] = AreaWeighting(input.area_weighting);      
         // Set up geolocation and variables
         l2_files[ifile].iniGeolocation();
+        // set up area weighting
+        area_weightings[ifile].set_l2_reader(l2_files[ifile]);
         l2_files[ifile].setVariables(products_requested, wavelength_requested, product_list);
 
         // Handle L2 flags if needed

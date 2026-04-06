@@ -12,6 +12,9 @@
 
 #include "wavelength_3d.h"
 
+// To add a new option, one must add some kind of storage to the inst definition (input_struc.h), add a string
+// to l2gen_optionKeys, add an appropriate call to clo_addOption in l2gen_init_options, make an addition to
+// l2gen_load_input, and then add some kind of storage to the instr definition
 
 static int32_t numTauas = -1;
 instr *input;
@@ -156,6 +159,7 @@ static char *l2gen_optionKeys[] = {
     "owtfile",
     "owtchlerrfile",
     "aermodfile",
+    "rayleigh_prefix",
     "uncertaintyfile",
     "aermodels",
     "met1",
@@ -177,6 +181,7 @@ static char *l2gen_optionKeys[] = {
     "cth_albedo",
     "anc_cor_file",
     "pixel_anc_file",
+    "pixel_anc_vars",
     "land",
     "water",
     "demfile",
@@ -286,7 +291,6 @@ static char *l2gen_optionKeys[] = {
     "glint_thresh",
     "cloud_thresh",
     "cloud_wave",
-    "cloud_eps",
     "cloud_mask_file",
     "cloud_mask_opt",
     "offset",
@@ -300,7 +304,7 @@ static char *l2gen_optionKeys[] = {
     "georegion_file",
     "extreme_glint",
     "watervapor_bands",
-
+    "f0file",
     NULL
 };
 
@@ -890,6 +894,8 @@ int l2gen_init_options(clo_optionList_t* list, const char* prog) {
     clo_addOption(list, "aer_opt", CLO_TYPE_INT, "99", tmpStr);
 
     clo_addOption(list, "aermodfile", CLO_TYPE_IFILE, NULL, "aerosol model filename leader");
+    clo_addOption(list, "rayleigh_prefix", CLO_TYPE_STRING, NULL,
+                  "The directory in which to search for Rayleigh tables");
     clo_addOption(list, "uncertaintyfile", CLO_TYPE_IFILE, NULL, "uncertainty LUT");
 
     clo_addOption(list, "aer_wave_short", CLO_TYPE_INT, "765", "shortest sensor wavelength for aerosol\n        model selection");
@@ -938,7 +944,8 @@ int l2gen_init_options(clo_optionList_t* list, const char* prog) {
     strcat(tmpStr, "        3: Fresnel reflection/refraction correction for sensor + solar path\n");
     strcat(tmpStr, "        7: Morel f/Q + Fresnel solar + Fresnel sensor\n");
     strcat(tmpStr, "       15: Gordon DT + Morel f/Q + Fresnel solar + Fresnel sensor\n");
-    strcat(tmpStr, "       19: Morel Q + Fresnel solar + Fresnel sensor");
+    strcat(tmpStr, "       19: Morel Q + Fresnel solar + Fresnel sensor\n");
+    strcat(tmpStr, "       32: Zhongping Lee's f/Q");
     clo_addOption(list, "brdf_opt", CLO_TYPE_INT, "0", tmpStr);
 
     strcpy(tmpStr, "gaseous transmittance bitmask selector\n");
@@ -1193,9 +1200,10 @@ int l2gen_init_options(clo_optionList_t* list, const char* prog) {
     clo_addOption(list, "cth_albedo", CLO_TYPE_IFILE, NULL, "\n        ancillary albedo file for cloud top height use");
     clo_addOption(list, "anc_cor_file", CLO_TYPE_IFILE, NULL, "ozone correction file");
     clo_addOption(list, "pixel_anc_file", CLO_TYPE_IFILE, NULL, "per pixel ancillary data file");
-    clo_addOption(list, "land", CLO_TYPE_IFILE, "$OCDATAROOT/common/gebco_ocssw_v2020.nc", "land mask file");
-    clo_addOption(list, "water", CLO_TYPE_IFILE, "$OCDATAROOT/common/gebco_ocssw_v2020.nc", "\n        shallow water mask file");
-    clo_addOption(list, "demfile", CLO_TYPE_IFILE, "$OCDATAROOT/common/gebco_ocssw_v2020.nc", "\n        digital elevation map file");
+    clo_addOption(list, "pixel_anc_vars", CLO_TYPE_STRING, "ALL", "per pixel ancillary variable list\n");
+    clo_addOption(list, "land", CLO_TYPE_IFILE, "$OCDATAROOT/common/gebco_ocssw_v2025.nc", "land mask file");
+    clo_addOption(list, "water", CLO_TYPE_IFILE, "$OCDATAROOT/common/gebco_ocssw_v2025.nc", "\n        shallow water mask file");
+    clo_addOption(list, "demfile", CLO_TYPE_IFILE, "$OCDATAROOT/common/gebco_ocssw_v2025.nc", "\n        digital elevation map file");
     clo_addOption(list, "dem_auxfile", CLO_TYPE_IFILE, NULL, "auxiliary digital elevation map file");
     clo_addOption(list, "mldfile", CLO_TYPE_IFILE, NULL, "Multi-layer depth file");
     clo_addOption(list, "icefile", CLO_TYPE_IFILE, "$OCDATAROOT/common/ice_mask.hdf", "sea ice file");
@@ -2082,11 +2090,19 @@ int l2gen_load_input(clo_optionList_t *list, instr *input, int32_t nbands) {
 
         }else if (strcmp(keyword, "band_shift_opt") == 0) {
             input->band_shift_opt = clo_getOptionInt(option);
+
         } else if (strcmp(keyword, "aermodfile") == 0) {
             if (clo_isOptionSet(option)) {
                 strVal = clo_getOptionString(option);
                 parse_file_name(strVal, tmp_file);
                 strcpy(input->aermodfile, tmp_file);
+            }
+
+        } else if (strcmp(keyword, "rayleigh_prefix") == 0) {
+            if ((clo_isOptionSet(option))) {
+                strVal = clo_getOptionString(option);
+                parse_file_name(strVal, tmp_file);
+                strcpy(input->rayleigh_prefix, tmp_file);
             }
 
         } else if (strcmp(keyword, "uncertaintyfile") == 0) {
@@ -2379,6 +2395,17 @@ int l2gen_load_input(clo_optionList_t *list, instr *input, int32_t nbands) {
                 strVal = clo_getOptionString(option);
                 parse_file_name(strVal, tmp_file);
                 strcpy(input->pixel_anc_file, tmp_file);
+            }
+
+        }  else if (strcmp(keyword, "pixel_anc_vars") == 0) {
+            if (clo_isOptionSet(option)) {
+                strArray = clo_getOptionStrings(option,&count);
+                input->pixel_anc_vars[0] = '\0';
+                for (i = 0; i < count; i++) {
+                    if (i != 0)
+                        strcat(input->pixel_anc_vars, ",");
+                    strcat(input->pixel_anc_vars, strArray[i]);
+                }
             }
 
         } else if (strcmp(keyword, "land") == 0) {
@@ -2885,7 +2912,6 @@ int l2gen_load_input(clo_optionList_t *list, instr *input, int32_t nbands) {
             if (clo_isOptionSet(option)) {
                 strcpy(input->wavelength_3d_str, clo_getOptionRawString(option));
             }
-            
         // silence errors for libl1 parameters
         } else if (strcmp(keyword, "pversion") == 0) {
         } else if (strcmp(keyword, "rad_opt") == 0) {
@@ -2919,7 +2945,6 @@ int l2gen_load_input(clo_optionList_t *list, instr *input, int32_t nbands) {
         } else if (strcmp(keyword, "extreme_glint") == 0) {
         } else if (strcmp(keyword, "cloud_thresh") == 0) {
         } else if (strcmp(keyword, "cloud_wave") == 0) {
-        } else if (strcmp(keyword, "cloud_eps") == 0) {
         } else if (strcmp(keyword, "cloud_mask_file") == 0) {
         } else if (strcmp(keyword, "cloud_mask_opt") == 0) {
         } else if (strcmp(keyword, "gain") == 0) {
@@ -2930,6 +2955,7 @@ int l2gen_load_input(clo_optionList_t *list, instr *input, int32_t nbands) {
         } else if (strcmp(keyword, "sline") == 0) {
         } else if (strcmp(keyword, "eline") == 0) {
         } else if (strcmp(keyword, "dline") == 0) {
+        } else if (strcmp(keyword, "f0file") == 0) {
         } else {
             printf("-E- Invalid argument \"%s\"\n", keyword);
             clo_dumpOption(option);
@@ -3162,6 +3188,10 @@ int msl12_option_input(int argc, char **argv, clo_optionList_t* list,
     strcat(l1_input->input_parms, str_buf);
     strcat(l1_input->input_parms, "\n");
 
+    sprintf(str_buf, "rayleigh_prefix = %s", input->rayleigh_prefix);
+    strcat(l1_input->input_parms, str_buf);
+    strcat(l1_input->input_parms, "\n");
+    
     sprintf(str_buf, "uncertaintyfile = %s", input->uncertaintyfile);
     strcat(l1_input->input_parms, str_buf);
     strcat(l1_input->input_parms, "\n");
@@ -3561,6 +3591,10 @@ int msl12_option_input(int argc, char **argv, clo_optionList_t* list,
     strcat(l1_input->input_parms, "\n");
 
     sprintf(str_buf, "pixel_anc_file = %s", input->pixel_anc_file);
+    strcat(l1_input->input_parms, str_buf);
+    strcat(l1_input->input_parms, "\n");
+
+    sprintf(str_buf, "pixel_anc_vars = %s", input->pixel_anc_vars);
     strcat(l1_input->input_parms, str_buf);
     strcat(l1_input->input_parms, "\n");
 
@@ -4028,11 +4062,9 @@ int msl12_option_input(int argc, char **argv, clo_optionList_t* list,
     strcat(l1_input->input_parms, str_buf);
     strcat(l1_input->input_parms, "\n");
 
-
     sprintf(str_buf, "georegion_file = %s", input->georegionfile);
     strcat(l1_input->input_parms, str_buf);
     strcat(l1_input->input_parms, "\n");
-
 
     if(input->mbac_wave){
         strcat(l1_input->input_parms, "mbac_wave = ");
@@ -4237,6 +4269,12 @@ int msl12_option_input(int argc, char **argv, clo_optionList_t* list,
         sprintf(str_buf, ",%s", tmp_str);
         strcat(l1_input->input_files, str_buf);
     }
+    if (strlen(input->rayleigh_prefix)) {
+        tmp_str = strrchr(input->rayleigh_prefix, '/');
+        tmp_str = (tmp_str == 0x0) ? input->rayleigh_prefix : tmp_str + 1;
+        sprintf(str_buf, ",%s", tmp_str);
+        strcat(l1_input->input_files, str_buf);
+    }
     if (strlen(input->vcnnfile)) {
         tmp_str = strrchr(input->vcnnfile, '/');
         tmp_str = (tmp_str == 0x0) ? input->vcnnfile : tmp_str + 1;
@@ -4393,7 +4431,7 @@ int msl12_input(int argc, char *argv[], const char* progName, filehandle *l1file
     result = msl12_option_input(argc, argv, list, (char*) progName, l1file);
 
     rdsensorinfo(l1file->sensorID, l1_input->evalmask, "Lambda", (void **) &l1file->iwave);
-
+    rdsensorinfo(l1file->sensorID, l1_input->evalmask, "fwave", (void **) &l1file->fwave);
     // Populate input wavelength_3d index matches
     get_wavelength3d(l1file, input);
     

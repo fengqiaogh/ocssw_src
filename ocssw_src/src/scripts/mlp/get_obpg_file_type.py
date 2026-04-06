@@ -225,7 +225,7 @@ class ObpgFileTyper(object):
             working_title = title.replace('Level 1', 'Level-1')
         else:
             working_title = title
-        working_title = re.sub("""^['"](.*)['"].*;$""", '\g<1>', working_title)
+        working_title = re.sub("""^['"](.*)['"].*;$""", r'\g<1>', working_title)
         title_parts = working_title.split()
         for part in title_parts:
             if part in KNOWN_SENSORS:

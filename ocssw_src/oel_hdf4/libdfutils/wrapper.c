@@ -422,6 +422,7 @@ int createDS2(idDS ds_id, const char *sname, productInfo_t* p_info, int32_t dm[3
         }
 
         status = CreateNCDF(ds_id, sname, p_info->description, p_info->standardName,
+                p_info->flag_values, p_info->flag_meanings,
                 p_info->reference, p_info->comment, p_info->units, p_info->validMin,
                 p_info->validMax, p_info->scaleFactor, p_info->addOffset,
                 p_info->fillValue, nt, p_info->rank, dimids);
@@ -494,7 +495,250 @@ int writeDS(
                     __FILE__, __LINE__, nc_strerror(status), name);
             exit(1);
         }
-        status = nc_put_vara(ds_id0.fid, ds_id0.sid, startp, countp, data);
+        int att_type;
+        size_t att_len;
+        status = nc_inq_att(ds_id0.fid, ds_id0.sid, "_FillValue", &att_type, &att_len);
+        if (status == NC_NOERR) {
+            void* data_fixed;
+            if (att_len != 1) {
+                fprintf(stderr, "-E- %s:%d Fill Value is not an array\n", __FILE__, __LINE__);
+                exit(EXIT_FAILURE);
+            }
+            size_t total_size = 1;
+            for (size_t ic = 0; ic < 3; ic++) {
+                if (countp[ic] > 0) {
+                    total_size *= countp[ic];
+                }
+            }
+            if (att_type == NC_BYTE || att_type == NC_CHAR) {
+                static char* data_ptr = NULL;
+                static size_t size_allocated = 0;
+                size_t size_copy = total_size * sizeof(char);
+                if (data_ptr == NULL) {
+                    data_ptr = (char*)malloc(size_copy);
+                    size_allocated = size_copy; 
+                }
+                if (size_allocated < size_copy) {
+                    data_ptr = realloc(data_ptr, size_copy);
+                    size_allocated = size_copy;
+                }
+                if (data_ptr == NULL) {
+                    fprintf(stderr, "-E- %s:%d Unable to allocate %ld bytes for variable %s \n", __FILE__,
+                            __LINE__, size_copy, name);
+                    exit(EXIT_FAILURE);
+                }
+                memcpy(data_ptr, data, size_copy);
+                signed char fill_value;
+                status = nc_get_att_schar(ds_id0.fid, ds_id0.sid, "_FillValue", &fill_value);
+                check_err(status,__LINE__,__FILE__);
+                for (size_t ip = 0; ip < total_size; ip++) {
+                    if (data_ptr[ip] == BAD_BYTE) {
+                        data_ptr[ip] = fill_value;
+                    }
+                }
+                data_fixed = (VOIDP)data_ptr;
+            }
+            else if (att_type == NC_SHORT) {
+                static short* data_ptr = NULL;
+                static size_t size_allocated = 0;
+                size_t size_copy = total_size * sizeof(short);
+                if (data_ptr == NULL) {
+                    data_ptr = (short*)malloc(size_copy);
+                    size_allocated = size_copy;
+                }
+                if (size_allocated < size_copy) {
+                    data_ptr = realloc(data_ptr, size_copy);
+                    size_allocated = size_copy;
+                }
+                if (data_ptr == NULL) {
+                    fprintf(stderr, "-E- %s:%d Unable to allocate %ld bytes for variable %s \n", __FILE__,
+                            __LINE__, size_copy, name);
+                    exit(EXIT_FAILURE);
+                }
+                memcpy(data_ptr, data, size_copy);
+                short fill_value;
+                status = nc_get_att_short(ds_id0.fid, ds_id0.sid, "_FillValue", &fill_value);
+                check_err(status,__LINE__,__FILE__);
+                for (size_t ip = 0; ip < total_size; ip++) {
+                    if (data_ptr[ip] == BAD_INT) {
+                        data_ptr[ip] = fill_value;
+                    }
+                }
+                data_fixed = (VOIDP)data_ptr;
+            } else if (att_type == NC_INT) {
+                static int32_t* data_ptr = NULL;
+                static size_t size_allocated = 0;
+                size_t size_copy = total_size * sizeof(int32_t);
+                if (data_ptr == NULL) {
+                    data_ptr = (int32_t*)malloc(size_copy);
+                    size_allocated = size_copy;
+                }
+                if (size_allocated < size_copy) {
+                    data_ptr = realloc(data_ptr, size_copy);
+                    size_allocated = size_copy;
+                }
+                if (data_ptr == NULL) {
+                    fprintf(stderr, "-E- %s:%d Unable to allocate %ld bytes for variable %s \n", __FILE__,
+                            __LINE__, size_copy, name);
+                    exit(EXIT_FAILURE);
+                }
+                memcpy(data_ptr, data, size_copy);
+                int32_t fill_value;
+                status = nc_get_att_int(ds_id0.fid, ds_id0.sid, "_FillValue", &fill_value);
+                check_err(status,__LINE__,__FILE__);
+                for (size_t ip = 0; ip < total_size; ip++) {
+                    if (data_ptr[ip] == BAD_INT) {
+                        data_ptr[ip] = fill_value;
+                    }
+                }
+                data_fixed = (VOIDP)data_ptr;
+            } else if (att_type == NC_FLOAT) {
+                static float* data_ptr = NULL;
+                static size_t size_allocated = 0;
+                size_t size_copy = total_size * sizeof(float);
+                if (data_ptr == NULL) {
+                    data_ptr = (float*)malloc(size_copy);
+                    size_allocated = size_copy;
+                }
+                if (size_allocated < size_copy) {
+                    data_ptr = realloc(data_ptr, size_copy);
+                    size_allocated = size_copy;
+                }
+                if (data_ptr == NULL) {
+                    fprintf(stderr, "-E- %s:%d Unable to allocate %ld bytes for variable %s \n", __FILE__,
+                            __LINE__, size_copy, name);
+                    exit(EXIT_FAILURE);
+                }
+                memcpy(data_ptr, data, size_copy);
+                float fill_value;
+                status = nc_get_att_float(ds_id0.fid, ds_id0.sid, "_FillValue", &fill_value);
+                check_err(status,__LINE__,__FILE__);
+                for (size_t ip = 0; ip < total_size; ip++) {
+                    if (data_ptr[ip] == BAD_FLT) {
+                        data_ptr[ip] = fill_value;
+                    }
+                }
+                data_fixed = (VOIDP)data_ptr;
+            } else if (att_type == NC_DOUBLE) {
+                static double* data_ptr = NULL;
+                static size_t size_allocated = 0;
+                size_t size_copy = total_size * sizeof(double);
+                if (data_ptr == NULL) {
+                    data_ptr = (double*)malloc(size_copy);
+                    size_allocated = size_copy;
+                }
+                if (size_allocated < size_copy) {
+                    data_ptr = realloc(data_ptr, size_copy);
+                    size_allocated = size_copy;
+                }
+                if (data_ptr == NULL) {
+                    fprintf(stderr, "-E- %s:%d Unable to allocate %ld bytes for variable %s \n", __FILE__,
+                            __LINE__, size_copy, name);
+                    exit(EXIT_FAILURE);
+                }
+                memcpy(data_ptr, data, size_copy);
+                double fill_value;
+                status = nc_get_att_double(ds_id0.fid, ds_id0.sid, "_FillValue", &fill_value);
+                check_err(status,__LINE__,__FILE__);
+                for (size_t ip = 0; ip < total_size; ip++) {
+                    if (data_ptr[ip] == BAD_FLT) {
+                        data_ptr[ip] = fill_value;
+                    }
+                }
+                data_fixed = (VOIDP)data_ptr;
+            } else if (att_type == NC_UINT) {
+                static uint32_t* data_ptr = NULL;
+                static size_t size_allocated = 0;
+                size_t size_copy = total_size * sizeof(uint32_t);
+                if (data_ptr == NULL) {
+                    data_ptr = (uint32_t*)malloc(size_copy);
+                    size_allocated = size_copy;
+                }
+                if (size_allocated < size_copy) {
+                    data_ptr = realloc(data_ptr, size_copy);
+                    size_allocated = size_copy;
+                }
+                if (data_ptr == NULL) {
+                    fprintf(stderr, "-E- %s:%d Unable to allocate %ld bytes for variable %s \n", __FILE__,
+                            __LINE__, size_copy, name);
+                    exit(EXIT_FAILURE);
+                }
+                memcpy(data_ptr, data, size_copy);
+                uint32_t fill_value;
+                status = nc_get_att_uint(ds_id0.fid, ds_id0.sid, "_FillValue", &fill_value);
+                check_err(status,__LINE__,__FILE__);
+                for (size_t ip = 0; ip < total_size; ip++) {
+                    if (data_ptr[ip] == BAD_UINT) {
+                        data_ptr[ip] = fill_value;
+                    }
+                }
+                data_fixed = (VOIDP)data_ptr;
+            } else if (att_type == NC_USHORT) {
+                static uint16_t* data_ptr = NULL;
+                static size_t size_allocated = 0;
+                size_t size_copy = total_size * sizeof(uint16_t);
+                if (data_ptr == NULL) {
+                    data_ptr = (uint16_t*)malloc(size_copy);
+                    size_allocated = size_copy;
+                }
+                if (size_allocated < size_copy) {
+                    data_ptr = realloc(data_ptr, size_copy);
+                    size_allocated = size_copy;
+                }
+                if (data_ptr == NULL) {
+                    fprintf(stderr, "-E- %s:%d Unable to allocate %ld bytes for variable %s \n", __FILE__,
+                            __LINE__, size_copy, name);
+                    exit(EXIT_FAILURE);
+                }
+                memcpy(data_ptr, data, size_copy);
+                uint16_t fill_value;
+                status = nc_get_att_ushort(ds_id0.fid, ds_id0.sid, "_FillValue", &fill_value);
+                check_err(status,__LINE__,__FILE__);
+                for (size_t ip = 0; ip < total_size; ip++) {
+                    if (data_ptr[ip] == BAD_UINT) {
+                        data_ptr[ip] = fill_value;
+                    }
+                }
+                data_fixed = (VOIDP)data_ptr;
+            } else if (att_type == NC_UBYTE) {
+                static uint8_t* data_ptr = NULL;
+                static size_t size_allocated = 0;
+                size_t size_copy = total_size * sizeof(uint8_t);
+                if (data_ptr == NULL) {
+                    data_ptr = (uint8_t*)malloc(size_copy);
+                    size_allocated = size_copy;
+                }
+                if (size_allocated < size_copy) {
+                    data_ptr = realloc(data_ptr, size_copy);
+                    size_allocated = size_copy;
+                }
+                if (data_ptr == NULL) {
+                    fprintf(stderr, "-E- %s:%d Unable to allocate %ld bytes for variable %s \n", __FILE__,
+                            __LINE__, size_copy, name);
+                    exit(EXIT_FAILURE);
+                }
+                memcpy(data_ptr, data, size_copy);
+                uint8_t fill_value;
+                status = nc_get_att_ubyte(ds_id0.fid, ds_id0.sid, "_FillValue", &fill_value);
+                check_err(status,__LINE__,__FILE__);
+                for (size_t ip = 0; ip < total_size; ip++) {
+                    if (data_ptr[ip] == BAD_UBYTE) {
+                        data_ptr[ip] = fill_value;
+                    }
+                }
+                data_fixed = (VOIDP)data_ptr;                
+            } else {
+                char type_name[256];
+                size_t type_size;
+                status =  nc_inq_type(ds_id0.fid, att_type, type_name, &type_size);
+                check_err(status,__LINE__,__FILE__);
+                fprintf(stderr, "-E-  %s:%d: Not supported NC type %s \n", __FILE__, __LINE__, type_name);
+                exit(EXIT_FAILURE);
+            }
+            status = nc_put_vara(ds_id0.fid, ds_id0.sid, startp, countp, data_fixed);
+        } else {
+            status = nc_put_vara(ds_id0.fid, ds_id0.sid, startp, countp, data);
+        }
         if (status != NC_NOERR) {
             printf("-E- %s %d: %s for %s\n",
                     __FILE__, __LINE__, nc_strerror(status), name);
@@ -573,7 +817,7 @@ idDS startDS(const char *filename, ds_format_t format, ds_access_t access,
                     __FILE__, __LINE__, filename);
         }
     } else if (format == DS_NCDF) {
-        nc_init_chunk_cache();
+//        nc_init_chunk_cache();
         int status;
         if (access == DS_READ) {
             status = nc_open(filename, NC_NOWRITE, &ds_id.fid);
@@ -840,6 +1084,8 @@ int CreateNCDF(
         const char *sname, /* short name */
         const char *lname, /* long name */
         const char *standard_name, /* NetCDF standard name (not set if passed NULL or "") */
+        const char *flag_values, 
+        const char *flag_meanings,
         const char *reference,
         const char *comment,
         const char *units, /* units (not set if passed NULL or "") */
@@ -900,7 +1146,8 @@ int CreateNCDF(
     if (units != NULL
             && units[0] != 0
             && strcasecmp(units, "dimensionless") != 0
-            && strcasecmp(units, "unitless") != 0) {
+            && strcasecmp(units, "unitless") != 0
+            && strcasecmp(units, "none") != 0) {
         status = nc_put_att_text(nc_id, var_id, "units", strlen(units), units);
         if (status != NC_NOERR) {
             printf("-E- %s %d: %s for %s\n",
@@ -1059,7 +1306,7 @@ skip_fill:
             vr[1] = (uint8_t) ROUND((high - add_offset) / scale_factor);
             for (i = 0; i < 2; i++) {
                 status = nc_put_att_uchar(nc_id, var_id, validnames[i], NC_UBYTE,
-                        1, (const unsigned char *) &vr[i]);
+                        1, &vr[i]);
                 if (status != NC_NOERR) {
                     printf("-E- %s %d: %s for %s\n",
                             __FILE__, __LINE__, nc_strerror(status), validnames[i]);
@@ -1154,6 +1401,103 @@ skip_fill:
             fprintf(stderr, "while trying to create NCDF variable, \"%s\", ", sname);
             return (PROGRAMMER_BOOBOO);
         }
+    }
+
+    /* Add flag attributes if specified */
+    if (flag_meanings != NULL && flag_values != NULL) {
+
+      // parse flag_values string into array
+      char* valstring = strdup(flag_values);
+      long* longvals = (long*) calloc(strlen(valstring)+1, sizeof(long));
+      size_t nvals = 0;
+      char *token = strtok(valstring, ",");
+      while (token != NULL) {
+        longvals[nvals++] = atol(token);
+        token=strtok(NULL, ",");
+      }
+      free(valstring);
+
+      // write flag_values
+      char* attname = {"flag_values"};
+      switch (nt) // use appropriate number type
+        {
+        case NC_BYTE:
+          {
+            int8_t *flag_array = (int8_t*) calloc(nvals, sizeof(int8_t));
+            for (size_t i=0; i<nvals; i++)
+              flag_array[i] = (int8_t) longvals[i];
+            status = nc_put_att_schar(nc_id, var_id, attname, nt, nvals, flag_array);
+	    free(flag_array);
+            break;
+          }
+        case NC_UBYTE:
+          {
+            uint8_t *flag_array = (uint8_t*) calloc(nvals, sizeof(uint8_t));
+            for (size_t i=0; i<nvals; i++)
+              flag_array[i] = (uint8_t) longvals[i];
+            status = nc_put_att_uchar(nc_id, var_id, attname, nt, nvals, flag_array);
+	    free(flag_array);
+            break;
+          }
+        case NC_SHORT:
+          {
+            int16_t *flag_array = (int16_t*) calloc(nvals, sizeof(int16_t));
+            for (size_t i=0; i<nvals; i++)
+              flag_array[i] = (int16_t) longvals[i];
+            status = nc_put_att_short(nc_id, var_id, attname, nt, nvals, flag_array);
+	    free(flag_array);
+            break;
+          }
+        case NC_USHORT:
+          {
+            uint16_t *flag_array = (uint16_t*) calloc(nvals, sizeof(uint16_t));
+            for (size_t i=0; i<nvals; i++)
+              flag_array[i] = (uint16_t) longvals[i];
+            status = nc_put_att_ushort(nc_id, var_id, attname, nt, nvals, flag_array);
+	    free(flag_array);
+            break;
+          }
+        case NC_INT:
+          {
+            int32_t *flag_array = (int32_t*) calloc(nvals, sizeof(int32_t));
+            for (size_t i=0; i<nvals; i++)
+              flag_array[i] = (int32_t) longvals[i];
+            status = nc_put_att_int(nc_id, var_id, attname, nt, nvals, flag_array);
+	    free(flag_array);
+            break;
+          }
+        case NC_UINT:
+          {
+            uint32_t *flag_array = (uint32_t*) calloc(nvals, sizeof(uint32_t));
+            for (size_t i=0; i<nvals; i++)
+              flag_array[i] = (uint32_t) longvals[i];
+            status = nc_put_att_uint(nc_id, var_id, attname, nt, nvals, flag_array);
+	    free(flag_array);
+            break;
+          }
+        default:
+          {
+            fprintf(stderr, "-E- %s line %d: ", __FILE__, __LINE__);
+            fprintf(stderr, "Got unsupported number type (%d) ", nt);
+            fprintf(stderr, "while trying to create NCDF variable, \"%s\", ", sname);
+            return (PROGRAMMER_BOOBOO);
+          }
+        }
+      if (status != NC_NOERR) {
+        printf("-E- %s %d: %s for %s\n",
+               __FILE__, __LINE__, nc_strerror(status), attname);
+        exit(1);
+      }
+      free(longvals);
+
+      // write flag_meanings
+      status = nc_put_att_text(nc_id, var_id, "flag_meanings",
+                               strlen(flag_meanings), flag_meanings);
+      if (status != NC_NOERR) {
+        printf("-E- %s %d: %s for %s\n",
+               __FILE__, __LINE__, nc_strerror(status), "flag_meanings");
+        exit(1);
+      }
     }
 
     /* Add a "reference" attribute */

@@ -55,7 +55,7 @@ add_library(l1
     windex.c
     brightness.c
     geom_per_band.c
-    xcal.c
+    xcal.cpp
     get_f0.c
     setflags_l1.c
     cloud_flag.c
@@ -77,6 +77,7 @@ add_library(l1
     l1_goci.c
     l1_sgli.c
     l1_modis.c
+    l1_modis_h5.cpp
     l1_viirs_l1b.c
     ${historical_src}
     l1_ocm.c
@@ -90,7 +91,7 @@ add_library(l1
     l1_misr.c
     l1_oci.c
     l1_seabass.cpp
-    l1_l1c.c
+    l1_l1c.cpp
     l1_l1c_anc.c
     l1_spexone.c
     uncertainty.c

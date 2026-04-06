@@ -11,6 +11,8 @@
 #include "netcdf.h"
 #include "timeutils.h"
 
+using namespace std;
+
 ncdfFile::ncdfFile() {
     ncid = -1;
 }

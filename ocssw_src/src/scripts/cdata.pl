@@ -47,7 +47,7 @@ sub cdata {
 	my %options = (
 		verbose => 1,
 	        "rsync-path" => [
-		        'analysis701:/gfs-oceanweb/www-data/oceandata.sci.gsfc.nasa.gov/htdocs/ocssw_test',
+		        'www-admin@oceandata601:/data1/oceandata.sci.gsfc.nasa.gov/prod/htdocs/ocssw_test',
 		],
 		tabs_to_add => 0,
 		'remote-default-from-base' => 1,

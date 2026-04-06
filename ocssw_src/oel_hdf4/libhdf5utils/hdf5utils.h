@@ -5,8 +5,6 @@
 
 #include <sstream>
 
-using namespace std;
-
 #include "hdf5.h"
 //#define VOIDP (void*)
 
@@ -15,7 +13,7 @@ using namespace std;
 #define DIFF2000_1980 631152000
 #define DIFF2000_JAN0680 (631152000 - 432000)
 
-int32_t get_millisec(string *ydhmsf_str);
+int32_t get_millisec(std::string *ydhmsf_str);
 double get_tai(int32_t year, int32_t doy, double millisec);
 double get_tai(char *orbString);
 double gpstai2utc2000(double gpstai);
@@ -100,5 +98,4 @@ herr_t h5d_write(hid_t id, const char *name, void* data, hsize_t rank,
 int SetScalarH5A(hid_t id, const char *name, hid_t type, const void *value);
 
 }
-#endif
-
+#endif // HDF5UTILS_H

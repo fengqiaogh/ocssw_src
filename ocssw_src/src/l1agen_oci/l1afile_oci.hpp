@@ -10,6 +10,7 @@
 #include "global_attrs.h"
 #include "l0PacketUtil_oci.h"
 #include "dimension_shape.hpp"
+#include "navigation_timeframe.hpp"
 
 
 
@@ -26,6 +27,8 @@ const float CHUNK_CACHE_PREEMPTION = 1.0;
 const size_t CHUNK_BANDS = 36;
 const size_t CHUNK_PIXELS = 256;
 const size_t CHUNK_LINES = 128;
+
+const short SCIENCE_FILE = 1;
 
 class L1aFile {
    public:
@@ -127,6 +130,8 @@ class L1aFile {
     /**
      * @brief Write scan line attributes to the netcdf file. Grabbing ccsds scan times and start times.
      * @param dimShape - current size of dimensions for the current l1a file
+     * @param navTimeFrame - updates start and end of scan time for valid navigation coverage
+     * @param dataType - current data type being processed
      * @param scanNum
      * @param ancillaryData
      * @param sciPacketSequenceError
@@ -135,8 +140,8 @@ class L1aFile {
      * @param starttime struct that contains year, day and seconds
      * @return
      */
-    int writeScanMetaData(DimensionShape* dimShape, uint32_t scanNum, uint8_t *ancillaryData, uint8_t *sciPacketSequenceError,
-                          int8_t *ccdLineError, int32_t *spinID, AncillaryPktTimeStamp &starttime);
+    int writeScanMetaData(DimensionShape* dimShape, NavigationTimeFrame* navTimeFrame, short dataType, uint32_t scanNum, uint8_t *ancillaryData,
+                          uint8_t *sciPacketSequenceError, int8_t *ccdLineError, int32_t *spinID, AncillaryPktTimeStamp &starttime);
 
     /**
      * @brief Write the files start, end times, file name and basic information about the l1a file
@@ -185,12 +190,14 @@ class L1aFile {
     /**
      * @brief Write spacecrafts navigation data like orbit position, speed, etc.
      * @param dimShape - current size of dimensions for the current l1a file
+     * @param navTimeFrame - updates start and end of scan time for valid navigation coverage
+     * @param dataType - current data type being processed
      * @param hktList
      * @param startTime
      * @param endTime
      * @return
      */
-    int writeNavigationData(DimensionShape* dimShape, std::string hktList, AncillaryPktTimeStamp &startTime,
+    int writeNavigationData(DimensionShape* dimShape, NavigationTimeFrame* navTimeFrame, short dataType,  std::string hktList, AncillaryPktTimeStamp &startTime,
                             AncillaryPktTimeStamp &endTime);
 
     /**

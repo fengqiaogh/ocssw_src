@@ -12,7 +12,6 @@ from .converters import Converter
 from .decode import _decode_fixed_length, _decode_variable_length
 from .packet_fields import PacketField, PacketArray
 
-
 __author__ = "Daniel da Silva <mail@danieldasilva.org>"
 
 
@@ -21,18 +20,42 @@ class _BasePacket:
     directly.
     """
 
-    def _init(self, fields):
+    def __init__(self, fields, apid=None, name=None, description=None):
         """
         Parameters
         ----------
         fields : list of `ccsdspy.PacketField`
             Layout of packet fields contained in the definition.
+        apid : int, optional
+            APID of the packet. Acts as a unique identifier for the packet type. Used
+            as metadata.
+        name : str, optional
+            Name of the packet. Used as metadata.
+        description : str, optional
+            Description of the packet. Used as metadata.
         """
+        if type(self) is _BasePacket:
+            raise NotImplementedError(
+                "The _BasePacket class is an abstract base class and "
+                "cannot be instantiated directly."
+            )
+
+        if apid is not None and not isinstance(apid, int):
+            raise TypeError("apid must be an int")
+        if name is not None and not isinstance(name, str):
+            raise TypeError("name must be a str")
+        if description is not None and not isinstance(description, str):
+            raise TypeError("description must be a str")
+
         # List of PacketField instances
         self._fields = fields[:]
 
         # Dictionary mapping input name to tuple (output_name: str, Converter instance)
         self._converters = {}
+
+        self._apid = apid
+        self._name = name
+        self._description = description
 
     @classmethod
     def from_file(cls, file):
@@ -42,12 +65,17 @@ class _BasePacket:
         file : str
            Path to file on the local file system that defines the packet fields.
            Currently only supports csv files.
-           See :download:`simple_csv_3col.csv <../../ccsdspy/tests/data/packet_def/simple_csv_3col.csv>`  # noqa: E501
-           and :download:`simple_csv_4col.csv <../../ccsdspy/tests/data/packet_def/simple_csv_4col.csv>`  # noqa: E501
+           See :download:`basic_csv_3col.csv <../../ccsdspy/tests/data/packet_def/basic_csv_3col.csv>`  # noqa: E501
+           and :download:`extended_csv_4col.csv <../../ccsdspy/tests/data/packet_def/extended_csv_4col.csv>`  # noqa: E501
 
         Returns
         -------
         An instance of FixedLength.
+
+        Raises
+        ------
+        ValueError
+            If the file type is not supported. Currently on CSV files are supported.
         """
         file_extension = os.path.splitext(file)
         if file_extension[1] == ".csv":
@@ -56,6 +84,21 @@ class _BasePacket:
             raise ValueError(f"File type {file_extension[1]} not supported.")
 
         return cls(fields)
+
+    @property
+    def apid(self) -> int:
+        """int: APID of the packet."""
+        return self._apid
+
+    @property
+    def description(self) -> str:
+        """str: Description of the packet."""
+        return self._description
+
+    @property
+    def name(self) -> str:
+        """str: Name of the packet."""
+        return self._name
 
     def add_converted_field(self, input_field_name, output_field_name, converter):
         """Add a converted field to the packet definition, used to apply
@@ -99,7 +142,13 @@ class _BasePacket:
 
         # Check that each of the input field names exists in the packet, and report
         # the missing fields if not
-        fields_in_packet_set = {field._name for field in self._fields}
+        # Collect valid names of fields, which include primary header fields as well
+        # as fields defined in the packet.
+        fields_in_packet_set = set()
+
+        for field in _prepend_primary_header_fields(self._fields):
+            fields_in_packet_set.add(field._name)
+
         input_field_names_set = set(input_field_names)
         all_fields_present = input_field_names_set <= fields_in_packet_set  # subset
 
@@ -121,12 +170,19 @@ class FixedLength(_BasePacket):
     messages.
     """
 
-    def __init__(self, fields):
+    def __init__(self, fields, apid=None, name=None, description=None):
         """
         Parameters
         ----------
         fields : list of :py:class:`~ccsdspy.PacketField` or :py:class:`~ccsdspy.PacketArray`
             Layout of packet fields contained in the definition.
+        apid : int, optional
+            APID of the packet. Acts as a unique identifier for the packet type. Used
+            as metadata.
+        name : str, optional
+            Name of the packet. Used as metadata.
+        description : str, optional
+            Description of the packet. Used as metadata.
 
         Raises
         ------
@@ -139,9 +195,9 @@ class FixedLength(_BasePacket):
                 "Instead, use the VariableLength class."
             )
 
-        self._init(fields)
+        super().__init__(fields, apid=apid, name=name, description=description)
 
-    def load(self, file, include_primary_header=False):
+    def load(self, file, include_primary_header=False, reset_file_obj=False):
         """Decode a file-like object containing a sequence of these packets.
 
         Parameters
@@ -149,7 +205,14 @@ class FixedLength(_BasePacket):
         file : str
            Path to file on the local file system, or file-like object
         include_primary_header : bool
-           If True, provides the primary header in the output
+           If True, provides the primary header in the output. The names of the
+           fields are: `CCSDS_VERSION_NUMBER`, `CCSDS_PACKET_TYPE`,
+           `CCSDS_SECONDARY_FLAG`, `CCSDS_SEQUENCE_FLAG`, `CCSDS_APID`,
+           `CCSDS_SEQUENCE_COUNT`, and `CCSDS_PACKET_LENGTH`
+        reset_file_obj : bool
+           If True, leave the file object, when it is file buffer, where it was before load is called.
+           Otherwise, (default), leave the file stream pos after the read packets.
+           Does not apply when file is a string.
 
         Returns
         -------
@@ -172,6 +235,7 @@ class FixedLength(_BasePacket):
             self._converters,
             "fixed_length",
             include_primary_header=True,
+            reset_file_obj=reset_file_obj,
         )
 
         # inspect the primary header and issue warning if appropriate
@@ -203,7 +267,7 @@ class VariableLength(_BasePacket):
       * Do not specify explicit bit_offsets (they will be computed automatically)
     """
 
-    def __init__(self, fields):
+    def __init__(self, fields, apid=None, name=None, description=None):
         """
         Parameters
         ----------
@@ -211,6 +275,13 @@ class VariableLength(_BasePacket):
             Layout of packet fields contained in the definition. No more than
             one field should have array_shape="expand". The field must have no
             bit_offset's. Do not include the primary header fields.
+        apid : int, optional
+            APID of the packet. Acts as a unique identifier for the packet type. Used
+            as metadata.
+        name : str, optional
+            Name of the packet. Used as metadata.
+        description : str, optional
+            Description of the packet. Used as metadata.
 
         Raises
         ------
@@ -257,9 +328,9 @@ class VariableLength(_BasePacket):
                 "determined automatically."
             )
 
-        self._init(fields)
+        super().__init__(fields, apid=apid, name=name, description=description)
 
-    def load(self, file, include_primary_header=False):
+    def load(self, file, include_primary_header=False, reset_file_obj=False):
         """Decode a file-like object containing a sequence of these packets.
 
         Parameters
@@ -267,7 +338,14 @@ class VariableLength(_BasePacket):
         file : str
            Path to file on the local file system, or file-like object
         include_primary_header : bool
-           If True, provides the primary header in the output
+           If True, provides the primary header in the output. The names of the
+           fields are: `CCSDS_VERSION_NUMBER`, `CCSDS_PACKET_TYPE`,
+           `CCSDS_SECONDARY_FLAG`, `CCSDS_SEQUENCE_FLAG`, `CCSDS_APID`,
+           `CCSDS_SEQUENCE_COUNT`, and `CCSDS_PACKET_LENGTH`
+        reset_file_obj : bool
+           If True, leave the file object, when it is file buffer, where it was before load is called.
+           Otherwise, (default), leave the file stream pos after the read packets.
+           Does not apply when file is a string.
 
         Returns
         -------
@@ -288,7 +366,12 @@ class VariableLength(_BasePacket):
         # they didn't want the primary header fields, we parse for them and then
         # remove them after.
         packet_arrays = _load(
-            file, self._fields, self._converters, "variable_length", include_primary_header=True
+            file,
+            self._fields,
+            self._converters,
+            "variable_length",
+            include_primary_header=True,
+            reset_file_obj=reset_file_obj,
         )
 
         # inspect the primary header and issue warning if appropriate
@@ -313,6 +396,15 @@ def _inspect_primary_header_fields(packet_arrays):
     packet_arrays
         dictionary mapping field names to NumPy arrays, with key order matching
         the order fields in the packet. Modified in place
+
+    Warns
+    -----
+    UserWarning
+        If the ccsds sequence count is not in order
+    UserWarning
+        If the ccsds sequence count is missing packets
+    UserWarning
+        If there are more than one APID
     """
     seq_counts = packet_arrays["CCSDS_SEQUENCE_COUNT"]
     start, end = seq_counts[0], seq_counts[-1]
@@ -434,9 +526,14 @@ def _unexpand_field_arrays(field_arrays, expand_history):
 
         for element_name, indices in array_details["fields"].items():
             array.__setitem__((slice(None),) + indices, field_arrays[element_name])
+            # get index of the position where the array field was
+            pos = list(return_field_arrays.keys()).index(element_name)
             del return_field_arrays[element_name]
 
-        return_field_arrays[array_name] = array
+        # do the following trick to insert the unexpanded array where the expanded arrays fields were.
+        return_field_items = list(return_field_arrays.items())
+        return_field_items.insert(pos, (array_name, array))
+        return_field_arrays = dict(return_field_items)
 
     return return_field_arrays
 
@@ -499,6 +596,40 @@ def _prepend_primary_header_fields(existing_fields):
     return return_fields
 
 
+def _parse_csv_array_shape(data_type_str):
+    """Parse a data type string from a CSV to determine the array shape.
+
+    Parameters
+    ----------
+    data_type_str : str
+        Full string specifying the data type, e.g. `uint(1, 2)`
+
+    Returns
+    -------
+    array_shape : str, int, tuple of int
+       Parsed array shape to be used in loading CSV.
+
+    Raises
+    ------
+    ValueError
+        If the array shape is not valid. Must be `expand`, the name of another field,
+        or a tuple of ints.
+    """
+    array_shape_str = data_type_str[data_type_str.find("(") + 1 : data_type_str.find(")")]
+    if array_shape_str == "expand":
+        array_shape = "expand"
+    elif "," in array_shape_str:
+        try:
+            array_shape = tuple(map(int, array_shape_str.split(", ")))
+        except ValueError:
+            raise ValueError(
+                "Array shape must be `expand`, the name of another field, or a tuple of ints."
+            )
+    else:  # string is either another field for reference or a single integer for a one dimensional array shape
+        array_shape = int(array_shape_str) if array_shape_str.isnumeric() else array_shape_str
+    return array_shape
+
+
 def _get_fields_csv_file(csv_file):
     """Parse a simple comma-delimited file that defines a packet.
 
@@ -514,6 +645,13 @@ def _get_fields_csv_file(csv_file):
     -------
     fields : list
         A list of `PacketField` objects.
+
+    Raises
+    ------
+    RuntimeError
+        If the CSV file is empty.
+    ValueError
+        If the CSV file does not contain the required columns. Must have at least `name`, `data_type`, and `bit_length`.
     """
     req_columns = ["name", "data_type", "bit_length"]
 
@@ -529,19 +667,16 @@ def _get_fields_csv_file(csv_file):
             raise ValueError(f"Minimum required columns are {req_columns}.")
 
         for row in reader:  # skip the header row
-            if "bit_offset" not in headers:  # 3 col csv file
+            if "bit_offset" not in headers:  # basic 3 col csv file
                 if (row["data_type"].count("(") == 1) and (row["data_type"].count(")") == 1):
                     data_type = row["data_type"].split("(")[0]
-                    array_shape_str = row["data_type"][
-                        row["data_type"].find("(") + 1 : row["data_type"].find(")")
-                    ]
-                    array_shape = tuple(map(int, array_shape_str.split(", ")))
+                    array_shape = _parse_csv_array_shape(row["data_type"])
                     fields.append(
                         PacketArray(
                             name=row["name"],
                             data_type=data_type,
                             bit_length=int(row["bit_length"]),
-                            array_shape=(array_shape),
+                            array_shape=array_shape,
                         )
                     )
                 else:
@@ -555,14 +690,11 @@ def _get_fields_csv_file(csv_file):
                             byte_order=row["byte_order"],
                         )
                     )
-            if "bit_offset" in headers:  # 4 col csv file provides bit offsets
+            if "bit_offset" in headers:  # extended 4 col csv file provides bit offsets
                 # TODO: Check the consistency of bit_offsets versus previous bit_lengths
                 if (row["data_type"].count("(") == 1) and (row["data_type"].count(")") == 1):
                     data_type = row["data_type"].split("(")[0]
-                    array_shape_str = row["data_type"][
-                        row["data_type"].find("(") + 1 : row["data_type"].find(")")
-                    ]
-                    array_shape = tuple(map(int, array_shape_str.split(", ")))
+                    array_shape = _parse_csv_array_shape(row["data_type"])
                     fields.append(
                         PacketArray(
                             name=row["name"],
@@ -588,7 +720,9 @@ def _get_fields_csv_file(csv_file):
     return fields
 
 
-def _load(file, fields, converters, decoder_name, include_primary_header=False):
+def _load(
+    file, fields, converters, decoder_name, include_primary_header=False, reset_file_obj=False
+):
     """Decode a file-like object containing a sequence of these packets.
 
     Parameters
@@ -604,6 +738,10 @@ def _load(file, fields, converters, decoder_name, include_primary_header=False):
        String identifying which decoder to use.
     include_primary_header: bool
        If True, provides the primary header in the output
+    reset_file_obj : bool
+           If True, leave the file object, when it is a file buffer, where it was before _load is called.
+           Otherwise, (default), leave the file stream pos after the read packets.
+           Does not apply when file is a string.
 
     Returns
     -------
@@ -616,9 +754,12 @@ def _load(file, fields, converters, decoder_name, include_primary_header=False):
       the decoder_name is not one of the allowed values
     """
     if hasattr(file, "read"):
+        file_pos = file.tell()
         file_bytes = np.frombuffer(file.read(), "u1")
     else:
         file_bytes = np.fromfile(file, "u1")
+
+    orig_fields = fields
 
     if include_primary_header:
         fields = _prepend_primary_header_fields(fields)
@@ -636,9 +777,12 @@ def _load(file, fields, converters, decoder_name, include_primary_header=False):
         )
 
     field_arrays = _unexpand_field_arrays(field_arrays, expand_history)
+    field_arrays = _apply_post_byte_reoderings(field_arrays, orig_fields)
     if len(converters)>0:
         field_arrays = _apply_converters(field_arrays, converters)
 
+    if hasattr(file, "read") and reset_file_obj:
+        file.seek(file_pos)
     return field_arrays
 
 
@@ -673,3 +817,91 @@ def _apply_converters(field_arrays, converters):
         converted[output_field_name] = converter.convert(*input_arrays)
 
     return converted
+
+
+def _apply_post_byte_reoderings(field_arrays, orig_fields):
+    """Step of load procedure to apply post-processing byte reorderings.
+
+    A field gets post-processing byte reordering if the attribute
+      `field._byte_order_post` is not None.
+
+    Parameters
+    ----------
+    field_arrays : dict of string to NumPy arrays
+       The decoded packet field arrays without any post-processing applied
+    orig_fields : List of PacketField
+       Original fields as specified in the packet, before any replacements
+       which occur in the processing step.
+
+    Returns
+    -------
+    Reference to argument field_arrays (object was mutuated).
+    """
+    for field in orig_fields:
+        if field._byte_order_post is None:
+            continue
+
+        byte_order_string = field._byte_order_post
+        byte_order_ints = [int(digit) for digit in byte_order_string]
+        is_obj_array = field_arrays[field._name].dtype == object
+
+        if is_obj_array:
+            new_packet_arrays = []
+
+            for i, packet_array in enumerate(field_arrays[field._name]):
+                field_arrays[field._name][i] = _do_array_byte_reordering(
+                    packet_array, byte_order_ints
+                )
+        else:
+            field_arrays[field._name] = _do_array_byte_reordering(
+                field_arrays[field._name], byte_order_ints
+            )
+
+    return field_arrays
+
+
+def _do_array_byte_reordering(array, byte_order_ints):
+    """Reorder the bytes of an array.
+
+    Parameters
+    ----------
+    array : NumPy array
+      May be multidimensional. Dtype of array must not be object.
+    byte_order_ints : list of int
+      Inceces of the bytes in order, e.g., 2314.
+
+    Returns
+    -------
+    Array with bytes reordered according to the passed order.
+    """
+    assert array.dtype != object, "Error in byte reordering, please report a bug:.{array.dtype}"
+
+    parsed_byte_length = array.itemsize
+    native_byte_length = max(byte_order_ints)
+
+    array_bytes = array.copy()
+    array_bytes.dtype = np.uint8
+    array_bytes = array_bytes.reshape((array.size, parsed_byte_length))
+
+    digits_zero_idx = [digit - 1 for digit in reversed(byte_order_ints)]
+    select_indeces = []
+    select_indeces.extend(digits_zero_idx)
+    select_indeces.extend(sorted(set(range(array.itemsize)) - set(digits_zero_idx)))
+
+    padding = array.itemsize - len(byte_order_ints)
+    reordered = np.zeros_like(array_bytes)
+
+    for i in range(reordered.shape[0]):
+        reordered[i, :] = array_bytes[i, ::-1][select_indeces]
+
+    shifted = np.zeros_like(reordered)
+
+    if padding > 0:
+        shifted[:, padding:] = reordered[:, :-padding]
+    else:
+        shifted[:] = reordered
+
+    shifted.dtype = array.dtype
+    shifted = shifted.reshape(array.shape)
+
+    return shifted

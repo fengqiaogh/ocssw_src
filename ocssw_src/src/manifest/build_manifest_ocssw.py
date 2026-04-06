@@ -74,6 +74,9 @@ buildRemotapStr = " && mkdir build && cd build && cmake .. && make install"
 getGpcStr = " && cd \$OCSSWROOT/../polarimetry && rm -rf gpc && git clone git@git.smce.nasa.gov:oel/polarimetry/gpc.git && cd gpc"
 buildGpcStr = " && mkdir build && cd build && cmake .. && make -j 20 install"
 
+getTraceGasStr = " && cd \$OCSSWROOT/../sat && rm -rf pace_no2 && git clone git@git.smce.nasa.gov:oel/sat/pace_no2.git && cd pace_no2"
+buildTraceGasStr = " && mkdir build && cd build && cmake .. && make -j 20 install"
+
 def doIt(cmd, logFilename):
     logFile = open(logFilename, "w")
     result = subprocess.run(cmd, shell=True, stderr=subprocess.STDOUT, stdout=logFile)
@@ -179,6 +182,12 @@ def run():
             if args.tag:
                 commandLine += " && git checkout " + args.tag
             commandLine += buildGpcStr
+
+            # build Trace Gas
+            commandLine += getTraceGasStr
+            if args.tag:
+                commandLine += " && git checkout " + args.tag
+            commandLine += buildTraceGasStr
 
         #
         # for now only build on poseidon 

@@ -44,7 +44,12 @@ void get_ipar(l2str *l2rec, float ipar[]) {
         // instantaneous solar irradiance at 1-nm intervals
         for (iw = PARW1; iw <= PARW2; iw++) {
             ib = iw - PARW1;
-            get_f0_thuillier_ext(iw, 1, &F0vis[ib]);
+            float width = 1;
+            int status = get_f0(iw,width, &F0vis[ib]);
+            if (status) {
+                printf("-E- %s:%d - Can't read solar irradiance.\n", __FILE__, __LINE__);
+                exit(EXIT_FAILURE);
+            }
             F0vis[ib] *= l1rec->fsol;
         }
 

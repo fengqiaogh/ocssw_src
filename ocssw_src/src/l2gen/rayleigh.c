@@ -1,3 +1,5 @@
+#include <stdio.h>  // For snprintf. Also transitively included through l12_proto.h, but C doesn't guarantee transitive inclusion
+#include <string.h>
 #include "l12_proto.h"
 
 #define NSOL   45
@@ -144,6 +146,55 @@ void read_rayleigh_lut(char* file, int32_t iw, int pol_opt) {
     nc_close(nc_id);
 }
 
+int try_nc_then_hdf(char *file, const char *sensor_directory, int subsensorId, const char *sensorstr,
+                    const char *wavestr) {
+
+    if (!input->rayleigh_prefix[0]) {
+        strcpy(file, sensor_directory);
+        if (subsensorId >= 0) {
+            strcat(file, "/");
+            strcat(file, subsensorId2SubsensorDir(subsensorId));
+        }
+        strcat(file, "/rayleigh");  // directory
+    } else {
+        strcpy(file, input->rayleigh_prefix);
+    }
+    strcat(file, "/rayleigh_");  // First part of the file name
+    strcat(file, sensorstr);
+    strcat(file, "_");
+    strcat(file, wavestr);
+    strcat(file, "_iqu.nc");
+
+    if (access(file, R_OK) == 0) {
+        return 0;
+    }
+
+    char *extension = strrchr(file, '.');
+    if (extension && strcmp(extension, ".nc") == 0) {
+        snprintf(extension, FILENAME_MAX - (extension - file), ".hdf");
+    } else {
+        fprintf(stderr, "-E- %s: Malformed filename: %s\n", __FILE__, file);
+        return -1;
+    }
+
+    return access(file, R_OK);
+}
+
+bool find_rayleigh_table(char *file, const char *sensor_directory, const int subsensorId,
+                         const char *sensorstr, const char *wavestr) {
+    int access_result = -1;
+
+    if (subsensorId >= 0) {
+        access_result = try_nc_then_hdf(file, sensor_directory, subsensorId, sensorstr, wavestr);
+    }
+
+    if (access_result == -1) {
+        // Sometimes there is a subsensor but the rayleighs live at the sensor level instead
+        access_result = try_nc_then_hdf(file, sensor_directory, -1, sensorstr, wavestr);
+    }
+
+    return access_result == 0;
+}
 
 /* -------------------------------------------------------------------------------
  * rayleigh() - compute Rayleigh radiances with polarization, per band.
@@ -187,11 +238,11 @@ void rayleigh(l1str *l1rec, int32_t ip) {
     int isen1;
     int isen2;
 
-    char *tmp_str;
-    char file [FILENAME_MAX] = "";
-    char path [FILENAME_MAX] = "";
-    char wavestr[10] = "";
-    char sensorstr[32] = "";
+    char *oc_data_root;
+    char file [FILENAME_MAX] = ""; // Full rayleigh table filename. reused every sensor wavelength
+    char sensor_directory [FILENAME_MAX] = ""; // Where the sensor lives
+    char wavestr[10] = ""; // A string version of a given wavelength
+    char sensorstr[32] = ""; // The name of the sensor (e.g. modisa, oci, seawifs, viirs, etc.)
 
     /* working variables */
     float sigma_m;
@@ -246,90 +297,58 @@ void rayleigh(l1str *l1rec, int32_t ip) {
     setvbuf(stderr, NULL, _IOLBF, 0);
 
     if (firstCall) {
-
-        int32_t *wave;
-
-        nwave = rdsensorinfo(sensorID, evalmask, "Lambda", (void **) &wave);
-
-        if ((tmp_str = getenv("OCDATAROOT")) == NULL) {
+        if ((oc_data_root = getenv("OCDATAROOT")) == NULL) {
             printf("OCDATAROOT environment variable is not defined.\n");
             exit(1);
         }
-        if ((evalmask & NEWRAYTAB) != 0) {
-            strcpy(path, tmp_str);
-            strcat(path, "/eval/");
-            strcat(path, sensorId2SensorDir(sensorID));
-            strcat(path, "/");
+
+        if (input->rayleigh_prefix[0]) {
+            strcpy(sensor_directory, input->rayleigh_prefix);
         } else {
-            strcpy(path, tmp_str);
-            strcat(path, "/");
-            strcat(path, sensorId2SensorDir(sensorID));
-            strcat(path, "/");
+            strcpy(sensor_directory, oc_data_root);
+            if ((evalmask & NEWRAYTAB) != 0) {
+                strcat(sensor_directory, "/eval");
+            }
+            strcat(sensor_directory, "/");
+            strcat(sensor_directory, sensorId2SensorDir(sensorID));
         }
+
         printf("\n");
-        if ((ray_for_i = (ray_array *) calloc(nwave, sizeof (ray_array))) == NULL) {
+
+        int32_t *wave;
+        nwave = rdsensorinfo(sensorID, evalmask, "Lambda", (void **)&wave);
+
+        if ((ray_for_i = (ray_array *)calloc(nwave, sizeof(ray_array))) == NULL) {
             printf("-E- : Error allocating memory to ray_for_i\n");
             exit(FATAL_ERROR);
         }
 
-        if ((ray_for_q = (ray_array *) calloc(nwave, sizeof (ray_array))) == NULL) {
+        if ((ray_for_q = (ray_array *)calloc(nwave, sizeof(ray_array))) == NULL) {
             printf("-E- : Error allocating memory to ray_for_q\n");
             exit(FATAL_ERROR);
         }
-        if ((ray_for_u = (ray_array *) calloc(nwave, sizeof (ray_array))) == NULL) {
+
+        if ((ray_for_u = (ray_array *)calloc(nwave, sizeof(ray_array))) == NULL) {
             printf("-E- : Error allocating memory to ray_for_u\n");
             exit(FATAL_ERROR);
         }
 
         strcpy(sensorstr, sensorId2SensorName(sensorID));
         lowcase(sensorstr);
-        
+
         for (iw = 0; iw < nwave; iw++) {
-
-            sprintf(wavestr, "%d", (int) wave[iw]);
+            sprintf(wavestr, "%d", (int)wave[iw]);
             file[0] = 0;
-            
-            // try subsensor dir netCDF first
-            if(l1rec->l1file->subsensorID >= 0) {
-                strcpy(file, path);
-                strcat(file, subsensorId2SubsensorDir(l1rec->l1file->subsensorID));
-                strcat(file, "/rayleigh/rayleigh_");
-                strcat(file, sensorstr);
-                strcat(file, "_");
-                strcat(file, wavestr);
-                strcat(file, "_iqu.nc");
 
-                // then try subsensor dir HDF
-                if(access(file, R_OK) == -1) {
-                    strcpy(file, path);
-                    strcat(file, subsensorId2SubsensorDir(l1rec->l1file->subsensorID));
-                    strcat(file, "/rayleigh/rayleigh_");
-                    strcat(file, sensorstr);
-                    strcat(file, "_");
-                    strcat(file, wavestr);
-                    strcat(file, "_iqu.hdf");
-                }
+            bool file_found =
+                find_rayleigh_table(file, sensor_directory, l1rec->l1file->subsensorID, sensorstr, wavestr);
+
+            if (!file_found) {
+                // Subsensor dir didn't have rayleighs, nor did sensor dir
+                fprintf(stderr, "-E- %s: Unable to find rayleigh tables\n", __FILE__);
+                exit(EXIT_FAILURE);
             }
 
-            // then try sensor dir netCDF
-            if(access(file, R_OK) == -1) {
-                strcpy(file, path);
-                strcat(file, "rayleigh/rayleigh_");
-                strcat(file, sensorstr);
-                strcat(file, "_");
-                strcat(file, wavestr);
-                strcat(file, "_iqu.nc");
-
-                // then try sensor dir HDF
-                if(access(file, R_OK) == -1) {
-                    strcpy(file, path);
-                    strcat(file, "rayleigh/rayleigh_");
-                    strcat(file, sensorstr);
-                    strcat(file, "_");
-                    strcat(file, wavestr);
-                    strcat(file, "_iqu.hdf");
-                }
-            }
             read_rayleigh_lut(file, iw, pol_opt);
         }
         // initialize recompute
@@ -341,7 +360,6 @@ void rayleigh(l1str *l1rec, int32_t ip) {
         }
         firstCall = 0;
     }
-
 
     /* windspeed index into tables */
 

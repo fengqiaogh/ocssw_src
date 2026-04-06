@@ -8,7 +8,7 @@ use Data::Dumper;
 
 my @types = (
 	#['char', '_char'],
-	#['unsigned char', '_uchar'],
+	['unsigned char', '_uchar'],
 	#['signed char', '_schar'],
 	#['short', '_short'],
 	['int', '_int'],

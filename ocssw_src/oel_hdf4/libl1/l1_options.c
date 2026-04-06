@@ -35,7 +35,6 @@ void l1_input_init() {
     for (i = 0; i < 2; i++) l1_input->cirrus_thresh[i] = -1;
     l1_input->albedo = -1.0;
     l1_input->cloud_wave = 865.0;
-    l1_input->cloud_eps = -1.0;
     l1_input->glint = 0.005;
     l1_input->extreme_glint=0.03;
     l1_input->sunzen = 75.0;
@@ -113,7 +112,7 @@ void l1_add_options(clo_optionList_t* list) {
     clo_addOption(list, "xcal_wave", CLO_TYPE_FLOAT, NULL, tmpStr);
 
     clo_addOption(list, "btfile", CLO_TYPE_IFILE, NULL, "IR brightness temperature file");
-
+    clo_addOption(list, "f0file", CLO_TYPE_IFILE, "$OCDATAROOT/common/thuillier2003_f0.nc", "Solar Irradiance file");
     strcpy(tmpStr, "processing resolution (MODIS only)\n");
     strcat(tmpStr, "       -1: standard ocean 1km processing\n");
     strcat(tmpStr, "     1000: 1km resolution including aggregated 250 and 500m land bands\n");
@@ -176,8 +175,6 @@ void l1_add_options(clo_optionList_t* list) {
     option = clo_addOption(list, "cloud_thresh", CLO_TYPE_FLOAT, "0.027", "cloud reflectance\n        threshold");
     clo_addOptionAlias(option, "albedo");
     clo_addOption(list, "cloud_wave", CLO_TYPE_FLOAT, "865.0", "wavelength of cloud reflectance test");
-    clo_addOption(list, "cloud_eps", CLO_TYPE_FLOAT, "-1.0", "cloud reflectance ratio threshold\n        (-1.0=disabled)");
-
     clo_addOption(list, "cloud_mask_file", CLO_TYPE_IFILE, NULL, "cloud mask file");
 
     strcpy(tmpStr, "cloud mask file variable name\n");
@@ -496,14 +493,18 @@ void l1_load_options(clo_optionList_t *list, filehandle *l1file) {
     l1_input->extreme_glint = clo_getFloat(list, "extreme_glint");
     l1_input->albedo = clo_getFloat(list, "cloud_thresh");
     l1_input->cloud_wave = clo_getFloat(list, "cloud_wave");
-    l1_input->cloud_eps = clo_getFloat(list, "cloud_eps");
-
+    
     option = clo_findOption(list, "cloud_mask_file");
     if (clo_isOptionSet(option)) {
         strVal = clo_getOptionString(option);
         parse_file_name(strVal, tmp_file);
         strcpy(l1_input->cld_msk_file, tmp_file);
     }
+    option = clo_findOption(list, "f0file");
+    strVal = clo_getOptionString(option);
+    parse_file_name(strVal, tmp_file);
+    strcpy(l1_input->f0file, tmp_file);
+
     l1_input->cloud_mask_opt = clo_getInt(list, "cloud_mask_opt");
 
     // Used to indicate if the program needs to read from the calfile.
@@ -666,6 +667,11 @@ void l1_get_input_params(filehandle *l1file, char *input_parms) {
     strcat(input_parms, str_buf);
     strcat(input_parms, "\n");
 
+    sprintf(str_buf, "f0file = %s", l1_input->f0file);
+    strcat(input_parms, str_buf);
+    strcat(input_parms, "\n");
+
+
     sprintf(str_buf, "resolution = %3d", l1_input->resolution);
     strcat(input_parms, str_buf);
     strcat(input_parms, "\n");
@@ -766,11 +772,11 @@ void l1_get_input_params(filehandle *l1file, char *input_parms) {
     strcat(input_parms, str_buf);
     strcat(input_parms, "\n");
 
-    sprintf(str_buf, "cloud_eps = %8.3f", l1_input->cloud_eps);
+    sprintf(str_buf, "cloud_mask_file= %s", l1_input->cld_msk_file);
     strcat(input_parms, str_buf);
     strcat(input_parms, "\n");
 
-    sprintf(str_buf, "cloud_mask_file= %s", l1_input->cld_msk_file);
+    sprintf(str_buf, "cloud_mask_opt= %d", l1_input->cloud_mask_opt);
     strcat(input_parms, str_buf);
     strcat(input_parms, "\n");
 
@@ -850,6 +856,12 @@ void l1_get_input_files(filehandle *l1file, char *input_files) {
     if (l1_input->btfile[0]) {
         tmp_str = strrchr(l1_input->btfile, '/');
         tmp_str = (tmp_str == 0x0) ? l1_input->btfile : tmp_str + 1;
+        sprintf(str_buf, ",%s", tmp_str);
+        strcat(input_files, str_buf);
+    }
+    if (l1_input->f0file[0]) {
+        tmp_str = strrchr(l1_input->f0file, '/');
+        tmp_str = (tmp_str == 0x0) ? l1_input->f0file : tmp_str + 1;
         sprintf(str_buf, ",%s", tmp_str);
         strcat(input_files, str_buf);
     }

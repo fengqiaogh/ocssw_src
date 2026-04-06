@@ -2,6 +2,15 @@
 #include "genutils.h"
 #include "calibrations.hpp"
 
+std::vector<double> aggregateIrradiances(size_t numBands, size_t numWavelengths,
+                                         std::vector<double> irradiances, float **aggMat) {
+    std::vector<double> aggregatedIrrs(numBands, 0.0);
+    for (size_t i = 0; i < numBands; i++)
+        for (size_t j = 0; j < numWavelengths; j++)
+            aggregatedIrrs[i] += irradiances[j] * aggMat[j][i];
+    return aggregatedIrrs;
+}
+
 int aggregateBands(const size_t numTaps, size_t *tapAggFactors, size_t binCounts[NUMBER_OF_TAPS],
                    const int16_t aggregationFlags[NUMBER_OF_TAPS], size_t &numInstrumentBands,
                    size_t &numL1bBands) {
@@ -17,8 +26,6 @@ int aggregateBands(const size_t numTaps, size_t *tapAggFactors, size_t binCounts
     if (numActiveTaps == 0) {
         return 2;
     } else {
-        for (size_t i = 0; i < NUMBER_OF_TAPS; i++)
-            binCounts[i] = 0;
         for (size_t i = 0; i < numActiveTaps; i++)
             binCounts[tapAggFactors[i]] = BANDS_PER_TAP / aggregationFlags[tapAggFactors[i]];
         numInstrumentBands = 0;
@@ -38,54 +45,87 @@ int aggregateBands(const size_t numTaps, size_t *tapAggFactors, size_t binCounts
     return 0;
 }
 
-int getAggregationMatrices(size_t *taps, int16_t tapAggFactors[NUMBER_OF_TAPS],
-                           size_t binCounts[NUMBER_OF_TAPS], uint32_t numInstrumentBands,
-                           uint32_t numL1bBands, float **instrumentAggMatrix, float **gainAggMatrix) {
+void getAggregationMatrices(size_t* taps, int16_t tapAggFactors[NUMBER_OF_TAPS],
+                            size_t binCounts[NUMBER_OF_TAPS], size_t numInstrumentBands, size_t numL1bBands,
+                            bool aggregationOff, float** instrumentAggMatrix, float** gainAggMatrix,
+                            Device color) {
     // tap start/end locations for instrument bands in terms of band indices
     int16_t tapBounds[NUMBER_OF_TAPS][2];
+    for (size_t i = 0; i < NUMBER_OF_TAPS; i++) {
+        tapBounds[i][0] = 0;
+        tapBounds[i][1] = 0;
+    }
 
-    for (size_t i = 0; i < NUMBER_OF_BANDS; i++) {
-        gainAggMatrix[i] = new float[numInstrumentBands];
-        for (size_t j = 0; j < numInstrumentBands; j++)
-            gainAggMatrix[i][j] = 0.0;
+    // When aggregation is turned off, gain and instrument aggregation matrices are set to an identity.
+    if (color == BLUE && aggregationOff) {
+        // For blue, the first tap is disabled (low signal), so the identity needs to start at the second tap.
+        for (size_t i = 0; i < NUMBER_OF_BANDS; i++) {
+            gainAggMatrix[i] = new float[numInstrumentBands];
+            for (size_t j = 0; j < numInstrumentBands; j++) {
+                if (i >= BANDS_PER_TAP && i - BANDS_PER_TAP == j) {
+                    gainAggMatrix[i][j] = 1.0;
+                } else {
+                    gainAggMatrix[i][j] = 0.0;
+                }
+            }
+        }
+    } else { // Red does have a disabled tap but it's at the end, so no special logic for red.
+        for (size_t i = 0; i < NUMBER_OF_BANDS; i++) {
+            gainAggMatrix[i] = new float[numInstrumentBands];
+            for (size_t j = 0; j < numInstrumentBands; j++) {
+                if (i == j && aggregationOff) {
+                    gainAggMatrix[i][j] = 1.0;
+                } else {
+                    gainAggMatrix[i][j] = 0.0;
+                }
+            }
+        }
     }
 
     for (size_t i = 0; i < numInstrumentBands; i++) {
         instrumentAggMatrix[i] = new float[numL1bBands];
-        for (size_t j = 0; j < numL1bBands; j++)
-            instrumentAggMatrix[i][j] = 0;
+        for (size_t j = 0; j < numL1bBands; j++) {
+            if (i == j && aggregationOff) {
+                instrumentAggMatrix[i][j] = 1.0;
+            } else {
+                instrumentAggMatrix[i][j] = 0.0;
+            }
+        }
     }
 
-    populateGainAggMatrix(gainAggMatrix, tapAggFactors, binCounts, numInstrumentBands, tapBounds);
-    populateInstrumentAggMatrix(instrumentAggMatrix, tapAggFactors, binCounts, tapBounds, taps);
+    populateGainAggMatrix(gainAggMatrix, tapAggFactors, binCounts, tapBounds);
 
-    return 0;
+    if (aggregationOff) {
+        for (size_t i = 0; i < numInstrumentBands; i++) {
+            instrumentAggMatrix[i][i] = 1.0;
+        }
+    } else {
+        populateInstrumentAggMatrix(instrumentAggMatrix, tapAggFactors, binCounts, tapBounds, taps);
+    }
 }
 
-void populateGainAggMatrix(float **gainAggMatrix, int16_t tapAggFactors[NUMBER_OF_TAPS],
-                           size_t binCounts[NUMBER_OF_TAPS], uint32_t numInstrumentBands,
-                           int16_t tapBounds[NUMBER_OF_TAPS][2]) {
+void populateGainAggMatrix(float** gainAggMatrix, int16_t tapAggFactors[NUMBER_OF_TAPS],
+                           size_t binCounts[NUMBER_OF_TAPS], int16_t tapBounds[NUMBER_OF_TAPS][2]) {
     int16_t tapBoundBuf = 0;  // Either the start of the current tap or the end of it
+
     for (size_t currTap = 0; currTap < NUMBER_OF_TAPS; currTap++) {
-        tapBounds[currTap][0] = tapBoundBuf;
+        if (tapAggFactors[currTap] > 0) {
+            for (size_t bin = 0; bin < binCounts[currTap]; bin++) {
+                // The index of the first band in this tap
+                size_t firstTapBand = BANDS_PER_TAP * currTap;
+                // The index of the current bin from the start of the taps
+                size_t binIndex = bin * tapAggFactors[currTap];
 
-        if (tapAggFactors[currTap] <= 0) {
-            continue;
+                for (size_t wavelengthIndex = 0; wavelengthIndex < (size_t)tapAggFactors[currTap];
+                    wavelengthIndex++)
+                    gainAggMatrix[firstTapBand + binIndex + wavelengthIndex][tapBoundBuf + bin] =
+                        (1.0 / tapAggFactors[currTap]);
+            }
+
+            tapBounds[currTap][0] = tapBoundBuf;
+            tapBoundBuf += binCounts[currTap];
+            tapBounds[currTap][1] = tapBoundBuf - 1;
         }
-
-        for (size_t bin = 0; bin < binCounts[currTap]; bin++) {
-            // The index of the first band in this tap
-            size_t firstTapBand = BANDS_PER_TAP * currTap;
-            // The index of the current bin from the start of the taps
-            size_t binIndex = bin * tapAggFactors[currTap];
-
-            for (size_t wavelengthIndex = 0; wavelengthIndex < (size_t)tapAggFactors[currTap];
-                 wavelengthIndex++)
-                gainAggMatrix[firstTapBand + binIndex + wavelengthIndex][tapBoundBuf + bin] =
-                    (1.0 / tapAggFactors[currTap]);
-        }
-        tapBoundBuf += binCounts[currTap];
-        tapBounds[currTap][1] = tapBoundBuf - 1;
     }
 }
 
@@ -157,9 +197,9 @@ void populateInstrumentAggMatrix(float **instrumentAggMatrix, int16_t *tapAggFac
     }
 }
 
-void aggAndCalcRefls(size_t currScan, size_t numBands, size_t numInsBands, const GeoData &geoData,
-                     float *preAgg, float *aggregated, float **insAggMat, bool radianceGen,
-                     std::vector<double> &solIrrL1a, const float *cosSolZens) {
+void aggAndCalcRefls(size_t currScan, size_t numBands, size_t numInsBands, const GeoData& geoData,
+                     double* preAgg, float* aggregated, float** insAggMat, bool radianceGen,
+                     std::vector<double>& solIrrL1a, const double* cosSolZens) {
     for (size_t insBand = 0; insBand < numInsBands; insBand++) {
         for (size_t l1bBand = 0; l1bBand < numBands; l1bBand++) {
             float instrumentAgg = insAggMat[insBand][l1bBand];
@@ -168,7 +208,13 @@ void aggAndCalcRefls(size_t currScan, size_t numBands, size_t numInsBands, const
                 size_t dataIndex = insBand * geoData.numCcdPix + pix;
                 size_t outIndex = l1bBand * geoData.numCcdPix + pix;
 
-                aggregated[outIndex] += instrumentAgg * preAgg[dataIndex];
+                if (preAgg[dataIndex] == BAD_FLT) {
+                    aggregated[outIndex] = BAD_FLT;
+                } else {
+                    if (aggregated[outIndex] != BAD_FLT) {
+                        aggregated[outIndex] += instrumentAgg * preAgg[dataIndex];
+                    }
+                }
             }
         }
     }
@@ -177,12 +223,23 @@ void aggAndCalcRefls(size_t currScan, size_t numBands, size_t numInsBands, const
         for (size_t pix = 0; pix < geoData.numCcdPix; pix++) {
             size_t dataIndex = l1bBand * geoData.numCcdPix + pix;
 
-            if (!radianceGen) {
-                if (geoData.solarZeniths[currScan * geoData.numCcdPix + pix] < MAX_SOLZ)
+            if (aggregated[dataIndex] == BAD_FLT) {
+                continue;
+            }
+
+            if (!radianceGen) {  // Calculating reflectances
+                if (geoData.solarZeniths[currScan * geoData.numCcdPix + pix] < MAX_SOLZ) {
+                    // Checked here to avoid erroneously setting pixels to fill during solar cal
+                    if (solIrrL1a[l1bBand] == 0 || cosSolZens[currScan * geoData.numCcdPix + pix] == 0) {
+                        aggregated[dataIndex] = BAD_FLT;
+                        continue;
+                    }
+
                     aggregated[dataIndex] *=
                         OEL_PI * geoData.auCorrection /
                         (solIrrL1a[l1bBand] * cosSolZens[currScan * geoData.numCcdPix + pix]);
-                else
+
+                } else  // Calculating radiances
                     aggregated[dataIndex] = BAD_FLT;
             }
         }

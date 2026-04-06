@@ -21,6 +21,10 @@ typedef struct seabass {
     int hour_index;
     int minute_index;
     int second_index;
+    int solz_index;
+    int sola_index;
+    int senz_index;
+    int sena_index;
     int current_row;
 } seabass;
 

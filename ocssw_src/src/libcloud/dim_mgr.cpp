@@ -27,7 +27,7 @@
     hash_tbl_siz = 7;
     this->hash_tbl_siz = hash_tbl_siz;
     this->const_hlp(ndim);
-    //cout << __FILE__ << ": 1-arg dim_mgr\n";
+    //std::cout << __FILE__ << ": 1-arg dim_mgr\n";
   }
 
 /********************************************************************
@@ -40,7 +40,7 @@
     hash_tbl_siz = hash_tbl_sz;
     this->const_hlp(ndim);
     this->hash_tbl_siz = hash_tbl_siz;
-    //cout << __FILE__ << ": 2-arg dim_mgr\n";
+    //std::cout << __FILE__ << ": 2-arg dim_mgr\n";
   }
 
 /********************************************************************
@@ -55,7 +55,7 @@
     n_tot_dat_blobs = 0;
     dim_info = ( dim_info_struc ** )malloc
       ( ndim * sizeof( dim_info_struc * ) );
-    //cout << __FILE__ << ": Setting the # dims\n";
+    //std::cout << __FILE__ << ": Setting the # dims\n";
     // allocate all dim_info structs
     for( int i = 0; i < ndim; i++ )
       {
@@ -65,8 +65,8 @@
       dim_info[i]->type = 0;  //  ditto
       }
     // to set the hash table
-    hash_tbl = new vector <hash_entry_struc>[hash_tbl_siz];
-    gpt_hash_tbl = new vector <gpt_hash_struc>[hash_tbl_siz];
+    hash_tbl = new std::vector <hash_entry_struc>[hash_tbl_siz];
+    gpt_hash_tbl = new std::vector <gpt_hash_struc>[hash_tbl_siz];
 
     // to set up the point information structure
     int ncorner = pow( 2, ndim );
@@ -141,11 +141,11 @@
     double min, double max ) {
     // set the dim_info_struc if not set yet
     if( dim_info == NULL ) {
-      cout << __FILE__ << __LINE__ << " dim_info array is null\n";
+      std::cout << __FILE__ << __LINE__ << " dim_info array is null\n";
       return 0;
     }
     if( dim_info[dim_num]->nvals != 0 ) {
-      cout << __FILE__ << __LINE__ << " dim_info array entry " << dim_num <<
+      std::cout << __FILE__ << __LINE__ << " dim_info array entry " << dim_num <<
        " is filled already\n";
       return 0; 
     }
@@ -173,11 +173,11 @@
     double *dim_coords ) {
   
     if( dim_info == NULL ) {
-      cout << __FILE__ << __LINE__ << " dim_info array is null\n";
+      std::cout << __FILE__ << __LINE__ << " dim_info array is null\n";
       return 0;
     }
     if( dim_info[dim_num]->dim_coords != NULL ) {
-      cout << __FILE__ << __LINE__ << " dim_info array entry " << dim_num <<
+      std::cout << __FILE__ << __LINE__ << " dim_info array entry " << dim_num <<
       " is filled already\n";
       return 0;
     }
@@ -338,7 +338,7 @@
       *  get/set the interval for this grid point
       */
       acc_mode = 0;
-      valarray<int> ix_val(ndim);
+      std::valarray<int> ix_val(ndim);
       for( int i = 0; i < ndim; i++ )
         ix_val[i] = ix[i];
       found_int = access( ix_val, acc_mode );
@@ -369,7 +369,7 @@
          /*  if the data for this corner is not there, create and fill it */
           if( found_int->dat_info[idat] == NULL )
             {
-            valarray<int> ixv_off(ndim);
+            std::valarray<int> ixv_off(ndim);
             pt_info.interval_needs_data = 1;  // flag that data needed 
                                                // for this interval / grid box
            /* set up each data info struct */
@@ -515,7 +515,7 @@
   return 0;
   }
 
-interval_struc * dim_mgr::access( valarray<int>& s, int32_t acc_mode )
+interval_struc * dim_mgr::access( std::valarray<int>& s, int32_t acc_mode )
 /********************************************************************
    access  search / insert interval defining the data at the grid point
 
@@ -555,19 +555,19 @@ interval_struc * dim_mgr::access( valarray<int>& s, int32_t acc_mode )
                            // not handled here!!! so fix before use
         {
         hash_tbl[index].erase( hash_tbl[index].begin() + i );
-        cout << "Set is removed" << endl;
+        std::cout << "Set is removed" << std::endl;
         return (interval_struc *) NULL;
         }
       else      // return interval struc for the interval
         {
-        //cout << "Set is found!" << endl;
-        //cout << "position: " << i << endl;
+        //std::cout << "Set is found!" << std::endl;
+        //std::cout << "position: " << i << std::endl;
         return hash_tbl[index][i].int_str;
         }
       }
     }
   //  if not found,
-  //cout << "Set is not found!" << endl;
+  //std::cout << "Set is not found!" << std::endl;
   if( acc_mode == 0 )  // add a new entry
     {
     //  create the new entry
@@ -584,20 +584,20 @@ interval_struc * dim_mgr::access( valarray<int>& s, int32_t acc_mode )
     // Insert the element in the linked list at the particular hash index
 
     hash_tbl[index].push_back(hash_entry);
-    //cout << "Inserting new interval, hash item\n";
+    //std::cout << "Inserting new interval, hash item\n";
     return insert;
     }
   else
     {
     return (interval_struc *) NULL;
     }
-  cout << "Code should not get here!/n";
+  std::cout << "Code should not get here!/n";
   return (interval_struc *)NULL;
   }
 
 //  New - add a data info structure to the grid point hash table
 
-int32_t dim_mgr::gpt_add( valarray<int> s, data_info_struc *dat_info )
+int32_t dim_mgr::gpt_add( std::valarray<int> s, data_info_struc *dat_info )
 /*-------------------------------------------------------------------
    gpt_add - add a data info structure to the grid point hash table
 
@@ -626,8 +626,8 @@ int32_t dim_mgr::gpt_add( valarray<int> s, data_info_struc *dat_info )
     if( ( gpt_hash_tbl[index][i].ix_arr == s ).min() != 0 )
       {
       // we have a match, which should not happen as this is insert
-      cout << __FILE__ << __LINE__ << 
-        "Error: grid point is already in hash table, Exiting" << endl;
+      std::cout << __FILE__ << __LINE__ << 
+        "Error: grid point is already in hash table, Exiting" << std::endl;
       return 1;
       }
     }
@@ -639,13 +639,13 @@ int32_t dim_mgr::gpt_add( valarray<int> s, data_info_struc *dat_info )
 
   gpt_hash_tbl[index].push_back( hash_entry );
   /*
-   cout << __FILE__ << ", " << __LINE__ << ", " << 
-   "Just added a grid point to hash" << endl;
+   std::cout << __FILE__ << ", " << __LINE__ << ", " << 
+   "Just added a grid point to hash" << std::endl;
   */
   return 0;
   }
 
-int dim_mgr::hash_func(valarray<int> s, int32_t hash_tbl_siz )
+int dim_mgr::hash_func(std::valarray<int> s, int32_t hash_tbl_siz )
 /********************************************************************
    hash_func - from the grid coordinates, make a hash entry number
    This is one of the more odd parts of using a hashtable - get a good
@@ -708,7 +708,7 @@ int32_t dim_mgr::share_gpt( interval_struc *intvl, int32_t *ix )
 ********************************************************************/
   {
   int32_t *ix_off, i;
-  valarray<int> s(ndim);
+  std::valarray<int> s(ndim);
   int32_t npt = pow( 2, ndim );
   ix_off = ( int32_t * ) malloc( ndim * sizeof(int32_t) );
   //

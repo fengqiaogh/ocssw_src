@@ -10,7 +10,6 @@
 #include "l12_proto.h"
 #include <sensorInfo.h>
 #include "mph_flags.h"
-#include "vegetation_indices.h" // Band averaging
 
 /*
  * Harmful Algal Bloom Indexes and related functions
@@ -95,17 +94,11 @@ void get_habs_ci(l2str *l2rec, l2prodstr *p, float ci[]) {
 
     filehandle *l1file = l2rec->l1rec->l1file;
     l1str *l1rec = l2rec->l1rec;
+    int instrumentId = sensorId2InstrumentId(l1file->sensorID);
 
-    switch (l1file->sensorID) {
-        case MODISA:
-        case MODIST:
+    if(instrumentId == INSTRUMENT_MODIS) {
             fac = 1.3;
-            break;
-        case OLCIS3A:
-        case OLCIS3B:
-            fac = 1.0;
-            break;
-        default:
+    } else {
             fac = 1.0;
     }
     switch (p->cat_ix) {
@@ -114,38 +107,34 @@ void get_habs_ci(l2str *l2rec, l2prodstr *p, float ci[]) {
         case CAT_CI_noncyano:
             // Cyanobacteria Index
             // Wynne, Stumpf algorithm 2013
-            switch (l1file->sensorID) {
-                case MODISA:
-                case MODIST:
-                    wav0 = 547;
-                    wav1 = 667;
-                    wav2 = 678;
-                    wav3 = 748;
-                    break;
-                default:
-                    wav0 = 620;
-                    wav1 = 665;
-                    wav2 = 681;
-                    wav3 = 709;
-                    wav4 = 443;
-                    wav5 = 490;
-                    wav6 = 560;
-                    wav7 = 865;
-                    wav8 = 885;
-                    ib4 = bindex_get(wav4);
-                    ib5 = bindex_get(wav5);
-                    ib6 = bindex_get(wav6);
-                    ib7 = bindex_get(wav7);
-                    ib8 = bindex_get(wav8);
+            if(instrumentId == INSTRUMENT_MODIS) {
+                wav0 = 547;
+                wav1 = 667;
+                wav2 = 678;
+                wav3 = 748;
+            } else {
+                wav0 = 620;
+                wav1 = 665;
+                wav2 = 681;
+                wav3 = 709;
+                wav4 = 443;
+                wav5 = 490;
+                wav6 = 560;
+                wav7 = 865;
+                wav8 = 885;
+                ib4 = bindex_get(wav4);
+                ib5 = bindex_get(wav5);
+                ib6 = bindex_get(wav6);
+                ib7 = bindex_get(wav7);
+                ib8 = bindex_get(wav8);
             }
             ib0 = bindex_get(wav0);
             break;
 
         case CAT_MCI_stumpf:
-            if (l1file->sensorID != MERIS && l1file->sensorID != OLCIS3A &&
-                l1file->sensorID != OLCIS3B) {
+            if (instrumentId != INSTRUMENT_MERIS && instrumentId != INSTRUMENT_OLCI && instrumentId != INSTRUMENT_OCI) {
                 printf("MCI not supported for this sensor (%s).\n",
-                       sensorId2SensorName(l2rec->l1rec->l1file->sensorID));
+                       sensorId2SensorName(l1file->sensorID));
                 exit(EXIT_FAILURE);
             }
             wav1 = 681;
@@ -160,7 +149,7 @@ void get_habs_ci(l2str *l2rec, l2prodstr *p, float ci[]) {
 
     if (ci_product_info == NULL) {
         ci_product_info = allocateProductInfo();
-        findProductInfo("CI_cyano", l2rec->l1rec->l1file->sensorID, ci_product_info);
+        findProductInfo("CI_cyano", l1file->sensorID, ci_product_info);
     }
 
     ib1 = bindex_get(wav1);
@@ -178,7 +167,7 @@ void get_habs_ci(l2str *l2rec, l2prodstr *p, float ci[]) {
         //  and valid data for processing CI
         if ((l1rec->height[ip] == 0 && l1rec->dem[ip] < -1 * input->shallow_water_depth) ||
             (l1rec->flags[ip] & mask) != 0 || l1rec->rhos[ipb + ib1] <= 0.0 ||
-            l1rec->rhos[ipb + ib2] <= 0.0 || l1rec->rhos[ipb + ib3] <= 0.0) {
+            l1rec->rhos[ipb + ib2] <= 0.0 || l1rec->rhos[ipb + ib3] <= 0.0 || l1rec->land[ip]) {
             ci[ip] = BAD_FLT;
             l1rec->flags[ip] |= PRODFAIL;
         } else {
@@ -188,48 +177,15 @@ void get_habs_ci(l2str *l2rec, l2prodstr *p, float ci[]) {
                 case CAT_CI_noncyano: {
                     const float wave_ratio = (wav2 - wav1) / (wav3 - wav1);
 
-                    float band_665_rhos = 0;
-                    float band_681_rhos = 0;
-                    float band_709_rhos = 0;
-
-                    if (instrument_is_hyperspectral(l2rec->l1rec->l1file->nbands)) {
-                        // This algorithm is designed to work with bands that have some width larger than a
-                        // hyperspectral instrument would provide. We average a few bands from a hyperspectral
-                        // instrument to approximate the behavior of the kind of sensor for which this
-                        // algorithm was originally designed.
-
-                        /** @ref Ocean Color's RSR tables */
-                        const int band_665_fwhm = 10;  // Rounded from 9.987
-                        const int band_681_fwhm = 8;   // Rounded from 7.527
-                        const int band_709_fwhm = 10;  // Rounded from 10.013
-
-                        const int band_665_min = wav1 - (band_665_fwhm / 2);
-                        const int band_681_min = wav2 - (band_681_fwhm / 2);
-                        const int band_709_min = wav3 - (band_709_fwhm / 2);
-                        const int band_665_min_index = bindex_get(band_665_min);
-                        const int band_681_min_index = bindex_get(band_681_min);
-                        const int band_709_min_index = bindex_get(band_709_min);
-
-                        const float *band_665_rhos_ptr = &l1rec->rhos[ipb + band_665_min_index];
-                        const float *band_681_rhos_ptr = &l1rec->rhos[ipb + band_681_min_index];
-                        const float *band_709_rhos_ptr = &l1rec->rhos[ipb + band_709_min_index];
-
-                        band_665_rhos = average_rhos_values(band_665_rhos_ptr, band_665_fwhm);
-                        band_681_rhos = average_rhos_values(band_681_rhos_ptr, band_665_fwhm);
-                        band_709_rhos = average_rhos_values(band_709_rhos_ptr, band_665_fwhm);
-                    } else {
-                        band_665_rhos = l1rec->rhos[ipb + ib1];
-                        band_681_rhos = l1rec->rhos[ipb + ib2];
-                        band_709_rhos = l1rec->rhos[ipb + ib3];
-                    }
+                    float band_665_rhos = l1rec->rhos[ipb + ib1];
+                    float band_681_rhos = l1rec->rhos[ipb + ib2];
+                    float band_709_rhos = l1rec->rhos[ipb + ib3];
 
                     ci[ip] = fac *
                              ((band_709_rhos - band_665_rhos) * wave_ratio - (band_681_rhos - band_665_rhos));
 
-                    // following corrections currently only applicable for MERIS/OLCI
-                    if (l1rec->l1file->sensorID == MERIS ||
-                        l1rec->l1file->sensorID == OLCIS3A ||
-                        l1rec->l1file->sensorID == OLCIS3B) {
+                    // following corrections currently only applicable for MERIS/OLCI/OCI
+                    if (instrumentId == INSTRUMENT_MERIS || instrumentId == INSTRUMENT_OLCI) {
                         // turbidity correction based on ss620 and rhos560<rhos620 test
                         if ((l1rec->rhos[ipb + ib0] - l1rec->rhos[ipb + ib6] +
                                  (l1rec->rhos[ipb + ib6] - l1rec->rhos[ipb + ib1]) *
@@ -244,37 +200,37 @@ void get_habs_ci(l2str *l2rec, l2prodstr *p, float ci[]) {
                                            l1rec->rhos[ipb + ib1], l1rec->rhos[ipb + ib3],
                                            l1rec->rhos[ipb + ib7], l1rec->rhos[ipb + ib8],
                                            &ci[ip]);
+                    } // only MERIS and OLCI
 
-                        if (p->cat_ix == CAT_CI_cyano || p->cat_ix == CAT_CI_noncyano) {
-                            if (l1rec->rhos[ipb + ib1] - l1rec->rhos[ipb + ib0] +
-                                    (l1rec->rhos[ipb + ib0] - l1rec->rhos[ipb + ib2]) *
-                                        (wav1 - wav0) / (wav2 - wav0) >=
-                                0) {
-                                nonci = 0;
-                            } else {
-                                nonci = 1;
-                                // set HABS_NONCYANO - we may decide to set a CI threshold for tripping
-                                // NONCYANO
-                                flags_habs[ip] |= HABS_NONCYANO;
-                            }
+                    if (p->cat_ix == CAT_CI_cyano || p->cat_ix == CAT_CI_noncyano) {
+                        if (l1rec->rhos[ipb + ib1] - l1rec->rhos[ipb + ib0] +
+                                (l1rec->rhos[ipb + ib0] - l1rec->rhos[ipb + ib2]) *
+                                    (wav1 - wav0) / (wav2 - wav0) >=
+                            0) {
+                            nonci = 0;
+                        } else {
+                            nonci = 1;
+                            // set HABS_NONCYANO - we may decide to set a CI threshold for tripping
+                            // NONCYANO
+                            flags_habs[ip] |= HABS_NONCYANO;
+                        }
 
-                            if (l1rec->rhos[ipb + ib0] <= 0 && p->cat_ix == CAT_CI_noncyano) {
-                                ci[ip] = BAD_FLT;
-                                l1rec->flags[ip] |= PRODFAIL;
+                        if (l1rec->rhos[ipb + ib0] <= 0 && p->cat_ix == CAT_CI_noncyano) {
+                            ci[ip] = BAD_FLT;
+                            l1rec->flags[ip] |= PRODFAIL;
+                        } else {
+                            // we may decide to NOT set CI to zero and just use flagging
+                            if (p->cat_ix == CAT_CI_noncyano) {
+                                if (nonci == 0)
+                                    ci[ip] = 0;
                             } else {
-                                // we may decide to NOT set CI to zero and just use flagging
-                                if (p->cat_ix == CAT_CI_noncyano) {
-                                    if (nonci == 0)
-                                        ci[ip] = 0;
-                                } else {
-                                    if (nonci == 1)
-                                        ci[ip] = 0;
-                                }
+                                if (nonci == 1)
+                                    ci[ip] = 0;
                             }
                         }
                     }
-                    break;
                 }
+                    break;
                 case CAT_MCI_stumpf:
                     ci[ip] = fac * (l1rec->rhos[ipb + ib2] - l1rec->rhos[ipb + ib1] -
                                     (l1rec->rhos[ipb + ib3] - l1rec->rhos[ipb + ib1]) *
@@ -323,9 +279,8 @@ void get_habs_mph(l2str *l2rec, l2prodstr *p, float chl_mph[]) {
     float sipf, sicf, bair, mph0, mph1;
     float *rhos = l2rec->l1rec->rhos;
 
-    if ((l2rec->l1rec->l1file->sensorID != MERIS) && 
-            (l2rec->l1rec->l1file->sensorID != OLCIS3A) &&
-            (l2rec->l1rec->l1file->sensorID != OLCIS3B)) {
+    int instrumentId = sensorId2InstrumentId(l2rec->l1rec->l1file->sensorID);
+    if (instrumentId != INSTRUMENT_MERIS && instrumentId != INSTRUMENT_OLCI && instrumentId != INSTRUMENT_OCI) {
         printf("MPH not supported for this sensor (%s).\n",
                 sensorId2SensorName(l2rec->l1rec->l1file->sensorID));
         exit(EXIT_FAILURE);
@@ -353,12 +308,18 @@ void get_habs_mph(l2str *l2rec, l2prodstr *p, float chl_mph[]) {
     for (ip = 0; ip < l2rec->l1rec->npix; ip++) {
         ipb = l2rec->l1rec->l1file->nbands*ip;
 
-        //if (l2rec->Rrs[ipb + ib6] <= 0.0) {
-            //            if(l2rec->Rrs[ipb+ib6] <= 0.0 || l2rec->Rrs[ipb+ib7] <= 0.0 || l2rec->Rrs[ipb+ib8] <= 0.0
-            //            || l2rec->Rrs[ipb+ib9] <= 0.0) {
-            //chl_mph[ip] = BAD_FLT;
-            //l2rec->l1rec->flags[ip] |= PRODFAIL;
-        //} else {
+        bool anyRhosIsFill = rhos[ipb + ib6] == BAD_FLT || rhos[ipb + ib7] == BAD_FLT ||
+                             rhos[ipb + ib8] == BAD_FLT || rhos[ipb + ib9] == BAD_FLT ||
+                             rhos[ipb + ib14] == BAD_FLT;
+        bool pixelIsFlagged =
+            (l2rec->l1rec->flags[ip] & LAND) != 0 || (l2rec->l1rec->flags[ip] & NAVFAIL) != 0;
+
+        if (anyRhosIsFill || pixelIsFlagged) {
+            chl_mph[ip] = BAD_FLT;
+            l2rec->l1rec->flags[ip] |= PRODFAIL;
+            continue;
+        }
+
         if (rhos[ipb + ib8] > rhos[ipb + ib9]) {
             wavmax0 = wav8;
             Rmax0 = rhos[ipb + ib8];
@@ -405,8 +366,6 @@ void get_habs_mph(l2str *l2rec, l2prodstr *p, float chl_mph[]) {
                 chl_mph[ip] = 5.24e9 * pow(mph0, 4) - 1.95e8 * pow(mph0, 3) + 2.46e6 * pow(mph0, 2) + 4.02e3 * mph0 + 1.97;
             }
         }
-        //}
-        //if (chl_mph[ip] < 0.) chl_mph[ip] = 0.;
     }
 
 }
@@ -425,9 +384,8 @@ uint8_t* get_flags_habs_mph(l2str *l2rec) {
     float *rhos = l2rec->l1rec->rhos;
     static float thresh = 350;
 
-    if ((l2rec->l1rec->l1file->sensorID != MERIS) && 
-            (l2rec->l1rec->l1file->sensorID != OLCIS3A) &&
-            (l2rec->l1rec->l1file->sensorID != OLCIS3B)) {
+    int instrumentId = sensorId2InstrumentId(l2rec->l1rec->l1file->sensorID);
+    if (instrumentId != INSTRUMENT_MERIS && instrumentId != INSTRUMENT_OLCI && instrumentId != INSTRUMENT_OCI) {
         printf("MPH not supported for this sensor (%s).\n",
                 sensorId2SensorName(l2rec->l1rec->l1file->sensorID));
         exit(EXIT_FAILURE);
@@ -536,10 +494,8 @@ uint8_t* get_flags_habs_meris(l2str *l2rec) {
 
     allocateFlagsHABS(l2rec->l1rec->npix);
 
-    if (l2rec->l1rec->l1file->sensorID != MERIS && 
-            l2rec->l1rec->l1file->sensorID != OLCIS3A &&
-            l2rec->l1rec->l1file->sensorID != OLCIS3B &&
-            l2rec->l1rec->l1file->sensorID != OCI) {
+    int instrumentId = sensorId2InstrumentId(l2rec->l1rec->l1file->sensorID);
+    if (instrumentId != INSTRUMENT_MERIS && instrumentId != INSTRUMENT_OLCI && instrumentId != INSTRUMENT_OCI) {
         printf("HABS flags not supported for this sensor (%s).\n",
                 sensorId2SensorName(l2rec->l1rec->l1file->sensorID));
         exit(EXIT_FAILURE);
@@ -735,15 +691,15 @@ uint8_t* get_flags_habs(l2str *l2rec) {
     if (currentLine == l2rec->l1rec->iscan )
         return flags_habs;
     currentLine = l2rec->l1rec->iscan;
-    switch (l2rec->l1rec->l1file->sensorID) {
-    case MERIS:
-    case OLCIS3A:
-    case OLCIS3B:
-    case OCI:
+
+    int instrumentId = sensorId2InstrumentId(l2rec->l1rec->l1file->sensorID);
+    switch (instrumentId) {
+    case INSTRUMENT_MERIS:
+    case INSTRUMENT_OLCI:
+    case INSTRUMENT_OCI:
         return get_flags_habs_meris(l2rec);
         break;
-    case MODISA:
-    case MODIST:
+    case INSTRUMENT_MODIS:
         return get_flags_habs_modis(l2rec);
         break;
     default:

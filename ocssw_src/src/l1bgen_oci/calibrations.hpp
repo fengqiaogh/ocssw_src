@@ -22,47 +22,11 @@
 #include "l1b_file.hpp"
 #include "device.hpp"
 #include "geo_data.hpp"
+#include "l1b_options.hpp"
 #include "types.hpp"
 
 // A solar zenith of 90 degrees indicates that we're on the terminator, 88 is just before
 constexpr float MAX_SOLZ = 88.0;
-
-/**
- * @brief A collection of data specific to a CCD needed for calibration
- */
-struct CalibrationData {
-    // Inputs
-    Device color;  // Which device (of RED, BLUE, SWIR) owns this data
-    size_t numInsBands = 1;
-    size_t numBands = 1;
-    size_t numBandsL1a;
-    size_t ncpix;
-    uint32_t fillValue;
-    bool enableCrosstalk = false;
-    vec2D<uint16_t> sciData;  // Science data from L1A. Bands by pixels
-    float **insAgg;           // Instrument aggregation matrix. numInsBands by numBands
-    float **gainAgg;          // Gain aggregation matrix
-    double ***cmat;           // Crosstalk coefficient matrix
-    std::vector<int16_t> *specAgg;
-    std::vector<double> *solIrrL1a;  // Aggregated solar irradiances for each L1A band
-    Gains *gains;
-    DarkData *darkData;
-
-    // Outputs
-    float *calibratedData = nullptr;  // Bands by pixels
-    uint8_t *qualityFlags = nullptr;  // Bands by pixels
-
-    ~CalibrationData() {
-        if (gainAgg)
-            delete[] gainAgg;
-        if (insAgg)
-            delete[] insAgg;
-        if (calibratedData)
-            delete[] calibratedData;
-        if (cmat)
-            delete[] cmat;
-    }
-};
 
 struct CalibrationLut {
     uint16_t dimensions[7];  // The shape of this LUT
@@ -110,6 +74,68 @@ struct CalibrationLut {
 };
 
 /**
+ * @brief A collection of data specific to a CCD needed for calibration
+ */
+struct CalibrationData {
+    // Inputs
+    Device color;  // Which device (of RED, BLUE, SWIR) owns this data
+    size_t numInsBands;
+    size_t numBands;
+    size_t numBandsL1a;
+    size_t ncpix;
+    uint32_t fillValue;
+    bool enableCrosstalk;
+    vec2D<uint16_t> sciData;  // Science data from L1A. Bands by pixels
+    float **insAgg;           // Instrument aggregation matrix. numInsBands by numBands
+    float **gainAgg;          // Gain aggregation matrix
+    double ***cmat;           // Crosstalk coefficient matrix
+    std::vector<int16_t> specAggModes; // Aggregation factor per tap. Each value is one of {1, 2, 4, 8}
+    std::vector<double> solIrrL1a;  // Aggregated solar irradiances for each L1A band
+    Gains *gains;
+    DarkData *darkData;
+    std::vector<size_t> saturatedPixelCounts; // Aggregates number of saturated pixels per band 
+
+    // Outputs
+    float *calibratedData;  // Bands by pixels
+    uint8_t *qualityFlags;  // Bands by pixels
+
+    CalibrationData(const netCDF::NcFile *l1aFile, const GeoData &geoData, Device device, uint32_t gainBands,
+                    size_t k2tTimes, double *k2t, std::vector<int16_t> &spatialAgg, size_t spatialAggIndex,
+                    CalibrationLut &calLut, std::vector<double> &solarIrradiances, const bool aggregationOff);
+
+    void writeSaturationPercent(Level1bFile &outfile, const GeoData &geoData);
+
+    /**
+     * @brief Writes band information to the L1B file
+     *
+     * @param calData A struct of calibration data fields
+     * @param calLut A struct of calibration LUT fields
+     * @param l1aWavelengths The set of wavelengths for the given calibrated data
+     * @param irradiances The set of solar irradiances for the given calibrated data
+     *
+     * @return int Status code (EXIT_SUCCESS or EXIT_FAILURE)
+     *
+     * This function calculates and writes band-specific information to the L1B file, including:
+     * - Wavelengths
+     * - Solar irradiances
+     * - Mueller matrix coefficients (m12 and m13)
+     */
+    void writeBandInfo(Level1bFile& outfile, const CalibrationLut& calLut,
+                       const std::vector<float>& l1aWavelengths);
+
+    ~CalibrationData() {
+        if (gainAgg)
+            delete[] gainAgg;
+        if (insAgg)
+            delete[] insAgg;
+        if (calibratedData)
+            delete[] calibratedData;
+        if (cmat)
+            delete[] cmat;
+    }
+};
+
+/**
  * @brief Read a calibration look up table for OCI
  * @param calLUTfile The OCI calibration look up table
  * @param device Indicates which device (between red and blue) is being read for
@@ -132,14 +158,14 @@ CalibrationLut readOciCalLut(const netCDF::NcFile *calLutFile, const Device devi
  * @param relGainFactors Relative gain factors
  * @param boardId The MCE board ID. -1 if an OCI CCD
  * @param spatialAgg A spatial aggregation factor
- * @param specAgg The spectral aggregation matrix
+ * @param specAggModes The spectral aggregation matrix
  * @param calLut A calibration look up table for this a specific device
  * @param gainMat Gain matrix
  * @return A pointer to a Gains object
  */
 Gains *makeOciGains(uint32_t numInsBands, uint32_t banddim, uint16_t year, uint32_t julianDay,
                     double scanTime, size_t numTimes, double *relGainFactors, int16_t boardId,
-                    int16_t spatialAgg, int16_t *specAgg, CalibrationLut &calLut, float **gainMat);
+                    int16_t spatialAgg, int16_t *specAggModes, CalibrationLut &calLut, float **gainMat);
 
 /**
  * @brief Read and return temperatures from L1A, interpolated against scan times.
@@ -174,7 +200,7 @@ void calibrate(CalibrationData &calData, const GeoData &geoData, DarkData &darkD
                const netCDF::NcGroup &l1aSciData, const Level1bFile &outfile, const size_t currScan,
                const std::vector<int16_t> &spatialAgg, const size_t spatialAggregationIndex,
                const size_t numTaps, const size_t numNonlinCoefs, const std::vector<double> &sciScanAngles,
-               const float *referenceTemps, const vec2D<double> &temps, const std::vector<float> &cosSolZens,
+               const float *referenceTemps, const vec2D<double> &temps, const std::vector<double> &cosSolZens,
                const bool radianceGenerationEnabled);
 
 #endif

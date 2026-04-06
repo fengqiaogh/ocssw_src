@@ -65,17 +65,9 @@
 
 // evalmask
 #define STDPROC          0   /* evalmask bit definitions                 */
-#define OLDAERMOD        1   /* init to old aerosol models               */
-#define MODCLOUD         2   /* enables MODIS/MERIS cloud mask algorithm */
-#define MODCIRRUS       16   /* enables MODIS cirrus mask                */
 #define NEWSENSINFO     32   /* use test sensor info file                */
 #define NEWRAYTAB       64   /* use test rayleigh tables                 */
-#define NEWAERTAB      128   /* use test aerosol tables                  */
-#define NEWPOLTAB      256   /* use test polarization tables             */
-#define MSKMODMIR1    1024   /* mask modis mirror-side 1 (navfail)       */
-#define MSKMODMIR2    2048   /* mask modis mirror-side 2 (navfail)       */
 #define SSTMODS       4096   /* reserved for testing SST changes         */
-#define ALTSENSORINFO 8192   /* use .alt sensor infor file in eval       */
 #define TRANSSPHER   32768   /* enables spherical path geom for dtran    */
 
 #define XCALRVS          1
@@ -315,9 +307,23 @@ int invbindx(int band, int32_t *bindx, int nbands);
 void radiance2bt(l1str *l1rec, int resolution);
 void flag_bowtie_deleted(l1str *l1rec, size_t ipix, int extract_offset);
 
-int get_f0_neckel(int32_t wl, int32_t width, float *f0);
-int get_f0_thuillier(int32_t wl, int32_t width, float *f0);
-void get_f0_thuillier_ext(int32_t wl, int32_t width, float *f0);
+/**
+ * @brief Set the solar irradiance object
+ * 
+ * @param f0_filename The LUT filename
+ * @return 0 if success, 1 if failure
+ */
+int set_solar_irradiance(const char * f0_filename);
+
+/**
+ * @brief Get the f0 object
+ * 
+ * @param wave input wave
+ * @param width spectral response function width
+ * @param f0 irradiance output
+ * @return  0 if success, 1 if failure 
+ */
+int get_f0(float wave, float width, float *f0);
 
 int init_geom_per_band(l1str *);
 int geom_per_band_deriv(l1str *);

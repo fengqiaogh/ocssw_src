@@ -18,7 +18,7 @@ int AreaWeighting::get_mode() const {
     return area_mode;
 }
 
-void AreaWeighting::set_scan(size_t iscan, std::vector<uint8_t> &mask) {
+void AreaWeighting::set_scan(size_t iscan, std::vector<uint8_t>& mask) {
     if (iscan > 0) {
         mask[iscan - 1] = scan_within_the_group;
         std::vector<size_t> start = {iscan - 1, 0};
@@ -36,30 +36,35 @@ void AreaWeighting::set_scan(size_t iscan, std::vector<uint8_t> &mask) {
     lastLine = iscan;
     l2file->readLatitudeScan(&latitude, iscan, mask);
     l2file->readLongitudeScan(&longitude, iscan, mask);
+
     if (mode == L2PixelCorner) {
         // Find center sample index
         int i_center = nsamp / 2;
-        
+
         // Set initial scale factor for latitude differences
         float scale_factor = scale_factor_min_2;
-        
+
         // Use larger scale factor for high latitudes
         if (std::abs(latitude[i_center]) > high_lat_value)
             scale_factor = scale_factor_max_2;
-            
+
         bool use_last_delta_lat = false;
-        
-        // Check if latitude differences are too large compared to previous deltas
+
         for (size_t i = 0; i < nsamp; i++) {
-            if (std::abs(dlat[i]) * scale_factor < std::abs(latitude[i] - lastLat[i]) && dlat[i] != 0) {
+            bool pixelTooBig = std::abs(dlat[i]) * scale_factor < std::abs(latitude[i] - lastLat[i]);
+            bool pixelTooSmall = std::abs(dlat[i]) / scale_factor > std::abs(latitude[i] - lastLat[i]);
+
+            if (pixelTooBig || pixelTooSmall) {
+                // printf("Latitude difference too large/small at scan %zu sample %zu: |%f - %f| = %f\n",
+                // iscan, i, latitude[i], lastLat[i], std::abs(latitude[i] - lastLat[i]));
                 lat2Valid = false;
                 use_last_delta_lat = true;
                 break;
             }
         }
-        
+
         if (use_last_delta_lat) {
-            // If differences too large, calculate new last lat/lon using previous deltas
+            // If differences too large/ too small, calculate new last lat/lon using previous deltas
             for (size_t i = 0; i < nsamp; i++) {
                 lastLat[i] = latitude[i] - dlat[i];
                 lastLon[i] = longitude[i] - dlon[i];
@@ -74,14 +79,16 @@ void AreaWeighting::set_scan(size_t iscan, std::vector<uint8_t> &mask) {
     }
 }
 
-void AreaWeighting::set_corners(size_t iscan, std::vector<uint8_t> &mask) {
+void AreaWeighting::set_corners(size_t iscan, std::vector<uint8_t>& mask) {
     // Check if L2 file has been set
     if (l2file == nullptr) {
         EXIT_LOG(std::cerr << "-Error-: L2 file has not been set")
     }
+
     // Return early if pixel mode is off
     if (mode == L2PixelOff)
         return;
+
     // Initialize arrays if this is first scan
     if (lastLat.empty()) {
         size_t nrec;
@@ -95,8 +102,8 @@ void AreaWeighting::set_corners(size_t iscan, std::vector<uint8_t> &mask) {
             upperCornerLon.resize(nsamp + 1);
             lowerCornerLat.resize(nsamp + 1);
             lowerCornerLon.resize(nsamp + 1);
-            dlat.resize(nsamp,median_start_value);
-            dlon.resize(nsamp,median_start_value);
+            dlat.resize(nsamp, pixel_size);
+            dlon.resize(nsamp, pixel_size);
         } else if (mode == L2PixelDelta) {
             // For delta mode, allocate delta arrays and initialize center value
             delta_lat.resize(nsamp + 1);
@@ -104,6 +111,7 @@ void AreaWeighting::set_corners(size_t iscan, std::vector<uint8_t> &mask) {
             delta_lat[nsamp / 2] = median_start_value;
         }
     }
+
     // Set scan data based on whether this is first scan
     if (!lastLine.has_value()) {
         set_scan(iscan, mask);
@@ -113,14 +121,15 @@ void AreaWeighting::set_corners(size_t iscan, std::vector<uint8_t> &mask) {
             lat2Valid = false;
         set_scan(iscan, mask);
     }
+
     if (mode == L2PixelCorner) {
         // Handle first scan differently since no previous scan exists
         if (iscan == 0) {
             // For first scan, extrapolate upper corners and interpolate lower corners
-            extrapolatePixelCorners(lastLat.data(), lastLon.data(), latitude, longitude, upperCornerLat.data(),
-                                    upperCornerLon.data(), nsamp);
-            interpolatePixelCorners(latitude, longitude, lastLat.data(), lastLon.data(), lowerCornerLat.data(),
-                                    lowerCornerLon.data(), nsamp);
+            extrapolatePixelCorners(lastLat.data(), lastLon.data(), latitude, longitude,
+                                    upperCornerLat.data(), upperCornerLon.data(), nsamp);
+            interpolatePixelCorners(latitude, longitude, lastLat.data(), lastLon.data(),
+                                    lowerCornerLat.data(), lowerCornerLon.data(), nsamp);
         } else {
             // For subsequent scans, reuse previous corners if valid
             if (lat2Valid) {
@@ -129,12 +138,12 @@ void AreaWeighting::set_corners(size_t iscan, std::vector<uint8_t> &mask) {
                 upperCornerLon.swap(lowerCornerLon);
             } else {
                 // Otherwise interpolate new upper corners
-                interpolatePixelCorners(lastLat.data(), lastLon.data(), latitude, longitude, upperCornerLat.data(),
-                                        upperCornerLon.data(), nsamp);
+                interpolatePixelCorners(lastLat.data(), lastLon.data(), latitude, longitude,
+                                        upperCornerLat.data(), upperCornerLon.data(), nsamp);
             }
             // Extrapolate new lower corners
-            extrapolatePixelCorners(lastLat.data(), lastLon.data(), latitude, longitude, lowerCornerLat.data(),
-                                    lowerCornerLon.data(), nsamp);
+            extrapolatePixelCorners(lastLat.data(), lastLon.data(), latitude, longitude,
+                                    lowerCornerLat.data(), lowerCornerLon.data(), nsamp);
         }
     } else {
         // For delta mode, calculate pixel deltas between scans
@@ -148,12 +157,14 @@ void AreaWeighting::set_corners(size_t iscan, std::vector<uint8_t> &mask) {
 bool AreaWeighting::valid_geolocation(size_t ipixel) const {
     if (mode == L2PixelOff)
         return true;
+
     if (mode == L2PixelDelta) {
         if (!valid_lat(lastLat[ipixel]))
             return false;
         if (ipixel < nsamp - 1 && !valid_lon(longitude[ipixel + 1]))
             return false;
     }
+
     if (mode == L2PixelCorner) {
         if (!valid_lat(upperCornerLat[ipixel]))
             return false;
@@ -172,9 +183,11 @@ bool AreaWeighting::valid_geolocation(size_t ipixel) const {
         if (!valid_lon(lowerCornerLon[ipixel + 1]))
             return false;
     }
+
     return true;
 }
-void clampDeltaLon(float *deltaLon) {
+
+void clampDeltaLon(float* deltaLon) {
     if (*deltaLon > 90) {
         if (*deltaLon > 270)
             *deltaLon -= 360.0;
@@ -188,9 +201,8 @@ void clampDeltaLon(float *deltaLon) {
     }
 }
 
-
-void AreaWeighting::interpolatePixelCorners(float *lat0, float *lon0, float *lat1, float *lon1, float *latOut,
-                                            float *lonOut, int32_t numPoints) {
+void AreaWeighting::interpolatePixelCorners(float* lat0, float* lon0, float* lat1, float* lon1, float* latOut,
+                                            float* lonOut, int32_t numPoints) {
     // calc the delta for first point
     float dLat = (lat1[0] - lat0[0] + lat0[1] - lat0[0]) / 2.0;
     float dLon = (lon1[0] - lon0[0] + lon0[1] - lon0[0]) / 2.0;
@@ -215,9 +227,8 @@ void AreaWeighting::interpolatePixelCorners(float *lat0, float *lon0, float *lat
     lonOut[numPoints] = lon0[numPoints - 1] + dLon;
 }
 
-
-void AreaWeighting::extrapolatePixelCorners(float *lat0, float *lon0, float *lat1, float *lon1, float *latOut,
-                                            float *lonOut, int32_t numPoints) {
+void AreaWeighting::extrapolatePixelCorners(float* lat0, float* lon0, float* lat1, float* lon1, float* latOut,
+                                            float* lonOut, int32_t numPoints) {
     // calc the delta for first point
     float dLat = (lat1[1] - lat1[0] + lat0[0] - lat1[0]) / 2.0;
     float dLon = (lon1[1] - lon1[0] + lon0[0] - lon1[0]) / 2.0;
@@ -242,16 +253,19 @@ void AreaWeighting::extrapolatePixelCorners(float *lat0, float *lon0, float *lat
     lonOut[numPoints] = lon1[numPoints - 1] + dLon;
 }
 
-
-void AreaWeighting::calculatePixelDeltas(float *lat0, float *lon0, float *lat1, float *lon1, float *latOut,
-                                         float *lonOut, int32_t numPoints) {
+void AreaWeighting::calculatePixelDeltas(float* lat0, float* lon0, float* lat1, float* lon1, float* latOut,
+                                         float* lonOut, int32_t numPoints) {
     // bail if the new delta is more than 2x bigger than the previous line
     int i_center = numPoints / 2;
     float scale_factor = scale_factor_min;
     if (fabs(lat0[i_center]) > high_lat_value)
         scale_factor = scale_factor_max;
-    if (fabsf(lat0[i_center] - lat1[i_center]) > latOut[i_center] * scale_factor && latOut[i_center] != 0)
+
+    bool pixelTooBig = fabsf(lat0[i_center] - lat1[i_center]) > pixel_size * scale_factor;
+    bool pixelTooSmall = fabsf(lat0[i_center] - lat1[i_center]) < pixel_size / scale_factor;
+    if (pixelTooBig || pixelTooSmall) {
         return;
+    }
 
     // calc all points except the last one
     for (int i = 0; i < numPoints - 1; i++) {
@@ -305,4 +319,29 @@ float AreaWeighting::get_delta_lat(size_t ipixel) const {
 }
 float AreaWeighting::get_delta_lon(size_t ipixel) const {
     return delta_lon[ipixel];
+}
+
+void AreaWeighting::set_l2_reader(L2_Reader& l2file) {
+    this->l2file = &l2file;
+    size_t nlines, npixels;
+    l2file.getDimensions(nlines, npixels);
+    std::vector<float> delta_lat_abs_min(nlines - 1, median_start_value);
+    std::vector<float> prev_lat(npixels), curr_lat(npixels);
+    std::vector<size_t> start = {0, 0};
+    std::vector<size_t> count = {1, npixels};
+    l2file.readLatitude(prev_lat.data(), start, count);
+    for (size_t iline = 1; iline < nlines; iline++) {
+        start = {iline, 0};
+        l2file.readLatitude(curr_lat.data(), start, count);
+        for (size_t ipixel = 0; ipixel < npixels; ipixel++) {
+            float delta_lat = fabsf(curr_lat[ipixel] - prev_lat[ipixel]);
+            if (delta_lat < delta_lat_abs_min[iline - 1])
+                delta_lat_abs_min[iline - 1] = delta_lat;
+        }
+        prev_lat.swap(curr_lat);
+    }
+
+    // sort delta_lat_abs_min to find pixel size
+    std::sort(delta_lat_abs_min.begin(), delta_lat_abs_min.end());
+    pixel_size = delta_lat_abs_min[delta_lat_abs_min.size() / 2];
 }

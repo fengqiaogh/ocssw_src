@@ -623,7 +623,7 @@ void get_luts_data(l2str *l2rec, luts_par *luts_data) {
                    luts_data->scalar_luts.PARo_c, start, count);
         get_nc_var(&luts_scalar_par_struct, "PARc_above",
                    luts_data->scalar_luts.PARc_above, start, count);
-                   
+
     }
     // Reading Scalar Inst Par LUT
     {
@@ -1482,10 +1482,36 @@ float getrefm(float wl, const luts_par *luts_data) {
     return refm;
 }
 
-float getr0(float wl, float chl, float u0, const luts_par *luts_data) {
+float getr0(float wl, float chl, float u0, const luts_par *luts_data, int band, int nbands) {
     float *grid[1];
     float point[] = {wl};
     float chlabs, bw, aw;
+    static int first_call = 1;
+    static double log10_chl;
+    static double  pow_chl_0_65;
+    static double  pow_chl_0_766;
+    static double * ylmd_bands;
+    static double * bbp_bands;
+    if (first_call) {
+        log10_chl = log10((double)chl);
+        pow_chl_0_65 = pow(chl, 0.65);
+        pow_chl_0_766 = pow(chl, 0.766);
+        first_call = 0;
+        ylmd_bands = (double *) malloc(nbands * sizeof(double));
+        if (ylmd_bands == NULL) {
+            fprintf(stderr,"-E-: failure to allocate memory. See %s:%d",__FILE__,__LINE__);
+            exit(1);
+        }
+        bbp_bands = (double *) malloc(nbands * sizeof(double));
+        if (bbp_bands == NULL) {
+            fprintf(stderr,"-E-: failure to allocate memory. See %s:%d",__FILE__,__LINE__);
+            exit(1);
+        }
+        for (int ib = 0; ib < nbands; ib++) {
+            ylmd_bands[ib] = 0.0;
+            bbp_bands[ib] = 0.0;
+        }
+    }
     // get chlor
     {
         size_t dims[] = {luts_data->soa_lut.dim_jwvl};
@@ -1506,24 +1532,25 @@ float getr0(float wl, float chl, float u0, const luts_par *luts_data) {
         grid[0] = luts_data->soa_lut.wv3;
         aw = interp1d(dims, point, grid, luts_data->soa_lut.aw3);
     }
-    const float ylmd = exp(0.014 * (440.0 - wl));
+    if (ylmd_bands[band] == 0) {
+        ylmd_bands[band] = exp(0.014 * (440.0 - wl));
+        double v = 0.5 * (log10_chl - 0.3);
+        bbp_bands[band] = pow(wl / 550., v);
+    }
+    const float ylmd = ylmd_bands[band];
     const float aw440 = 0.00635;
-    const float ap = 0.06 * chlabs * pow(chl, 0.65) +
-                     0.2 * (aw440 + 0.06 * pow(chl, 0.65)) * ylmd;
+    const float ap = 0.06 * chlabs * pow_chl_0_65 +
+                     0.2 * (aw440 + 0.06 * pow_chl_0_65) * ylmd;
 
-    const float bp550 = 0.416 * pow(chl, 0.766);
+    const float bp550 = 0.416 * pow_chl_0_766;
 
-    float v, bbp;
+    float  bbp;
 
     if (chl >= 2) {
-        v = 0.;
-        bbp = (0.002 + 0.01 * (0.5 - 0.25 * log10(chl))) * bp550;
+        bbp = (0.002 + 0.01 * (0.5 - 0.25 * log10_chl)) * bp550;
     } else {
         if (chl > 0.02) {
-            v = 0.5 * (log10(chl) - 0.3);
-            bbp =
-                    (0.002 + 0.01 * (0.5 - 0.25 * log10(chl)) * pow(wl / 550., v)) *
-                    bp550;
+            bbp = (0.002 + 0.01 * (0.5 - 0.25 * log10_chl) * bbp_bands[band]) * bp550;
         } else {
             bbp = 0.019 * (550. / wl) * bp550;
         }
@@ -1541,17 +1568,40 @@ float getr0(float wl, float chl, float u0, const luts_par *luts_data) {
     return r0;
 }
 
-float getosa(float wl, float sza, float wind, float chl, float fr,
-             const luts_par *luts_data) {  // # wl	wavelength (nm), set wl=0 for broadband
+float getosa(float wl, float csz, float wind, float chl, float fr,
+             const luts_par *luts_data, int band, int nbands) {  // # wl	wavelength (nm), set wl=0 for broadband
     // # chl	chlorophyll (g/m3)
     // # sza	solar zenith angle (degree)
     // # wind	wind speed (m/s)
     // # fr	fraction of diffuse incidence
+    static int first_call = 1;
+    static double *r00_bands;
+    static double *refm_bands;
+    static double *rr0_bands;
+    static double *rrr_bands;
+    if (first_call) {
+        r00_bands = (double *)malloc(nbands * sizeof(double));
+        refm_bands = (double *)malloc(nbands * sizeof(double));
+        rr0_bands = (double *)malloc(nbands * sizeof(double));
+        rrr_bands = (double *)malloc(nbands * sizeof(double));
+        if (r00_bands == NULL || refm_bands == NULL || rr0_bands == NULL || rrr_bands == NULL) {
+            fprintf(stderr, "-E-: failure to allocate memory. See %s:%d", __FILE__, __LINE__);
+            exit(1);
+        }
+        for (int ib = 0; ib < nbands; ib++) {
+            r00_bands[ib] = 0.0;
+            refm_bands[ib] = 0.0;
+            rr0_bands[ib] = 0.0;
+            rrr_bands[ib] = 0.0;
+        }
+        first_call = 0;
+    }
     const float sig = sqrt(0.003 + 0.00512 * wind);  //       #convert to Sigma
+    if (refm_bands[band] == 0) {
+        refm_bands[band] = getrefm(wl, luts_data);
+    }
+    const float refm = refm_bands[band];
 
-    const float refm = getrefm(wl, luts_data);
-
-    const float csz = cos(sza * OEL_PI / 180.);
 
     const float xx2 = sqrt(1.0 - (1.0 - csz * csz) / refm / refm);
 
@@ -1567,26 +1617,29 @@ float getosa(float wl, float sza, float wind, float chl, float fr,
     // # Water volume scattering
     const float r22 = 0.48168549 - 0.014894708 * sig - 0.20703885 * sig * sig;
 
-    float r00 = getr0(wl, chl, csz, luts_data);
+    float r00 = getr0(wl, chl, csz, luts_data, band, nbands);
 
     const float rw = r00 * (1. - r22) * (1. - r11) /
                      (1. - r00 * r22);  // #direct water-leaving albedo
 
-    const float ue =
-            0.676;  //               # the equivalent u_unif for diffuse incidence
-    const float ue2 = sqrt(1.0 - (1.0 - ue * ue) / refm / refm);
+    const float ue = 0.676;  //               # the equivalent u_unif for diffuse incidence
+    if (r00_bands[band] == 0) {
+        r00_bands[band] = getr0(wl, chl, ue, luts_data, band, nbands);
+        const float ue2 = sqrt(1.0 - (1.0 - ue * ue) / refm / refm);
+        rr0_bands[band] = 0.5 * (pow(((ue2 - refm * ue) / (ue2 + refm * ue)), 2) +
+                                 pow(((ue - refm * ue2) / (ue + refm * ue2)), 2));
+        rrr_bands[band] = 0.5 * (pow(((ue2 - 1.34 * ue) / (ue2 + 1.34 * ue)), 2) +
+                                 pow(((ue - 1.34 * ue2) / (ue + 1.34 * ue2)), 2));
+    }
 
-    rr0 = 0.5 * (pow(((ue2 - refm * ue) / (ue2 + refm * ue)), 2) +
-                 pow(((ue - refm * ue2) / (ue + refm * ue2)), 2));
-    rrr = 0.5 * (pow(((ue2 - 1.34 * ue) / (ue2 + 1.34 * ue)), 2) +
-                 pow(((ue - 1.34 * ue2) / (ue + 1.34 * ue2)), 2));
+    rr0 = rr0_bands[band];
+    rrr = rrr_bands[band];
 
     float r11df = rr0 - ff(ue, sig) * rr0 / rrr;
 
-    r00 = getr0(wl, chl, ue, luts_data);
+    r00 = r00_bands[band];
 
-    float rwdf = r00 * (1. - r22) * (1. - r11df) /
-                 (1. - r00 * r22);  // # diffuse water-leaving albedo
+    float rwdf = r00 * (1. - r22) * (1. - r11df) / (1. - r00 * r22);  // # diffuse water-leaving albedo
 
     float pc[] = {-0.1482, -0.012, 0.1609, -0.0244};
 
@@ -1594,15 +1647,13 @@ float getosa(float wl, float sza, float wind, float chl, float fr,
     if (fr > 0.99)
         rdf = -0.1479 + 0.1502 * refm - 0.0176 * sig * refm;
     else
-        rdf = pc[0] + pc[1] * sig + pc[2] * refm +
-              pc[3] * sig * refm;  // # surface diffuse (Eq 5a-5b)
+        rdf = pc[0] + pc[1] * sig + pc[2] * refm + pc[3] * sig * refm;  // # surface diffuse (Eq 5a-5b)
 
     // float rwt =
     //     (1. - fr) * rw +
-    //     fr * rwdf;  //          #total parameterized water-leaving albedo
+    //     fr * rwdf;  //
 
-    float albt = (1. - fr) * (r11 + rw) +
-                 fr * (rdf + rwdf);  //          # total parameterized albedo
+    float albt = (1. - fr) * (r11 + rw) + fr * (rdf + rwdf);   //     #total parameterized water-leaving albedo
 
     // # Foam correction (Eq 16-17)
     float fwc = (2.95e-6) * pow(wind, 3.52);
@@ -1644,7 +1695,7 @@ float SunGlint(float sz, float vz, float ra, float ws) {
     return rho_g;
 }
 
-void set_searh_grid(size_t pts[][2], float width[], size_t ndims,
+void set_search_grid(size_t pts[][2], float width[], size_t ndims,
                     const size_t *dims, const float *point, float **grid) {
     for (size_t i_dim = 0; i_dim < ndims; i_dim++) {
         size_t dim_size = dims[i_dim];
@@ -1678,7 +1729,7 @@ float interp6d(const size_t *dims, const float *point, float **grid,
     const size_t ndims = 6;
     size_t pts[ndims][2];
     float width[ndims];
-    set_searh_grid(pts, width, ndims, dims, point, grid);
+    set_search_grid(pts, width, ndims, dims, point, grid);
     float temp0[2][2][2][2][2][2];
     for (size_t i0 = 0; i0 < 2; i0++)
         for (size_t i1 = 0; i1 < 2; i1++)
@@ -1752,7 +1803,7 @@ float interp4d(const size_t *dims, const float *point, float **grid,
     const size_t ndims = 4;
     size_t pts[ndims][2];
     float width[ndims];
-    set_searh_grid(pts, width, ndims, dims, point, grid);
+    set_search_grid(pts, width, ndims, dims, point, grid);
     float temp0[2][2][2][2];
     for (size_t i0 = 0; i0 < 2; i0++)
         for (size_t i1 = 0; i1 < 2; i1++)
@@ -1798,7 +1849,7 @@ float interp3d(const size_t *dims, const float *point, float **grid,
     const size_t ndims = 3;
     size_t pts[ndims][2];
     float width[ndims];
-    set_searh_grid(pts, width, ndims, dims, point, grid);
+    set_search_grid(pts, width, ndims, dims, point, grid);
     float temp0[2][2][2];
     for (size_t i0 = 0; i0 < 2; i0++)
         for (size_t i1 = 0; i1 < 2; i1++)
@@ -1830,7 +1881,7 @@ float interp1d(const size_t *dims, const float *point, float **grid,
     const size_t ndims = 1;
     size_t pts[ndims][2];
     float width[ndims];
-    set_searh_grid(pts, width, ndims, dims, point, grid);
+    set_search_grid(pts, width, ndims, dims, point, grid);
     float temp0[2];
     for (size_t i0 = 0; i0 < 2; i0++) {
         size_t point_pos[] = {pts[0][i0]};
@@ -1841,4 +1892,288 @@ float interp1d(const size_t *dims, const float *point, float **grid,
     temp1 = (temp0[1] - temp0[0]) * width[0] + temp0[0];
 
     return temp1;
+}
+
+#define N_TIMES 48 // no more than 48 data points across airmass ( no more than 48 hours)
+typedef float lut_wave_slice[OCI_BANDS][2];
+typedef lut_wave_slice arr_lut_slice[N_TIMES];
+typedef arr_lut_slice lut_slice[2][2];
+
+bool is_out_of_range(size_t ind1, size_t ind2, const float *grid, float val, size_t ndims) {
+    if (ind1 != ind2) {
+        if ((grid[ind1] - val) * (grid[ind2] - val) > 0) {
+            return true;
+        }
+    } else if ((grid[0] - val) * (grid[ndims - 1] - val) < 0) {
+        return true;
+    }
+    return false;
+}
+size_t get2dindex(const size_t *point, const size_t *dims) {
+    return  point[0] * dims[1] + point[1];
+}
+
+void copy_data(lut_slice *data_storage, const arr_lut_slice *data_storage_ptr, const size_t *size_dims,
+               const size_t index1[2], const size_t index2[2]) {
+    {
+        size_t point_2d[2] = {index1[0], index2[0]};
+        size_t index_2d = get2dindex(point_2d, size_dims + 2);
+        memcpy((*data_storage)[0][0], data_storage_ptr[index_2d], sizeof(arr_lut_slice));
+    }
+    {
+        size_t point_2d[2] = {index1[0], index2[1]};
+        size_t index_2d = get2dindex(point_2d, size_dims + 2);
+        memcpy((*data_storage)[0][1], data_storage_ptr[index_2d], sizeof(arr_lut_slice));
+    }
+    {
+        size_t point_2d[2] = {index1[1], index2[0]};
+        size_t index_2d = get2dindex(point_2d, size_dims + 2);
+        memcpy((*data_storage)[1][0], data_storage_ptr[index_2d], sizeof(arr_lut_slice));
+    }
+    {
+        size_t point_2d[2] = {index1[1], index2[1]};
+        size_t index_2d = get2dindex(point_2d, size_dims + 2);
+        memcpy((*data_storage)[1][1], data_storage_ptr[index_2d], sizeof(arr_lut_slice));
+    }
+}
+
+float get_4D_bilinear(lut_slice *data_storage, size_t air_index1, size_t air_index2, int i_band,
+                      float *width) {
+    // set data
+    float temp0[2][2][2][2];
+    for (size_t i0 = 0; i0 < 2; i0++)
+        for (size_t i1 = 0; i1 < 2; i1++)
+            for (size_t i2 = 0; i2 < 2; i2++) {
+                size_t air_index = air_index1;
+                if (i2)
+                    air_index = air_index2;
+                for (size_t i3 = 0; i3 < 2; i3++) {
+                    temp0[i0][i1][i2][i3] = (*data_storage)[i0][i1][air_index][i_band][i3];
+                }
+            }
+    float temp1[2][2][2];
+    for (size_t i1 = 0; i1 < 2; i1++)
+        for (size_t i2 = 0; i2 < 2; i2++)
+            for (size_t i3 = 0; i3 < 2; i3++) {
+                temp1[i1][i2][i3] =
+                    (temp0[1][i1][i2][i3] - temp0[0][i1][i2][i3]) * width[0] + temp0[0][i1][i2][i3];
+            }
+
+    float temp2[2][2];
+    for (size_t i2 = 0; i2 < 2; i2++)
+        for (size_t i3 = 0; i3 < 2; i3++) {
+            temp2[i2][i3] = (temp1[1][i2][i3] - temp1[0][i2][i3]) * width[1] + temp1[0][i2][i3];
+        }
+
+    float temp3[2];
+    for (size_t i3 = 0; i3 < 2; i3++) {
+        temp3[i3] = (temp2[1][i3] - temp2[0][i3]) * width[2] + temp2[0][i3];
+    }
+
+    return (temp3[1] - temp3[0]) * width[3] + temp3[0];
+}
+
+float interp4d_TG_fast(luts_par *luts_data, float *wv_bands, float water_vapor, float ozone, float airmass,
+                      int n_bands, int i_band) {
+    static int first_call = 1;
+    static size_t vp_index1, vp_index2;
+    static size_t oz_index1, oz_index2;
+    static size_t w_index1[OCI_BANDS], w_index2[OCI_BANDS];
+    static float wave_width[OCI_BANDS];
+    static size_t air_index1, air_index2;
+    static float *wave_grid = NULL;
+    static float *air_grid = NULL;
+    static float *vp_grid = NULL;
+    static float *oz_grid = NULL;
+    static size_t n_wave, n_air, n_vp, n_ozone;
+    static lut_slice data_storage;
+    static size_t size_dims[4];
+    static arr_lut_slice *data_storage_ptr;
+
+    if (first_call) {
+        wave_grid = luts_data->tgdims.wavelength;
+        air_grid = luts_data->tgdims.air_mass;
+        vp_grid = luts_data->tgdims.water_vapor_pressure;
+        oz_grid = luts_data->tgdims.ozone_concentration;
+        n_wave = luts_data->tgdims.dimwavelength;
+        n_air = luts_data->tgdims.dimair_mass;
+        n_vp = luts_data->tgdims.dimwater_vapor_pressure;
+        n_ozone = luts_data->tgdims.dimozone_concentration;
+        // save dims for unwrapping 1d index
+        size_dims[0] = n_wave;
+        size_dims[1] = n_air;
+        size_dims[2] = n_vp;
+        size_dims[3] = n_ozone;
+
+        data_storage_ptr = (arr_lut_slice *)malloc(sizeof(arr_lut_slice) * n_vp * n_ozone);
+        if (n_bands > OCI_BANDS) {
+            fprintf(stderr, "-E-: number of bands %d exceeds maximum number of bands %d. See %s:%d ", n_bands,
+                    OCI_BANDS, __FILE__, __LINE__);
+            exit(1);
+        }
+        if (n_air > N_TIMES) {
+            fprintf(stderr,
+                    "-E-: airmass dimension %ld exceeds maximum allowed airmass dimension %d. See %s:%d ",
+                    n_air, N_TIMES, __FILE__, __LINE__);
+            exit(1);
+        }
+        for (int ib = 0; ib < n_bands; ib++) {
+            search(wave_grid, 0, n_wave - 1, wv_bands[ib], &w_index1[ib], &w_index2[ib]);
+            if (w_index1[ib] != w_index2[ib])
+                wave_width[ib] = (wv_bands[ib] - wave_grid[w_index1[ib]]) /
+                                 (wave_grid[w_index2[ib]] - wave_grid[w_index1[ib]]);
+            else
+                wave_width[ib] = 0;
+            // copying data
+            for (int i_vp = 0; i_vp < n_vp; i_vp++) {
+                for (int i_oz = 0; i_oz < n_ozone; i_oz++) {
+                    size_t point_2d[2] = {i_vp, i_oz};
+                    size_t index_2d = get2dindex(point_2d, size_dims + 2);
+                    for (int i_air = 0; i_air < n_air; i_air++) {
+                        size_t point[4] = {w_index1[ib], i_air, i_vp, i_oz};
+                        size_t index = get4dindex(point, size_dims);
+                        data_storage_ptr[index_2d][i_air][ib][0] = luts_data->lut_tg[index];
+                        point[0] = w_index2[ib];
+                        index = get4dindex(point, size_dims);
+                        data_storage_ptr[index_2d][i_air][ib][1] = luts_data->lut_tg[index];
+                    }
+                }
+            }
+        }
+        search(vp_grid, 0, n_vp - 1, water_vapor, &vp_index1, &vp_index2);
+        search(oz_grid, 0, n_ozone - 1, ozone, &oz_index1, &oz_index2);
+        size_t index1[2] = {vp_index1,vp_index2};
+        size_t index2[2] = {oz_index1,oz_index2};
+        copy_data(&data_storage, data_storage_ptr, size_dims, index1, index2);
+        search(air_grid, 0, n_air - 1, airmass, &air_index1, &air_index2);
+        first_call = 0;
+    }
+    bool need_new_slice = false;
+    // check if we need a new slice
+    need_new_slice |= is_out_of_range(vp_index1, vp_index2, vp_grid, water_vapor, n_vp);
+    need_new_slice |= is_out_of_range(oz_index1, oz_index2, oz_grid, ozone, n_ozone);
+    if (need_new_slice) {
+        search(vp_grid, 0, n_vp - 1, water_vapor, &vp_index1, &vp_index2);
+        search(oz_grid, 0, n_ozone - 1, ozone, &oz_index1, &oz_index2);
+        size_t index1[2] = {vp_index1,vp_index2};
+        size_t index2[2] = {oz_index1,oz_index2};
+        copy_data(&data_storage, data_storage_ptr, size_dims, index1, index2);
+    }
+    if (is_out_of_range(air_index1, air_index2, air_grid, airmass, n_air)) {
+          search(air_grid, 0, n_air - 1, airmass, &air_index1, &air_index2);
+    }
+    // set width
+    float width[4] = {0,0,0,wave_width[i_band]};
+    if (vp_index1 != vp_index2) {
+        width[0] = (water_vapor - vp_grid[vp_index1]) / (vp_grid[vp_index2] - vp_grid[vp_index1]);
+    }
+    if (oz_index1 != oz_index2) {
+        width[1] = (ozone - oz_grid[oz_index1]) / (oz_grid[oz_index2] - oz_grid[oz_index1]);
+    }
+    if (air_index1 != air_index2) {
+        width[2] = (airmass - air_grid[air_index1]) / (air_grid[air_index2] - air_grid[air_index1]);
+    }
+    return get_4D_bilinear(&data_storage, air_index1, air_index2, i_band, width);
+}
+
+
+float interp4d_TD_fast(luts_par *luts_data, float *wv_bands, float angstrom, float aot, float airmass,
+                      int n_bands, int i_band) {
+    static int first_call = 1;
+    static size_t ang_index1, ang_index2;
+    static size_t aot_index1, aot_index2;
+    static size_t w_index1[OCI_BANDS], w_index2[OCI_BANDS];
+    static float wave_width[OCI_BANDS];
+    static size_t air_index1, air_index2;
+    static float *wave_grid = NULL;
+    static float *air_grid = NULL;
+    static float *ang_grid = NULL;
+    static float *aot_grid = NULL;
+    static size_t n_wave, n_air, n_ang, n_aot;
+    static lut_slice data_storage;
+    static size_t size_dims[4];
+    static arr_lut_slice *data_storage_ptr;
+    if (first_call) {
+        wave_grid = luts_data->tddims.wavelength;
+        air_grid = luts_data->tddims.air_mass;
+        ang_grid = luts_data->tddims.angstrom_coefficients;
+        aot_grid = luts_data->tddims.optical_depth_at_550_nm;
+        n_wave = luts_data->tddims.dimwavelength;
+        n_air = luts_data->tddims.dimair_mass;
+        n_ang = luts_data->tddims.dimangstrom_coefficients;
+        n_aot = luts_data->tddims.dimoptical_depth_at_550_nm;
+        size_dims[0] = n_wave;
+        size_dims[1] = n_air;
+        size_dims[2] = n_ang;
+        size_dims[3] = n_aot;
+        data_storage_ptr = (arr_lut_slice *)malloc(sizeof(arr_lut_slice) * n_ang * n_aot);
+        if (n_bands > OCI_BANDS) {
+            fprintf(stderr, "-E-: number of bands %d exceeds maximum number of bands %d. See %s:%d ", n_bands,
+                    OCI_BANDS, __FILE__, __LINE__);
+            exit(1);
+        }
+        if (n_air > N_TIMES) {
+            fprintf(stderr,
+                    "-E-: airmass dimension %ld exceeds maximum allowed airmass dimension %d. See %s:%d ",
+                    n_air, N_TIMES, __FILE__, __LINE__);
+            exit(1);
+        }
+        for (int ib = 0; ib < n_bands; ib++) {
+            search(wave_grid, 0, n_wave - 1, wv_bands[ib], &w_index1[ib], &w_index2[ib]);
+            if (w_index1[ib] != w_index2[ib])
+                wave_width[ib] = (wv_bands[ib] - wave_grid[w_index1[ib]]) /
+                                 (wave_grid[w_index2[ib]] - wave_grid[w_index1[ib]]);
+            else
+                wave_width[ib] = 0;
+            // copying data
+            for (int i_ang = 0; i_ang < n_ang; i_ang++) {
+                for (int i_aot = 0; i_aot < n_aot; i_aot++) {
+                    size_t point_2d[2] = {i_ang, i_aot};
+                    size_t index_2d = get2dindex(point_2d, size_dims + 2);
+                    for (int i_air = 0; i_air < n_air; i_air++) {
+                        size_t point[4] = {w_index1[ib], i_air, i_ang, i_aot};
+                        size_t index = get4dindex(point, size_dims);
+                        data_storage_ptr[index_2d][i_air][ib][0] = luts_data->lut_td[index];
+                        point[0] = w_index2[ib];
+                        index = get4dindex(point, size_dims);
+                        data_storage_ptr[index_2d][i_air][ib][1] = luts_data->lut_td[index];
+                    }
+                }
+            }
+        }
+
+        search(ang_grid, 0, n_ang - 1, angstrom, &ang_index1, &ang_index2);
+        search(aot_grid, 0, n_aot - 1, aot, &aot_index1, &aot_index2);
+        size_t index1[2] = {ang_index1,ang_index2};
+        size_t index2[2] = {aot_index1,aot_index2};
+        copy_data(&data_storage, data_storage_ptr, size_dims, index1, index2);
+        search(air_grid, 0, n_air - 1, airmass, &air_index1, &air_index2);
+        first_call = 0;
+    }
+    bool need_new_slice = false;
+    // check if we need a new slice
+    need_new_slice |= is_out_of_range(ang_index1, ang_index2, ang_grid, angstrom, n_ang);
+    need_new_slice |= is_out_of_range(aot_index1, aot_index2, aot_grid, aot, n_aot);
+    if (need_new_slice) {
+        search(ang_grid, 0, n_ang - 1, angstrom, &ang_index1, &ang_index2);
+        search(aot_grid, 0, n_aot - 1, aot, &aot_index1, &aot_index2);
+        size_t index1[2] = {ang_index1,ang_index2};
+        size_t index2[2] = {aot_index1,aot_index2};
+        copy_data(&data_storage, data_storage_ptr, size_dims, index1, index2);
+    }
+    if (is_out_of_range(air_index1, air_index2, air_grid, airmass, n_air)) {
+          search(air_grid, 0, n_air - 1, airmass, &air_index1, &air_index2);
+    }
+
+    float width[4] = {0,0,0,wave_width[i_band]};
+    if (ang_index1 != ang_index2) {
+        width[0] = (angstrom - ang_grid[ang_index1]) / (ang_grid[ang_index2] - ang_grid[ang_index1]);
+    }
+    if (aot_index1 != aot_index2) {
+        width[1] = (aot - aot_grid[aot_index1]) / (aot_grid[aot_index2] - aot_grid[aot_index1]);
+    }
+    if (air_index1 != air_index2) {
+        width[2] = (airmass - air_grid[air_index1]) / (air_grid[air_index2] - air_grid[air_index1]);
+    }
+    return get_4D_bilinear(&data_storage, air_index1, air_index2, i_band, width);
 }

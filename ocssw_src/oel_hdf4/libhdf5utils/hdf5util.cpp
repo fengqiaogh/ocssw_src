@@ -16,8 +16,8 @@
 
 // Millisecs since start of day
 
-int32_t get_millisec(string *ydhmsf_str) {
-    istringstream istr;
+int32_t get_millisec(std::string *ydhmsf_str) {
+    std::istringstream istr;
     int32_t itemp;
 
     istr.clear();

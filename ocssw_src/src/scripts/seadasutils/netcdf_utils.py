@@ -1,17 +1,28 @@
-#! /usr/bin/env python3
 """
 Module containing utilities to manipulate netCDF4 files.
 """
-__author__ = 'gfireman'
 
+__author__ = "gfireman"
+
+import re
 import sys
 import time
-import numpy as np
-import netCDF4
 from os.path import basename
 
-def nccopy_var(srcvar, dstgrp, indices=None, verbose=False):
-    """Copy a netCDF4 variable, optionally subsetting some dimensions.
+import netCDF4
+import numpy as np
+
+
+def sanitize(name):
+    name = re.sub(r"/+", r"#", name)
+    name = re.sub(r"^\.+", r"", name)
+    name = re.sub(r"^\%+", r"Percent", name)
+    return name
+
+
+def nccopy_var(srcvar, dstgrp, indices=None, verbose=False, debug=False):
+    """
+    Copy a netCDF4 variable, optionally subsetting some dimensions.
 
     Function to copy a single netCDF4 variable and associated attributes.
     Optionally subset specified dimensions.
@@ -33,58 +44,83 @@ def nccopy_var(srcvar, dstgrp, indices=None, verbose=False):
     Empty attributes are written as scalar "" instead of NULL
     """
 
-    # create variable with same name, dimnames, storage format
-    zlib =      srcvar.filters().get('zlib', False)
-    shuffle =   srcvar.filters().get('shuffle', False)
-    complevel = srcvar.filters().get('complevel', 0)
+    grpname = srcvar.group().path
+    if grpname == "/":
+        grpname = ""
+    varname = sanitize(srcvar.name)
+    varpath = "/".join([grpname, varname])
+    # if verbose:
+    #    print(f"var: {varpath}")
 
-    # Define chunk sizes
+    # get variable definition
+    zlib = srcvar.filters().get("zlib", False)
+    shuffle = srcvar.filters().get("shuffle", False)
+    complevel = srcvar.filters().get("complevel", 0)
+
+    # ensure dimensions are correctly handled
     outputDims = {}
-    # Ensure dimensions are correctly handled
     if indices:
         for dimname in srcvar.dimensions:
             if dimname in indices:
                 outputDims[dimname] = len(indices[dimname])
-        
-    if srcvar.chunking() == 'contiguous':  # if srcvar is not chunked
-        dstvar = dstgrp.createVariable(srcvar.name,
-                                    srcvar.dtype,
-                                    srcvar.dimensions,
-                                    zlib=zlib,
-                                    shuffle=shuffle,
-                                    complevel=complevel)
 
+    # define chunk sizes
+    if srcvar.chunking() == "contiguous":  # srcvar is not chunked
+        dstChunks = None
     else:
         srcChunks = list(srcvar.chunking())
-        newChunks = []
+        dstChunks = []
         for idx, dimname in enumerate(srcvar.dimensions):
             if dimname in outputDims:
-                newChunks.append(min(srcChunks[idx], outputDims[dimname]))
+                dstChunks.append(min(srcChunks[idx], outputDims[dimname]))
             else:
-                newChunks.append(srcChunks[idx])
+                dstChunks.append(srcChunks[idx])
 
-        dstvar = dstgrp.createVariable(srcvar.name,
-                                    srcvar.dtype,
-                                    srcvar.dimensions,
-                                    zlib=zlib,
-                                    shuffle=shuffle,
-                                    complevel=complevel,
-                                    chunksizes=newChunks)
+    # define compound datatypes as needed
+    if srcvar._iscompound:
+        name = sanitize(srcvar._cmptype.name)
+        if debug:
+            print(f"compound type: {name}")
+        dtype = dstgrp.createCompoundType(srcvar.dtype, name)
+        fillvalue = None  # no fill value for compound types
+    else:  # _isenum, _isprimitive, _isvlen
+        dtype = srcvar.dtype
+        fillvalue = srcvar._FillValue if "_FillValue" in srcvar.ncattrs() else None
 
+    # create variable with same storage format
+    dstvar = dstgrp.createVariable(
+        sanitize(srcvar.name),
+        dtype,
+        srcvar.dimensions,
+        fill_value=fillvalue,
+        zlib=zlib,
+        shuffle=shuffle,
+        complevel=complevel,
+        chunksizes=dstChunks,
+    )
 
     # set variable attributes
-    dstvar.setncatts(srcvar.__dict__)
+    for name, value in srcvar.__dict__.items():
+        if name == "_FillValue":
+            continue
+        name = sanitize(name)
+        if debug:
+            print(f"\t{name} = {value}")
+        dstvar.setncattr(name, value)
 
     # if no dimension changes, copy all
     if not indices or not any(k in indices for k in srcvar.dimensions):
         if verbose:
-            print("\tcopying",srcvar.name)
-        dstvar[:] = srcvar[:]
+            print(f"\tcopying {srcvar.name}")
+        if srcvar._isvlen:
+            dstvar[0] = srcvar[0]
+        else:
+            dstvar[:] = srcvar[:]
 
     # otherwise, copy only the subset
     else:
         if verbose:
-            print("\tsubsetting",srcvar.name)
+            print(f"\tsubsetting {srcvar.name}")
         tmpvar = srcvar[:]
         for dimname in indices:
             try:
@@ -98,8 +134,17 @@ def nccopy_var(srcvar, dstgrp, indices=None, verbose=False):
     dstgrp.sync()
 
 
-def nccopy_grp(srcgrp, dstgrp, indices=None, verbose=False):
-    """Recursively copy a netCDF4 group, optionally subsetting some dimensions.
+def nccopy_grp(
+    srcgrp,
+    dstgrp,
+    indices=None,
+    verbose=False,
+    debug=False,
+    copyvars=True,
+    copygrps=True,
+):
+    """
+    Recursively copy a netCDF4 group, optionally subsetting some dimensions.
 
     Function to recursively copy a netCDF4 group,
     with associated attributes, dimensions and variables.
@@ -118,10 +163,14 @@ def nccopy_grp(srcgrp, dstgrp, indices=None, verbose=False):
     """
 
     if verbose:
-        print('grp: ', srcgrp.path)
+        print(f"grp: {srcgrp.path}")
 
     # copy all group attributes
-    dstgrp.setncatts(srcgrp.__dict__)
+    for name, value in srcgrp.__dict__.items():
+        name = sanitize(name)
+        if debug:
+            print(f"att: {name} = {value}")
+        dstgrp.setncattr(name, value)
 
     # define each dimension
     for dimname, dim in srcgrp.dimensions.items():
@@ -131,22 +180,27 @@ def nccopy_grp(srcgrp, dstgrp, indices=None, verbose=False):
             dimsize = len(indices[dimname])
         else:
             dimsize = len(dim)
+        if debug:
+            print(f"dim: {dimname} = {dimsize}")
         dstgrp.createDimension(dimname, dimsize)
 
     # define each variable
-    for varname, srcvar in srcgrp.variables.items():
-        if verbose:
-            print('var: ', '/'.join([srcgrp.path, srcvar.name]))
-        nccopy_var(srcvar, dstgrp, indices=indices, verbose=verbose)
+    if copyvars:
+        for varname, srcvar in srcgrp.variables.items():
+            nccopy_var(srcvar, dstgrp, indices=indices, verbose=verbose, debug=debug)
 
     # define each subgroup
-    for grpname, srcsubgrp in srcgrp.groups.items():
-        dstsubgrp = dstgrp.createGroup(grpname)
-        nccopy_grp(srcsubgrp, dstsubgrp, indices=indices, verbose=verbose)
+    if copygrps:
+        for grpname, srcsubgrp in srcgrp.groups.items():
+            dstsubgrp = dstgrp.createGroup(grpname)
+            nccopy_grp(
+                srcsubgrp, dstsubgrp, indices=indices, verbose=verbose, debug=debug
+            )
 
 
-def nccopy(srcfile, dstfile, verbose=False):
-    """Copy a netCDF4 file.
+def nccopy(srcfile, dstfile, verbose=False, debug=False):
+    """
+    Copy a netCDF4 file.
 
     Function to copy a netCDF4 file to a new file.
     Intended mostly as a demonstration.
@@ -161,20 +215,20 @@ def nccopy(srcfile, dstfile, verbose=False):
         Print extra info
     """
 
-    with netCDF4.Dataset(srcfile, 'r') as src, \
-         netCDF4.Dataset(dstfile, 'w') as dst:
+    with netCDF4.Dataset(srcfile, "r") as src, netCDF4.Dataset(dstfile, "w") as dst:
         if verbose:
-            print('\nfile:', src.filepath())
-        nccopy_grp(src, dst, verbose=verbose)
+            print(f"src: {src.filepath()}")
+            print(f"dst: {dst.filepath()}")
+
+        # copy values without masking
+        src.set_auto_mask(False)
+        dst.set_auto_mask(False)
+        nccopy_grp(src, dst, verbose=verbose, debug=debug)
 
 
-def ncsubset_vars(srcfile, dstfile, subset, verbose=False, **kwargs):
-    """Copy a netCDF4 file, with some dimensions subsetted.
-
-    Function to copy netCDF4 file to a new file,
-
-    Function to copy a single netCDF4 variable and associated attributes.
-    Optionally subset specified dimensions.
+def ncsubset_vars(srcfile, dstfile, subset, verbose=False, debug=False, **kwargs):
+    """
+    Copy a netCDF4 file, with some dimensions subsetted.
 
     Parameters
     ----------
@@ -193,49 +247,46 @@ def ncsubset_vars(srcfile, dstfile, subset, verbose=False, **kwargs):
     Empty attributes are written as scalar "" instead of NULL
     """
 
-    # works only for dimensions defined in root group
-    # TODO: allow dimensions specified in subgroups
-
     if verbose:
-        print('opening', srcfile)
-    with netCDF4.Dataset(srcfile, 'r') as src:
+        print(f"opening {srcfile}")
+    with netCDF4.Dataset(srcfile, "r") as src:
+        src.set_auto_mask(False)
 
         # validate input
         for dimname in subset:
-            if dimname not in src.dimensions:
-                print('Warning: dimension "' +
-                      dimname + '" does not exist in input file root group.')
-            if (subset[dimname][0] > subset[dimname][1]):
-                print('Invalid indices for dimension "' +
-                      dimname + '"; exiting.')
+            if subset[dimname][0] > subset[dimname][1]:
+                print(f'Invalid indices for dimension "{dimname}"; exiting.')
                 return
         for dimname, dim in src.dimensions.items():
-            if ((dimname in subset) and
-                any((0 > d or d > len(dim) - 1) for d in subset[dimname])):
+            if (dimname in subset) and any(
+                (0 > d or d > len(dim) - 1) for d in subset[dimname]
+            ):
                 oldsubset = subset.copy()
-                subset[dimname] = np.clip(subset[dimname], a_min=0,
-                                          a_max=len(dim) - 1).tolist()
-                print('Clipping "' + dimname +
-                      '" dimension indices to match input file:',
-                      oldsubset[dimname], '->', subset[dimname])
+                subset[dimname] = np.clip(
+                    subset[dimname], a_min=0, a_max=len(dim) - 1
+                ).tolist()
+                print(
+                    f'Clipping "{dimname}" dimension indices to match input file: {oldsubset[dimname]} -> {subset[dimname]}'
+                )
 
         # construct index arrays
-        indices = {k : np.arange(subset[k][0],
-                                 subset[k][1] + 1) for k in subset}
+        indices = {k: np.arange(subset[k][0], subset[k][1] + 1) for k in subset}
 
         # copy source file
         if verbose:
-            print('opening', dstfile)
-        with netCDF4.Dataset(dstfile, 'w') as dst:
-            nccopy_grp(src, dst, indices=indices, verbose=verbose)
+            print(f"opening {dstfile}")
+        with netCDF4.Dataset(dstfile, "w") as dst:
+            dst.set_auto_mask(False)
+            nccopy_grp(src, dst, indices=indices, verbose=verbose, debug=debug)
             update_history(dst, **kwargs)
-
             # dstfile closes automatically
+
         # srcfile closes automatically
 
 
 def update_history(dataset, timestamp=None, cmdline=None):
-    """Update 'date_created' and 'history' attributes
+    """
+    Update 'date_created' and 'history' attributes
 
     Function to add or update 'date_created' and 'history'
     attributes for specified dataset (usually root).
@@ -253,16 +304,16 @@ def update_history(dataset, timestamp=None, cmdline=None):
 
     if not timestamp:
         timestamp = time.gmtime()
-    fmt = '%Y-%m-%dT%H:%M:%SZ'   # ISO 8601 extended date format
+    fmt = "%Y-%m-%dT%H:%M:%SZ"  # ISO 8601 extended date format
     date_created = time.strftime(fmt, timestamp)
 
     if not cmdline:
-        cmdline = ' '.join([basename(sys.argv[0])]+sys.argv[1:])
-    cmdline = ''.join([date_created, ': ', cmdline])
-    if 'history' in dataset.ncattrs():
-        history = ''.join([dataset.history.strip(), '; ', cmdline])
+        cmdline = " ".join([basename(sys.argv[0])] + sys.argv[1:])
+    cmdline = "".join([date_created, ": ", cmdline])
+    if "history" in dataset.ncattrs():
+        history = "".join([dataset.history.strip(), "; ", cmdline])
     else:
         history = cmdline
 
-    dataset.setncattr('date_created', date_created)
-    dataset.setncattr('history', history)
+    dataset.setncattr("date_created", date_created)
+    dataset.setncattr("history", history)

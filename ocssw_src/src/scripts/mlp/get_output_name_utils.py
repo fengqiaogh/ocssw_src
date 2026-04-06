@@ -197,6 +197,7 @@ def get_extension(program, clopts):
                 'geolocate_viirs': '.nc',
                 'l1aextract': '.nc',
                 'l1aextract_modis': '.hdf',
+                'l1aextract_netcdf': '.nc',
                 'l1aextract_viirs': '.nc',
                 'l1aextract_seawifs': '.hdf',
                 'l1brsgen': '.hdf',
@@ -309,8 +310,8 @@ def get_l3_time(data_files):
         L3bin file.
         """
         l3_time = ''
-        if len(data_files) == 1 and (re.search("\.\d\d\d\d\d\d\d\dT\d\d\d\d\d\d\.", data_files[0].name) or 
-                                    re.search("\d\d\d\d\d\d\d\d\d\d\d\d\d\.L2", data_files[0].name)):
+        if len(data_files) == 1 and (re.search(r"\.\d\d\d\d\d\d\d\dT\d\d\d\d\d\d\.", data_files[0].name) or
+                                    re.search(r"\d\d\d\d\d\d\d\d\d\d\d\d\d\.L2", data_files[0].name)):
             time_stamp = data_files[0].start_time
             dt_obj = datetime.datetime.strptime(time_stamp, "%Y%j%H%M%S")
             l3_time = "{}T{}".format(dt_obj.strftime("%Y%m%d"), time_stamp[7:]) 
@@ -350,6 +351,7 @@ def get_level(program, data_files):
                 'geolocate_viirs': '.GEO',
                 'l1aextract': '.L1A.sub',
                 'l1aextract_modis': '.L1A.sub',
+                'l1aextract_netcdf': '.L1A.sub',
                 'l1aextract_viirs': '.L1A.sub',
                 'l1aextract_seawifs': '.L1A.sub',
                 'l1brsgen': '.L1BRS',

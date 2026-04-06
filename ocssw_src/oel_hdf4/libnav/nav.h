@@ -12,6 +12,10 @@ const static double pi = 3.141592653589793e0, radeg = 57.29577951e0, re_const = 
                     f_const = 1.e0 / 298.257e0, omf2 = (1.e0 - f_const) * (1.e0 - f_const),
                     omegae = 7.29211585494e-5;  //   common /gconst/pi,radeg,re,rem,f,omf2,omegae
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * @brief
  * computes the norm of a vector
@@ -126,4 +130,9 @@ void jddate(int jd, int *i, int *j, int *k);
  * @param jul output julian date
  */
 void ymdhms2jul(int32_t year,int32_t month, int32_t day,int32_t hour, int32_t minute, double sec, double *jul);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif

@@ -2,7 +2,7 @@
 
 import sys
 import numpy as np
-import datetime
+from datetime import datetime, timezone
 import os
 import argparse
 import netCDF4
@@ -14,7 +14,7 @@ from telemetry.timestamp import *
 from telemetry.derive_orbitparams import derive_orbitparams
 from telemetry import ccsdspy
 
-__version__ = '1.5.5 (2024-11-15)'
+__version__ = '1.5.6 (2025-10-20)'
 
 ignored_apids = [
     636,  # OCI Ancillary packet
@@ -288,7 +288,7 @@ EXIT Status:
                   for rec in pktDict[att]['recordlist']]
 
         var = group.createVariable(  # att_quat
-            'att_quat', 'f4', ('att_records', 'quaternion_elements'), fill_value=-32767.)
+            'att_quat', 'f8', ('att_records', 'quaternion_elements'), fill_value=-32767.)
         var.long_name = "Attitude quaternions (J2000 to spacecraft)"
         var.valid_min = -1
         var.valid_max = 1
@@ -296,10 +296,10 @@ EXIT Status:
         var[:] = [rec['q_EciToBrf_Est'] for rec in pktDict[att]['recordlist']]
 
         var = group.createVariable(  # att_rate
-            'att_rate', 'f4', ('att_records', 'vector_elements'), fill_value=-32767.)
+            'att_rate', 'f8', ('att_records', 'vector_elements'), fill_value=-32767.)
         var.long_name = "Attitude angular rates in spacecraft frame"
-        var.valid_min = np.array((-0.004), 'f4')
-        var.valid_max = np.array(( 0.004), 'f4')
+        var.valid_min = np.array((-0.004), 'f8')
+        var.valid_max = np.array(( 0.004), 'f8')
         var.units = "radians/second"
         var[:] = [rec['w_EciToBrf_Brf_Est']
                   for rec in pktDict[att]['recordlist']]
@@ -324,7 +324,7 @@ EXIT Status:
                   for rec in pktDict[orb]['recordlist']]
 
         var = group.createVariable(  # orb_pos
-            'orb_pos', 'f4', ('orb_records', 'vector_elements'), fill_value=-9999999)
+            'orb_pos', 'f8', ('orb_records', 'vector_elements'), fill_value=-9999999)
         var.long_name = "Orbit position vectors (ECR)"
         var.valid_min = -7200000
         var.valid_max = 7200000
@@ -332,7 +332,7 @@ EXIT Status:
         var[:] = orbitparams['posr']
 
         var = group.createVariable(  # orb_vel
-            'orb_vel', 'f4', ('orb_records', 'vector_elements'), fill_value=-32767.)
+            'orb_vel', 'f8', ('orb_records', 'vector_elements'), fill_value=-32767.)
         var.long_name = "Orbit velocity vectors (ECR)"
         var.valid_min = -7600
         var.valid_max = 7600
@@ -419,7 +419,7 @@ EXIT Status:
     ofile.history = ' '.join([v for v in sys.argv])
     if input_list:
         ofile.source = ','.join([os.path.basename(f) for f in filelist])
-    ofile.date_created = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+    ofile.date_created = datetime.datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
     # if pversion and doi are specified, write the, to the global attributes 
     if args.pversion != None:

@@ -100,8 +100,8 @@ int main(int argc, char *argv[]) {
     if (numPositionOptions == 0) {
         inFile = clo_getString(optionList, "ifile");
         outFile = clo_getString(optionList, "ofile");
-        sPixel = clo_getInt(optionList, "spix");
-        ePixel = clo_getInt(optionList, "epix");
+        sPixel = clo_getInt(optionList, "spixl");
+        ePixel = clo_getInt(optionList, "epixl");
         sScan = clo_getInt(optionList, "sline");
         eScan = clo_getInt(optionList, "eline");
         pixelSub = 1;

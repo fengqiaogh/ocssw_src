@@ -2,7 +2,7 @@
 Module to hold time utility classes and functions.
 """
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import os
 
 def convert_month_day_to_doy(mon, dom, yr):
@@ -23,13 +23,13 @@ def get_leap_seconds(taitime,epochyear=1958):
     import julian
 
     epochsecs = (datetime(epochyear,1,1,0,0,0,tzinfo=timezone.utc) - datetime(1970,1,1,0,0,0,tzinfo=timezone.utc)).total_seconds()
-    taidt = datetime.utcfromtimestamp(taitime + epochsecs)
+    taidt = datetime.fromtimestamp(taitime + epochsecs, timezone.utc)
     taiutc = os.path.join(os.environ['OCVARROOT'], 'common', 'tai-utc.dat')
     leapsec = 0
     with open(taiutc, "r") as tdat:
         for line in tdat:
             rec = line.rstrip().split(None, 7)
-            dt = julian.from_jd(float(rec[4]))
+            dt = julian.from_jd(float(rec[4])).replace(tzinfo=timezone.utc)
             if dt < taidt:
                 leapsec = float(rec[6])
 

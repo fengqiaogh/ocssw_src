@@ -100,10 +100,12 @@ float chl_oc3(l2str *l2rec, float Rrs[]) {
         rat = MAX(Rrs1, Rrs2) / Rrs3;
         if (rat > minrat && rat < maxrat) {
             rat = log10(rat);
-            chl = (float)
-                    pow(10.0, (a[0] + rat * (a[1] + rat * (a[2] + rat * (a[3] + rat * a[4])))));
-  
-            if(uncertainty){
+            chl = (float)pow(10.0, (a[0] + rat * (a[1] + rat * (a[2] + rat * (a[3] + rat * a[4])))));
+
+            chl = (chl > chlmin ? chl : chlmin);
+            chl = (chl < chlmax ? chl : chlmax);
+
+            if(uncertainty && chl!=chlmin && chl!=chlmax){
                 ibmax=ib1;
                 Rrsmax=Rrs1;
                 if(Rrs2>Rrs1){
@@ -116,14 +118,6 @@ float chl_oc3(l2str *l2rec, float Rrs[]) {
                 *dchl=pow(tmpderiv,2)*(pow(dRrs[ibmax]/Rrsmax,2)+ pow(dRrs[ib3]/Rrs3,2));
                 *dchl-=2*pow(tmpderiv,2)/(Rrsmax*Rrs3)*covariance_matrix[ibmax*nbands+ib3]; //adding the covariance between Rrsmax and Rrs3
                 *dchl=sqrt(*dchl+chl*fit_unc*chl*fit_unc);
-            }
-
-            chl = (chl > chlmin ? chl : chlmin);
-            chl = (chl < chlmax ? chl : chlmax);
-
-            if(uncertainty){
-                if(fabs(chl-chlmin)<0.0000001 || fabs(chl-chlmax)<0.0000001)
-                    *dchl=0;
             }
         }
     }
@@ -232,7 +226,10 @@ float chl_oc4(l2str *l2rec, float Rrs[]) {
             chl = (float)
                     pow(10.0, (a[0] + rat * (a[1] + rat * (a[2] + rat * (a[3] + rat * a[4])))));
 
-            if(uncertainty){
+            chl = (chl > chlmin ? chl : chlmin);
+            chl = (chl < chlmax ? chl : chlmax);
+
+            if(uncertainty && chl!=chlmin && chl!=chlmax){
                 if(Rrs1>=Rrs2 && Rrs1>=Rrs3){
                     ibmax=ib1;
                     Rrsmax=Rrs1;
@@ -249,13 +246,6 @@ float chl_oc4(l2str *l2rec, float Rrs[]) {
                 *dchl=pow(tmpderiv,2)*(pow(dRrs[ibmax]/Rrsmax,2)+ pow(dRrs[ib4]/Rrs4,2));
                 *dchl-=2*pow(tmpderiv,2)/(Rrsmax*Rrs4)*covariance_matrix[ibmax*nbands+ib4]; //adding the covariance between Rrsmax and Rrs3
                 *dchl=sqrt(*dchl+chl*fit_unc*chl*fit_unc);
-            }
-
-            chl = (chl > chlmin ? chl : chlmin);
-            chl = (chl < chlmax ? chl : chlmax);
-            if(uncertainty){
-                if(fabs(chl-chlmin)<0.0000001 || fabs(chl-chlmax)<0.0000001)
-                    *dchl=0;
             }
         }
     }
@@ -345,15 +335,16 @@ float chl_hu(l2str *l2rec, float Rrs[]) {
             }
         }
         chl = (float) pow(10.0, a[0] + a[1] * ci);
-        if(uncertainty){
+
+        chl = (chl > chlmin ? chl : chlmin);
+        chl = (chl < chlmax ? chl : chlmax);
+        
+        if(uncertainty && chl!=chlmin && chl!=chlmax){
             *dchl=chl*log(10)*a[1]*dci;
             if(dci>0){
                 *dchl=sqrt(*dchl**dchl+fit_unc*chl*fit_unc*chl);
             }
         }
-
-        chl = (chl > chlmin ? chl : chlmin);
-        chl = (chl < chlmax ? chl : chlmax);
     }
 
     return (chl);
