@@ -80,6 +80,7 @@ void atmocor1(l1str *l1rec, int32_t ip) {
     int32_t ib, ipb;
     float scaleRayleigh;
     double nw=4.0e0 / 3.0e0;
+    float derv_gc_ws;
 
     airmass = 1.0 / mu0 + 1.0 / mu;
     ipb = ip*nwave;
@@ -148,7 +149,9 @@ void atmocor1(l1str *l1rec, int32_t ip) {
         if (input->glint_opt == 3)
                 nw = get_nw(input->aer_wave_base);
         getglint_iqu(senz, solz, raz, ws, zero,
-                &l1rec->glint_coef[ip], &glint_coef_q, &glint_coef_u,nw);
+                &l1rec->glint_coef[ip], &glint_coef_q, &glint_coef_u,nw,&derv_gc_ws);
+        if (l1rec->uncertainty)
+            l1rec->uncertainty->derv_gc_ws[ip] = derv_gc_ws;
 
         for (ib = 0; ib < nwave; ib++) {
             l1rec->TLg[ipb + ib] = l1rec->glint_coef[ip] * exp(-(Tau_r[ib] + 0.1) * airmass) * Fo[ib];

@@ -208,13 +208,13 @@ int convl21(l2str *l2rec, tgstr *tgrec, int32_t spix, int32_t epix,
             /* correction from sensor geometry to nadir view, zero sun angle */
             ocbrdf(l2rec, ip, input->brdf_opt, wave, nwvis,
                     l1rec->solz[ip], l1rec->senz[ip], l1rec->delphi[ip], l1rec->ws[ip],
-                    chl, nLw, F0, brdfsensor);
+                    chl, nLw, F0, brdfsensor,NULL);
 
             /* correction from in situ geometry to nadir view, zero sun angle */
             if (vcal_opt == INVERSE_LW) {
                 ocbrdf(l2rec, ip, input->brdf_opt, wave, nwvis,
                         solz_insitu, 0.0, 0.0, l1rec->ws[ip],
-                        chl, nLw, F0, brdfinsitu);
+                        chl, nLw, F0, brdfinsitu,NULL);
             }
         }
 

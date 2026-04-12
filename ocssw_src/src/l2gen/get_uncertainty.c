@@ -29,6 +29,122 @@ float make_noise(float sigma) {
     return (noise);
 }
 
+/* get the No. and  corresponding index of bands that used for calculating rhownir */
+/* please note chl is used for calculating rhownir, so the bands used to calculate chla should also be included */
+/*  it only works for chl_oci right now*/
+void get_bands_rhownir(int *band_index, l1str* l1rec){
+    
+    uncertainty_t *uncertainty=l1rec->uncertainty;
+    int *nbands=&uncertainty->nbands_rhownir;
+    int num_oc=0,i,ib2,ib5,ib6;
+    int nwave=l1rec->l1file->nbands;
+    float *wave=l1rec->l1file->fwave;
+    float *temp_index=(float *)malloc(nwave*sizeof(float));
+
+    /* bands used for calculating rhownir*/
+    ib6 = windex(670, wave, nwave);
+    if (fabs(670 - wave[ib6]) > 50) {
+        printf("%s line %d: can't find reasonable red band\n", __FILE__, __LINE__);
+        printf("looking for 670, found %f\n", wave[ib6]);
+        exit(EXIT_FAILURE);
+    }
+
+    ib5 = windex(555, wave, nwave);
+    if (fabs(555 - wave[ib5]) > 15) {
+        printf("%s line %d: can't find reasonable green band\n", __FILE__, __LINE__);
+        printf("looking for 555, found %f\n", wave[ib5]);
+        exit(EXIT_FAILURE);
+    }
+    ib2 = windex(443, wave, nwave);
+    if (fabs(443 - wave[ib2]) > 5) {
+        printf("%s line %d: can't find reasonable blue band\n", __FILE__, __LINE__);
+        printf("looking for 443, found %f\n", wave[ib2]);
+        exit(EXIT_FAILURE);
+    }
+
+    band_index[0]=ib2;
+    band_index[1]=ib5;
+    band_index[2]=ib6;
+
+    /* bands used for calculating chla*/
+
+     switch (l1rec->l1file->sensorID) {
+    case SEAWIFS:
+    case OCTS:
+    case OCM1:
+    case OCM2:
+    case MERIS:
+    case HICO:
+    case OCI:
+    case HAWKEYE:
+    case AVIRIS:
+    case OLCIS3A:
+    case OLCIS3B:
+        num_oc=4;
+        for(i=0;i<num_oc;i++)
+            band_index[3+i]=windex(input->chloc4w[i]*1.0,wave, nwave);
+        break;
+    case MODIST:
+    case MODISA:
+    case CZCS:
+    case VIIRSN:
+    case VIIRSJ1:
+    case VIIRSJ2:
+    case OCRVC:
+    case GOCI:
+    case OLIL8:
+    case OLIL9:
+    case PRISM:
+    case SGLI:
+    case MSIS2A:
+    case MSIS2B:
+         num_oc=3;
+        for(i=0;i<num_oc;i++)
+            band_index[3+i]=windex(input->chloc3w[i]*1.0,wave, nwave);
+        break;
+    case L5TM:
+    case L7ETMP:
+    case MISR:
+         num_oc=2;
+        for(i=0;i<num_oc;i++)
+            band_index[3+i]=windex(input->chloc2w[i]*1.0,wave, nwave);
+        break;
+    default:
+        printf("%s Line %d: need a default chlorophyll algorithm for this sensor\n",
+                __FILE__,__LINE__);
+        exit(1);
+        break;
+    }
+
+    // put the index in order
+    int j=0,ifexist=0,total=0;
+    for(j=0;j<num_oc;j++){
+        ifexist=0;
+        for (i = 0; i < 3; i++) {
+            if (band_index[3 + j] == band_index[i])
+                ifexist = 1;
+        }
+        if(!ifexist){
+            band_index[3+total]=band_index[3+j];
+            total++;
+        }    
+    }
+
+    *nbands=3+total;
+
+    for (i = 0; i < *nbands - 1; i++)
+        for (j = i + 1; j < *nbands; j++) {
+            if (band_index[j] < band_index[i]) {
+                total = band_index[i];
+                band_index[i] = band_index[j];
+                band_index[j] = total;
+            }
+        }
+
+    free(temp_index);
+
+}
+
 /*
 if uncertainty products are produced, calculate the uncertainty of the uncertainty sources, return NULL.
 Otherwise, calculate the sensor noise, that is used by the mbac AC algorithm, return sensor_noise.
@@ -45,23 +161,28 @@ float *get_uncertainty(l1str *l1rec) {
     float *wave=l1rec->l1file->fwave;
     static int firstcall=1;
     static float *SNR_scale, *noise_coef, *corr_coef_rhot, *rel_unc_vc,*temp_corr_coef;
-    static float Lr_unc=0.0;
     int polynomial_order=4, iorder;
     float tmp_poly;
     static float *noise_temp=NULL;
-    static char model_type[20]="\0";
+    //static char model_type[20]="\0";
     static int nbands_table=0, *bandindex;
     static float  *wave_table;
     static int sensorID;
+    static int *bindx_rhownir, nbands_rhownir;
 
     float scaled_lt;
     static int uncertainty_lut=1;
 
     if(firstcall){
         firstcall=0;
+        bindx_rhownir=(int *)malloc(nbands*sizeof(int));
 
-        if(uncertainty)
+        if(uncertainty){
             corr_coef_rhot=uncertainty->corr_coef_rhot;
+            get_bands_rhownir(bindx_rhownir,l1rec);
+            nbands_rhownir=uncertainty->nbands_rhownir;
+        }
+            
 
         if(input->uncertaintyfile[0]=='\0'){
             uncertainty_lut=0;
@@ -91,10 +212,10 @@ float *get_uncertainty(l1str *l1rec) {
 
         if (nc_open(filename, NC_NOWRITE, &ncid) == NC_NOERR) {
 
-            status = nc_inq_varid(ncid, "wave", &sds_id);
+            status = nc_inq_varid(ncid, "wavelength", &sds_id);
             if (status != NC_NOERR) {
                 fprintf(stderr, "-E- %s line %d:  Error reading %s from %s.\n",
-                        __FILE__, __LINE__, "wave", filename);
+                        __FILE__, __LINE__, "wavelength", filename);
                 exit(1);
             }
             status = nc_inq_var(ncid, sds_id, 0, &rh_type, &rh_ndims, rh_dimids,
@@ -146,11 +267,11 @@ float *get_uncertainty(l1str *l1rec) {
                 exit(1);
             }
             status = nc_inq_varid(group_id, "sensor_noise", &sds_id);
-            if(nc_get_att_text(group_id,sds_id,"model_type",model_type)!=NC_NOERR){
+           /* if(nc_get_att_text(group_id,sds_id,"model_type",model_type)!=NC_NOERR){
                 fprintf(stderr, "-E- %s line %d:  Error reading model_type attribute from %s.\n",
                         __FILE__, __LINE__,filename);
                 exit(1);
-            }
+            }*/
             if (nc_get_var(group_id, sds_id, noise_coef) != NC_NOERR) {
                 fprintf(stderr, "-E- %s line %d:  Error reading %s from %s.\n",
                         __FILE__, __LINE__, "sensor_noise", filename);
@@ -191,13 +312,13 @@ float *get_uncertainty(l1str *l1rec) {
 
                 iw_table=bandindex[iw];
 
-                if (strstr(model_type, "polynomial")) {
+                //if (strstr(model_type, "polynomial")) {
                     float pow_scaled = 1;
                     for (iorder = 0; iorder <= polynomial_order; iorder++) {
                         tmp_poly += noise_coef[iw_table * (polynomial_order + 1) + iorder] * pow_scaled;
                         pow_scaled *= scaled_lt;
                     }
-                }
+              //  }
 
                 noise_temp[ipb]=tmp_poly/SNR_scale[iw_table]/10.;
                 if(sensorID==OCI)
@@ -215,17 +336,16 @@ float *get_uncertainty(l1str *l1rec) {
         for(iw=0;iw<nbands;iw++){
             iw_table=bandindex[iw];
 
-            for(ib=0;ib<nbands;ib++)
-                corr_coef_rhot[iw*nbands+ib]=temp_corr_coef[iw_table*nbands_table+bandindex[ib]];
-
-            if(sensorID==OCI){
-                for(ib=0;ib<nbands;ib++){
-                    corr_coef_rhot[iw*nbands+ib]=0.;
-                    if(ib==iw)
-                        corr_coef_rhot[iw*nbands+ib]=1.;
-                }
+            for(ib=0;ib<nbands;ib++){
+                corr_coef_rhot[iw * nbands + ib] = temp_corr_coef[iw_table * nbands_table + bandindex[ib]];
+                if (ib < iw)
+                    corr_coef_rhot[iw * nbands + ib] =
+                        temp_corr_coef[bandindex[ib] * nbands_table +iw_table];
             }
         }
+
+        for (iw = 0; iw < nbands_rhownir; iw++)
+            uncertainty->bindx_rhownir[iw] = bindx_rhownir[iw];
     }
 
     // calculate uncertainty of uncertainty sources
@@ -236,13 +356,13 @@ float *get_uncertainty(l1str *l1rec) {
             scaled_lt=l1rec->Lt[ipb]*10.;
 
             iw_table=bandindex[iw];
-            if (strstr(model_type, "polynomial")) {
+           // if (strstr(model_type, "polynomial")) {
                 float pow_scaled = 1;
                 for (iorder = 0; iorder <= polynomial_order; iorder++) {
                     tmp_poly += noise_coef[iw_table * (polynomial_order + 1) + iorder] * pow_scaled;
                     pow_scaled *= scaled_lt;
                 }
-            }
+           // }
 
             uncertainty->dsensor[ipb]=tmp_poly/SNR_scale[iw_table]/10.;
 
@@ -250,7 +370,6 @@ float *get_uncertainty(l1str *l1rec) {
                 uncertainty->dsensor[ipb]=sqrt(tmp_poly)/SNR_scale[iw_table]/10.;
 
             uncertainty->dvc[ipb]=rel_unc_vc[iw_table]*l1rec->Lt[ipb];
-            uncertainty->dLr[ipb]=l1rec->Lr[ipb]*Lr_unc;
 
             noise_temp[ipb] =sqrt(uncertainty->dvc[ipb] * uncertainty->dvc[ipb] +uncertainty->dsensor[ipb]*uncertainty->dsensor[ipb]);
         }

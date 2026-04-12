@@ -156,6 +156,7 @@ static char *l2gen_optionKeys[] = {
     "flh_height_wavelength",
     "vcnnfile",
     "picfile",
+    "pic_limits_file",
     "owtfile",
     "owtchlerrfile",
     "aermodfile",
@@ -812,8 +813,7 @@ int l2gen_init_options(clo_optionList_t* list, const char* prog) {
 
     strcpy(tmpStr, "uncertainty propagation mode\n");
     strcat(tmpStr, "        0: without uncertainty propagation\n");
-    strcat(tmpStr, "        1: uncertainty propagation generating error variance");
-    strcat(tmpStr, "        2: uncertainty propagation generating full covariance matrix");
+    strcat(tmpStr, "        1: uncertainty propagation generating full covariance matrix");
     clo_addOption(list, "proc_uncertainty", CLO_TYPE_INT, "0", tmpStr);
 
     strcpy(tmpStr, "toggle SST processing\n");
@@ -1165,6 +1165,7 @@ int l2gen_init_options(clo_optionList_t* list, const char* prog) {
     clo_addOption(list, "sst3jsonfile", CLO_TYPE_IFILE, NULL, "Triple window sst algorithm decision tree file"); 
     clo_addOption(list, "vcnnfile", CLO_TYPE_IFILE, NULL, "virtual constellation neural net file");
     clo_addOption(list, "picfile", CLO_TYPE_IFILE, NULL, "pic table for Balch 2-band algorithm");
+    clo_addOption(list, "pic_limits_file", CLO_TYPE_IFILE, NULL, "pic limits file for calcite algorithm");
     clo_addOption(list, "owtfile", CLO_TYPE_IFILE, NULL, "optical water type file");
     clo_addOption(list, "owtchlerrfile", CLO_TYPE_IFILE, NULL, "chl error file associate with optical water type");
     clo_addOption(list, "avw_coef", CLO_TYPE_FLOAT, "[0.0,0.0,0.0,0.0,0.0,0.0]", "coefficients for AVW");
@@ -2220,6 +2221,13 @@ int l2gen_load_input(clo_optionList_t *list, instr *input, int32_t nbands) {
                 strVal = clo_getOptionString(option);
                 parse_file_name(strVal, tmp_file);
                 strcpy(input->picfile, tmp_file);
+            }
+
+        } else if (strcmp(keyword, "pic_limits_file") == 0) {
+            if (clo_isOptionSet(option)) {
+                strVal = clo_getOptionString(option);
+                parse_file_name(strVal, tmp_file);
+                strcpy(input->pic_limits_file, tmp_file);
             }
 
         } else if (strcmp(keyword, "sst3coeffile") == 0) {
@@ -3654,6 +3662,10 @@ int msl12_option_input(int argc, char **argv, clo_optionList_t* list,
     strcat(l1_input->input_parms, str_buf);
     strcat(l1_input->input_parms, "\n");
 
+    sprintf(str_buf, "pic_limits_file = %s", input->pic_limits_file);
+    strcat(l1_input->input_parms, str_buf);
+    strcat(l1_input->input_parms, "\n");
+
     sprintf(str_buf, "owmcfile = %s", input->owmcfile);
     strcat(l1_input->input_parms, str_buf);
     strcat(l1_input->input_parms, "\n");
@@ -4349,10 +4361,15 @@ int msl12_option_input(int argc, char **argv, clo_optionList_t* list,
         sprintf(str_buf, ",%s", tmp_str);
         strcat(l1_input->input_files, str_buf);
     }
-
     if (strlen(input->picfile)) {
         tmp_str = strrchr(input->picfile, '/');
         tmp_str = (tmp_str == 0x0) ? input->picfile : tmp_str + 1;
+        sprintf(str_buf, ",%s", tmp_str);
+        strcat(l1_input->input_files, str_buf);
+    }
+    if (strlen(input->pic_limits_file)) {
+        tmp_str = strrchr(input->pic_limits_file, '/');
+        tmp_str = (tmp_str == 0x0) ? input->pic_limits_file : tmp_str + 1;
         sprintf(str_buf, ",%s", tmp_str);
         strcat(l1_input->input_files, str_buf);
     }
@@ -4434,7 +4451,10 @@ int msl12_input(int argc, char *argv[], const char* progName, filehandle *l1file
     rdsensorinfo(l1file->sensorID, l1_input->evalmask, "fwave", (void **) &l1file->fwave);
     // Populate input wavelength_3d index matches
     get_wavelength3d(l1file, input);
-    
+
+    if (input->aer_opt == AERRHMSEPS)
+        input->nbands_ac = 2;
+
     clo_deleteList(list);
     
     return result;

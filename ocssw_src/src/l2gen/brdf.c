@@ -5,7 +5,7 @@ static float radeg = OEL_RADEG;
 static float nw = 1.334;
 
 void foq_morel(int foqopt, l2str *l2rec, float wave[], int32_t nwave, float chl,
-        float nLw[], float Fo[], float solz, float senz, float phi, float brdf[]);
+        float nLw[], float Fo[], float solz, float senz, float phi, float brdf[],float derv_brdf_chl[]);
 void dtran_brdf(l2str *l2rec, int32_t ip, float wave[], int32_t nwave, float Fo[], float nLw[], float chl,
         float brdf[]);
 void diff_tran_corr_(int *iphase, float *solz, float *senz, float *phi,
@@ -40,7 +40,7 @@ int getncFQdim(int ncid, char *file, char *sdsname, int sds_id, int nexp, float 
 /* ---------------------------------------------------------------------------- */
 
 int ocbrdf(l2str *l2rec, int32_t ip, int32_t brdf_opt, float wave[], int32_t nwave,
-        float solz, float senz, float phi, float ws, float chl, float nLw[], float Fo[], float brdf[]) {
+        float solz, float senz, float phi, float ws, float chl, float nLw[], float Fo[], float brdf[], float derv_brdf_chl[]) {
     static int firstCall = 1;
 
     float *temp;
@@ -89,15 +89,17 @@ int ocbrdf(l2str *l2rec, int32_t ip, int32_t brdf_opt, float wave[], int32_t nwa
 
     /* Morel f/Q correction */
     if ((brdf_opt & FOQMOREL) > 0) {
-        foq_morel(FOQMOREL, l2rec, wave, nwave, chl, nLw, Fo, solz, senz, phi, temp);
+        foq_morel(FOQMOREL, l2rec, wave, nwave, chl, nLw, Fo, solz, senz, phi, temp,derv_brdf_chl);
         for (iw = 0; iw < nwave; iw++) {
+            if (derv_brdf_chl)
+                derv_brdf_chl[iw] *= brdf[iw];
             brdf[iw] *= temp[iw];
         }
     }
 
     /* Morel f/Q with free sun (Voss) */
     if ((brdf_opt & QMOREL) > 0) {
-        foq_morel(QMOREL, l2rec, wave, nwave, chl, nLw, Fo, solz, senz, phi, temp);
+        foq_morel(QMOREL, l2rec, wave, nwave, chl, nLw, Fo, solz, senz, phi, temp,derv_brdf_chl);
         for (iw = 0; iw < nwave; iw++) {
             brdf[iw] *= temp[iw];
         }
@@ -320,11 +322,12 @@ int morel_index(float xtab[], int32_t ntab, float x) {
 /* phi    - relative azimuth of observation, 0=<--> (deg)                       */
 /* chl    - chlorophyll-a concentration (mg/m^3)                                */
 /* brdf[] - band-indexed array of f/Q corrections per wavelength (f0/Q0)/(f/Q)  */
+/* derv_brdf -  derivative of brdf to chl       added by Zhang  01/29/2026     */
 /*                                                                              */
 
 /* ---------------------------------------------------------------------------- */
 void foqint_morel(char *file, float wave[], int32_t nwave, float solz, float senzp,
-        float phi, float chl, float brdf[]) {
+        float phi, float chl, float brdf[],float derv_brdf[]) {
     static int firstCall = 1;
     static float *foqtab;
     static float *wavetab;
@@ -486,6 +489,14 @@ void foqint_morel(char *file, float wave[], int32_t nwave, float solz, float sen
         }
     }
 
+    // clamp chl to table minimum
+    if(chl < lchltab[0]) {
+        chl = lchltab[0];
+    }
+    // clamp chl to table maximum
+    if(chl > lchltab[n_c-1]) {
+        chl = lchltab[n_c-1];
+    }
     lchl = log(MAX(chl, 0.01));
 
     if (senzp < senztab[0]) {
@@ -518,6 +529,9 @@ void foqint_morel(char *file, float wave[], int32_t nwave, float solz, float sen
 
         brdf[iw] = 0.0;
 
+        if (derv_brdf)
+            derv_brdf[iw] = 0.;
+
         for (j = 0; j <= 1; j++)
             for (k = 0; k <= 1; k++)
                 for (l = 0; l <= 1; l++)
@@ -525,7 +539,18 @@ void foqint_morel(char *file, float wave[], int32_t nwave, float solz, float sen
 
                         ndx = i * n_s * n_c * n_n * n_a + (js + j) * n_c * n_n * n_a + (kc + k) * n_n * n_a + (ln + l) * n_a + ma + m;
                         brdf[iw] += ds[j] * dc[k] * dn[l] * da[m]*(*(foqtab + ndx));
+                        if (derv_brdf && chl > 0.01){
+                            if (k == 0)
+                                derv_brdf[iw] -= ds[j] * dn[l] * da[m] * (*(foqtab + ndx)) /
+                                                 (lchltab[kc + 1] - lchltab[kc]);
+                            else if (k == 1)
+                                derv_brdf[iw] += ds[j] * dn[l] * da[m] * (*(foqtab + ndx)) /
+                                                 (lchltab[kc + 1] - lchltab[kc]);
+                        }
+                            
                     }
+        if (derv_brdf && chl>0.01)
+            derv_brdf[iw] /= chl;
     }
 
     return;
@@ -602,7 +627,7 @@ int getncFQdim(int ncid, char *file, char *sdsname, int sds_id, int nexp, float 
 
 /* ---------------------------------------------------------------------------- */
 void foq_morel(int foqopt, l2str *l2rec, float wave[], int32_t nwave, float chl,
-        float nLw[], float Fo[], float solz, float senz, float phi, float brdf[]) {
+        float nLw[], float Fo[], float solz, float senz, float phi, float brdf[],float derv_brdf_chl[]) {
     static int maxiter = 3;
     static int compchl = 1;
 
@@ -610,8 +635,10 @@ void foq_morel(int foqopt, l2str *l2rec, float wave[], int32_t nwave, float chl,
     float *foq0;
     float *foq;
     float *Rrs;
-    int32_t iw, iter;
+    int32_t iw, iter,ib,ipb;
     int numiter;
+    float *derv_foq_chl=NULL,*derv_foq0_chl=NULL, *dRrs=NULL, *covariance_matrix=NULL;
+    float *temp_drrs=NULL,*temp_covariance_matrix=NULL;
 
     if ((foq0 = (float *) calloc(nwave, sizeof (float))) == NULL) {
         printf("-E- : Error allocating memory to foq0\n");
@@ -624,6 +651,35 @@ void foq_morel(int foqopt, l2str *l2rec, float wave[], int32_t nwave, float chl,
     if ((Rrs = (float *) calloc(nwave, sizeof (float))) == NULL) {
         printf("-E- : Error allocating memory to Rrs\n");
         exit(FATAL_ERROR);
+    }
+    if (derv_brdf_chl) {
+        if ((derv_foq0_chl = (float*)calloc(nwave, sizeof(float))) == NULL) {
+            printf("-E- : Error allocating memory to derv_foq0_chl\n");
+            exit(FATAL_ERROR);
+        }
+        if ((derv_foq_chl = (float*)calloc(nwave, sizeof(float))) == NULL) {
+            printf("-E- : Error allocating memory to derv_foq_chl\n");
+            exit(FATAL_ERROR);
+        }
+        if ((temp_drrs = (float*)calloc(nwave, sizeof(float))) == NULL) {
+            printf("-E- : Error allocating memory to temp_drrs\n");
+            exit(FATAL_ERROR);
+        }
+        if ((temp_covariance_matrix = (float*)calloc(nwave*nwave, sizeof(float))) == NULL) {
+            printf("-E- : Error allocating memory to temp_covariance_matrix \n");
+            exit(FATAL_ERROR);
+        }
+        dRrs=l2rec->l1rec->uncertainty->dRrs;
+        covariance_matrix=l2rec->l1rec->uncertainty->covariance_matrix;
+
+        for(iw=0;iw<nwave;iw++){
+            temp_drrs[iw]=dRrs[iw];
+            for(ib=0;ib<nwave;ib++){
+                iter=iw*nwave+ib;
+                temp_covariance_matrix[iter]=covariance_matrix[iter];
+            }
+                
+        }
     }
 
     /* Need view zenith and relative azimuth below water. The MSl12 definition of   */
@@ -653,18 +709,32 @@ void foq_morel(int foqopt, l2str *l2rec, float wave[], int32_t nwave, float chl,
         for (iter = 0; iter < numiter; iter++) {
 
             if (foqopt == QMOREL)
-                foqint_morel(input->fqfile, wave, nwave, solz, 0.0, 0.0, chl, foq0);
+                foqint_morel(input->fqfile, wave, nwave, solz, 0.0, 0.0, chl, foq0,derv_foq0_chl);
             else
-                foqint_morel(input->fqfile, wave, nwave, 0.0, 0.0, 0.0, chl, foq0);
+                foqint_morel(input->fqfile, wave, nwave, 0.0, 0.0, 0.0, chl, foq0,derv_foq0_chl);
 
-            foqint_morel(input->fqfile, wave, nwave, solz, senzp, phip, chl, foq);
+            foqint_morel(input->fqfile, wave, nwave, solz, senzp, phip, chl, foq,derv_foq_chl);
 
             for (iw = 0; iw < nwave; iw++) {
                 brdf [iw] = foq0[iw] / foq[iw];
                 Rrs [iw] = nLw[iw] * brdf[iw] / Fo[iw];
+                if (derv_brdf_chl){
+                    derv_brdf_chl[iw] =
+                        1 / foq[iw] * derv_foq0_chl[iw] - foq0[iw] / foq[iw] / foq[iw] * derv_foq_chl[iw];
+                }
+                    
             }
 
             if (compchl) {
+                if (derv_brdf_chl) {
+                    for (iw = 0; iw < nwave; iw++) {
+                        dRrs[iw]=temp_drrs[iw]*brdf[iw];
+                        for (ib = 0; ib < nwave; ib++) {
+                            ipb = iw * nwave + ib;
+                            covariance_matrix[ipb]=temp_covariance_matrix[ipb]*brdf[ib]*brdf[iw];
+                        }
+                    }
+                }
                 chl = get_default_chl(l2rec, Rrs);
             }
         }
@@ -673,12 +743,21 @@ void foq_morel(int foqopt, l2str *l2rec, float wave[], int32_t nwave, float chl,
     if (chl < 0.0) {
         for (iw = 0; iw < nwave; iw++) {
             brdf [iw] = 1.0;
+            if (derv_brdf_chl)
+                derv_brdf_chl[iw] = 0.;
         }
     }
 
     free(foq);
     free(foq0);
     free(Rrs);
+    if (derv_foq0_chl) {
+        free(derv_foq0_chl);
+        free(derv_foq_chl);
+        free(temp_drrs);
+        free(temp_covariance_matrix);
+    }
+
     return;
 }
 

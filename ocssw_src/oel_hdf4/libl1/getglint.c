@@ -75,7 +75,7 @@ void reflec_(float *inc_angle, float *Effective_Refl) {
 }
 
 void getglint_iqu(float senz, float solz, float raz, float ws, float chi, float *glint_coef,
-                  float *glint_coef_q, float *glint_coef_u,double nw) {
+                  float *glint_coef_q, float *glint_coef_u,double nw, float *derv_gc_ws) {
     const double deg_cuttof = 1e-7;
     // from Cox & Munk, 54
     const double ws_gl = .04964e0;
@@ -101,17 +101,21 @@ void getglint_iqu(float senz, float solz, float raz, float ws, float chi, float 
     if (beta == 0.0)
         beta = deg_cuttof;
     double sigc = ws_gl * sqrt(ws_);
+    double derv_sigc_ws= -0.5 *ws_gl/sqrt(ws_);
     double expon = -tan(beta) * tan(beta) / 2. / sigc / sigc;
+    double derv_expon_sigc=tan(beta) * tan(beta)/sigc/sigc/sigc;
     if (expon < -30.)
         expon = -30.;  //   ! trap underflow
     if (expon > 30.)
         expon = +30.;  // ! trap overflow
     double prob = exp(expon) / (2. * OEL_PI * sigc * sigc);
+    double derv_prob_sigc =prob*derv_expon_sigc-exp(expon)/(OEL_PI* sigc * sigc* sigc);
     double BiRefl, effective_refl;
     reflec_both(omega, &effective_refl, &BiRefl, nw);
     double cs_beta2 = cos(beta) * cos(beta);
     double cs_beta4 = cs_beta2 * cs_beta2;
     *glint_coef = effective_refl * prob / (4.0e0 * cos(senz_) * cs_beta4);
+    *derv_gc_ws=effective_refl * derv_prob_sigc / (4.0e0 * cos(senz_) * cs_beta4)*derv_sigc_ws;
     double rot_ang;
     if (omega > 0.0001) {
         double CR = (cos(solz_) - cos(2. * omega) * cos(senz_)) / (sin(2. * omega) * sin(solz_));
@@ -129,13 +133,15 @@ void getglint_iqu(float senz, float solz, float raz, float ws, float chi, float 
 void getglint_(float *senz, float *solz, float *raz, float *ws, float *chi, float *glint_coef) {
     float glint_coef_q, glint_coef_u;
     const double ref = 4.0e0 / 3.0e0;  // water ref index, no wavelength dependencies
+    float derv_gc_ws; // not used, but needed to call getglint_iqu
 
-    getglint_iqu(*senz, *solz, *raz, *ws, *chi, glint_coef, &glint_coef_q, &glint_coef_u, ref);
+    getglint_iqu(*senz, *solz, *raz, *ws, *chi, glint_coef, &glint_coef_q, &glint_coef_u, ref, &derv_gc_ws);
 }
 
 void getglint_iqu_(float *senz, float *solz, float *raz, float *ws, float *chi, float *glint_coef,
                    float *glint_coef_q, float *glint_coef_u) {
     const double ref = 4.0e0 / 3.0e0;  // water ref index, no wavelength dependencies
+    float derv_gc_ws; // not used, but needed to call getglint_iqu
 
-    getglint_iqu(*senz, *solz, *raz, *ws, *chi, glint_coef, glint_coef_q, glint_coef_u, ref);
+    getglint_iqu(*senz, *solz, *raz, *ws, *chi, glint_coef, glint_coef_q, glint_coef_u, ref, &derv_gc_ws);
 }

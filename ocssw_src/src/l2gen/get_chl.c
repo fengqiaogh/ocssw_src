@@ -58,20 +58,11 @@ float chl_oc3(l2str *l2rec, float Rrs[]) {
     float rat, minRrs;
     float Rrs1, Rrs2, Rrs3, Rrsmax;
     float chl = chlbad;
-    float *dRrs, *dchl,*covariance_matrix, tmpderiv;
+    float *dRrs, *dchl,*covariance_matrix, tmpderiv,*derv_chl_rrs;
     int ibmax=-1;
     uncertainty_t *uncertainty=l2rec->l1rec->uncertainty;
-    static int nbands=0;
-    float fit_unc=0.13;
-
-    if(uncertainty){
-        dRrs=uncertainty->dRrs;
-        dchl=&uncertainty->dchl;
-        if(input->proc_uncertainty==2)
-            covariance_matrix=uncertainty->covaraince_matrix;
-        else
-            covariance_matrix=uncertainty->pixel_covariance;
-    }
+    static int nbands;
+    float fit_unc=0.0;
 
     if (w == NULL) {
         nbands=l2rec->l1rec->l1file->nbands;
@@ -88,6 +79,15 @@ float chl_oc3(l2str *l2rec, float Rrs[]) {
             printf("chl_oc3: incompatible sensor wavelengths for this algorithm\n");
             exit(1);
         }
+    }
+     if(uncertainty){
+        dRrs=uncertainty->dRrs;
+        dchl=&uncertainty->dchl;
+        covariance_matrix=uncertainty->covariance_matrix;
+
+        derv_chl_rrs=uncertainty->derv_chl_rrs;
+        for (ibmax = 0; ibmax < nbands; ibmax++)
+            derv_chl_rrs[ibmax] = 0.;
     }
 
     Rrs1 = Rrs[ib1];
@@ -118,6 +118,9 @@ float chl_oc3(l2str *l2rec, float Rrs[]) {
                 *dchl=pow(tmpderiv,2)*(pow(dRrs[ibmax]/Rrsmax,2)+ pow(dRrs[ib3]/Rrs3,2));
                 *dchl-=2*pow(tmpderiv,2)/(Rrsmax*Rrs3)*covariance_matrix[ibmax*nbands+ib3]; //adding the covariance between Rrsmax and Rrs3
                 *dchl=sqrt(*dchl+chl*fit_unc*chl*fit_unc);
+
+                derv_chl_rrs[ib3]=-tmpderiv/Rrs3;
+                derv_chl_rrs[ibmax]=tmpderiv/Rrsmax;
             }
         }
     }
@@ -183,15 +186,12 @@ float chl_oc4(l2str *l2rec, float Rrs[]) {
     float *dRrs, *dchl,*covariance_matrix, tmpderiv;
     uncertainty_t *uncertainty=l2rec->l1rec->uncertainty;
     static int nbands=0;
-    float fit_unc=0.13;
+    float fit_unc=0.0;
 
     if(uncertainty){
         dRrs=uncertainty->dRrs;
         dchl=&uncertainty->dchl;
-        if(input->proc_uncertainty==2)
-            covariance_matrix=uncertainty->covaraince_matrix;
-        else
-            covariance_matrix=uncertainty->pixel_covariance;
+        covariance_matrix = uncertainty->covariance_matrix;
     }
 
     if (w == NULL) {
@@ -259,25 +259,19 @@ float chl_hu(l2str *l2rec, float Rrs[]) {
     static int ib1 = -1;
     static int ib2 = -1;
     static int ib3 = -1;
-    float fit_unc=0.13;
+    int ib;
+    float fit_unc=0.0;
 
     float ci;
     float Rrs1, Rrs2, Rrs3;
-    float dRrs2, dci;
+    float dRrs2=0., dci;
     float chl = chlbad;
     static int nbands=0;
+    float temp;
 
     uncertainty_t *uncertainty=l2rec->l1rec->uncertainty;
-    float *dRrs, *dchl, *covariance_matrix, cov_term=0;
-
-    if(uncertainty){
-        dRrs=uncertainty->dRrs;
-        dchl=&uncertainty->dchl;
-        if(input->proc_uncertainty==2)
-            covariance_matrix=uncertainty->covaraince_matrix;
-        else
-            covariance_matrix=uncertainty->pixel_covariance;
-    }
+    float *dchl, *covariance_matrix, cov_term=0,*derv_chl_rrs;
+    static float *dRrs=NULL;
 
     if (ib1 == -1) {
         nbands=l2rec->l1rec->l1file->nbands;
@@ -294,6 +288,20 @@ float chl_hu(l2str *l2rec, float Rrs[]) {
         } else {
             printf("chl_hu: using %7.2f %7.2f %7.2f\n", l2rec->l1rec->l1file->fwave[ib1], l2rec->l1rec->l1file->fwave[ib2], l2rec->l1rec->l1file->fwave[ib3]);
         }
+        if (uncertainty)
+            dRrs = (float*)calloc(nbands, sizeof(float));
+    }
+
+    if (uncertainty) {
+       // dRrs = uncertainty->dRrs;
+        dchl = &uncertainty->dchl;
+        covariance_matrix = uncertainty->covariance_matrix;
+        derv_chl_rrs = uncertainty->derv_chl_rrs;
+        for (ib = 0; ib < nbands; ib++){
+            derv_chl_rrs[ib] = 0.;
+            dRrs[ib]=sqrt(covariance_matrix[ib*nbands+ib]);
+        }
+            
     }
 
     Rrs1 = Rrs[ib1];
@@ -317,21 +325,33 @@ float chl_hu(l2str *l2rec, float Rrs[]) {
         // Cases of negative blue radiance are likely high chl anyway.
 
         if (Rrs3 > BAD_FLT + 1 && Rrs2 > 0.0 && Rrs1 > 0.0) {
-            // shift Rrs2 to 555
-            if(uncertainty)
+            // shift Rrs2 to 555, dRrs2 is temporarily used to keep the derivative of Rrs[555] to Rrs2
+            if(uncertainty){
                 Rrs2 = conv_rrs_to_555(Rrs2, l2rec->l1rec->l1file->fwave[ib2],dRrs[ib2], &dRrs2);
+                derv_chl_rrs[ib2]=dRrs2;
+                dRrs2=dRrs[ib2]*dRrs2;
+            }      
             else
                 Rrs2=conv_rrs_to_555(Rrs2, l2rec->l1rec->l1file->fwave[ib2],-99., NULL);
             // compute index
             ci = MIN(Rrs2 - (Rrs1 + (w[1] - w[0]) / (w[2] - w[0])*(Rrs3 - Rrs1)), 0.0);
             // index should be negative in algorithm-validity range
-            if(uncertainty && ci<0){
-                dci=sqrt( dRrs2*dRrs2 + pow((w[2]-w[1])*dRrs[ib1]/(w[2]-w[0]),2) + pow((w[1]-w[0])*dRrs[ib3]/(w[2]-w[0]),2) );
-                cov_term=(w[1]-w[2])/(w[2]-w[0])*covariance_matrix[ib1*nbands+ib2];
-                cov_term+=(w[0]-w[1])/(w[2]-w[0])*covariance_matrix[ib2*nbands+ib3];
-                cov_term+=(w[1]-w[2])/(w[2]-w[0])*(w[0]-w[1])/(w[2]-w[0])*covariance_matrix[ib1*nbands+ib3];
-                dci=sqrt(dci*dci+cov_term);
+            if(uncertainty){
+                if (ci <0.) {
+                    /*standard uncertainty in ci*/
+                    dci = sqrt(dRrs2 * dRrs2 + pow((w[2] - w[1]) * dRrs[ib1] / (w[2] - w[0]), 2) +
+                               pow((w[1] - w[0]) * dRrs[ib3] / (w[2] - w[0]), 2));
+                    cov_term = (w[1] - w[2]) / (w[2] - w[0]) * covariance_matrix[ib1 * nbands + ib2];
+                    cov_term += (w[0] - w[1]) / (w[2] - w[0]) * covariance_matrix[ib2 * nbands + ib3];
+                    cov_term += (w[1] - w[2]) / (w[2] - w[0]) * (w[0] - w[1]) / (w[2] - w[0]) *
+                                covariance_matrix[ib1 * nbands + ib3];
+                    dci = sqrt(dci * dci + cov_term);
 
+                    /* derivative of ci to rrs */
+                    derv_chl_rrs[ib1] = (w[2] - w[1]) / (w[2] - w[0]);
+                    derv_chl_rrs[ib3] = (w[1] - w[0]) / (w[2] - w[0]);
+                } else
+                    derv_chl_rrs[ib2] = 0.;
             }
         }
         chl = (float) pow(10.0, a[0] + a[1] * ci);
@@ -339,10 +359,24 @@ float chl_hu(l2str *l2rec, float Rrs[]) {
         chl = (chl > chlmin ? chl : chlmin);
         chl = (chl < chlmax ? chl : chlmax);
         
-        if(uncertainty && chl!=chlmin && chl!=chlmax){
-            *dchl=chl*log(10)*a[1]*dci;
-            if(dci>0){
-                *dchl=sqrt(*dchl**dchl+fit_unc*chl*fit_unc*chl);
+        if(uncertainty ){
+            if (chl != chlmin && chl != chlmax) {
+                temp=chl * log(10) * a[1];
+
+                derv_chl_rrs[ib1]*=temp;
+                derv_chl_rrs[ib2]*=temp;
+                derv_chl_rrs[ib3]*=temp;
+
+                *dchl =  temp* dci;
+                if (dci > 0)
+                    *dchl = sqrt(*dchl * *dchl + fit_unc * chl * fit_unc * chl);
+                
+                
+            }
+            else{
+                derv_chl_rrs[ib1]=0.;
+                derv_chl_rrs[ib2]=0.;
+                derv_chl_rrs[ib3]=0.;
             }
         }
     }
@@ -369,7 +403,7 @@ float get_dchl_oci(l2str *l2rec,float Rrs[],float chl1,float chl2){
     float dRrs2;
     float chl = chlbad;
     static int nbands=0;
-    float fit_unc=0.13;
+    float fit_unc=0.0;
 
     fit_unc=fit_unc* (chl1 * (t2 - chl1) / (t2 - t1)+ chl2 * (chl1 - t1) / (t2 - t1));
 
@@ -390,10 +424,7 @@ float get_dchl_oci(l2str *l2rec,float Rrs[],float chl1,float chl2){
 
     if(uncertainty){
         dRrs=uncertainty->dRrs;
-        if(input->proc_uncertainty==2)
-            covariance_matrix=uncertainty->covaraince_matrix;
-        else
-            covariance_matrix=uncertainty->pixel_covariance;
+        covariance_matrix=uncertainty->covariance_matrix;
     }
 
     if (ib1 == -1) {
@@ -528,15 +559,32 @@ float chl_oci(l2str *l2rec, float Rrs[]) {
     float chl = chlbad;
 
     uncertainty_t *uncertainty=l2rec->l1rec->uncertainty;
-    float *dchl;
-    if(uncertainty)
-        dchl=&uncertainty->dchl;
+    float *dchl,*derv_chl_rrs,derv_chl1,derv_chl2;
+    static float *temp_derv_chl;
+    static int firstcall=1,nbands;
+    int ib;
+
+    if(uncertainty){
+         dchl=&uncertainty->dchl;
+         derv_chl_rrs= uncertainty->derv_chl_rrs;
+         if(firstcall){
+            nbands=l2rec->l1rec->l1file->nbands;
+            temp_derv_chl=(float *)malloc(nbands*sizeof(float));
+            firstcall=0;
+         }        
+    }
+       
 
     chl1 = chl_hu(l2rec, Rrs);
 
     if (chl1 <= t1)
         chl = chl1;
     else {
+        if (uncertainty) {
+            for (ib = 0; ib < nbands; ib++)
+                temp_derv_chl[ib] = derv_chl_rrs[ib];
+        }
+
         chl2 = get_chl_ocx(l2rec, Rrs);
         if (chl2 > 0.0) {
             if (chl1 >= t2)
@@ -544,8 +592,17 @@ float chl_oci(l2str *l2rec, float Rrs[]) {
             else {
                 chl = chl1 * (t2 - chl1) / (t2 - t1)
                         + chl2 * (chl1 - t1) / (t2 - t1);
-                if(uncertainty)
+                if(uncertainty){
                     *dchl=get_dchl_oci(l2rec,Rrs,chl1,chl2);
+
+                    derv_chl1=(-2*chl1+chl2+t2)/(t2-t1);
+                    derv_chl2=(chl1 - t1) / (t2 - t1);
+                    for(ib=0;ib<nbands;ib++){
+                        derv_chl_rrs[ib]=derv_chl1*temp_derv_chl[ib]+derv_chl2*derv_chl_rrs[ib];
+                    }
+
+                }
+                    
             }
         }
     }
@@ -690,6 +747,7 @@ float get_chl_ocx(l2str *l2rec, float Rrs[]) {
     case MERIS:
     case HICO:
     case OCI:
+    case OCRVC:
     case HAWKEYE:
     case AVIRIS:
     case OLCIS3A:
@@ -702,7 +760,6 @@ float get_chl_ocx(l2str *l2rec, float Rrs[]) {
     case VIIRSN:
     case VIIRSJ1:
     case VIIRSJ2:
-    case OCRVC:
     case GOCI:
     case OLIL8:
     case OLIL9:

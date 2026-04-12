@@ -220,33 +220,15 @@ void L1aFileManager::dumpOutlistBuffer(string outlist) {
     // check all the other files that can be merged
     if (outlistData.size() > 0) {
         for (const auto& item : outlistData) {
-            short dataTypeId = item.first;
-            string dataType = outlistData[dataTypeId]["data_type"];
-            string fileName = outlistData[dataTypeId]["file_name"];
-            string startTime = outlistData[dataTypeId]["start_time"];
-            string endTime = outlistData[dataTypeId]["end_time"];
-            string completeFlag = outlistData[dataTypeId]["complete_flag"];
-
-            // check navigation coverage if Science Fiile
-            if (dataTypeId == SCIENCE_FILE && !navTimeFrame.isGoodNavigationCoverage()) {
-                completeFlag = "-1";
-            }
-
-            outFile << fileName << " " << startTime << " " << endTime << " " \
-                << completeFlag << " " << dataType << "\n";
+            string outString = processOutlistStringFor(item.first);
+            outFile << outString;
         }
     }
     outFile.close();
 
 }
 
-// // update last file type seen
-// void L1aFileManager::updateLastDataTypeSeen(short dataType) {
-//     lastDataTypeSeen = dataType;
-// }
-
-// add the previous file to the noMergeOutlistString
-void L1aFileManager::processOutlistFor(short dataType) {
+string L1aFileManager::processOutlistStringFor(short dataType) {
     string type = outlistData[dataType]["data_type"];
     string fileName = outlistData[dataType]["file_name"];
     string startTime = outlistData[dataType]["start_time"];
@@ -254,13 +236,33 @@ void L1aFileManager::processOutlistFor(short dataType) {
     string completeFlag = outlistData[dataType]["complete_flag"];
 
     // bad navigation coverage for a science file, replace complete flag
+    // if att_time does not cover the entirely of scan times.
     if (dataType == SCIENCE_FILE && !navTimeFrame.isGoodNavigationCoverage()) {
         completeFlag = "-1";
     }
 
-    string outString = fileName + " " + startTime + " " + endTime + " " \
-                             + completeFlag + " " + type + "\n";
+    // check for missing navigation data records. att_records should be in range of ((num_scans)/5.7) + 10
+    // NOTE: does something similar using time, but this just checks the number of records. When you are missing
+    // att_records, it should naturally fail the time check since it will no longer cover the scan times.
+    if (dataType == SCIENCE_FILE && contains(dataType)) {
+        size_t numScans = fileDimShapes[dataType].numScans;
+        size_t attRecords = fileDimShapes[dataType].attRecords;
 
+        // number of att records should at least be the number of scans in seconds
+        // anything less, you may be missing some att records
+        // 5.7 is OCI's scan rate. NumScans/scan_rate == granule size in seconds
+        if (attRecords < (numScans/5.7) + 10) {
+            completeFlag = "-1";
+        }
+    }
+
+    return fileName + " " + startTime + " " + endTime + " " \
+                             + completeFlag + " " + type + "\n";
+}
+
+// add the previous file to the noMergeOutlistString
+void L1aFileManager::processOutlistFor(short dataType) {
+    string outString = processOutlistStringFor(dataType);
     noMergeOutlistStrings.push_back(outString);
 
     // remove it from the map 

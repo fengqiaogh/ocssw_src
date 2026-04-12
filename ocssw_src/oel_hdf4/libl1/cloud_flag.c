@@ -141,8 +141,8 @@ int get_sdps_cld_mask( l1str *l1rec, int32_t ip, char *cld_category ){
         return (0);
 }
 
-char get_cloudmask_meris(l1str *l1rec, int32_t ip) {
-    // Cloud Masking for MERIS and OLCI
+char get_cloudmask_habs_visnir(l1str *l1rec, int32_t ip) {
+    // Cloud Masking for HABS without SWIR (MERIS, OLCI, OCI...)
 
     static int ib443, ib490, ib560, ib620, ib665, ib681, ib709, ib754, ib865, ib885, firstCall = 1;
     int ipb;
@@ -164,7 +164,7 @@ char get_cloudmask_meris(l1str *l1rec, int32_t ip) {
         ib885 = bindex_get(885);
 
         if (ib443 < 0 || ib490 < 0 || ib560 < 0 ||  ib620 < 0 || ib665 < 0 || ib681 < 0 || ib709 < 0 || ib754 < 0 || ib865 < 0 || ib885 < 0) {
-            printf("get_habs_cldmask: incompatible sensor wavelengths for this algorithm\n");
+            printf("get_habs_cloudmask: incompatible sensor wavelengths for this algorithm\n");
             exit(EXIT_FAILURE);
         }
 
@@ -249,8 +249,8 @@ char get_cloudmask_meris(l1str *l1rec, int32_t ip) {
     return (flagcld);
 }
 
-char get_cloudmask_modis(l1str *l1rec, int32_t ip) {
-    // Cloud Masking for MODIS
+char get_cloudmask_habs_swir(l1str *l1rec, int32_t ip) {
+    // Cloud Masking for HABS with SWIR
     static int firstCall = 1;
     static int ib469, ib555, ib645, ib667, ib859, ib1240, ib2130;
     int ipb;
@@ -268,7 +268,7 @@ char get_cloudmask_modis(l1str *l1rec, int32_t ip) {
         ib1240 = bindex_get(1240);
         ib2130 = bindex_get(2130);
         if (ib469 < 0 || ib555 < 0 || ib645 < 0 || ib667 < 0 || ib859 < 0 || ib1240 < 0 || ib2130 < 0) {
-            printf("get_habs_cldmask: incompatible sensor wavelengths for this algorithm\n");
+            printf("get_habs_cloudmask: incompatible sensor wavelengths for this algorithm\n");
             exit(EXIT_FAILURE);
         }
         firstCall = 0;
@@ -319,20 +319,20 @@ char get_cloudmask_modis(l1str *l1rec, int32_t ip) {
     return (flagcld);
 }
 
-char get_cldmask(l1str *l1rec, int32_t ip) {
+char get_cloudmask_habs(l1str *l1rec, int32_t ip) {
     //function for cloud mask by pixel
-    switch (l1rec->l1file->sensorID) {
-    case MERIS:
-    case OLCIS3A:
-    case OLCIS3B:
-        return (get_cloudmask_meris(l1rec, ip));
+    int instrumentId = sensorId2InstrumentId(l1rec->l1file->sensorID);
+    switch (instrumentId) {
+    case INSTRUMENT_MERIS:
+    case INSTRUMENT_OLCI:
+    case INSTRUMENT_OCI:
+        return (get_cloudmask_habs_visnir(l1rec, ip));
         break;
-    case MODISA:
-    case MODIST:
-        return (get_cloudmask_modis(l1rec, ip));
+    case INSTRUMENT_MODIS:
+        return (get_cloudmask_habs_swir(l1rec, ip));
         break;
     default:
-        printf("HABS cldmsk not supported for this sensor (%s).\n",
+        printf("HABS cloud mask not supported for this sensor (%s).\n",
                 sensorId2SensorName(l1rec->l1file->sensorID));
         exit(EXIT_FAILURE);
     }

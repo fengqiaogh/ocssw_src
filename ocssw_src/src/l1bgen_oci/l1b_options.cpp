@@ -53,6 +53,9 @@ oel::L1bOptions::L1bOptions(int argc, char *argv[], const char *version) {
                   "Compression factor, 0-9. 0 is least compression, 9 is most");
     // Defaulting deflate to 5 results in no change to current version
 
+    string help = "\nReturns:\n   0: All is well\n   100: Geolocation (or selenolocation) failed\n";
+    clo_setHelpStr(help.c_str());
+
     clo_readArgs(optionList, argc, argv);
 
     if (argc == 1) {

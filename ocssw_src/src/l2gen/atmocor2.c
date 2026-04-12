@@ -48,14 +48,13 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
     static int32_t nwave;
     static float *wave;
     static float *gc;
+    float derv_gc_ws; 
     float glint_coef_q,glint_coef_u;
     double nw;
-    int32_t nWaveCovariance = 1;
 
     l1str *l1rec = l2rec->l1rec;
     filehandle *l1file = l1rec->l1file;
     uncertainty_t *uncertainty=l1rec->uncertainty;
-    int32_t proc_uncertainty = input->proc_uncertainty;
 
     int32_t sensorID = l1file->sensorID;
     int32_t brdf_opt = input->brdf_opt;
@@ -89,31 +88,28 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
     float *brdf = &l2rec->brdf [ip * l1file->nbands];
     float *Rrs = &l2rec->Rrs [ip * l1file->nbands];
 
-    float *Rrs_unc;
+    static float *Rrs_unc=NULL;
+    float cov;
 
     double *tg_sol = &l1rec->tg_sol[ip * l1file->nbands];
-    double *tg= &l1rec->tg[ip * l1file->nbands];;  // double way absorption
+    double *tg= &l1rec->tg[ip * l1file->nbands]; // double way absorption
+    double *tg_sen = &l1rec->tg_sen[ip * l1file->nbands];
 
-    float *dsensor=NULL, *dLr=NULL, *dtaua=NULL, *dtg_sol=NULL;
-    float *dtg_sen=NULL, *dt_sol=NULL, *dt_sen=NULL, *dvc=NULL, *last_dtaua=NULL;
+    float *dsensor=NULL, *dtg_sol=NULL;
+    float *dtg_sen=NULL, *dvc=NULL,*last_derv_taua_rhorc=NULL;
     float dLt;
 
-    float last_dtaua_aer_l, *derv_taua_l, **derv_rhorc, *derv_rhow_l, *derv_rh;
-
-    float *derv_Lg_taua=NULL; //derivative of TLg[wave] to corresponding taua[nir_l]
-    float *drhown_nir=NULL;
+    float **derv_taua_rhorc; // derivative taua [nwave] to rhorc[nwave]
     float *dchl;
-    float *covariance_matrix;
-    static float *corr_coef_rhot;
-    int dim;
-    float *F1, *F1_temp, *F2, **COV, **corr_nir;
+    static float *covariance_matrix=NULL;
+    float F1[2], F2[2];
     static float *delta_Lt = NULL;
 
     float *taur,*radref;
-    float *tLw, *dtLw;
+    float *tLw;
     float *rhown_nir;
-    float *tLw_nir, *dtLw_nir, *last_tLw_nir, *dlast_tLw_nir;
-    int32_t ib, ipb,inir,iw, i, j, ix1, ix2;
+    float *tLw_nir, *last_tLw_nir;
+    int32_t ib, ipb,iw, i, j, ix1, ix2;
     int32_t status;
     int32_t iter, iter_max, iter_min, last_iter, iter_reset;
     float mu, mu0;
@@ -126,12 +122,23 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
     float tindx;
     float Ka = 0.8; /* 1.375 um channel transmittance for water vapor (<=1)  Gao et al. 1998 JGR */
     float *mbac_w;
-    static int nbands_ac=2;
+    static int nbands_ac;
     static int *acbands_index=NULL;
+    static float *derv_brdf_chl=NULL;
+    float tmp,tmp_derv1,tmp_derv2=0.;
+    float *last_derv_rhownir_rrs; //derivative of last_rhownir[nbands_ac] to rrs[nwave]
+    float *last_derv_rhownir_chl; //derivative of last_rhownir[nbands_ac] to chl
+    float *derv_rhownir_chl;
+    float *derv_rhownir_rrs; // derivative of rhownir[nbands_ac] to rrs[nwave] from last iteration
+    static int nbands_rhownir;  // No. of bands used in correction of non zero rhownir
+    static int *bindex_rhownir; // index of the bands used in correction of non zero rhownir
+    int rhownir_corr=0;            // 0: rhownir correction is not applied, 1: correction is applied
+    static float *derv_outband_nlw=NULL;  // derivative of out-of-band correction to the nlw 
 
     if (firstCall == 1) {
         firstCall = 0;
         nwave = l1file->nbands;
+        nbands_ac=input->nbands_ac;
         if ((wave = (float *) calloc(nwave, sizeof (float))) == NULL) {
             printf("-E- : Error allocating memory to wave\n");
             exit(FATAL_ERROR);
@@ -207,7 +214,6 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
                 want_nirLw = 1;
                 aer_iter_min = 1;
                 aer_iter_max = input->aer_iter_max;
-                input->nbands_ac=nbands_ac;
                 acbands_index[0]=windex(input->aer_wave_short,wave,nwave);
                 acbands_index[1]=windex(input->aer_wave_long,wave,nwave);
                 printf("NIR correction enabled --> for multi-scattering epsilon.\n");
@@ -217,7 +223,6 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
                 aer_iter_min = 1;
                 aer_iter_max = input->aer_iter_max;
             daer=1;
-            nbands_ac=input->nbands_ac;
 
             if(input->mbac_wave[0]<input->aer_wave_short){
                 printf("%s line %d: the first mbac wavelength %d shouldn't be shorter than aer_wave_short %d \n", __FILE__, __LINE__,input->mbac_wave[0],input->aer_wave_short);
@@ -273,11 +278,29 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
         }
 
         if(uncertainty){
-            if ((delta_Lt = (float *)calloc(nwave, sizeof(float))) == NULL) {
+            if ((delta_Lt = (float*)calloc(nwave, sizeof(float))) == NULL) {
                 printf("-E- : Error allocating memory to delta_Lt\n");
                 exit(FATAL_ERROR);
             }
-            corr_coef_rhot = uncertainty->corr_coef_rhot;
+            if ((derv_brdf_chl = (float*)calloc(nwave, sizeof(float))) == NULL) {
+                printf("-E- : Error allocating memory to derv_brdf_chl\n");
+                exit(FATAL_ERROR);
+            }
+            if ((covariance_matrix = (float*)calloc(nwave * nwave, sizeof(float))) == NULL) {
+                printf("-E- : Error allocating memory to covariance_matrix\n");
+                exit(FATAL_ERROR);
+            }
+            if ((Rrs_unc = (float*)calloc(nwave, sizeof(float))) == NULL) {
+                printf("-E- : Error allocating memory to covariance_matrix\n");
+                exit(FATAL_ERROR);
+            }
+            if ((derv_outband_nlw = (float*)calloc(nwave * nwave, sizeof(float))) == NULL) {
+                printf("-E- : Error allocating memory to derv_outband_nlw\n");
+                exit(FATAL_ERROR);
+            }
+
+            nbands_rhownir = uncertainty->nbands_rhownir;
+            bindex_rhownir = uncertainty->bindx_rhownir;
         }
     }
 
@@ -316,32 +339,19 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
 
     if (uncertainty) {
         init_uncertainty(uncertainty,0);
-        derv_Lg_taua=uncertainty->derv_Lg_taua;
-        drhown_nir=uncertainty->drhown_nir;
         dchl=&uncertainty->dchl;
-        Rrs_unc = &l2rec->Rrs_unc[ip * l1file->nbands];
-        uncertainty->dRrs=Rrs_unc;
-        if (proc_uncertainty == 2) {
-            covariance_matrix = &l2rec->covariance_matrix[ip * l1file->nbands * l1file->nbands];
-            uncertainty->covaraince_matrix = covariance_matrix;
-        } else
-            covariance_matrix = uncertainty->pixel_covariance;
+       // Rrs_unc = &l2rec->Rrs_unc[ip * l1file->nbands];
+         uncertainty->dRrs=Rrs_unc;
+       // uncertainty->covariance_matrix = covariance_matrix;
 
-        dsensor = &uncertainty->dsensor[ip * nwave];
-        dLr = &uncertainty->dLr[ip * nwave];
-        dtg_sol = &uncertainty->dtg_sol[ip * nwave];
-        dtg_sen = &uncertainty->dtg_sen[ip * nwave];
-        dt_sol = &uncertainty->dt_sol[ip * nwave];
-        dt_sen = &uncertainty->dt_sen[ip * nwave];
-        dvc = &uncertainty->dvc[ip * nwave];
-        //dbrdf = &uncertainty->dbrdf[ip * nwave];
-
-        if ((last_dtaua = (float *) calloc(nwave, sizeof(float))) == NULL) {
-            printf("-E- : Error allocating memory to Lunc\n");
-            exit(FATAL_ERROR);
-        }
-        if ((dtaua = (float *) calloc(nwave, sizeof(float))) == NULL) {
-            printf("-E- : Error allocating memory to Lunc\n");
+        ipb=ip*nwave;
+        dsensor = &uncertainty->dsensor[ipb];
+        dtg_sol = &uncertainty->dtg_sol[ipb];
+        dtg_sen = &uncertainty->dtg_sen[ipb];
+        dvc    = &uncertainty->dvc[ipb];
+      
+        if ((last_derv_taua_rhorc = (float *) calloc(nwave*nbands_ac, sizeof(float))) == NULL) {
+            printf("-E- : Error allocating memory to last_derv_taua_rhorc\n");
             exit(FATAL_ERROR);
         }
 
@@ -349,69 +359,30 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
             printf("-E- : Error allocating memory to dLtemp\n");
             exit(FATAL_ERROR);
         }
-        if ((dlast_tLw_nir = (float *) calloc(nwave, sizeof(float))) == NULL) {
-
-            printf("-E- : Error allocating memory to last_tLw_nir\n");
+        if ((derv_taua_rhorc = (float **)calloc(nwave, sizeof(float *))) == NULL) {
+            printf("-E- : Error allocating memory to derv_taua_rhorc\n");
             exit(FATAL_ERROR);
         }
-        if ((dtLw = (float *) calloc(nwave, sizeof(float))) == NULL) {
-            printf("-E- : Error allocating memory to tLw\n");
+        if ((last_derv_rhownir_rrs = (float *) calloc(nwave*nbands_ac, sizeof(float))) == NULL) {
+            printf("-E- : Error allocating memory to last_derv_rhownir_rrs\n");
             exit(FATAL_ERROR);
         }
-        if ((dtLw_nir = (float *) calloc(nwave, sizeof(float))) == NULL) {
-            printf("-E- : Error allocating memory to dtLw_nir\n");
+        if ((last_derv_rhownir_chl = (float *) calloc(nbands_ac, sizeof(float))) == NULL) {
+            printf("-E- : Error allocating memory to last_derv_rhownir_chl\n");
             exit(FATAL_ERROR);
         }
-        if ((derv_taua_l = (float *)calloc(nwave, sizeof(float))) == NULL) {
-            printf("-E- : Error allocating memory to derv_taua_l\n");
+        if ((derv_rhownir_chl = (float *) calloc(nbands_ac, sizeof(float))) == NULL) {
+            printf("-E- : Error allocating memory to derv_rhownir_chl\n");
             exit(FATAL_ERROR);
         }
-        if ((derv_rhow_l = (float *)calloc(nwave, sizeof(float))) == NULL) {
-            printf("-E- : Error allocating memory to derv_rhow_l\n");
-            exit(FATAL_ERROR);
-        }
-        if ((derv_rh = (float *)calloc(nwave, sizeof(float))) == NULL) {
-            printf("-E- : Error allocating memory to derv_rh\n");
-            exit(FATAL_ERROR);
-        }
-        if ((derv_rhorc = (float **)calloc(nwave, sizeof(float *))) == NULL) {
-            printf("-E- : Error allocating memory to derv_rhorc\n");
+        if ((derv_rhownir_rrs = (float *) calloc(nbands_ac*nwave, sizeof(float))) == NULL) {
+            printf("-E- : Error allocating memory to derv_rhownir_rhorc\n");
             exit(FATAL_ERROR);
         }
         for (ib = 0; ib < nwave; ib++) {
-            if ((derv_rhorc[ib] = (float *)calloc(nbands_ac, sizeof(float))) == NULL) {
-                printf("-E- : Error allocating memory to derv_rhorc[%d]\n", ib);
+            if ((derv_taua_rhorc[ib] = (float *)calloc(nwave, sizeof(float))) == NULL) {
+                printf("-E- : Error allocating memory to derv_taua_rhorc[%d]\n", ib);
                 exit(FATAL_ERROR);
-            }
-        }
-
-        /// used for calculation cov(Rrs1,Rrs2)=F1.cov(X1,X2).F2
-
-        dim = nbands_ac + 4;
-        F1 = (float *)malloc(dim * sizeof(float));
-        F1_temp = (float *)malloc(dim * sizeof(float));
-        F2 = (float *)malloc(dim * sizeof(float));
-        COV = (float **)malloc(dim * sizeof(float *));
-        for (ib = 0; ib < dim; ib++)
-            COV[ib] = (float *)malloc(dim * sizeof(float));
-
-        for (ib = 0; ib < dim; ib++)
-            for (iw = 0; iw < dim; iw++)
-                COV[ib][iw] = 0.;
-
-        corr_nir = (float **)malloc(nwave * sizeof(float *));
-        for (ib = 0; ib < nwave; ib++)
-            corr_nir[ib] = (float *)malloc(nbands_ac * sizeof(float));
-        for (ib = 0; ib < nwave; ib++)
-            for (iw = 0; iw < nbands_ac; iw++)
-                corr_nir[ib][iw] = 0;
-
-        for (iw = 0; iw < nwave; iw++) {
-            for (ib = 0; ib < nbands_ac; ib++) {
-                if ((acbands_index[ib]) >= iw)
-                    corr_nir[iw][ib] = corr_coef_rhot[iw * nwave + acbands_index[ib]];
-                else
-                    corr_nir[iw][ib] = corr_coef_rhot[acbands_index[ib] * nwave + iw];
             }
         }
     }
@@ -445,11 +416,12 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
         if(aer_opt==AERRHSM)
             mbac_w[ib]=0.0;
         if (uncertainty) {
-            dtaua[ib] = 0.;
-            //derv_Lg_taua[ib] = 0.;
-            last_dtaua[ib] = 0;
-            // Rrs_unc[ib] = 0.;
-            dvc[ib] = dvc[ib] / tg[ib] / l1rec->polcor[ipb];
+            Rrs_unc[ib]=0.;
+            for (i = 0; i < nwave; i++){
+                covariance_matrix[ib * nwave + i] = 0.;
+                if (i < nbands_ac)
+                    last_derv_taua_rhorc[ib * nbands_ac + i] = 0.;
+            }
         }
     }
 
@@ -465,29 +437,17 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
         free(radref);
 
         if(uncertainty){
-            free(dtLw);
-            free(dtLw_nir);
-            free(dlast_tLw_nir);
             free(dLtemp);
-            free(last_dtaua);
-            free(dtaua);
-            free(derv_taua_l);
-            free(derv_rhow_l);
-            free(derv_rh);
-            for (ib = 0; ib < nwave; ib++)
-                free(derv_rhorc[ib]);
-            free(derv_rhorc);
-
-            free(F1);
-            free(F2);
-            free(F1_temp);
-            for (ib = 0; ib < dim; ib++)
-                free(COV[ib]);
-            free(COV);
+            free(last_derv_taua_rhorc);
 
             for (ib = 0; ib < nwave; ib++)
-                free(corr_nir[ib]);
-            free(corr_nir);
+                free(derv_taua_rhorc[ib]);
+            free(derv_taua_rhorc);
+
+            free(last_derv_rhownir_rrs);
+            free(last_derv_rhownir_chl);
+            free(derv_rhownir_chl);
+            free(derv_rhownir_rrs);
         }
 
         status = 1;
@@ -536,14 +496,16 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
 
         /* calculate uncertainty in Ltemp */
         if (uncertainty) {
-            dLt = (1 - l2rec->l1rec->Lt[ipb] * uncertainty->derv_pol[ipb] / l1rec->polcor[ipb]);
-            dLt *= (1 / l1rec->tg_sol[ipb] / l1rec->tg_sen[ipb]  / l1rec->polcor[ipb]);
-            dLt = pow(dLt * dsensor[ib], 2);
+            dLt = (1 /tg[ib]/ l1rec->polcor[ipb]);
+            dLt = (dLt* dLt) * ( dsensor[ib]*dsensor[ib] );//+ dvc[ib]*dvc[ib]
 
-            dLt += pow( l2rec->l1rec->Lt[ipb] / l1rec->tg_sol[ipb]  / pow(l1rec->tg_sen[ipb], 2) / l1rec->polcor[ipb] * dtg_sen[ib], 2);
-            dLt += pow( l2rec->l1rec->Lt[ipb] / l1rec->tg_sen[ipb]  / pow(l1rec->tg_sol[ipb], 2) / l1rec->polcor[ipb] * dtg_sol[ib], 2);
+            tmp=-l2rec->l1rec->Lt[ipb] /tg[ib]/l1rec->polcor[ipb]*(1/tg_sen[ipb]+uncertainty->derv_polcor_tgsen[ipb]/l1rec->polcor[ipb]);
+            dLt += pow( tmp * dtg_sen[ib], 2);
 
-            dLtemp[ib] = dLt + dLr[ib] * dLr[ib];
+            tmp=-l2rec->l1rec->Lt[ipb] /tg[ib]/l1rec->polcor[ipb]*(1/tg_sol[ipb]+uncertainty->derv_polcor_tgsol[ipb]/l1rec->polcor[ipb]);
+            dLt += pow( tmp * dtg_sol[ib], 2);
+
+            dLtemp[ib] = dLt;
         }
         radref[ib]=pi/(Fo[ib] * mu0);
     }
@@ -551,7 +513,7 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
 
     /* Compute BRDF correction, if not dependent on radiance */
     if (brdf_opt < FOQMOREL && brdf_opt > NOBRDF)
-        ocbrdf(l2rec, ip, brdf_opt, wave, nwvis, solz, senz, delphi, ws, -1.0, NULL, NULL, brdf);
+        ocbrdf(l2rec, ip, brdf_opt, wave, nwvis, solz, senz, delphi, ws, -1.0, NULL, NULL, brdf,derv_brdf_chl);
 
     /* Initialize iteration loop */
     chl = seed_chl;
@@ -565,9 +527,9 @@ int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip) {
 
     for (ib = 0; ib < nwave; ib++) {
         gc[ib] = l1rec->glint_coef[ip];
-        if (input->glint_opt == 3) {
+        if (glint_opt == 3) {
             nw = get_nw(wave[ib]);
-            getglint_iqu(senz, solz, delphi, ws, 0., &gc[ib], &glint_coef_q, &glint_coef_u, nw);
+            getglint_iqu(senz, solz, delphi, ws, 0., &gc[ib], &glint_coef_q, &glint_coef_u, nw,&derv_gc_ws);
         }   
     }
     /*  new glint_opt usage - a 2 will use the simple TLg from atmocor1 */
@@ -601,11 +563,6 @@ NIRSWIR:
             last_tLw_nir[ib] = 0.0;
             tLw_nir[ib] = 0.0;
             Rrs[ib] = 0.0;
-
-            if(uncertainty){
-                dtLw_nir[ib] = 0.;
-                dlast_tLw_nir[ib] = 0.;
-            }
         }
         Rrs[green] = seed_green;
         Rrs[red ] = seed_red;
@@ -623,23 +580,33 @@ NIRSWIR:
 
     /*compute the uncertainty in TOA radiance */
     if (uncertainty) {
-        for (ib = 0; ib < nwave; ib++)
+        for (ib = 0; ib < nwave; ib++){
             delta_Lt[ib] = sqrt(dLtemp[ib] + dvc[ib] * dvc[ib]);
+            dvc[ib]=delta_Lt[ib];
+        }
+         for(ib=0;ib<nbands_ac;ib++){
+            derv_rhownir_chl[ib]=0.;
+            last_derv_rhownir_chl[ib]=0.;
+         }           
     }
 
     while (!last_iter) {
         iter++;
         status = 0;
 
-        if (uncertainty)
-            last_dtaua_aer_l = dtaua[aer_l];
-
         /* Initialize tLw as surface + aerosol radiance */
         for (ib = 0; ib < nwave; ib++) {
             tLw[ib] = Ltemp[ib];
-            if (uncertainty){
-                dtLw[ib] = sqrt(dLtemp[ib]);
-                last_dtaua[ib] = dtaua[ib];
+            
+            if (uncertainty) {
+               // uncertainty->derv_chl_rrs[ib]=0.;
+                for (j = 0; j < nbands_ac; j++) {
+                    ipb = ib * nbands_ac + j;
+
+                    /* the max iteration is 2 for glint correction*/
+                    if (iter <= 2)
+                        last_derv_taua_rhorc[ipb] = derv_taua_rhorc[ib][acbands_index[j]];
+                }
             }
         }
 
@@ -694,6 +661,17 @@ NIRSWIR:
         /* Adjust for non-zero NIR water-leaving radiances using IOP model */
         if (want_nirLw) {
 
+            if (iter>=2 && uncertainty) {
+                for (ib = 0; ib < nbands_ac; ib++){
+                    for (iw = 0; iw < nbands_rhownir; iw++) {
+                        ipb=ib*nwave+bindex_rhownir[iw];
+                        last_derv_rhownir_rrs[ipb] = uncertainty->derv_rhownir_rrs[ipb];
+                    }
+                    last_derv_rhownir_chl[ib] = uncertainty->derv_rhownir_chl[ib];
+                }
+            }
+            rhownir_corr=0;
+
             ipb = ip*nwave;
             get_rhown_eval(input->fqfile, Rrs, wave, aer_s, aer_l, nwave, &l1rec->sw_a_avg[ipb], &l1rec->sw_bb_avg[ipb], chl, solz, senz, delphi, rhown_nir, l2rec,ip);
 
@@ -701,58 +679,79 @@ NIRSWIR:
 
                 /* Convert NIR reflectance to TOA W-L radiance */
                 tLw_nir[ib] = rhown_nir[ib] / pi * Fo[ib] * mu0 * t_sol[ib] * t_sen[ib] / brdf[ib];
-                if(uncertainty)
-                    dtLw_nir[ib] = Fo[ib] * mu0 / (pi * brdf[ib]) *
-                                   sqrt(pow(rhown_nir[ib] * t_sol[ib] * dt_sen[ib], 2) +
-                                        pow(rhown_nir[ib] * t_sen[ib] * dt_sol[ib], 2) +
-                                        pow(t_sen[ib] * t_sol[ib] * drhown_nir[ib], 2));
 
                 /* Iteration damping */
                 tLw_nir[ib] = (1.0 - df) * tLw_nir[ib] + df * last_tLw_nir[ib];
-
-                if(uncertainty)
-                    dtLw_nir[ib] = sqrt( pow((1. - df) * dtLw_nir[ib], 2) + pow(df * dlast_tLw_nir[ib], 2));
 
                 /* Ramp-up ?*/
                 if (want_ramp) {
                     if (chl > 0.0 && chl <= cbot) {
                         tLw_nir[ib] = 0.0;
-                        if(uncertainty)
-                            dtLw_nir[ib] = 0.0;
                     }
                     else if ((chl > cbot) && (chl < ctop)) {
                         tLw_nir[ib] *= (cslp * chl + cint);
-                        if(uncertainty)
-                            dtLw_nir[ib] *= (cslp * chl + cint); //error in chl should be included in the next
                     }
                 }
 
                 /* Remove estimated NIR water-leaving radiance */
                 tLw[ib] -= tLw_nir[ib];
+                if (tLw_nir[ib] != 0.0)
+                    rhownir_corr = 1;
             }
+            if (rhownir_corr && uncertainty) {
+                for (ib = 0; ib < nbands_ac; ib++) {
+                    i = acbands_index[ib];
+                    tmp_derv1 = 1 / pi * Fo[i] * mu0 * t_sol[i] * t_sen[i] / brdf[i];
 
-            if(uncertainty && tLw_nir[aer_l] > 0.){
-                for (ib = 0; ib <nbands_ac; ib ++){ 
-                    inir=acbands_index[ib];
-                    uncertainty->ratio_rhow[ib] = tLw_nir[inir] / tLw_nir[aer_l] * (Fo[aer_l] / Fo[inir]);
+                    derv_rhownir_chl[ib]=(1.0-df)*uncertainty->derv_rhownir_chl[ib]+df*last_derv_rhownir_chl[ib];
+                    derv_rhownir_chl[ib]*=tmp_derv1;
+                    if ((chl > cbot) && (chl < ctop)) {
+                        tmp = tLw_nir[i] / (cslp * chl + cint) * cslp;
+                        //derv_rhownir_chl[ib]+=tmp;
+                    }
+                    derv_rhownir_chl[ib]*=radref[i];
+
+                    for (iw = 0; iw < nbands_rhownir; iw++) {
+                        ix2 = bindex_rhownir[iw];
+                        ipb = ib * nwave + ix2;
+
+                        derv_rhownir_rrs[ipb]= uncertainty->derv_rhownir_rrs[ipb]*(1.0 - df)+last_derv_rhownir_rrs[ipb] * df;
+                        derv_rhownir_rrs[ipb] *= tmp_derv1;
+
+                        /* contribution of rhorc through t_sol and t_sen*/
+                        tmp=rhown_nir[i] / pi * Fo[i] * mu0 / brdf[i];
+                       // derv_rhownir_rhorc[ipb]+= (tmp * t_sol[i]*derv_tsen_rhorc[i][ix2] );
+                       // derv_rhownir_rhorc[ipb]+= (tmp * t_sen[i]*derv_tsol_rhorc[i][ix2] );  
+                        
+                        if ((chl > cbot) && (chl < ctop)){
+                            derv_rhownir_rrs[ipb] *= (cslp * chl + cint);
+
+                            /*contribution of rhorc through chl */
+                            /* the hard coded ctop value cause artifacts in Rrs uncertainty*/
+                            /*  remove this contribution temporarily.  CAUTION:!!!!!!*/
+                            /*tmp=tLw_nir[i]/(cslp * chl + cint)*cslp;
+                            tmp_derv2= derv_rhownir_rhorc[ipb];
+                            for (j = 1; j < nbands_uncertainty; j++) {
+                                ix1 = bindex_uncertainty[j];
+                                if(uncertainty->derv_chl_rrs[ix1]!=0.)
+                                    tmp_derv2+=tmp*uncertainty->derv_chl_rrs[ix1]/Fobar[ix1]*derv_nlw_rhorc[ix1][ix2];
+                            }*/
+                            //derv_rhownir_rhorc[ipb] = tmp_derv2;
+                        }
+                            
+                        derv_rhownir_rrs[ipb] *= radref[i];
+                    }
                 }
             }
         }
 
-        if (uncertainty) {
-            if (aer_opt == AERRHMSEPS && fabs(uncertainty->derv_Lg_taua[aer_s]) > 0.) {
-                uncertainty->derv_eps_taua_s = -1/ (Ltemp[aer_l] - TLg[aer_l] - tLw_nir[aer_l]) * derv_Lg_taua[aer_s];
-                uncertainty->derv_eps_taua_s *= (Fo[aer_l] / Fo[aer_s]);
-
-                uncertainty->derv_eps_taua_l = (Ltemp[aer_s] - TLg[aer_s] - tLw_nir[aer_s]) /
-                                               pow(Ltemp[aer_l] - TLg[aer_l] - tLw_nir[aer_l], 2) *
-                                               derv_Lg_taua[aer_l];
-                uncertainty->derv_eps_taua_l *= (Fo[aer_l] / Fo[aer_s]);
-                uncertainty->derv_eps_taua_l+=uncertainty->derv_eps_taua_s;
+        if (want_glintcorr && uncertainty) {
+            for (ib = 0; ib < nwave; ib++){
+                if (iter == 2)
+                    uncertainty->derv_rhog_taua[ib] *= radref[ib];
+                uncertainty->derv_rhog_rhorc_l[ib]*=(radref[ib]/radref[aer_l]);
             }
-
-            for (ib = 0; ib < nwave; ib++)
-                uncertainty->derv_Lg_taua[ib] *= radref[ib];
+                
         }
 
         /*  Compute the aerosol contribution */
@@ -785,224 +784,23 @@ NIRSWIR:
                 tLw[ib] = tLw[ib] - La[ib];
                 Lw [ib] = tLw[ib] / t_sen[ib] * tg_sol[ib];
                 nLw[ib] = Lw [ib] / t_sol[ib] / tg_sol[ib] / mu0 / fsol * brdf[ib];
-
-                if(uncertainty){
-
-                    dt_sen[ib] = pow(uncertainty->derv_tsen_taua_l[ib] * last_dtaua_aer_l, 2);
-
-                    for(inir=0;inir<nbands_ac;inir++){
-                        i=acbands_index[inir];
-                        dt_sen[ib] += pow(uncertainty->derv_tsen_rhorc[ib][inir] * sqrt(dLtemp[i]) * radref[i], 2);
-                    }
-
-                    dt_sen[ib] += pow(uncertainty->derv_tsen_rhow_l[ib] * dtLw_nir[aer_l] *  radref[aer_l], 2);
-                    dt_sen[ib] += pow(uncertainty->derv_tsen_rh[ib] * uncertainty->drh[ip],2);
-
-                    /* vicarious calibration contribution */
-                    for(inir=0;inir<nbands_ac;inir++){
-                        i=acbands_index[inir];
-                        dt_sen[ib] += pow(uncertainty->derv_tsen_rhorc[ib][inir] *radref[i]* dvc[i], 2);
-                    }
-
-                    //TBD,only works for mseps right now, need to tune for mbac.
-                    for(inir=0;inir<nbands_ac;inir++){
-                        i=acbands_index[inir];
-                        dt_sen[ib] +=2*corr_nir[i][nbands_ac - 1] *(uncertainty->derv_tsen_rhorc[ib][inir] * radref[i] * dvc[i] *uncertainty->derv_tsen_rhorc[ib][nbands_ac - 1] * radref[aer_l] * dvc[aer_l]);
-                    }
-
-                    if(dt_sen[ib]<0)
-                        dt_sen[ib]=0.;
-                    dt_sen[ib] = sqrt(dt_sen[ib]);
-                    /*                                    */
-
-                    dt_sol[ib] = pow(uncertainty->derv_tsol_taua_l[ib] * last_dtaua_aer_l, 2);
-
-                    for(inir=0;inir<nbands_ac;inir++){
-                        i=acbands_index[inir];
-                        dt_sol[ib] += pow(uncertainty->derv_tsol_rhorc[ib][inir] * sqrt(dLtemp[i]) * radref[i], 2);
-                    }
-
-                    dt_sol[ib] += pow(uncertainty->derv_tsol_rhow_l[ib] * dtLw_nir[aer_l] * radref[aer_l], 2);
-                    dt_sol[ib] += pow(uncertainty->derv_tsol_rh[ib] * uncertainty->drh[ip], 2);
-
-                    /* vicarious calibration contribution */
-                    for(inir=0;inir<nbands_ac;inir++){
-                        i=acbands_index[inir];
-                        dt_sol[ib] += pow(uncertainty->derv_tsol_rhorc[ib][inir] * radref[i]* dvc[i], 2);
-                    }
-
-                    for(inir=0;inir<nbands_ac;inir++){
-                        i=acbands_index[inir];
-                        dt_sol[ib] +=
-                            2 * corr_nir[i][nbands_ac - 1] *
-                            (uncertainty->derv_tsol_rhorc[ib][inir] * radref[i] * dvc[i] *
-                             uncertainty->derv_tsol_rhorc[ib][nbands_ac - 1] * radref[aer_l] * dvc[aer_l]);
-                    }
-
-                    if(dt_sol[ib]<0)
-                        dt_sol[ib]=0;
-                    dt_sol[ib] = sqrt(dt_sol[ib]);
-                    /*                                    */
-
-                    derv_taua_l[ib] = -derv_Lg_taua[ib] / (t_sol[ib] * t_sen[ib]) * (1 / radref[ib]);
-                    derv_taua_l[ib] += -uncertainty->derv_La_taua_l[ib] / (t_sol[ib] * t_sen[ib]);
-                    derv_taua_l[ib] +=
-                        (-tLw[ib] / (t_sol[ib] * t_sen[ib] * t_sen[ib]) * uncertainty->derv_tsen_taua_l[ib]);
-                    derv_taua_l[ib] +=
-                        (-tLw[ib] / (t_sol[ib] * t_sol[ib] * t_sen[ib]) * uncertainty->derv_tsol_taua_l[ib]);
-
-                    for (inir = 0; inir < nbands_ac; inir++) {
-                        derv_rhorc[ib][inir] =
-                            -uncertainty->derv_La_rhorc[ib][inir] / (t_sol[ib] * t_sen[ib]);
-                        derv_rhorc[ib][inir] += (-tLw[ib] / (t_sol[ib] * t_sen[ib] * t_sen[ib]) *
-                                                 uncertainty->derv_tsen_rhorc[ib][inir]);
-                        derv_rhorc[ib][inir] += (-tLw[ib] / (t_sol[ib] * t_sol[ib] * t_sen[ib]) *
-                                                 uncertainty->derv_tsol_rhorc[ib][inir]);
-                    }
-
-                    derv_rhow_l[ib] = -uncertainty->derv_La_rhow_l[ib] / (t_sol[ib] * t_sen[ib]);
-                    derv_rhow_l[ib] +=
-                        (-tLw[ib] / (t_sol[ib] * t_sen[ib] * t_sen[ib]) * uncertainty->derv_tsen_rhow_l[ib]);
-                    derv_rhow_l[ib] +=
-                        (-tLw[ib] / (t_sol[ib] * t_sol[ib] * t_sen[ib]) * uncertainty->derv_tsol_rhow_l[ib]);
-
-                    derv_rh[ib] = -uncertainty->derv_La_rh[ib] / (t_sol[ib] * t_sen[ib]);
-                    derv_rh[ib] +=
-                        (-tLw[ib] / (t_sol[ib] * t_sen[ib] * t_sen[ib]) * uncertainty->derv_tsen_rh[ib]);
-                    derv_rh[ib] +=
-                        (-tLw[ib] / (t_sol[ib] * t_sol[ib] * t_sen[ib]) * uncertainty->derv_tsol_rh[ib]);
-
-                    dtaua[ib] = pow(uncertainty->derv_taua_taua_l[ib] * last_dtaua_aer_l, 2);
-                    for (inir = 0; inir < nbands_ac; inir++) {
-                        i = acbands_index[inir];
-                        dtaua[ib] +=
-                            pow(uncertainty->derv_taua_rhorc[ib][inir] * sqrt(dLtemp[i]) * radref[i], 2);
-                    }
-
-                    dtaua[ib] += pow(uncertainty->derv_taua_rhow_l[ib] * dtLw_nir[aer_l] * radref[aer_l], 2);
-                    dtaua[ib] += pow(uncertainty->derv_taua_rh[ib] * uncertainty->drh[ip], 2);
-
-                    /* vicarious calibration contribution */
-                    for (inir = 0; inir < nbands_ac; inir++) {
-                        i = acbands_index[inir];
-                        dtaua[ib] += pow(uncertainty->derv_taua_rhorc[ib][inir] * radref[i] * dvc[i], 2);
-                    }
-                    dtaua[ib] +=
-                        2 * corr_nir[aer_s][nbands_ac - 1] *
-                        (uncertainty->derv_taua_rhorc[ib][nbands_ac - 1] * radref[aer_l] * dvc[aer_l] *
-                         uncertainty->derv_taua_rhorc[ib][0] * radref[aer_s] * dvc[aer_s]);
-
-                    /*                                    */
-                    if (dtaua[ib] < 0)
-                        dtaua[ib] = 0;
-
-                    dtaua[ib] = sqrt(dtaua[ib]);
-                }
             }
-
-            /*calculate covariance matrix for Rrs                                         */
-            /* cov(Rrs1, Rrs2)=F1.Cov(X1,X2).F2                                           */
-            /*  F1: matrix of partial derivative of Rrs1 to X1(matrix)  dimension: 1*dim  */
-            /*  F2: matrix of partial derivative of Rrs2 to X2(matrix)  dimension: dim*1  */
-            /*  COV(X1,X2):variance-covariance matrix of (X1,X2)        dimension: dim*dim */
-            /*  X1(rhorc1, rhorc_NIR, rh, rhow_l,taua_l)                                   */
-            /*  X2(rhorc2, rhorc_NIR, rh, rhow_l,taua_l)                                   */
-
-            if (uncertainty) {
-                for (ib = 0; ib < nwave; ib++) {
-                    if (proc_uncertainty == 2)
-                        nWaveCovariance = nwave - ib;
-                    for (iw = ib; iw < ib + nWaveCovariance; iw++) {
-                        /* calculate cov(Rrs[ib],Rrs[iw])   */
-                        float cov = 0;
-                        F1[0] = 1 / t_sol[ib] / t_sen[ib] / radref[ib];
-                        for (ix1 = 1; ix1 <= nbands_ac; ix1++)
-                            F1[ix1] = derv_rhorc[ib][ix1 - 1];
-                        F1[ix1] = derv_rh[ib];
-                        F1[ix1 + 1] = derv_rhow_l[ib];
-                        F1[ix1 + 2] = derv_taua_l[ib];
-
-                        F2[0] = 1 / t_sol[iw] / t_sen[iw] / radref[iw];
-                        for (ix1 = 1; ix1 <= nbands_ac; ix1++)
-                            F2[ix1] = derv_rhorc[iw][ix1 - 1];
-                        F2[ix1] = derv_rh[iw];
-                        F2[ix1 + 1] = derv_rhow_l[iw];
-                        F2[ix1 + 2] = derv_taua_l[iw];
-                        cov += F1[0] * F2[0] *
-                                       (corr_coef_rhot[ib * nwave + iw] * delta_Lt[ib] * radref[ib] *
-                                        delta_Lt[iw] * radref[iw]);
-                        // COV[0][0] = corr_coef_rhot[ib * nwave + iw] * delta_Lt[ib] * radref[ib] *
-                        //             delta_Lt[iw] * radref[iw];
-                        for (i = 0; i < nbands_ac; i++) {
-                            ix1 = acbands_index[i];
-                            cov += F1[0] * F2[i + 1] *  corr_nir[ib][i] * delta_Lt[ib] * radref[ib] * delta_Lt[ix1] * radref[ix1];
-                            // COV[0][i + 1] =
-                            //     corr_nir[ib][i] * delta_Lt[ib] * radref[ib] * delta_Lt[ix1] * radref[ix1];
-                        }
-                        // COV[0][nbands_ac + 1] = 0;
-                        // COV[0][nbands_ac + 2] = 0;
-                        // COV[0][nbands_ac + 3] = 0;
-
-                        for (i = 0; i < nbands_ac; i++) {
-                            ix2 = acbands_index[i];
-
-                            cov+=F1[i + 1] * F2[0] * corr_nir[iw][i] * delta_Lt[iw] * radref[iw] * delta_Lt[ix2] * radref[ix2];
-                            // COV[i + 1][0] =
-                            //     corr_nir[iw][i] * delta_Lt[iw] * radref[iw] * delta_Lt[ix2] * radref[ix2];
-
-                            for (j = 0; j < nbands_ac; j++) {
-                                ix1 = acbands_index[j];
-                                cov+=F1[i + 1] * F2[j + 1] * corr_nir[ix2][j] * delta_Lt[ix2] * radref[ix2] *
-                                                    delta_Lt[ix1] * radref[ix1];
-                                // COV[i + 1][j + 1] = corr_nir[ix2][j] * delta_Lt[ix2] * radref[ix2] *
-                                //                     delta_Lt[ix1] * radref[ix1];
-                            }
-                            // COV[i + 1][nbands_ac + 1] = 0;
-                            // COV[i + 1][nbands_ac + 2] = 0;
-                            // COV[i + 1][nbands_ac + 3] = 0;
-                        }
-
-                        // for (ix2 = 1; ix2 < 4; ix2++)
-                        //     for (ix1 = 0; ix1 < dim; ix1++)
-                        //         COV[nbands_ac + ix2][ix1] = 0;
-                        cov+=F1[nbands_ac + 1] * F2[nbands_ac + 1] *     uncertainty->drh[ip] * uncertainty->drh[ip];  
-                        // COV[nbands_ac + 1][nbands_ac + 1] = pow(uncertainty->drh[ip], 2);
-                        cov+=F1[nbands_ac + 2] * F2[nbands_ac + 2] *  dtLw_nir[aer_l] * radref[aer_l] *dtLw_nir[aer_l] * radref[aer_l];
-                        // COV[nbands_ac + 2][nbands_ac + 2] = pow(dtLw_nir[aer_l] * radref[aer_l], 2);
-                        cov+=F1[nbands_ac + 3] * F2[nbands_ac + 3] * last_dtaua_aer_l * last_dtaua_aer_l;
-                        // COV[nbands_ac + 3][nbands_ac + 3] = pow(last_dtaua_aer_l, 2);
-
-                        // for (ix1 = 0; ix1 < dim; ix1++) {
-                        //     F1_temp[ix1] = 0.f;
-                        // }
-
-                        // for (ix2 = 0; ix2 < dim; ix2++)
-                        //     for (ix1 = 0; ix1 < dim; ix1++) {
-                        //         F1_temp[ix1] += F1[ix2] * COV[ix2][ix1];
-                        //     }
-                        covariance_matrix[ib * nwave + iw] = cov;
-                        // for (ix1 = 0; ix1 < dim; ix1++)
-                        //     covariance_matrix[ib * nwave + iw] += F1_temp[ix1] * F2[ix1];
-
-                        covariance_matrix[ib * nwave + iw] *=
-                            (brdf[ib] * brdf[iw] / (mu0 * mu0) / (fsol * fsol));
-                    }
+            if (uncertainty){
+                compute_uncertainty(l2rec, ip, aer_l, rhownir_corr, want_glintcorr, 1, radref, delta_Lt,
+                                    derv_rhownir_chl, derv_rhownir_rrs, tLw, last_derv_taua_rhorc, derv_taua_rhorc, brdf,
+                                    covariance_matrix);
+                memcpy(uncertainty->covariance_matrix,covariance_matrix,nwave*nwave*sizeof(float));
                 }
-            }
 
             /* Compute new estimated chlorophyll */
             if (want_nirLw) {
                 refl_nir = Rrs[red];
                 for (ib = aer_s; ib <= aer_l; ib += daer) {
                     last_tLw_nir[ib] = tLw_nir[ib];
-                    if(uncertainty)
-                        dlast_tLw_nir[ib] = dtLw_nir[ib];
                 }
                 for (ib = 0; ib < nwvis; ib++) {
                     Rrs[ib] = nLw[ib] / Fobar[ib];
                     if(uncertainty) {
-                        for (iw = ib; iw < nwvis; iw++)
-                            covariance_matrix[ib * nwave + iw] /= (Fobar[ib] * Fobar[iw]);
                         Rrs_unc[ib] = sqrt(covariance_matrix[ib * nwave + ib]);
                     }
                 }
@@ -1108,29 +906,15 @@ NIRSWIR:
         free(radref);
 
         if(uncertainty){
-            free(dtLw);
-            free(dtLw_nir);
-            free(dlast_tLw_nir);
             free(dLtemp);
-            free(last_dtaua);
-            free(dtaua);
-            free(derv_taua_l);
-            free(derv_rhow_l);
-            free(derv_rh);
-            for (ib = 0; ib < nwave; ib++)
-                free(derv_rhorc[ib]);
-            free(derv_rhorc);
+            free(last_derv_taua_rhorc);
 
-            free(F1);
-            free(F2);
-            free(F1_temp);
-            for (ib = 0; ib < dim; ib++)
-                free(COV[ib]);
-            free(COV);
+            for (ib = 0; ib < nwave; ib++) 
+                free(derv_taua_rhorc[ib]);
+            free(derv_taua_rhorc);
 
-            for (ib = 0; ib < nwave; ib++)
-                free(corr_nir[ib]);
-            free(corr_nir);
+            free(last_derv_rhownir_rrs);
+            free(derv_rhownir_rrs);
         }
         return (status);
 
@@ -1146,23 +930,95 @@ NIRSWIR:
         }
     }
 
+    if (uncertainty) {
+        compute_uncertainty(l2rec, ip, aer_l, rhownir_corr, want_glintcorr, 2, radref, delta_Lt,
+                            derv_rhownir_chl, derv_rhownir_rrs, tLw, last_derv_taua_rhorc, derv_taua_rhorc,
+                            brdf, covariance_matrix);
+        memcpy(uncertainty->covariance_matrix, covariance_matrix, nwave * nwave * sizeof(float));
+    }
+
     /* Convert water-leaving radiances from band-averaged to band-centered.  */
-    /* Switch mean solar irradiance from band-averaged to band centered also.*/
-    if (l1_input->outband_opt >= 2) {
-        nlw_outband(l1_input->evalmask, sensorID, wave, nwave, Lw, nLw, &l2rec->outband_correction[ip*nwave]);
+    /* Switch mean solar irradiance from band-averaged to band centered also.*/ 
+    float *outband_corr=&l2rec->outband_correction[ip*nwave];
+    if (l1_input->outband_opt >= 2) { 
+
         Fobar = l1file->Fonom;
+        if (uncertainty) { 
+            for (ix1 = 0; ix1 < nwave; ix1++)
+                for (ix2 = 0; ix2 < nwave; ix2++)
+                    derv_outband_nlw[ix1 * nwave + ix2] =
+                        covariance_matrix[ix1 * nwave + ix2] * Fobar[ix1] * Fobar[ix2];
+        }
+
+        nlw_outband(l1_input->evalmask, sensorID, wave, nwave, Lw, nLw, outband_corr,derv_outband_nlw,&tmp_derv2);
+
+        if (uncertainty && tmp_derv2!=0.) {
+             /*calculate covariance matrix accounting for the correction     */
+            /* cov(Rrs1, Rrs2)=F1.Cov(X1,X2).F2                             */
+            /*  F1: matrix of partial derivative of Rrs1 to X1(matrix)      */
+            /*  F2: matrix of partial derivative of Rrs2 to X2(matrix)     */
+            /*  COV(X1,X2):variance-covariance matrix of (X1,X2)           */
+            /*  X1(nLw_unc[ib], ratio)  ratio is used in calculating outband_corr */
+            /*  X2(nLw_unc[iw], ratio)                                     */
+            for (ib = 0; ib < nwave; ib++) {
+                F1[0]=outband_corr[ib];
+                F1[1]=derv_outband_nlw[ib];
+                for (iw = ib; iw < nwave; iw++) {
+                    ipb=ib*nwave+iw;
+                    tmp_derv1=Fobar[ib] * Fobar[iw];
+                    F2[0] = outband_corr[iw];
+                    F2[1] = derv_outband_nlw[iw];
+                    
+                    cov=F1[0]*F2[0]*covariance_matrix[ipb]*tmp_derv1;
+                    cov+=F1[1]*F2[1]*tmp_derv2;
+                    covariance_matrix[ipb]=cov/tmp_derv1;
+
+                    if (iw == ib)
+                        Rrs_unc[ib] = sqrt(covariance_matrix[ipb]);
+                }
+            }
+        }
+
     }
 
     /* Compute f/Q correction and apply to nLw */
     if (brdf_opt >= FOQMOREL) {
-        ocbrdf(l2rec, ip, brdf_opt, wave, nwvis, solz, senz, delphi, ws, -1.0, nLw, Fobar, brdf);
-        for (ib = 0; ib < nwvis; ib++) {
-            nLw[ib] = nLw[ib] * brdf[ib];
+        if (uncertainty) {
+            tmp_derv1=*dchl;
+            for (ib = 0; ib < nwave; ib++)
+                for (iw = ib; iw < nwave; iw++) {
+                    ipb = ib * nwave + iw;
+                    derv_outband_nlw[ipb]=covariance_matrix[ipb];
+                }
+        }
+        ocbrdf(l2rec, ip, brdf_opt, wave, nwvis, solz, senz, delphi, ws, -1.0, nLw, Fobar, brdf,
+               derv_brdf_chl);
+        for (ix1 = 0; ix1 < nwvis; ix1++) {
+            nLw[ix1] = nLw[ix1] * brdf[ix1];
+        }
 
-            if(uncertainty) {
-                Rrs_unc[ib] *= brdf[ib];
-                for (iw = ib; iw < nwave; iw++)
-                    covariance_matrix[ib * nwave + iw] *= (brdf[ib] * brdf[iw]);
+        if (uncertainty && derv_brdf_chl[0] != 0) {
+            /*calculate covariance matrix accounting for the correction     */
+            /* cov(Rrs1, Rrs2)=F1.Cov(X1,X2).F2                             */
+            /*  F1: matrix of partial derivative of Rrs1 to X1(matrix)      */
+            /*  F2: matrix of partial derivative of Rrs2 to X2(matrix)     */
+            /*  COV(X1,X2):variance-covariance matrix of (X1,X2)           */
+            /*  X1(nLw_unc[ib], chl)  chl is used in calculating brdf     */
+            /*  X2(nLw_unc[iw], chl)                                     */
+            *dchl = tmp_derv1;
+            for (ib = 0; ib < nwave; ib++) {
+                F1[0] = brdf[ib];
+                F1[1] = derv_brdf_chl[ib];
+                for (iw = ib; iw < nwave; iw++) {
+                    ipb = ib * nwave + iw;
+                    tmp_derv1 = Fobar[ib] * Fobar[iw];
+                    F2[0] = brdf[iw];
+                    F2[1] = derv_brdf_chl[iw];
+
+                    cov = F1[0] * F2[0] * derv_outband_nlw[ipb] * tmp_derv1;
+                    cov += F1[1] * F2[1] * (*dchl * *dchl);
+                    covariance_matrix[ipb] = cov / tmp_derv1;
+                }
             }
         }
     }
@@ -1172,21 +1028,8 @@ NIRSWIR:
         if (ib != aer_s && ib != aer_l) {
             Rrs[ib] = nLw[ib] / Fobar[ib];
             l2rec->Rrs[ip * nwave + ib] = Rrs[ib];
-        }
-    }
-
-    if (uncertainty) {
-        for (ib = nwvis; ib < nwave; ib++)
-            for (iw = ib; iw < nwave; iw++)
-                covariance_matrix[ib * nwave + iw] /= (Fobar[ib] * Fobar[iw]);
-
-        for (ib = aer_s; ib < nwave; ib += daer) {
-            if (Rrs_unc[ib] < 0)
-                Rrs_unc[ib] = BAD_FLT;
-            else {
-                for (iw = ib; iw < nwave; iw++)
-                    covariance_matrix[ib * nwave + iw] *= (brdf[ib] * brdf[iw]);
-            }
+            if (uncertainty)
+                l2rec->Rrs_unc[ip*nwave+ib] = sqrt(covariance_matrix[ib * nwave + ib]);
         }
     }
 
@@ -1197,7 +1040,7 @@ NIRSWIR:
     if (uncertainty) {
         if (*aermodmin == *aermodmax || (*aermodrat2!=BAD_FLT && *aermodmin2 == *aermodmax2)) {
             for (ib = 0; ib < nwave; ib++) {
-                Rrs_unc[ib] = BAD_FLT;
+                l2rec->Rrs_unc[ip*nwave+ib] = BAD_FLT;
                 for (iw = 0; iw < nwave; iw++)
                     covariance_matrix[ib * nwave + iw] = BAD_FLT;
             }
@@ -1220,33 +1063,18 @@ NIRSWIR:
     free(radref);
 
     if(uncertainty){
-        free(dtLw);
-        free(dtLw_nir);
-        free(dlast_tLw_nir);
         free(dLtemp);
-        free(last_dtaua);
-        free(dtaua);
-        free(derv_taua_l);
-        free(derv_rhow_l);
-        free(derv_rh);
-        for (ib = 0; ib < nwave; ib++)
-            free(derv_rhorc[ib]);
-        free(derv_rhorc);
+        free(last_derv_taua_rhorc);
+    
+        for (ib = 0; ib < nwave; ib++)  
+            free(derv_taua_rhorc[ib]);
+        free(derv_taua_rhorc);
 
-        free(F1);
-        free(F2);
-        free(F1_temp);
-        for (ib = 0; ib < dim; ib++)
-            free(COV[ib]);
-        free(COV);
-
-        for (ib = 0; ib < nwave; ib++)
-            free(corr_nir[ib]);
-        free(corr_nir);
+        free(last_derv_rhownir_rrs);
+        free(last_derv_rhownir_chl);
+        free(derv_rhownir_chl);
+        free(derv_rhownir_rrs);
     }
 
     return (status);
 }
-
-
-

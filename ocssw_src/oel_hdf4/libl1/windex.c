@@ -63,7 +63,7 @@ int bindex_get_555(int32_t sensorId) {
      // OCI is in this list to keep things from changing in V3. Before the next reprocessing,
      // remove OCI from this block !!!!!
      // !!!!!!!!
-    if ((sensorId == MODISA || sensorId == MODIST || sensorId == HICO || sensorId == OCI))
+    if (sensorId == MODISA || sensorId == MODIST || sensorId == HICO )
         return bindex_get(547);
 
     int bands[] = {555, 550, 560, 565}; // More easily extendable than an if ladder

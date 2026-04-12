@@ -65,7 +65,6 @@ set(L2GEN_COMMON_FILES
   viirs_pxcvt.c
   setflags_l2.c
   wavelength_3d.cpp
-  
 # fortran files to get rid of
   lenstr.cpp
 )
@@ -80,7 +79,9 @@ if(BUILD_HISTORICAL)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DBUILD_HISTORICAL")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBUILD_HISTORICAL")
 endif(BUILD_HISTORICAL)
-
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64" AND CMAKE_BUILD_TYPE STREQUAL "Release" )
+    set_source_files_properties(compute_uncertainty.c PROPERTIES COMPILE_FLAGS  "-ffast-math")
+endif()
 set(L2GEN_PRODUCT_FILES
   prodgen.c
   prodlist.c
@@ -146,7 +147,6 @@ set(L2GEN_PRODUCT_FILES
   axis_interp.c
   ams_oe_inversion.c
   get_bpar.c
-  get_uncertainty.c
   get_ndwi.c
   get_ndii.c
   get_cci.c
@@ -160,6 +160,7 @@ set(L2GEN_PRODUCT_FILES
 )
 
 set(L2GEN_ANCILLARY_FILES
+  get_uncertainty.c
   gas_trans.c
   seawater.c
   seawater_get.c
@@ -210,6 +211,7 @@ add_executable(l2gen
   water_vapor.c
   airmass.c
   aerosol.c
+  compute_uncertainty.c
   atmocor2.c
   glint.c
   get_rhown_nir.c
@@ -272,6 +274,7 @@ add_executable(l3gen
   water_vapor.c
   airmass.c
   aerosol.c
+  compute_uncertainty.c
   atmocor2.c
   glint.c
   get_rhown_nir.c
@@ -349,6 +352,7 @@ add_executable(vcalmerge
   owt.c
   get_owmc.c
   lonlat2pixline.cpp
+  compute_uncertainty.c
   atmocor2.c
   brdf.c
   cpl1rec.c
@@ -412,6 +416,7 @@ add_executable(l1det2det
   owt.c
   get_owmc.c
   lonlat2pixline.cpp
+  compute_uncertainty.c
   atmocor2.c
   brdf.c
   cpl1rec.c
@@ -454,27 +459,29 @@ add_executable(l1brsgen
   ${L2GEN_COMMON_FILES}
   )
 
-add_executable(l1mapgen
-  main_l1mapgen.c
-  l1_imgscale.c
-  msl12_input.c
-  loadl1.c
-  read_pixel_anc_file.cpp
-  atmocor1.c
-  atmocor1_land.c
-  whitecaps.c
-  rayleigh.c
-  polcor_hawkeye.cpp
-  polcor_oci.cpp
-  polcor.c
-  water_vapor.c
-  mipolyutil.c
-  get_rhos.c
-  ${ATREM_C_CODE}
-  ${ATREM_F_CODE}
-  ${L2GEN_ANCILLARY_FILES}
-  ${L2GEN_COMMON_FILES}
-  )
+if(X11_FOUND)
+  add_executable(l1mapgen
+    main_l1mapgen.c
+    l1_imgscale.c
+    msl12_input.c
+    loadl1.c
+    read_pixel_anc_file.cpp
+    atmocor1.c
+    atmocor1_land.c
+    whitecaps.c
+    rayleigh.c
+    polcor_hawkeye.cpp
+    polcor_oci.cpp
+    polcor.c
+    water_vapor.c
+    mipolyutil.c
+    get_rhos.c
+    ${ATREM_C_CODE}
+    ${ATREM_F_CODE}
+    ${L2GEN_ANCILLARY_FILES}
+    ${L2GEN_COMMON_FILES}
+    )
+endif(X11_FOUND)
 
 add_executable(l1bgen_generic
   main_l1bgen.c
@@ -530,11 +537,13 @@ target_link_libraries(l1brsgen
   ${LIBS}
   )
 
-target_link_libraries(l1mapgen
-  anc
-  ${PNG_LIBRARIES}
-  ${LIBS}
-  )
+if(X11_FOUND)
+  target_link_libraries(l1mapgen
+    anc
+    ${PNG_LIBRARIES}
+    ${LIBS}
+    )
+endif(X11_FOUND)
 
 target_link_libraries(l1info
   ${LIBS}
@@ -575,4 +584,9 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
   endif()
 endif()
 
-install (TARGETS l2gen l3gen l1bgen_generic l1brsgen l1mapgen l1info lonlat2pixline vcalmerge l2binmatch l1det2det DESTINATION bin)
+set(LOCAL_PROGRAMS l2gen l3gen l1bgen_generic l1brsgen l1info lonlat2pixline vcalmerge l2binmatch l1det2det)
+if (X11_FOUND)
+  list (APPEND LOCAL_PROGRAMS l1mapgen)
+endif(X11_FOUND)
+
+install (TARGETS ${LOCAL_PROGRAMS} DESTINATION bin)

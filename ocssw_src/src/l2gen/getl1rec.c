@@ -197,8 +197,6 @@ int getl1rec(int32_t iscan, int32_t dscan, l1str *l1rec) {
             return (EXIT_FAILURE);
         }
 
-        for(iq=0;iq<nq;iq++)
-            l1que.r[iq].uncertainty=NULL;
         if(l1rec->uncertainty){
             for(iq=0;iq<nq;iq++){
                 l1que.r[iq].uncertainty= (uncertainty_t*) malloc(sizeof (uncertainty_t));
@@ -220,6 +218,10 @@ int getl1rec(int32_t iscan, int32_t dscan, l1str *l1rec) {
     /* Now make a copy of the center queue record.                  */
     cpl1rec(l1rec, crec);
 
+    /* calculate uncertainty sources*/
+    if (l1rec->uncertainty)
+        get_uncertainty(l1rec);
+
     /* And replace data with smoothed values, if desired.           */
     if (input->fctl.nfilt > 0) {
         filter(&input->fctl, &l1que, l1rec, dscan);
@@ -227,19 +229,6 @@ int getl1rec(int32_t iscan, int32_t dscan, l1str *l1rec) {
         setflagbits_l1(1, l1rec, -1);
         for (ip = 0; ip < npix; ip++)
             l1_mask_set(l1rec, ip);
-    }
-
-    //lt_agregat_ocis(l1rec);
-
-    if(l1rec->uncertainty){
-
-        init_uncertainty(l1rec->uncertainty,1);
-
-        /*   calculate the error in Lt and Lr */
-        //set_error_input(l1rec);
-
-        get_uncertainty(l1rec);
-
     }
 
     /* Reset scan-specific private data */

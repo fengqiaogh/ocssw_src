@@ -52,12 +52,12 @@ float conv_rrs_to_555(float Rrs, float wave, float uRrs_in, float *uRrs_out ) {
         	temp_Rrs=Rrs;
         	Rrs = pow(10.0, a1 * log10(Rrs) - b1);
         	if(uRrs_out) {
-        	    *uRrs_out=Rrs*a1/temp_Rrs*uRrs_in;
+        	    *uRrs_out=Rrs*a1/temp_Rrs;
             }
         } else{
         	Rrs = a2 * Rrs - b2;
         	if(uRrs_out) {
-        	    *uRrs_out=a2*uRrs_in;
+        	    *uRrs_out=a2;
             }
         }
     }

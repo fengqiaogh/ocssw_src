@@ -47,18 +47,22 @@ void glint_rad(int32_t iter, int32_t nband, int32_t nir_s, int32_t nir_l,
     static float rhoa_min2 = 0.008;
     static int32_t iter_max = 2;
     static float rfac = 0.8;
-    float *derv_Lg_taua=NULL;
+    float *derv_rhog_taua=NULL, *derv_TLg_gc=NULL,*derv_rhog_rhorc_l;
     int aer_base=bindex_get(input->aer_wave_base);
+    float temp_derv;
+    float derv_taua_ave_gc=0.,derv_taua_ave_rhorc_l=0.;
 
-    if(uncertainty)
-        derv_Lg_taua=uncertainty->derv_Lg_taua;
+    if (uncertainty) {
+        derv_rhog_taua = uncertainty->derv_rhog_taua;
+        derv_rhog_rhorc_l = uncertainty->derv_rhog_rhorc_l;
+        derv_TLg_gc    = uncertainty->derv_TLg_gc;
+    }
 
     int32_t ib;
-    float taua_c;
+    float taua_c,multiply_taua_c;
     float refl_test;
     float taua_ave2;
     float fac;
-    int Iftaua=0;
     float derv_taua_c;
 
 
@@ -72,52 +76,74 @@ void glint_rad(int32_t iter, int32_t nband, int32_t nir_s, int32_t nir_l,
     else if (glint_coef[aer_base] <= glint_min)
         for (ib = 0; ib < nband; ib++) {
             TLg[ib] = 0.0;
-            if(uncertainty)
-                derv_Lg_taua[ib]=0.0;
+            if (uncertainty){
+                derv_rhog_taua[ib] = 0.0;
+                derv_rhog_rhorc_l[ib] = 0.0;
+            }              
         } else {
 
         refl_test = OEL_PI / mu0 * (La[nir_l] / F0[nir_l] - glint_coef[nir_l] * exp(-(taur[nir_l] + taua_ave) * airmass));
 
-        if (refl_test <= rhoa_min)
-            taua_ave2 = taua_est(10. * MAX(refl_test, 0.0001));
-        else
+        if (refl_test <= rhoa_min){
+            taua_ave2 = taua_est(10. * MAX(refl_test, 0.0001));  // !!!!! This part may need to include rhorc[nir_l]
+            if(uncertainty){
+                if (refl_test > 0.0001) {
+                    temp_derv=-0.4 / (10 * refl_test)* OEL_PI / mu0;
+
+                    derv_taua_ave_rhorc_l= 1/F0[nir_l];
+                    derv_taua_ave_gc =-exp(-(taur[nir_l] + taua_ave) * airmass);
+
+                    derv_taua_ave_gc *= temp_derv;
+                    derv_taua_ave_rhorc_l*=temp_derv;
+                }
+            }
+        } else {
             taua_ave2 = taua_ave;
+        }
 
         for (ib = 0; ib < nband; ib++) {
 
-            if (uncertainty)
-                derv_Lg_taua[ib]=0.0;
+            if(uncertainty){
+                derv_rhog_taua[ib] = 0.0;
+                temp_derv=0.;
+            }
+                
             if (iter <= 1) {
             	taua_c = taua_ave2;
             	derv_taua_c=0.0;
-            } else if (taua[nir_l] <= taua_min) {
-            	taua_c = taua_est(taua[nir_l]);
-            	Iftaua=1;
+                temp_derv=derv_taua_ave_gc;
 
+            } else if (taua[nir_l] <= taua_min) {
+                derv_taua_ave_rhorc_l=0.;
+            	taua_c = taua_est(taua[nir_l]);
+                
             	if(uncertainty) {
                     derv_taua_c=-0.4/taua[nir_l];
+                    uncertainty->aer_l_glint=1;
             	}
             } else {
+                derv_taua_ave_rhorc_l=0.;
             	taua_c = taua[ib];
-            	Iftaua=1;
-            	derv_taua_c=taua[ib]/taua[nir_l];
+            	derv_taua_c=1;
             }
 
             /* Check for over-correction */
             if (ib == 0)
                 refl_test = OEL_PI / mu0 * (La[nir_l] / F0[nir_l] - glint_coef[nir_l] * exp(-(taur[nir_l] + taua_c) * airmass));
 
-            if (refl_test <= rhoa_min2){
-            	TLg[ib] = F0[ib] * glint_coef[ib] * exp(-(taur[ib] + 1.5 * taua_c) * airmass);
-            	if(Iftaua && uncertainty)
-            		derv_Lg_taua[ib]=-TLg[ib]*1.5*airmass*derv_taua_c;   // TODO: fix the problem when taua_c equals to taua_est(taua[nir_l]);
-            } else {
-            	TLg[ib] = F0[ib] * glint_coef[ib] * exp(-(taur[ib] + taua_c) * airmass);
-            	if(Iftaua && uncertainty)
-                    derv_Lg_taua[ib]=-TLg[ib]*airmass*derv_taua_c;
+            if (refl_test <= rhoa_min2)
+                multiply_taua_c = 1.5;
+            else
+                multiply_taua_c = 1.0;
+
+            TLg[ib] = F0[ib] * glint_coef[ib] * exp(-(taur[ib] + multiply_taua_c * taua_c) * airmass);
+            if (uncertainty) {
+                derv_rhog_taua[ib]    = -TLg[ib] * multiply_taua_c * airmass * derv_taua_c;
+                derv_rhog_rhorc_l[ib] = -TLg[ib] * multiply_taua_c * airmass * derv_taua_ave_rhorc_l;
+                derv_TLg_gc[ib] = temp_derv * (-multiply_taua_c * TLg[ib] * airmass);
+                derv_TLg_gc[ib] += F0[ib] * exp(-(taur[ib] + multiply_taua_c * taua_c) * airmass);
             }
         }
-
 
         /* Make sure there is no over-correction */
         if (La[nir_l] > 0.0 && La[nir_s] > 0.0) {
@@ -125,8 +151,11 @@ void glint_rad(int32_t iter, int32_t nband, int32_t nir_s, int32_t nir_l,
             if (fac >= rfac) {
                 for (ib = 0; ib < nband; ib++) {
                     TLg[ib] = rfac * TLg[ib] / fac;
-                    if(uncertainty)
-                        derv_Lg_taua[ib]*=(rfac/fac);
+                    if(uncertainty){
+                        derv_rhog_taua[ib]*=(rfac/fac);
+                        derv_TLg_gc[ib]*=(rfac/fac);
+                        derv_rhog_rhorc_l[ib]*=(rfac/fac);
+                    }
                 }
 
             }

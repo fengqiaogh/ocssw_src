@@ -1396,7 +1396,6 @@ int main(int argc, char *argv[]) {
 
     /////////////////// End Main Loop ///////////////////
 
-    l1aFileManager.closeAllL1aFiles();
 
     // no l1a made, do not dump outlist buffer so no outlist is generated
     if (!l1aFileManager.filesWereGenerated()) {
@@ -1406,6 +1405,9 @@ int main(int argc, char *argv[]) {
         // dump all the file info into the file and close it
         l1aFileManager.dumpOutlistBuffer(outlist);
     }
+
+    // close after dumping outlist buffer because dumping to outlist needs to access to the L1aFileManager objects
+    l1aFileManager.closeAllL1aFiles();
     
 
     // Deallocate

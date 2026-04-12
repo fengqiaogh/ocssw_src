@@ -34,7 +34,7 @@ void polcor(l1str *l1rec, int32_t ip) {
     static char *pxangix; /* index of low angle storage */
 
     float *polcor = l1rec->polcor;
-    float *delta_polcor=NULL;
+    float *derv_polcor_Lt, *derv_polcor_tgsol, *derv_polcor_tgsen,temp;
     float *dpol = l1rec->dpol;
 
     int32_t pixnum = l1rec->pixnum[ip];
@@ -60,7 +60,9 @@ void polcor(l1str *l1rec, int32_t ip) {
     int get_wt(float, float *, int, float *, char *);
 
     if(l1rec->uncertainty) {
-        delta_polcor=l1rec->uncertainty->derv_pol;
+        derv_polcor_Lt=l1rec->uncertainty->derv_polcor_Lt;
+        derv_polcor_tgsen=l1rec->uncertainty->derv_polcor_tgsen;
+        derv_polcor_tgsol=l1rec->uncertainty->derv_polcor_tgsol;
     }
 
     if (mside < 0) mside = 0;
@@ -338,7 +340,9 @@ void polcor(l1str *l1rec, int32_t ip) {
         alpha = l1rec->alpha[ip] / OEL_RADEG;
         L_x = l1rec->Lt[ipb] / l1rec->tg_sol[ipb] / l1rec->tg_sen[ipb];
         if(l1rec->uncertainty) {
-            delta_polcor[ipb]= 1/ l1rec->tg_sol[ipb] / l1rec->tg_sen[ipb];
+            derv_polcor_Lt[ipb]   = 1/ l1rec->tg_sol[ipb] / l1rec->tg_sen[ipb];
+            derv_polcor_tgsen[ipb]= -L_x / l1rec->tg_sen[ipb];
+            derv_polcor_tgsol[ipb]= -L_x / l1rec->tg_sol[ipb];
         }
         if (L_x > 0.0) {
             L_qp = l1rec->L_q[ipb] * cos(2 * alpha) + l1rec->L_u[ipb] * sin(2 * alpha);
@@ -347,23 +351,28 @@ void polcor(l1str *l1rec, int32_t ip) {
                 dm12 = get_xcal(l1rec, XM12, l1rec->l1file->iwave[ib]);
                 dm13 = get_xcal(l1rec, XM13, l1rec->l1file->iwave[ib]);
                 polcor[ipb] = 1.0 / (1.0 - dm12[ip] * L_qp / L_x - dm13[ip] * L_up / L_x);
+                if (l1rec->uncertainty)
+                    temp = -polcor[ipb] * polcor[ipb] * (dm12[ip] * L_qp + dm13[ip] * L_up) / (L_x * L_x);
             } else {
                 for (iang = pxangix[pixnum]; iang <= (pxangix[pixnum] + 1); iang++) {
                     m1[iang] = 1.0 / (1.0
                             - m12[ib][mside][iang][idet] * L_qp / L_x
                             - m13[ib][mside][iang][idet] * L_up / L_x);
 
-                    if(l1rec->uncertainty) {
+                    if(l1rec->uncertainty)
                         deriv_m1[iang]=-m1[iang]*m1[iang]*(m12[ib][mside][iang][idet] * L_qp + m13[ib][mside][iang][idet] * L_up)/(L_x*L_x);
-                        deriv_m1[iang]*=delta_polcor[ipb];
-                    }
                 }
                 polcor[ipb] = m1[(int) pxangix[pixnum]] * (1. - pxwt[pixnum]) + m1[(int) pxangix[pixnum] + 1] * pxwt[pixnum];
-                if(l1rec->uncertainty) {
-                    delta_polcor[ipb]=deriv_m1[(int) pxangix[pixnum]] * (1. - pxwt[pixnum]) + deriv_m1[(int) pxangix[pixnum] + 1] * pxwt[pixnum];
-                }
+                if(l1rec->uncertainty)
+                    temp=deriv_m1[(int) pxangix[pixnum]] * (1. - pxwt[pixnum]) + deriv_m1[(int) pxangix[pixnum] + 1] * pxwt[pixnum];
             }
             dpol [ipb] = sqrt(pow(l1rec->L_q[ipb], 2.0) + pow(l1rec->L_u[ipb], 2.0)) / L_x;
+
+            if (l1rec->uncertainty) {
+                    derv_polcor_Lt[ipb]    *= temp;
+                    derv_polcor_tgsen[ipb] *= temp;
+                    derv_polcor_tgsol[ipb] *= temp;
+                }
 
             /* quick-fix to polcor of aerosol bands only */
             if (input->pol_opt == 6 && ib != nir_l && ib != nir_s)

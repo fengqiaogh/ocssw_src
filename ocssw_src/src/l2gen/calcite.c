@@ -24,13 +24,16 @@
 #include "l12_proto.h"
 #include "l2_flags.h"
 
-#define BAD_CACO3 BAD_FLT
-
 static int32_t  caco3_msk = LAND | HIGLINT | CLOUD | HILT;
-static float bbstr = 1.628;
+static float bbstr = 1.628; // for ci2 this is now updated via pic_limits_file
 static float caco3min = 1e-5;     // BCB - was 1.18e-5
 static float caco3hi   = 0.0005;  // BCB - was 0.003
 static float fixedbbstar = 1.28;
+// run_legacy is used to maintain backward compatiblity for use of newbbstar and fixedbbstar in 3-band
+static int32_t run_legacy = 1;
+// limits for blending ci2 with 3-band, updated via pic_limits_file
+static float lowlim = 0.00436;  // V2 lowlim = 0.00301
+static float uplim = 0.00628;   // V2 uplim = 0.00501
 
 /* --------------------------------------------------------------------- */
 /* calcite_3b() - calcium carbonate concentration from 3-Band algorith.. */
@@ -117,7 +120,7 @@ float calcite_3b(l2str *l2rec, int32_t ip) {
     numiter = 0;
     bbctol = 100.;
     bbcinit = 0.00085;
-    caco3 = BAD_CACO3;
+    caco3 = BAD_FLT;
     bbc[0] = 0.000;
 
     /* skip pixel if already masked (this should not include ATMFAIL) */
@@ -212,13 +215,15 @@ float calcite_3b(l2str *l2rec, int32_t ip) {
         if (bbc_cclth > 0) {
             // convert to calcite in moles/m^3 (Balch 2005)
             caco3 = bbc_cclth / bbstr;
-            newbbstar = pow(10,(0.2007476*log10(caco3)*log10(caco3) + 1.033187*log10(caco3) + 1.069821));
+            if (run_legacy) {
+                newbbstar = pow(10,(0.2007476*log10(caco3)*log10(caco3) + 1.033187*log10(caco3) + 1.069821));
 
-            if (newbbstar < fixedbbstar) {
-                newbbstar = fixedbbstar;
+                if (newbbstar < fixedbbstar) {
+                    newbbstar = fixedbbstar;
+                }
+
+                caco3 = caco3*bbstr/newbbstar;
             }
-
-            caco3 = caco3*bbstr/newbbstar;
         }
     }
 
@@ -325,7 +330,7 @@ float calcite_2b(l2str *l2rec, int32_t ip) {
         firstCall = 0;
     }
 
-    caco3 = BAD_CACO3;
+    caco3 = BAD_FLT;
 
     // skip pixel if already masked (this includes ATMFAIL)
     if (l1rec->mask[ip]) {
@@ -420,7 +425,7 @@ float calcite_2b(l2str *l2rec, int32_t ip) {
 /* calcite_c() - calcium carbonate concentration (combined algorithm)    */
 /* --------------------------------------------------------------------- */
 float calcite_c(l2str *l2rec, int32_t ip) {
-    float caco3 = BAD_CACO3;
+    float caco3 = BAD_FLT;
     int32_t shallow;
     int32_t turbid;
     int32_t shallowDepth = 30;          // BCB - how shallow is too shallow?
@@ -430,23 +435,23 @@ float calcite_c(l2str *l2rec, int32_t ip) {
 
 
     if (turbid & shallow) {
-      caco3 = BAD_CACO3;                // BCB - if it's shallow and turbid, we don't believe it.
+      caco3 = BAD_FLT;                // BCB - if it's shallow and turbid, we don't believe it.
     } else {
         caco3 = calcite_2b(l2rec,ip);     // BCB - calculate 2 band value
         if (caco3 < 0.0) {                // BCB - did it fail?
             if (caco3 < -2.0) {             // BCB - yes, how did it fail?
                 caco3 = calcite_3b(l2rec,ip); // BCB - normal 2 band failure, call the 3 band
                 if (caco3 < caco3hi) {        // BCB - is 3 band value believable?
-                    caco3 = BAD_CACO3;          // BCB - nope, fail.
+                    caco3 = BAD_FLT;          // BCB - nope, fail.
                 }
             } else {
-                caco3 = BAD_CACO3;            // BCB - 2 band failed out of the low side of the table, fail
+                caco3 = BAD_FLT;            // BCB - 2 band failed out of the low side of the table, fail
             }
         }
     }
 
     // if valid value
-    if (caco3 > BAD_CACO3) {
+    if (caco3 > BAD_FLT) {
         caco3 = MAX(caco3, caco3min);
     }
 
@@ -459,7 +464,7 @@ float calcite_c(l2str *l2rec, int32_t ip) {
 
 /* --------------------------------------------------------------------- */
 float calcite_ci2(l2str *l2rec, int32_t ip) {
-    float caco3 = BAD_CACO3;
+    float caco3 = BAD_FLT;
     int nwave = l2rec->l1rec->l1file->nbands;
     static int32_t ibRed;
     static int32_t ibGreen;
@@ -474,10 +479,100 @@ float calcite_ci2(l2str *l2rec, int32_t ip) {
     float RrsRed = l2rec->Rrs[ip * nwave + ibRed];
     float RrsGreen = l2rec->Rrs[ip * nwave + ibGreen];
     if (RrsRed >= 0.0 && RrsGreen >= 0.0) {
-        caco3 = 1.3055 * (RrsGreen - RrsRed) - 0.00188;    // SRP 09/21 changed from previous caco3 = 0.4579 * (RrsGreen - RrsRed) - 0.0006;
+		caco3 = 79.446 * pow((RrsGreen - RrsRed),2.160); // revised by C.Mitchell 03/17/2026
+        //caco3 = 1.3055 * (RrsGreen - RrsRed) - 0.00188;    // SRP 09/21 changed from previous caco3 = 0.4579 * (RrsGreen - RrsRed) - 0.0006;
     }
     if (caco3<0) {
-      caco3=BAD_CACO3;
+      caco3=BAD_FLT;
+    }
+    return (caco3);
+}
+
+void getCalciteLimits() {
+
+    if(input->pic_limits_file[0] != 0) {
+        FILE *info = fopen(input->pic_limits_file, "r");
+        if (!info) {
+            printf("-E- unable to open pic_limits_file %s for reading\n",
+                    input->pic_limits_file);
+            exit(EXIT_FAILURE);
+        }
+        if(fscanf(info, "lowlim = %f\n", &lowlim) != 1) {
+            printf("-E- unable to read lowlim from pic_limits_file %s\n",
+                    input->pic_limits_file);
+            exit(EXIT_FAILURE);
+        }
+        if(fscanf(info, "uplim = %f\n", &uplim) != 1) {
+            printf("-E- unable to read uplim from pic_limits_file %s\n",
+                    input->pic_limits_file);
+            exit(EXIT_FAILURE);
+        }
+        if(fscanf(info, "bbstar = %f\n", &bbstr) != 1) {
+            printf("-E- unable to read bbstar from pic_limits_file %s\n",
+                    input->pic_limits_file);
+            exit(EXIT_FAILURE);
+        }
+        fclose(info);
+    }
+
+    printf("Calcite limits file = %s\n", input->pic_limits_file);
+    printf("    lowlim = %f\n", lowlim);
+    printf("    uplim  = %f\n", uplim);
+    printf("    bbstar = %f\n", bbstr);
+}
+
+/* --------------------------------------------------------------------- */
+/* calcite_ci_merged() - calcium carbonate concentration -               */
+/*                       Merged CI2 and 3B algorithm                     */
+/*                reference: doi:10.1002/2017JC013146                    */
+/* --------------------------------------------------------------------- */
+float calcite_ci_merged(l2str *l2rec, int32_t ip) {
+    float caco3 = BAD_FLT;
+    float cipic;
+    float b3pic;
+    int nwave = l2rec->l1rec->l1file->nbands;
+    static int32_t ibRed;
+    static int32_t ibGreen;
+    static int firstCall = 1;
+
+    if (firstCall) {
+        run_legacy = 0;
+        caco3_msk = LAND | CLOUD | HILT;
+
+        ibRed = windex(667., l2rec->l1rec->l1file->fwave, nwave);
+        ibGreen = windex(550., l2rec->l1rec->l1file->fwave, nwave);
+        getCalciteLimits();
+        firstCall = 0;
+    }
+
+    if (uplim == BAD_FLT || lowlim == BAD_FLT) {
+        return BAD_FLT;
+    }
+
+    float RrsRed = l2rec->Rrs[ip * nwave + ibRed];  // Have RrsRed and Green available to calculate CI2
+    float RrsGreen = l2rec->Rrs[ip * nwave + ibGreen];
+
+    cipic = calcite_ci2(l2rec, ip);  // Have calcite values readily available for downstream if statements
+    b3pic = calcite_3b(l2rec, ip);
+
+    if (b3pic <= cipic) {  // If calcite_3b <= to calcite_ci2, or if calcite 3b is masked, use calcite_ci2
+        caco3 = cipic;
+    } else {
+        if (RrsRed >= 0.0 && RrsGreen >= 0.0) {  // Only evaluate merged product if we have good Rrs values.
+            if (RrsGreen - RrsRed < lowlim) {    // If CI2 less than lower limit, set calcite to calcite_ci2
+                caco3 = cipic;
+            } else if (RrsGreen - RrsRed >
+                       uplim) {  // If CI2 greater than upper limit, set calcite to calcite_3b
+                caco3 = b3pic;
+            } else {  // For CI2 between limits, set calcite to a weighted average of calcite_3b and
+                      // calcite_ci2
+                caco3 = cipic * (uplim - (RrsGreen - RrsRed)) / (uplim - lowlim) +
+                        b3pic * ((RrsGreen - RrsRed) - lowlim) / (uplim - lowlim);
+            }
+        }
+    }
+    if (caco3 < 0) {
+        caco3 = BAD_FLT;
     }
     return (caco3);
 }
@@ -489,7 +584,7 @@ float calcite_ci2(l2str *l2rec, int32_t ip) {
 
 /* --------------------------------------------------------------------- */
 float calcite_ciNIR(l2str *l2rec, int32_t ip, int32_t NIR) {
-    float caco3 = BAD_CACO3;
+    float caco3 = BAD_FLT;
     float CI = BAD_FLT;
     int nwave = l2rec->l1rec->l1file->nbands;
     static int32_t ibNIR;
@@ -528,10 +623,18 @@ float calcite_ciNIR(l2str *l2rec, int32_t ip, int32_t NIR) {
         }
     }
     if (caco3<0) {
-      caco3=BAD_CACO3;
+      caco3=BAD_FLT;
     }
 
     return (caco3);
+}
+
+float calcite_ci748_wrapper(l2str* l2rec, int ip) {
+    return calcite_ciNIR(l2rec, ip, 748);
+}
+
+float calcite_ci869_wrapper(l2str* l2rec, int ip) {
+    return calcite_ciNIR(l2rec, ip, 869);
 }
 
 /* ------------------------------------------------------------------- */
@@ -540,33 +643,43 @@ float calcite_ciNIR(l2str *l2rec, int32_t ip, int32_t NIR) {
 void calcite(l2str *l2rec, l2prodstr *p, float prod[]) {
     int32_t ip;
 
-    for (ip = 0; ip < l2rec->l1rec->npix; ip++) {
-        switch (p->cat_ix) {
+    float (*CalciteFunction)(l2str*, int32_t ip) = NULL;
+    switch (p->cat_ix) {
         case CAT_calcite:
-            prod[ip] = calcite_c(l2rec, ip);
+            CalciteFunction = calcite_c;
             break;
         case CAT_calcite_2b:
-            prod[ip] = calcite_2b(l2rec, ip);
+            CalciteFunction = calcite_2b;
             break;
         case CAT_calcite_3b:
-            prod[ip] = calcite_3b(l2rec, ip);
+            CalciteFunction = calcite_3b;
             break;
         case CAT_calcite_ci2:
-            prod[ip] = calcite_ci2(l2rec, ip);
+            CalciteFunction = calcite_ci2;
             break;
         case CAT_calcite_ci748:
-            prod[ip] = calcite_ciNIR(l2rec, ip,748);
+            CalciteFunction = calcite_ci748_wrapper;
             break;
         case CAT_calcite_ci869:
-            prod[ip] = calcite_ciNIR(l2rec, ip,869);
+            CalciteFunction = calcite_ci869_wrapper;
+            break;
+        case CAT_calcite_ci_merged:
+            CalciteFunction = calcite_ci_merged;
             break;
         default:
             printf("Error: %s : Unknown product specifier: %d\n", __FILE__, p->cat_ix);
             exit(1);
             break;
-        }
+    }
 
-        if (prod[ip] == BAD_CACO3)
+    if (CalciteFunction == NULL) {
+        fprintf(stderr, "-E- %s:%d. CalciteFunction was not set\n", __FILE__, __LINE__);
+        exit(EXIT_FAILURE);
+    }
+
+    for (ip = 0; ip < l2rec->l1rec->npix; ip++) {
+        prod[ip] = CalciteFunction(l2rec, ip);
+        if (prod[ip] == BAD_FLT)
             l2rec->l1rec->flags[ip] |= PRODFAIL;
     }
 

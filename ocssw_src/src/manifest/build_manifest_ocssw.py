@@ -33,10 +33,10 @@ machineInfo = [
             "initStr" : "source .zshrc",
             "exitStr" : ""
         },
-        # Poseidon HPC, RHEL 8
+        # triton HPC, Ubuntu 24.04        
         {
            "name" : "linux_hpc", 
-           "login" : "poseidon",
+           "login" : "triton",
            "initStr" : "source .bash_profile",
            "exitStr" : ""
         },
@@ -60,7 +60,7 @@ getHarp2Str = " && cd \$OCSSWROOT/../polarimetry && rm -rf harp && git clone git
 buildHarp2HippStr = " && cd hipp && mkdir build && cd build && cmake .. && make install && cd .."
 
 getL1bcgen_spexoneStr = " && cd \$OCSSWROOT/../polarimetry && rm -rf spex && git clone git@git.smce.nasa.gov:oel/polarimetry/spex.git && cd spex"
-buildL1bcgen_spexoneStr = " && mkdir build && cd build && cmake .. -DCMAKE_EXE_LINKER_FLAGS=\\\"-Wl,-rpath,\\\\\$ORIGIN/../opt/lib -L\$LIB3_DIR/lib -lnetcdf-cxx4 -lnetcdf -lhdf5 -llapack -lblas\\\" -DCMAKE_PREFIX_PATH=\$LIB3_DIR -DL1BC_ONLY=1 -DCMAKE_BUILD_TYPE=Release && make -j 20 && cp spexone \$OCSSWROOT/bin/l1bcgen_spexone"
+buildL1bcgen_spexoneStr = " && mkdir build && cd build && cmake .. -DCMAKE_EXE_LINKER_FLAGS=\\\"-Wl,-rpath,\\\\\$ORIGIN/../opt/lib -L\$LIB3_DIR/lib\\\" -DLIBRARIES=\\\"netcdf-cxx4 netcdf hdf5 lapack blas\\\" -DCMAKE_PREFIX_PATH=\$LIB3_DIR -DL1BC_ONLY=1 -DCMAKE_BUILD_TYPE=Release && make -j 20 && cp spexone \$OCSSWROOT/bin/l1bcgen_spexone"
 
 getFastmapolStr = " && cd \$OCSSWROOT/../polarimetry && rm -rf fastmapol && git clone git@git.smce.nasa.gov:oel/polarimetry/fastmapol.git && cd fastmapol"
 buildFastmapolStr = " && mkdir build && cd build && cmake .. && make install"

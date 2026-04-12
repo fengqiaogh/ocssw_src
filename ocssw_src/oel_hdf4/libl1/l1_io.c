@@ -432,6 +432,8 @@ int readl1(filehandle *l1file, int32_t recnum, l1str *l1rec) {
     l1rec->tilt = 0.0;
     l1rec->mside = 0;
     l1rec->detnum = 0;
+    if (l1rec->uncertainty)
+        init_uncertainty(l1rec->uncertainty, 1);
     /* Altitude of sensor should be set in l1_sensor.c
      * If not set it will be assumed sensor is above atmosphere
      * and no rayleigh correction will be done.

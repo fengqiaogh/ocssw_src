@@ -123,6 +123,12 @@ void lowercase(char *s);
 
 void atmocor1(l1str *l1rec, int32_t ip);
 int atmocor2(l2str *l2rec, aestr *aerec, int32_t ip);
+#if !defined(MACINTOSH)
+__attribute__((target_clones("avx2", "default")))
+#endif
+void compute_uncertainty(l2str* __restrict__ l2rec, int32_t ip, int aer_l, int rhownir_corr, int want_glintcorr,int proc_uncertainty,
+                             float* __restrict__  radref, float* __restrict__  delta_Lt, float* __restrict__  derv_rhownir_chl, float* __restrict__  derv_rhownir_rrs,
+                             float* __restrict__  tLw, float* __restrict__  last_derv_taua_rhorc, float ** __restrict__ derv_taua_rhorc, float* __restrict__ brdf, float* __restrict__ covariance_matrix);
 void whitecaps(int32_t sensorID, int32_t evalmask, int32_t nwave, float ws, float ws_max, float rhof[]);
 void rayleigh(l1str *l1rec, int32_t ip);
 int aerosol(l2str *l2rec, int32_t aer_opt_in, aestr *aerec, int32_t ip,
@@ -152,13 +158,13 @@ float fresnel_coef(float mu, float n);
 float fresnel_sen(float senz, int return_tf);
 void fresnel_sol(float wave[], int32_t nwave, float solz, float ws, float brdf[], int return_tf);
 void foqint_morel(char *file, float wave[], int32_t nwave, float solz, float senzp,
-        float phi, float chl, float brdf[]);
+        float phi, float chl, float brdf[],float derv_brdf[]);
 void qint_morel(float wave[], int32_t nwave, float solz, float chl, float Qn[]);
 void gothic_R(float wave[], int32_t nwave, float solz, float senz, float ws, float R[]);
 int ocbrdf(l2str *l2rec, int32_t ip, int32_t brdf_opt, float wave[], int32_t nwave,
-        float solz, float senz, float phi, float ws, float chl, float nLw[], float Fo[], float brdf[]);
+        float solz, float senz, float phi, float ws, float chl, float nLw[], float Fo[], float brdf[],float derv_brdf_chl[]);
 
-void nlw_outband(int32_t evalmask, int32_t sensorID, float wave[], int32_t nwave, float Lw[], float nLw[], float outband_correction[]);
+void nlw_outband(int32_t evalmask, int32_t sensorID, float wave[], int32_t nwave, float Lw[], float nLw[], float outband_correction[],float *derv_f_nlw,float *dratio);
 
 int l2gen_usage(const char *prog);
 int msl12_input_defaults(filehandle *l1file);

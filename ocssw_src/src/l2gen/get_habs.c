@@ -522,14 +522,8 @@ uint8_t* get_flags_habs_meris(l2str *l2rec) {
         flags_habs[ip] = 0;
         ipb = l2rec->l1rec->l1file->nbands*ip;
 
-        // if the eval cloud masking is used, just use the cloud mask
-        // otherwise, run the get_cldmask function
-        if ((l1_input->evalmask | 2) == 2){
-            flags_habs[ip] = (uint8_t) l2rec->l1rec->cloud[ip];
-        } else {
-            if (get_cldmask(l2rec->l1rec, ip)) {
-                flags_habs[ip] |= HABS_CLOUD;
-            }
+        if (get_cloudmask_habs(l2rec->l1rec, ip)) {
+            flags_habs[ip] |= HABS_CLOUD;
         }
 
         if (rhos[ipb + ib443] >= 0.0 &&

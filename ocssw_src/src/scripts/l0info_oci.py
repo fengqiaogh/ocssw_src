@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 
-__version__ = '2.8.0_2023-08-09'
+__version__ = '2.9.0_2026-03-26'
 
 __dtypes__ = ['','','_DARK','_SOL','_SPCA','_LIN','_LUN','_DIAG','_STAT',
     '_SPEC','','_SNAP-X','_SNAP-I','','_LUN-ST','_RAW']
@@ -57,7 +57,8 @@ CRC_TABLE = [0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50a5,
              ]
 CRC_LENGTH: int = 4
 
-science_oci_format_header = 0x2bc
+#science_oci_format_header = 0x2bc
+OCI_SCIENCE_PACKET_APID = [0x2bc, 0x2d0] # apid 700 and 720
 shift_bit = 0xffff
 
 
@@ -238,7 +239,17 @@ def get_oci_data_type(fpacket):
     return int(dtype)
 
 
-def l0info_oci(args, fh, output, bDSB, crcSumCheck):
+def isGoodCrcChecksum(packet):
+    dataCompute = list(packet[0:-CRC_LENGTH])
+    crcCalcs = compute_CRC_checksum(dataCompute, len(dataCompute))
+    crcExpected = int.from_bytes(packet[-CRC_LENGTH:], "big")
+    if crcExpected != crcCalcs:
+        return False
+    return True
+    
+
+
+def l0info_oci(args, fh, output, bDSB, disableCrcSumCheck):
     # procedure to get start and end times from Level-0 packet files for OCI
     print("Running l0info_oci (version: %s) \n" % __version__)
     
@@ -258,32 +269,36 @@ def l0info_oci(args, fh, output, bDSB, crcSumCheck):
         bSPW = True
     fh.seek(lpoint)
     
-    # Get first ancillary packet
+    
     apid = 0
     packetLength = 8
-    if crcSumCheck:
-        print("CRC checksum will be perfomed for each science packet")
+    numCrcFailures = 0
+    totalSciencePackets = 0
+
+    if not disableCrcSumCheck:
+        print("CRC Checksum will be performed for each science packet.")
+    else:
+        print("CRC Checksum is disabled.")
+
+    # Get first ancillary packet to grab the start time. If there's more packets, then it will keep 
+    # updating the end time (later in the code) for each ancillary packet until EOF.
+    # Also checks CRC checksum if not disabled for all science packets until the first ancillary packet is found.
     while (apid != 636) and (packetLength > 7):
         try:
             fpacket, packetLength = read_packet(fh, bSPW)
             apid = read_apid(fpacket)
             if is_bad_apid(apid,fh):  return 104
 
-            # check CRC sum
-            if fpacket and crcSumCheck:
+            # check CRC checksum 
+            if fpacket and not disableCrcSumCheck:
                 phead_format = int.from_bytes(fpacket[:2], "big")
-                if  phead_format == science_oci_format_header:
-                    dataCompute = list(fpacket[0:-CRC_LENGTH])
-                    crcCalcs = compute_CRC_checksum(dataCompute, len(dataCompute))
-                    crcExpected = int.from_bytes(fpacket[-CRC_LENGTH:], "big")
-                    if crcExpected != crcCalcs:
-                        print(f"Error : CRC checksum failed! Expected {hex(crcExpected)}, calculated {hex(crcCalcs)} for packet with apid {apid}")
-                        return 131
+                if  phead_format in OCI_SCIENCE_PACKET_APID:
+                    totalSciencePackets+=1
+                    isGoodCrc = isGoodCrcChecksum(fpacket)
+                    if not isGoodCrc:
+                        numCrcFailures += 1
         except:            
             return 103
-    if is_bad_packet(packetLength,fh):  return 104
-    if fpacket:
-        print("CRC check finished.")
         
     # If no ancillary packets, rewind and get times from HKT packets
     if fpacket is None: 
@@ -335,7 +350,8 @@ def l0info_oci(args, fh, output, bDSB, crcSumCheck):
                 output.write("datatype=OCI\n")
             print("No packets with valid time tags in file.")
             return status
-    
+        
+    # There was an ancillary packet and not EOF yet
     else:
         # Get data type
         dtype = get_oci_data_type(fpacket)
@@ -353,7 +369,8 @@ def l0info_oci(args, fh, output, bDSB, crcSumCheck):
         except:
             return 120        
         
-        # Read to end of file
+        # Read to end of file, updating the end time for each ancillary packet seen.
+        # Also checks CRC for science packets if not disabled.
         apacket = fpacket
         acomp = 0
         nagg = np.array([1,2,4,8])
@@ -388,7 +405,17 @@ def l0info_oci(args, fh, output, bDSB, crcSumCheck):
                 fpacket, packetLength = read_packet(fh, bSPW)     
                 apid = read_apid(fpacket)
                 if is_bad_apid(apid,fh):  return 104
-            
+                
+                # check CRC checksum
+                if fpacket and not disableCrcSumCheck:
+                    phead_format = int.from_bytes(fpacket[:2], "big")
+                    if fpacket and not disableCrcSumCheck:
+                        phead_format = int.from_bytes(fpacket[:2], "big")
+                        if  phead_format in OCI_SCIENCE_PACKET_APID:
+                            totalSciencePackets+=1
+                            isGoodCrc = isGoodCrcChecksum(fpacket)
+                            if not isGoodCrc:
+                                numCrcFailures += 1
             if is_bad_packet(packetLength,fh):  return 104
             if fpacket:  epacket = fpacket
         
@@ -421,5 +448,12 @@ def l0info_oci(args, fh, output, bDSB, crcSumCheck):
             output.write("start_time=%s\n" % str_stime)
         if str_etime!='':
             output.write("stop_time=%s\n" % str_etime)
+    
+    if not disableCrcSumCheck:
+        if numCrcFailures > 0:
+            print(f"Warning: {numCrcFailures} Science Packets failed CRC Checksum.")
+            status = 131
+        else:
+            print(f"All Science Packets ({totalSciencePackets} total) passed CRC Checksum.")
     
     return status

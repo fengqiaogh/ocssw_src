@@ -1807,15 +1807,13 @@ int ahmadaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
 
     float eps_obs;
 
-    float derv_eps_Lrc_s,derv_eps_Lrc_l,derv_eps_taua_l,derv_eps_rhow_l,derv_Lg_taua_l;
+    float derv_eps_Lrc_s,derv_eps_Lrc_l,derv_eps_taua_l=0,derv_eps_rhow_l=0,derv_Lg_taua_l;
     float derv_eps_mod[4][nmodels]; //derivative of modeled eps to 0: rhorc_s, 1: rhorc_l, 2: taua_l and 3: t_sen*t_sol*rhow[aer_l]
 
     if(uncertainty){
-        derv_eps_Lrc_s = uncertainty->derv_eps_Lrc_s;
-        derv_eps_Lrc_l = uncertainty->derv_eps_Lrc_l;
-        derv_eps_taua_l = uncertainty->derv_eps_taua_l;
-        derv_eps_rhow_l = uncertainty->derv_eps_rhow_l;
-        derv_Lg_taua_l = uncertainty->derv_Lg_taua[iwnir_l];
+        derv_eps_Lrc_s = uncertainty->derv_eps_rhorc_s;
+        derv_eps_Lrc_l = uncertainty->derv_eps_rhorc_l;
+        derv_Lg_taua_l = uncertainty->derv_rhog_taua[iwnir_l];
 
         derv_rhoa_min=(float *)malloc(nwave*sizeof(float));
         derv_rhoa_max=(float *)malloc(nwave*sizeof(float));
@@ -1892,7 +1890,7 @@ int ahmadaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
 
             derv_eps_rhoa_l[im]=derv_eps_rhoa_l[im]/rhoa[iwnir_l]-rho_iwnir_s_pred[im]/rhoa[iwnir_l]/rhoa[iwnir_l];
             derv_eps_mod[1][im]=derv_eps_rhoa_l[im];
-            derv_eps_mod[2][im] = -derv_eps_rhoa_l[im] * uncertainty->derv_Lg_taua[iwnir_l];
+            derv_eps_mod[2][im] = -derv_eps_rhoa_l[im] * uncertainty->derv_rhog_taua[iwnir_l];
             derv_eps_mod[3][im] = -derv_eps_rhoa_l[im];
         }
     }
@@ -1975,7 +1973,7 @@ int ahmadaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
         rho_aer[iw] = (1.0 - mwt) * rho_pred_min[iw] + mwt * rho_pred_max[iw];
 
         if(uncertainty){
-            uncertainty->derv_La_rhorc[iw][nbands_ac-1] = (1.0 - mwt) * derv_rhoa_min[iw]
+            uncertainty->derv_La_rhorc[iw*nbands_ac+nbands_ac-1] = (1.0 - mwt) * derv_rhoa_min[iw]
                     * derv_taua_rhoa[im1]
                     + mwt * derv_rhoa_max[iw] * derv_taua_rhoa[im2]
                     + (rho_pred_max[iw] - rho_pred_min[iw]) * derv_mwt_rhoa_l;
@@ -1984,14 +1982,14 @@ int ahmadaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
                     - mwt * derv_rhoa_max[iw] * derv_taua_rhoa[im2]
                             * derv_Lg_taua_l
                     + (rho_pred_max[iw] - rho_pred_min[iw]) * derv_mwt_taua_l;
-            uncertainty->derv_La_rhorc[iw][0] = (rho_pred_max[iw] - rho_pred_min[iw])
+            uncertainty->derv_La_rhorc[iw*nbands_ac] = (rho_pred_max[iw] - rho_pred_min[iw])
                     * derv_mwt_rhoa_s;
-            uncertainty->derv_La_rhow_l[iw] = -(1.0 - mwt) * derv_rhoa_min[iw]
+            uncertainty->derv_La_rhow[iw] = -(1.0 - mwt) * derv_rhoa_min[iw]
                     * derv_taua_rhoa[im1]
                     - mwt * derv_rhoa_max[iw] * derv_taua_rhoa[im2]
                     + (rho_pred_max[iw] - rho_pred_min[iw]) * derv_mwt_rhow_l;
 
-            uncertainty->derv_taua_rhorc[iw][nbands_ac-1]= (1.0 - mwt) * derv_taua_min[iw]
+            uncertainty->derv_taua_rhorc[iw*nbands_ac+nbands_ac-1]= (1.0 - mwt) * derv_taua_min[iw]
                     * derv_taua_rhoa[im1]
                     + mwt * derv_taua_max[iw] * derv_taua_rhoa[im2]
                     + (tau_pred_max[iw] - tau_pred_min[iw]) * derv_mwt_rhoa_l;
@@ -2000,9 +1998,9 @@ int ahmadaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
                     - mwt * derv_taua_max[iw] * derv_taua_rhoa[im2]
                             * derv_Lg_taua_l
                     + (tau_pred_max[iw] - tau_pred_min[iw]) * derv_mwt_taua_l;
-            uncertainty->derv_taua_rhorc[iw][0] = (tau_pred_max[iw] - tau_pred_min[iw])
+            uncertainty->derv_taua_rhorc[iw*nbands_ac] = (tau_pred_max[iw] - tau_pred_min[iw])
                     * derv_mwt_rhoa_s;
-            uncertainty->derv_taua_rhow_l[iw] = -(1.0 - mwt) * derv_taua_min[iw]
+            uncertainty->derv_taua_rhow[iw] = -(1.0 - mwt) * derv_taua_min[iw]
                     * derv_taua_rhoa[im1]
                     - mwt * derv_taua_max[iw] * derv_taua_rhoa[im2]
                     + (tau_pred_max[iw] - tau_pred_min[iw]) * derv_mwt_rhow_l;
@@ -2050,26 +2048,20 @@ int ahmadaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int
     }
 
     int status = 0.0;
-    float eps_obs;  //,deps_obs;
+    float eps_obs;
 
     /* compute the observed epsilon */
     eps_obs = rhoa[iwnir_s] / rhoa[iwnir_l];
 
+    if (uncertainty) {
+        uncertainty->derv_eps_rhorc_s = 1 / rhoa[iwnir_l];
+        uncertainty->derv_eps_rhorc_l = -eps_obs / rhoa[iwnir_l];
+    }
     /*switch to AC based on the PCA LUT */
     if (use_pca_lut) {
-        if (uncertainty) {
-            uncertainty->derv_eps_Lrc_s = 1 / rhoa[iwnir_l];
-            uncertainty->derv_eps_Lrc_l = -eps_obs / rhoa[iwnir_l];
-
-            if (uncertainty->ratio_rhow[iwnir_s - iwnir_s] != 0.) {
-                uncertainty->derv_eps_rhow_l =
-                    -1 / (rhoa[iwnir_l]) * uncertainty->ratio_rhow[iwnir_s - iwnir_s];
-                uncertainty->derv_eps_rhow_l += eps_obs / rhoa[iwnir_l];
-            }
-        }
-        status = ahmadaer_pca(sensorID,wave, nwave, iwnir_s, iwnir_l, nmodels, mindx, geom, wv, rhoa,
-                                    modmin, modmax, modrat, epsnir, tau_pred_max, tau_pred_min, rho_pred_max,
-                                    rho_pred_min, rhoa, ip, uncertainty);
+        status = ahmadaer_pca(sensorID, wave, nwave, iwnir_s, iwnir_l, nmodels, mindx, geom, wv, rhoa, modmin,
+                              modmax, modrat, epsnir, tau_pred_max, tau_pred_min, rho_pred_max, rho_pred_min,
+                              rhoa, ip, uncertainty);
         return status;
     }
     float *ac, *bc, *cc, *dc, *ec;
@@ -2086,13 +2078,11 @@ int ahmadaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int
     int iwtab_l, iwtab_s;
 
     float derv_taua_rhoa[nmodels]; //derivative of taua[aer_l] to rhoa[aer_l]
-    float derv_eps_rhoa_l[nmodels];
-    float *derv_rhoa_min=NULL,*derv_rhoa_max=NULL;  //derivative of rhoa[]to taua[aer_l] for aermodmin and aermodmax
-    float *derv_taua_min=NULL,*derv_taua_max=NULL;  //derivative of taua[]to taua[aer_l] for aermodmin and aermodmax
-    float derv_mwt_rhoa_s=0., derv_mwt_rhoa_l=0.,derv_mwt_taua_l=0.,derv_mwt_rhow_l=0.;
-
-    float derv_eps_Lrc_s,derv_eps_Lrc_l,derv_eps_taua_l,derv_eps_rhow_l,derv_Lg_taua_l;
-    float derv_eps_mod[4][nmodels]; //derivative of modeled eps to 0: rhorc_s, 1: rhorc_l, 2: taua_l and 3: t_sen*t_sol*rhow[aer_l]
+    float derv_eps_mod_rhorc_l[nmodels]; //derivative of eps[nmodels] to rhorc[aer_l]
+    static float *derv_rhoa_min=NULL,*derv_rhoa_max=NULL;  //derivative of rhoa[]to taua[aer_l] for aermodmin and aermodmax
+    static float *derv_taua_min=NULL,*derv_taua_max=NULL;  //derivative of taua[]to taua[aer_l] for aermodmin and aermodmax
+    float derv_mwt_rhorc_s=0., derv_mwt_rhorc_l=0.;   // derivative of modrat to rhorc
+    float derv_eps_rhorc_s,derv_eps_rhorc_l;
 
     int iw;
     static int firstcall=1, nbands_ac;
@@ -2100,18 +2090,16 @@ int ahmadaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int
     if(firstcall){
         firstcall=0;
         nbands_ac=input->nbands_ac;
+        if (uncertainty) {
+            derv_rhoa_min = (float*)malloc(nwave * sizeof(float));
+            derv_rhoa_max = (float*)malloc(nwave * sizeof(float));
+            derv_taua_min = (float*)malloc(nwave * sizeof(float));
+            derv_taua_max = (float*)malloc(nwave * sizeof(float));
+        }
     }
     if (uncertainty) {
-        derv_rhoa_min = (float *)malloc(nwave * sizeof(float));
-        derv_rhoa_max = (float *)malloc(nwave * sizeof(float));
-        derv_taua_min = (float *)malloc(nwave * sizeof(float));
-        derv_taua_max = (float *)malloc(nwave * sizeof(float));
-
-        derv_eps_Lrc_s = uncertainty->derv_eps_Lrc_s;
-        derv_eps_Lrc_l = uncertainty->derv_eps_Lrc_l;
-        derv_eps_taua_l = uncertainty->derv_eps_taua_l;
-        derv_eps_rhow_l = uncertainty->derv_eps_rhow_l;
-        derv_Lg_taua_l = uncertainty->derv_Lg_taua[iwnir_l];
+        derv_eps_rhorc_s = uncertainty->derv_eps_rhorc_s;
+        derv_eps_rhorc_l = uncertainty->derv_eps_rhorc_l;
     }
 
     /* compute MS epsilon for all nmodels.  note that nmodels may be only a subset of */
@@ -2151,7 +2139,7 @@ int ahmadaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int
         lg_tau_iwnir_s[im] = log(tau_iwnir_s[im]);
 
         if(uncertainty)
-            derv_eps_rhoa_l[im]=1/tau_iwnir_s[im]*(ext_iwnir_s / ext_iwnir_l)*derv_taua_rhoa[im];
+            derv_eps_mod_rhorc_l[im]=1/tau_iwnir_s[im]*(ext_iwnir_s / ext_iwnir_l)*derv_taua_rhoa[im];
 
 
         /* compute reflectance at band iwnir_s */
@@ -2161,23 +2149,20 @@ int ahmadaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int
                 ec[iwtab_s] * pow(lg_tau_iwnir_s[im], 4);
 
         if(uncertainty)
-            derv_eps_rhoa_l[im]=( bc[iwtab_s]+ 2*cc[iwtab_s]*lg_tau_iwnir_s[im]+3*dc[iwtab_s]*pow(lg_tau_iwnir_s[im], 2)+4*ec[iwtab_s] * pow(lg_tau_iwnir_s[im], 3) )*derv_eps_rhoa_l[im];
+            derv_eps_mod_rhorc_l[im]=( bc[iwtab_s]+ 2*cc[iwtab_s]*lg_tau_iwnir_s[im]+3*dc[iwtab_s]*pow(lg_tau_iwnir_s[im], 2)+4*ec[iwtab_s] * pow(lg_tau_iwnir_s[im], 3) )*derv_eps_mod_rhorc_l[im];
 
         rho_iwnir_s_pred[im] = exp(lg_rho_iwnir_s_pred[im]);
 
         if(uncertainty)
-            derv_eps_rhoa_l[im]=rho_iwnir_s_pred[im]*derv_eps_rhoa_l[im];
+            derv_eps_mod_rhorc_l[im]=rho_iwnir_s_pred[im]*derv_eps_mod_rhorc_l[im];
 
         /* compute model epsilon */
         eps_pred[im] = rho_iwnir_s_pred[im] / rhoa[iwnir_l];
 
-        ///!!!! TBD: should include the tlw[nir] in the future  zhang
-        if(uncertainty){
-            derv_eps_rhoa_l[im]=derv_eps_rhoa_l[im]/rhoa[iwnir_l]-rho_iwnir_s_pred[im]/rhoa[iwnir_l]/rhoa[iwnir_l];
-            derv_eps_mod[1][im]=derv_eps_rhoa_l[im];
-            derv_eps_mod[2][im] = -derv_eps_rhoa_l[im] * uncertainty->derv_Lg_taua[iwnir_l];
-            derv_eps_mod[3][im] = -derv_eps_rhoa_l[im];
-        }
+        /*compute derivative of eps to rhorc_l, taua_l,and t.rhow */ 
+        if(uncertainty)
+            derv_eps_mod_rhorc_l[im]=derv_eps_mod_rhorc_l[im]/rhoa[iwnir_l]-rho_iwnir_s_pred[im]/rhoa[iwnir_l]/rhoa[iwnir_l];
+        
     }
 
     *epsnir = eps_obs;
@@ -2194,42 +2179,25 @@ int ahmadaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int
 
         if(uncertainty){
             if (im1 == im2) {
-                for(iw=iwnir_s;iw<=iwnir_l;iw++)
-                    uncertainty->derv_modrat_rhorc[iw-iwnir_s]=0.;
-                uncertainty->derv_modrat_taua_l=0.;
+                for (iw = 0; iw < nbands_ac; iw++) {
+                    uncertainty->derv_modrat_rhorc[iw] = 0.;
+                    uncertainty->derv_modrat_taua [iw] = 0.;
+                }
             }
             else {
-                derv_mwt_rhoa_s = 1 / (eps_pred[im2] - eps_pred[im1])
-                        * derv_eps_Lrc_s;
+                derv_mwt_rhorc_s = 1 / (eps_pred[im2] - eps_pred[im1])
+                        * derv_eps_rhorc_s;
 
-                derv_mwt_rhoa_l = 1 / (eps_pred[im2] - eps_pred[im1])
-                        * derv_eps_Lrc_l;
-                derv_mwt_rhoa_l -= ((mwt / (eps_pred[im2] - eps_pred[im1])
-                        * derv_eps_mod[1][im2]));
-                derv_mwt_rhoa_l += ((eps_obs - eps_pred[im2])
+                derv_mwt_rhorc_l = 1 / (eps_pred[im2] - eps_pred[im1])
+                        * derv_eps_rhorc_l;
+                derv_mwt_rhorc_l -= ((mwt / (eps_pred[im2] - eps_pred[im1])
+                        * derv_eps_mod_rhorc_l[im2]));
+                derv_mwt_rhorc_l += ((eps_obs - eps_pred[im2])
                         / pow(eps_pred[im2] - eps_pred[im1], 2)
-                        * derv_eps_mod[1][im1]);
+                        * derv_eps_mod_rhorc_l[im1]);
 
-                derv_mwt_taua_l = 1 / (eps_pred[im2] - eps_pred[im1])
-                        * derv_eps_taua_l;
-                derv_mwt_taua_l -= ((mwt / (eps_pred[im2] - eps_pred[im1])
-                        * derv_eps_mod[2][im2]));
-                derv_mwt_taua_l += ((eps_obs - eps_pred[im2])
-                        / pow(eps_pred[im2] - eps_pred[im1], 2)
-                        * derv_eps_mod[2][im1]);
-
-                derv_mwt_rhow_l = 1 / (eps_pred[im2] - eps_pred[im1])
-                        * derv_eps_rhow_l;
-                derv_mwt_rhow_l -= ((mwt / (eps_pred[im2] - eps_pred[im1])
-                        * derv_eps_mod[3][im2]));
-                derv_mwt_rhow_l += ((eps_obs - eps_pred[im2])
-                        / pow(eps_pred[im2] - eps_pred[im1], 2)
-                        * derv_eps_mod[3][im1]);
-
-                uncertainty->derv_modrat_rhorc[0] = derv_mwt_rhoa_s;
-                uncertainty->derv_modrat_rhorc[nbands_ac-1] = derv_mwt_rhoa_l;
-                uncertainty->derv_modrat_taua_l = derv_mwt_taua_l;
-                uncertainty->derv_modrat_rhow_l = derv_mwt_rhow_l;
+                uncertainty->derv_modrat_rhorc[0] = derv_mwt_rhorc_s;
+                uncertainty->derv_modrat_rhorc[nbands_ac-1] = derv_mwt_rhorc_l;
             }
         }
     } else {
@@ -2256,55 +2224,24 @@ int ahmadaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int
         rhoa[iw] = (1.0 - mwt) * rho_pred_min[iw] + mwt * rho_pred_max[iw];
 
         if(uncertainty){
-            uncertainty->derv_La_rhorc[iw][nbands_ac-1] = (1.0 - mwt) * derv_rhoa_min[iw]
+            uncertainty->derv_La_rhorc[iw*nbands_ac+nbands_ac-1] = (1.0 - mwt) * derv_rhoa_min[iw]
                     * derv_taua_rhoa[im1]
                     + mwt * derv_rhoa_max[iw] * derv_taua_rhoa[im2]
-                    + (rho_pred_max[iw] - rho_pred_min[iw]) * derv_mwt_rhoa_l;
-            uncertainty->derv_La_taua_l[iw] = -(1.0 - mwt) * derv_rhoa_min[iw]
-                    * derv_taua_rhoa[im1] * derv_Lg_taua_l
-                    - mwt * derv_rhoa_max[iw] * derv_taua_rhoa[im2]
-                            * derv_Lg_taua_l
-                    + (rho_pred_max[iw] - rho_pred_min[iw]) * derv_mwt_taua_l;
-            uncertainty->derv_La_rhorc[iw][0] = (rho_pred_max[iw] - rho_pred_min[iw])
-                    * derv_mwt_rhoa_s;
-            uncertainty->derv_La_rhow_l[iw] = -(1.0 - mwt) * derv_rhoa_min[iw]
-                    * derv_taua_rhoa[im1]
-                    - mwt * derv_rhoa_max[iw] * derv_taua_rhoa[im2]
-                    + (rho_pred_max[iw] - rho_pred_min[iw]) * derv_mwt_rhow_l;
+                    + (rho_pred_max[iw] - rho_pred_min[iw]) * derv_mwt_rhorc_l;
+            uncertainty->derv_La_rhorc[iw*nbands_ac] = (rho_pred_max[iw] - rho_pred_min[iw])
+                    * derv_mwt_rhorc_s;
+          
 
-            uncertainty->derv_taua_rhorc[iw][nbands_ac-1]= (1.0 - mwt) * derv_taua_min[iw]
+            uncertainty->derv_taua_rhorc[iw*nbands_ac+nbands_ac-1]= (1.0 - mwt) * derv_taua_min[iw]
                     * derv_taua_rhoa[im1]
                     + mwt * derv_taua_max[iw] * derv_taua_rhoa[im2]
-                    + (tau_pred_max[iw] - tau_pred_min[iw]) * derv_mwt_rhoa_l;
-            uncertainty->derv_taua_taua_l[iw] = -(1.0 - mwt) * derv_taua_min[iw]
-                    * derv_taua_rhoa[im1] * derv_Lg_taua_l
-                    - mwt * derv_taua_max[iw] * derv_taua_rhoa[im2]
-                            * derv_Lg_taua_l
-                    + (tau_pred_max[iw] - tau_pred_min[iw]) * derv_mwt_taua_l;
-            uncertainty->derv_taua_rhorc[iw][0] = (tau_pred_max[iw] - tau_pred_min[iw])
-                    * derv_mwt_rhoa_s;
-            uncertainty->derv_taua_rhow_l[iw] = -(1.0 - mwt) * derv_taua_min[iw]
-                    * derv_taua_rhoa[im1]
-                    - mwt * derv_taua_max[iw] * derv_taua_rhoa[im2]
-                    + (tau_pred_max[iw] - tau_pred_min[iw]) * derv_mwt_rhow_l;
+                    + (tau_pred_max[iw] - tau_pred_min[iw]) * derv_mwt_rhorc_l;
+            uncertainty->derv_taua_rhorc[iw*nbands_ac] = (tau_pred_max[iw] - tau_pred_min[iw])
+                    * derv_mwt_rhorc_s;
 
             uncertainty->derv_taua_min_rhorc_l[iw] = derv_taua_min[iw] * derv_taua_rhoa[im1];
-            uncertainty->derv_taua_min_taua_l[iw] = -derv_taua_min[iw] * derv_taua_rhoa[im1]
-                    * derv_Lg_taua_l;
-            uncertainty->derv_taua_min_rhow_l[iw] = -derv_taua_min[iw] * derv_taua_rhoa[im1];
-       
             uncertainty->derv_taua_max_rhorc_l[iw]= derv_taua_max[iw] * derv_taua_rhoa[im2];
-            uncertainty->derv_taua_max_taua_l [iw]= -derv_taua_max[iw] * derv_taua_rhoa[im2]
-                    * derv_Lg_taua_l;
-            uncertainty->derv_taua_max_rhow_l [iw]= -derv_taua_max[iw] * derv_taua_rhoa[im2];
         }
-    }
-
-    if(uncertainty){
-        free(derv_rhoa_min);
-        free(derv_rhoa_max);
-        free(derv_taua_min);
-        free(derv_taua_max);
     }
 
     return (status);
@@ -3088,7 +3025,7 @@ void model_transmittance(int modnum, float wave[], int32_t nwave,
         dtran[iw] = MAX(MIN((1.0 - wt) * y1 + wt*y2, 1.0), 1e-5);
 
         if(dt){
-            if( fabs(dtran[iw]-1.0)<0.0000001 || fabs(dtran[iw]-1e-5)<0.0000001 )
+            if( dtran[iw]==1.0 || dtran[iw]==1e-5 )
                 dt[iw]=0;
             else
                 dt[iw]=-(1.0-wt)*y1*b1-wt*y2*b2;
@@ -3200,9 +3137,9 @@ void diff_tran_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
     float *tsenmin;
     float *tsenmax;
     float *dtmin=NULL,*dtmax=NULL;// derivative of tsol[iw] or tsen [iw] with respect to taua[nir_l]
-    float tmp;
     static int firstcall=1;
     static int32_t nbands_ac, *acbands_index;
+    double tmp_pressure_diff;
 
 
     if(firstcall){
@@ -3264,40 +3201,28 @@ void diff_tran_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
 
         if(uncertainty){
             for(ib=0;ib<nbands_ac;ib++){
-                uncertainty->derv_tsol_rhorc[iw][ib]=(tsolmax[iw]-tsolmin[iw])*uncertainty->derv_modrat_rhorc[ib];
+                uncertainty->derv_tsol_rhorc[iw*nbands_ac+ib]=(tsolmax[iw]-tsolmin[iw])*uncertainty->derv_modrat_rhorc[ib];
                 if(acbands_index[ib]==iwnir_l){
-                    uncertainty->derv_tsol_rhorc[iw][ib]+=(1.0 - modrat)*dtmin[iw]*uncertainty->derv_taua_min_rhorc_l[iwnir_l];
-                    uncertainty->derv_tsol_rhorc[iw][ib]+=  modrat      *dtmax[iw]*uncertainty->derv_taua_max_rhorc_l[iwnir_l];
+                    uncertainty->derv_tsol_rhorc[iw*nbands_ac+ib]+=(1.0 - modrat)*dtmin[iw]*uncertainty->derv_taua_min_rhorc_l[iwnir_l];
+                    uncertainty->derv_tsol_rhorc[iw*nbands_ac+ib]+=  modrat      *dtmax[iw]*uncertainty->derv_taua_max_rhorc_l[iwnir_l];
                 }
             }
-            uncertainty->derv_tsol_taua_l[iw]=(tsolmax[iw]-tsolmin[iw])*uncertainty->derv_modrat_taua_l;
-            uncertainty->derv_tsol_taua_l[iw]+=(1.0 - modrat)*dtmin[iw]*uncertainty->derv_taua_min_taua_l[iw];
-            uncertainty->derv_tsol_taua_l[iw]+=  modrat      *dtmax[iw]*uncertainty->derv_taua_max_taua_l[iw];
-
-            uncertainty->derv_tsol_rhow_l[iw]=(tsolmax[iw]-tsolmin[iw])*uncertainty->derv_modrat_rhow_l;
-            uncertainty->derv_tsol_rhow_l[iw]+=(1.0 - modrat)*dtmin[iw]*uncertainty->derv_taua_min_rhow_l[iw];
-            uncertainty->derv_tsol_rhow_l[iw]+=modrat        *dtmax[iw]*uncertainty->derv_taua_max_rhow_l[iw];
         }
 
         /* correct for pressure difference from standard pressure */
-        double tmp_pressure_diff = exp(-0.5 * taur[iw] / geom->csolz[ig]*(pr / p0 - 1));
+        tmp_pressure_diff = exp(-0.5 * taur[iw] / geom->csolz[ig]*(pr / p0 - 1));
         tsol[iw] = tsol[iw] * tmp_pressure_diff;
 
         if(uncertainty){
             for(ib=0;ib<nbands_ac;ib++){
-                uncertainty->derv_tsol_rhorc[iw][ib]*=tmp_pressure_diff;
+                uncertainty->derv_tsol_rhorc[iw*nbands_ac+ib]*=tmp_pressure_diff;
             }
-            uncertainty->derv_tsol_taua_l[iw]*=tmp_pressure_diff;
-            uncertainty->derv_tsol_rhow_l[iw]*=tmp_pressure_diff;
         }
 
         if ((evalmask & TRANSSPHER) != 0) {
             /* correct for airmass difference, plane-parallel to spherical atmosphere */
-            tmp=tsol[iw];
             tsol[iw] = pow(tsol[iw], geom->airmass_sph[ig] / geom->airmass_plp[ig]);
 
-            if(uncertainty)
-                uncertainty->dt_sol[ip*nwave+iw]*= ( geom->airmass_sph[ig] / geom->airmass_plp[ig] *pow(tmp,geom->airmass_sph[ig] / geom->airmass_plp[ig]-1) );
         }
     }
 
@@ -3314,39 +3239,27 @@ void diff_tran_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_
 
         if(uncertainty){
             for(ib=0;ib<nbands_ac;ib++){
-                uncertainty->derv_tsen_rhorc[iw][ib]=(tsenmax[iw]-tsenmin[iw])*uncertainty->derv_modrat_rhorc[ib];
+                uncertainty->derv_tsen_rhorc[iw*nbands_ac+ib]=(tsenmax[iw]-tsenmin[iw])*uncertainty->derv_modrat_rhorc[ib];
                 if(acbands_index[ib]==iwnir_l){
-                    uncertainty->derv_tsen_rhorc[iw][ib]+=(1.0 - modrat)*dtmin[iw]*uncertainty->derv_taua_min_rhorc_l[iwnir_l];
-                    uncertainty->derv_tsen_rhorc[iw][ib]+=  modrat      *dtmax[iw]*uncertainty->derv_taua_max_rhorc_l[iwnir_l];
+                    uncertainty->derv_tsen_rhorc[iw*nbands_ac+ib]+=(1.0 - modrat)*dtmin[iw]*uncertainty->derv_taua_min_rhorc_l[iwnir_l];
+                    uncertainty->derv_tsen_rhorc[iw*nbands_ac+ib]+=  modrat      *dtmax[iw]*uncertainty->derv_taua_max_rhorc_l[iwnir_l];
                 }
             }
-            uncertainty->derv_tsen_taua_l[iw]=(tsenmax[iw]-tsenmin[iw])*uncertainty->derv_modrat_taua_l;
-            uncertainty->derv_tsen_taua_l[iw]+=(1.0 - modrat)*dtmin[iw]*uncertainty->derv_taua_min_taua_l[iw];
-            uncertainty->derv_tsen_taua_l[iw]+=  modrat      *dtmax[iw]*uncertainty->derv_taua_max_taua_l[iw];
-
-            uncertainty->derv_tsen_rhow_l[iw]=(tsenmax[iw]-tsenmin[iw])*uncertainty->derv_modrat_rhow_l;
-            uncertainty->derv_tsen_rhow_l[iw]+=(1.0 - modrat)*dtmin[iw]*uncertainty->derv_taua_min_rhow_l[iw];
-            uncertainty->derv_tsen_rhow_l[iw]+=modrat        *dtmax[iw]*uncertainty->derv_taua_max_rhow_l[iw];
         }
 
         /* correct for pressure difference from standard pressure */
-        double tmp_pressure_diff = exp(-0.5 * taur[iw] / geom->csenz[ig] *(pr / p0 - 1));
+        tmp_pressure_diff = exp(-0.5 * taur[iw] / geom->csenz[ig] *(pr / p0 - 1));
         tsen[iw] = tsen[iw] * tmp_pressure_diff;
 
         if(uncertainty){
             for(ib=0;ib<nbands_ac;ib++){
-                uncertainty->derv_tsen_rhorc[iw][ib]*=tmp_pressure_diff;
+                uncertainty->derv_tsen_rhorc[iw*nbands_ac+ib]*=tmp_pressure_diff;
             }
-            uncertainty->derv_tsen_taua_l[iw]*=tmp_pressure_diff;
-            uncertainty->derv_tsen_rhow_l[iw]*=tmp_pressure_diff;
         }
 
         if ((evalmask & TRANSSPHER) != 0) {
             /* correct for airmass difference, plane-parallel to spherical atmosphere */
-            tmp=tsen[iw];
             tsen[iw] = pow(tsen[iw], geom->airmass_sph[ig] / geom->airmass_plp[ig]);
-            if(uncertainty)
-                uncertainty->dt_sen[ip*nwave+iw]*= ( geom->airmass_sph[ig] / geom->airmass_plp[ig] *pow(tmp,geom->airmass_sph[ig] / geom->airmass_plp[ig]-1) );
         }
     }
 
@@ -3370,17 +3283,6 @@ void diff_tran(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_l,
         int32_t modmax, float modrat, float rhoa[], float taua[], float tsol[],
         float tsen[], float tauamin[], float tauamax[], int taua_opt, int ip,uncertainty_t *uncertainty) {
 
-    int iw, gmult, ig;
-    float *tsolmin;
-    float *tsolmax;
-    float *tsenmin;
-    float *tsenmax;
-    float *dtmin=NULL,*dtmax=NULL;// derivative of tsol or tsen with respect to the corresponding taua
-    float tmp;
-
-    int iwnir_s;
-    int inir;
-
     /*switch to PCA based algorithm if PCA LUT is detected */
     if(use_pca_lut){
         diff_tran_pca(sensorID,wave,nwave,iwnir_l,geom,wv,pr,taur,modmin,modmax,modrat,rhoa,taua,tsol,tsen,\
@@ -3388,32 +3290,45 @@ void diff_tran(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_l,
         return;
     }
 
-    if ((tsolmin = (float *) calloc(nwave, sizeof (float))) == NULL) {
-        printf("Unable to allocate space for tsolmin.\n");
-        exit(1);
-    }
-    if ((tsolmax = (float *) calloc(nwave, sizeof (float))) == NULL) {
-        printf("Unable to allocate space for tsolmax.\n");
-        exit(1);
-    }
-    if ((tsenmin = (float *) calloc(nwave, sizeof (float))) == NULL) {
-        printf("Unable to allocate space for tsenmin.\n");
-        exit(1);
-    }
-    if ((tsenmax = (float *) calloc(nwave, sizeof (float))) == NULL) {
-        printf("Unable to allocate space for tsenmax.\n");
-        exit(1);
-    }
+    int iw, gmult, ig, inir,ib;
+    static float *tsolmin, *tsolmax, *tsenmin, *tsenmax;
+    static float *dtmin,*dtmax;// derivative of tsol or tsen with respect to the corresponding taua
+    float tmp;
+    double tmp_pressure_diff;
 
-    if(uncertainty){
-        iwnir_s=bindex_get(input->aer_wave_short);
-        if ((dtmin = (float *) calloc(nwave, sizeof(float))) == NULL) {
-            printf("Unable to allocate space for dtmin.\n");
+    static int firstcall=1, nbands_ac,*acbands_index;
+
+    if (firstcall) {
+        firstcall = 0;
+        nbands_ac = input->nbands_ac;
+        acbands_index = input->acbands_index;
+
+        if ((tsolmin = (float*)calloc(nwave, sizeof(float))) == NULL) {
+            printf("Unable to allocate space for tsolmin.\n");
             exit(1);
         }
-        if ((dtmax = (float *) calloc(nwave, sizeof(float))) == NULL) {
-            printf("Unable to allocate space for dtmax.\n");
+        if ((tsolmax = (float*)calloc(nwave, sizeof(float))) == NULL) {
+            printf("Unable to allocate space for tsolmax.\n");
             exit(1);
+        }
+        if ((tsenmin = (float*)calloc(nwave, sizeof(float))) == NULL) {
+            printf("Unable to allocate space for tsenmin.\n");
+            exit(1);
+        }
+        if ((tsenmax = (float*)calloc(nwave, sizeof(float))) == NULL) {
+            printf("Unable to allocate space for tsenmax.\n");
+            exit(1);
+        }
+
+        if (uncertainty) {
+            if ((dtmin = (float*)calloc(nwave, sizeof(float))) == NULL) {
+                printf("Unable to allocate space for dtmin.\n");
+                exit(1);
+            }
+            if ((dtmax = (float*)calloc(nwave, sizeof(float))) == NULL) {
+                printf("Unable to allocate space for dtmax.\n");
+                exit(1);
+            }
         }
     }
 
@@ -3441,31 +3356,30 @@ void diff_tran(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_l,
     	tsol[iw] = tsolmin[iw]*(1.0 - modrat) + tsolmax[iw] * modrat;
     
     	if(uncertainty){
-    	    for(inir=iwnir_s;inir<=iwnir_l;inir++){
-    	        uncertainty->derv_tsol_rhorc[iw][inir-iwnir_s]=(tsolmax[iw]-tsolmin[iw])*uncertainty->derv_modrat_rhorc[inir-iwnir_s];
-    	        if(inir==iwnir_l){
-    	            uncertainty->derv_tsol_rhorc[iw][inir-iwnir_s]+=(1.0 - modrat)*dtmin[iw]*uncertainty->derv_taua_min_rhorc_l[iw];
-    	            uncertainty->derv_tsol_rhorc[iw][inir-iwnir_s]+=  modrat      *dtmax[iw]*uncertainty->derv_taua_max_rhorc_l[iw];
-                }
-            }
-            uncertainty->derv_tsol_taua_l[iw]=(tsolmax[iw]-tsolmin[iw])*uncertainty->derv_modrat_taua_l;
-            uncertainty->derv_tsol_taua_l[iw]+=(1.0 - modrat)*dtmin[iw]*uncertainty->derv_taua_min_taua_l[iw];
-            uncertainty->derv_tsol_taua_l[iw]+=  modrat      *dtmax[iw]*uncertainty->derv_taua_max_taua_l[iw];
+    	    for(inir=0;inir<nbands_ac;inir++){
+                ib = iw * nbands_ac + inir;
+                uncertainty->derv_tsol_rhorc[ib] =(tsolmax[iw] - tsolmin[iw]) * uncertainty->derv_modrat_rhorc[inir];
 
-            uncertainty->derv_tsol_rhow_l[iw]=(tsolmax[iw]-tsolmin[iw])*uncertainty->derv_modrat_rhow_l;
-            uncertainty->derv_tsol_rhow_l[iw]+=(1.0 - modrat)*dtmin[iw]*uncertainty->derv_taua_min_rhow_l[iw];
-            uncertainty->derv_tsol_rhow_l[iw]+=modrat        *dtmax[iw]*uncertainty->derv_taua_max_rhow_l[iw];
+                uncertainty->derv_tsol_taua [ib] =(tsolmax[iw] - tsolmin[iw]) * uncertainty->derv_modrat_taua[inir];
+
+                if(acbands_index[inir]==iwnir_l){
+                    uncertainty->derv_tsol_rhorc[ib] += (1.0 - modrat) * dtmin[iw] * uncertainty->derv_taua_min_rhorc_l[iw];
+                    uncertainty->derv_tsol_rhorc[ib] += modrat * dtmax[iw] * uncertainty->derv_taua_max_rhorc_l[iw];
+
+                    uncertainty->derv_tsol_taua[ib] += (1.0 - modrat) * dtmin[iw] * uncertainty->derv_taua_min_taua_l[iw];
+                    uncertainty->derv_tsol_taua[ib] += modrat * dtmax[iw] * uncertainty->derv_taua_max_taua_l[iw];
+                }   
+                
+            }
         }
 
         /* correct for pressure difference from standard pressure */
-        double tmp_pressure_diff = exp(-0.5 * taur[iw] / geom->csolz[ig]*(pr / p0 - 1));
+        tmp_pressure_diff = exp(-0.5 * taur[iw] / geom->csolz[ig]*(pr / p0 - 1));
         tsol[iw] = tsol[iw] * tmp_pressure_diff;
 
     	if(uncertainty){
-    	    for(inir=iwnir_s;inir<=iwnir_l;inir++)
-    	        uncertainty->derv_tsol_rhorc[iw][inir-iwnir_s]*=tmp_pressure_diff;
-    	    uncertainty->derv_tsol_taua_l[iw]*=tmp_pressure_diff;
-    	    uncertainty->derv_tsol_rhow_l[iw]*=tmp_pressure_diff;
+    	    for(inir=0;inir<nbands_ac;inir++)
+    	        uncertainty->derv_tsol_rhorc[iw*nbands_ac+inir]*=tmp_pressure_diff;
         }
 
         if ((evalmask & TRANSSPHER) != 0) {
@@ -3473,8 +3387,13 @@ void diff_tran(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_l,
     		tmp=tsol[iw];
             tsol[iw] = pow(tsol[iw], geom->airmass_sph[ig] / geom->airmass_plp[ig]);
 
-    		if(uncertainty)
-    		    uncertainty->dt_sol[ip*nwave+iw]*= ( geom->airmass_sph[ig] / geom->airmass_plp[ig] *pow(tmp,geom->airmass_sph[ig] / geom->airmass_plp[ig]-1) );
+    		if(uncertainty){
+                tmp = geom->airmass_sph[ig] / geom->airmass_plp[ig] *
+                      pow(tmp, geom->airmass_sph[ig] / geom->airmass_plp[ig] - 1);
+                for (inir = 0; inir < nbands_ac; inir++)
+                    uncertainty->derv_tsol_rhorc[iw * nbands_ac + inir] *= tmp;
+            }
+    		    
         }
     }
 
@@ -3489,48 +3408,37 @@ void diff_tran(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_l,
         tsen[iw] = tsenmin[iw]*(1.0 - modrat) + tsenmax[iw] * modrat;
 
         if(uncertainty){
-            for(inir=iwnir_s;inir<=iwnir_l;inir++){
-                uncertainty->derv_tsen_rhorc[iw][inir-iwnir_s]=(tsenmax[iw]-tsenmin[iw])*uncertainty->derv_modrat_rhorc[inir-iwnir_s];
-                if(inir==iwnir_l){
-                    uncertainty->derv_tsen_rhorc[iw][inir-iwnir_s]+=(1.0 - modrat)*dtmin[iw]*uncertainty->derv_taua_min_rhorc_l[iw];
-                    uncertainty->derv_tsen_rhorc[iw][inir-iwnir_s]+=  modrat      *dtmax[iw]*uncertainty->derv_taua_max_rhorc_l[iw];
+            for(inir=0;inir<nbands_ac;inir++){
+                ib=iw*nbands_ac+inir;
+                uncertainty->derv_tsen_rhorc[ib]=(tsenmax[iw]-tsenmin[iw])*uncertainty->derv_modrat_rhorc[inir];
+                if (acbands_index[inir] == iwnir_l) {
+                    uncertainty->derv_tsen_rhorc[ib] += (1.0 - modrat) * dtmin[iw] * uncertainty->derv_taua_min_rhorc_l[iw];
+                    uncertainty->derv_tsen_rhorc[ib] += modrat * dtmax[iw] * uncertainty->derv_taua_max_rhorc_l[iw];
                 }
             }
-            uncertainty->derv_tsen_taua_l[iw]=(tsenmax[iw]-tsenmin[iw])*uncertainty->derv_modrat_taua_l;
-            uncertainty->derv_tsen_taua_l[iw]+=(1.0 - modrat)*dtmin[iw]*uncertainty->derv_taua_min_taua_l[iw];
-            uncertainty->derv_tsen_taua_l[iw]+=  modrat      *dtmax[iw]*uncertainty->derv_taua_max_taua_l[iw];
-
-            uncertainty->derv_tsen_rhow_l[iw]=(tsenmax[iw]-tsenmin[iw])*uncertainty->derv_modrat_rhow_l;
-            uncertainty->derv_tsen_rhow_l[iw]+=(1.0 - modrat)*dtmin[iw]*uncertainty->derv_taua_min_rhow_l[iw];
-            uncertainty->derv_tsen_rhow_l[iw]+=modrat        *dtmax[iw]*uncertainty->derv_taua_max_rhow_l[iw];
+            
         }
         /* correct for pressure difference from standard pressure */
-        double tmp_pressure_diff = exp(-0.5 * taur[iw] / geom->csenz[ig] *(pr / p0 - 1));
+        tmp_pressure_diff = exp(-0.5 * taur[iw] / geom->csenz[ig] *(pr / p0 - 1));
         tsen[iw] = tsen[iw] * tmp_pressure_diff;
 
         if(uncertainty){
-            for(inir=iwnir_s;inir<=iwnir_l;inir++)
-                uncertainty->derv_tsen_rhorc[iw][inir-iwnir_s]*=tmp_pressure_diff;
-            uncertainty->derv_tsen_taua_l[iw]*=tmp_pressure_diff;
-            uncertainty->derv_tsen_rhow_l[iw]*=tmp_pressure_diff;
+            for(inir=0;inir<nbands_ac;inir++)
+                uncertainty->derv_tsen_rhorc[iw*nbands_ac+inir]*=tmp_pressure_diff;
         }
 
         if ((evalmask & TRANSSPHER) != 0) {
             /* correct for airmass difference, plane-parallel to spherical atmosphere */
             tmp=tsen[iw];
             tsen[iw] = pow(tsen[iw], geom->airmass_sph[ig] / geom->airmass_plp[ig]);
-            if(uncertainty)
-                uncertainty->dt_sen[ip*nwave+iw]*= ( geom->airmass_sph[ig] / geom->airmass_plp[ig] *pow(tmp,geom->airmass_sph[ig] / geom->airmass_plp[ig]-1) );
-        }
-    }
 
-    free(tsolmin);
-    free(tsolmax);
-    free(tsenmin);
-    free(tsenmax);
-    if(uncertainty){
-        free(dtmin);
-        free(dtmax);
+            if(uncertainty){
+                tmp = geom->airmass_sph[ig] / geom->airmass_plp[ig] *
+                      pow(tmp, geom->airmass_sph[ig] / geom->airmass_plp[ig] - 1);
+                for (inir = 0; inir < nbands_ac; inir++)
+                    uncertainty->derv_tsen_rhorc[iw * nbands_ac + inir] *= tmp;
+            }
+        }
     }
 
     return;
@@ -3569,20 +3477,12 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
     float *noise=&noise_global[ip*nwave];
 
     static float **derv_chi_rhorc;//dimension: [nmodels][nbands_ac], deivative of chi to rhorc
-    static float *derv_chi_taua_l; //dimension: [nmodels], deivative of chi to taua_l
     static float **derv_rhoa_rhorc_l;// derivative of modeled rhoa[nwave] to rhorc[iwnir_l]
     float *derv_modrat_rhorc;// dimension: [nbands_ac], deivative of modrat to rhorc[iwnir_s to iwnir_l]
-    float derv_modrat_taua_l=0.; // deivative of modrat to taua [iwnir_l]
-    float derv_modrat_rhow_l=0.;
     float *derv_taua_min_rhorc_l;
-    float *derv_taua_min_taua_l;
-    float *derv_taua_min_rhow_l;
     float *derv_taua_max_rhorc_l;
-    float *derv_taua_max_taua_l;
-    float *derv_taua_max_rhow_l;
     static float *derv_taua_rhorc_l;//[nmodels], derivative of modeled taua[nir_l] to rhorc_l
     static float *derv_eps_obs_rhorc; //[nbands_ac], derivative of eps_obs to rhorc at nbands_ac
-    float derv_eps_obs_taua_l; // derivative of eps_obs to taua_l
 
     static float *derv_rhoa_min=NULL,*derv_rhoa_max=NULL;  //derivative of rhoa[]to taua[aer_l] for aermodmin and aermodmax
     static float *derv_taua_min=NULL,*derv_taua_max=NULL;  //derivative of taua[]to taua[aer_l] for aermodmin and aermodmax
@@ -3636,7 +3536,6 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
         free(tempwave);
 
         if(uncertainty){
-            derv_chi_taua_l =(float *)malloc(nmodels*sizeof(float));
             derv_chi_rhorc  =(float **)malloc(nmodels*sizeof(float *));
             derv_rhoa_rhorc_l=(float **)malloc(nmodels*sizeof(float*));
             derv_taua_rhorc_l=(float *)malloc(nmodels*sizeof(float));
@@ -3656,17 +3555,12 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
     if(uncertainty){
         derv_modrat_rhorc=uncertainty->derv_modrat_rhorc;
         derv_taua_min_rhorc_l=uncertainty->derv_taua_min_rhorc_l;
-        derv_taua_min_taua_l=uncertainty->derv_taua_min_taua_l;
-        derv_taua_min_rhow_l=uncertainty->derv_taua_min_rhow_l;
         derv_taua_max_rhorc_l=uncertainty->derv_taua_max_rhorc_l;
-        derv_taua_max_taua_l=uncertainty->derv_taua_max_taua_l;
-        derv_taua_max_rhow_l=uncertainty->derv_taua_max_rhow_l;
     }
 
     if(uncertainty){
         for(iw = 0; iw <nbands_ac; iw++)
             derv_eps_obs_rhorc[iw]=0.;
-        derv_eps_obs_taua_l=0.;
     }
 
     for (ib = 0; ib <nbands_ac; ib++) {
@@ -3679,12 +3573,10 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
         if(uncertainty){
             derv_eps_obs_rhorc[ib]=1/rhoa[nir_l];
             derv_eps_obs_rhorc[wave_base_index]+=(-rhoa[iw]/rhoa[nir_l]/rhoa[nir_l]);
-            derv_eps_obs_taua_l+=(-1/rhoa[nir_l]*uncertainty->derv_Lg_taua[iw]+rhoa[iw]/rhoa[nir_l]/rhoa[nir_l]*uncertainty->derv_Lg_taua[nir_l]);
         }
     }
     eps_obs/=mbac_wsum;
     if(uncertainty){
-        derv_eps_obs_taua_l/=mbac_wsum;
         for (ib = 0; ib <nbands_ac; ib++)
             derv_eps_obs_rhorc[ib]/=mbac_wsum;
     }
@@ -3769,7 +3661,6 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
         }
         if(uncertainty){
             derv_chi_rhorc[im][wave_base_index]=0.;
-            derv_chi_taua_l[im]=0.;
         }
         mbac_wsum=0.;
         eps_mod[im]=0.;
@@ -3786,7 +3677,6 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
             if(uncertainty){
                 derv_temp_rhorc=(derv_rhoa_rhorc_l[im][iw]/rhoa[nir_l]-rho_all_wav_pred[iw]/rhoa[nir_l]/rhoa[nir_l]);
                 derv_chi_rhorc [im][wave_base_index]+=derv_temp_rhorc;
-                derv_chi_taua_l[im]+=(-derv_temp_rhorc*uncertainty->derv_Lg_taua[nir_l]);
             }
         }
 
@@ -3794,7 +3684,6 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
         chi[im]=diff_1/mbac_wsum;
         if(uncertainty){
             derv_chi_rhorc[im][wave_base_index]/=mbac_wsum;
-            derv_chi_taua_l [im]/=mbac_wsum;
         }
         chi_struct[im].value=chi[im];
         chi_struct[im].index=im;
@@ -3836,8 +3725,6 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
                 derv_modrat_rhorc[ib]=0.;
 
              }
-             uncertainty->derv_modrat_rhow_l=0.;
-             uncertainty->derv_modrat_taua_l=0.;
         }
        
     } else {
@@ -3863,19 +3750,11 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
                 iw=acbands_index[ib];
                 if(iw!=nir_l){
                     derv_modrat_rhorc[ib]=derv_eps_obs_rhorc[ib]/(eps_mod[*modmax]-eps_mod[*modmin]);
-                    derv_modrat_rhow_l+=-derv_modrat_rhorc[ib]*uncertainty->ratio_rhow[ib];
                 }
             }
 
             derv_modrat_rhorc[wave_base_index]=derv_modrat_chi0*derv_chi_rhorc[*modmin][wave_base_index]+derv_modrat_chi1*derv_chi_rhorc[*modmax][wave_base_index];
             derv_modrat_rhorc[wave_base_index]+=derv_eps_obs_rhorc[wave_base_index]/(eps_mod[*modmax]-eps_mod[*modmin]);
-            derv_modrat_rhow_l+=-derv_modrat_rhorc[wave_base_index];
-
-            derv_modrat_taua_l =derv_modrat_chi0*derv_chi_taua_l [*modmin]+derv_modrat_chi1*derv_chi_taua_l [*modmax];
-            derv_modrat_taua_l +=derv_eps_obs_taua_l/(eps_mod[*modmax]-eps_mod[*modmin]);
-
-            uncertainty->derv_modrat_rhow_l=derv_modrat_rhow_l;
-            uncertainty->derv_modrat_taua_l=derv_modrat_taua_l;
         }
     }
 
@@ -3894,25 +3773,14 @@ int smaer_pca(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
             for(itemp=0;itemp<nbands_ac;itemp++){
                 ib=acbands_index[itemp];
                 if(ib!=nir_l){
-                    uncertainty->derv_La_rhorc[iw][itemp]=(rho_pred_max[iw]-rho_pred_min[iw])*derv_modrat_rhorc[itemp];
-                    uncertainty->derv_La_rhow_l[iw]+=-uncertainty->derv_La_rhorc[iw][itemp]*uncertainty->ratio_rhow[itemp];
+                    uncertainty->derv_La_rhorc[iw*nbands_ac+itemp]=(rho_pred_max[iw]-rho_pred_min[iw])*derv_modrat_rhorc[itemp];
                 }
             }
-            uncertainty->derv_La_rhorc[iw][wave_base_index]=(rho_pred_max[iw]-rho_pred_min[iw])*derv_modrat_rhorc[wave_base_index];
-            uncertainty->derv_La_rhorc[iw][wave_base_index]+= (1-*modrat)*derv_rhoa_min[iw]*derv_taua_rhorc_l[*modmin];
-            uncertainty->derv_La_rhorc[iw][wave_base_index]+= (*modrat)  *derv_rhoa_max[iw]*derv_taua_rhorc_l[*modmax];
-            uncertainty->derv_La_rhow_l[iw]+=-uncertainty->derv_La_rhorc[iw][wave_base_index];
-
-            uncertainty->derv_La_taua_l[iw]=(rho_pred_max[iw]-rho_pred_min[iw])*derv_modrat_taua_l;
-            uncertainty->derv_La_taua_l[iw]+=(1-*modrat)*(-derv_rhoa_min[iw]*derv_taua_rhorc_l[*modmin]*uncertainty->derv_Lg_taua[iw]);
-            uncertainty->derv_La_taua_l[iw]+=(*modrat)  *(-derv_rhoa_max[iw]*derv_taua_rhorc_l[*modmax]*uncertainty->derv_Lg_taua[iw]);
-
+            uncertainty->derv_La_rhorc[iw*nbands_ac+wave_base_index]=(rho_pred_max[iw]-rho_pred_min[iw])*derv_modrat_rhorc[wave_base_index];
+            uncertainty->derv_La_rhorc[iw*nbands_ac+wave_base_index]+= (1-*modrat)*derv_rhoa_min[iw]*derv_taua_rhorc_l[*modmin];
+            uncertainty->derv_La_rhorc[iw*nbands_ac+wave_base_index]+= (*modrat)  *derv_rhoa_max[iw]*derv_taua_rhorc_l[*modmax];
             derv_taua_min_rhorc_l[iw]=derv_taua_min[iw]*derv_taua_rhorc_l[*modmin];
             derv_taua_max_rhorc_l[iw]=derv_taua_max[iw]*derv_taua_rhorc_l[*modmax];
-            derv_taua_min_taua_l[iw]=-derv_taua_min_rhorc_l[iw]*uncertainty->derv_Lg_taua[iw];
-            derv_taua_max_taua_l[iw]=-derv_taua_max_rhorc_l[iw]*uncertainty->derv_Lg_taua[iw];
-            derv_taua_min_rhow_l[iw]=-derv_taua_min_rhorc_l[iw];
-            derv_taua_max_rhow_l[iw]=-derv_taua_max_rhorc_l[iw];
 
         }
     }
@@ -3982,12 +3850,6 @@ int smaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
     float *derv_modrat_rhorc;// dimension: [nbands_ac], deivative of modrat to rhorc[iwnir_s to iwnir_l]
     float derv_modrat_taua_l=0.; // deivative of modrat to taua [iwnir_l]
     float derv_modrat_rhow_l=0.;
-    float *derv_taua_min_rhorc_l;
-    float *derv_taua_min_taua_l;
-    float *derv_taua_min_rhow_l;
-    float *derv_taua_max_rhorc_l;
-    float *derv_taua_max_taua_l;
-    float *derv_taua_max_rhow_l;
     static float **derv_taua_rhorc_l;//[nmodels][nwave], derivative of modeled taua[nwave] to rhorc_l
     static float *derv_eps_obs_rhorc;  //[nbands_ac], derivative of eps_obs to rhorc at nbands_ac
     float derv_eps_obs_taua_l;  // derivative of eps_obs to taua_l
@@ -4039,12 +3901,6 @@ int smaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
 
      if(uncertainty){
         derv_modrat_rhorc=uncertainty->derv_modrat_rhorc;
-        derv_taua_min_rhorc_l=uncertainty->derv_taua_min_rhorc_l;
-        derv_taua_min_taua_l=uncertainty->derv_taua_min_taua_l;
-        derv_taua_min_rhow_l=uncertainty->derv_taua_min_rhow_l;
-        derv_taua_max_rhorc_l=uncertainty->derv_taua_max_rhorc_l;
-        derv_taua_max_taua_l=uncertainty->derv_taua_max_taua_l;
-        derv_taua_max_rhow_l=uncertainty->derv_taua_max_rhow_l;
 
         for(im=0;im<nmodels;im++)
             for(iw=0;iw<nbands_ac;iw++)
@@ -4075,7 +3931,7 @@ int smaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
         if (uncertainty) {
             derv_eps_obs_rhorc[ib] = 1 / rhoa[nir_l];
             derv_eps_obs_rhorc[wave_base_index] += (-rhoa[iw] / rhoa[nir_l] / rhoa[nir_l]);
-            derv_eps_obs_taua_l += (-1 / rhoa[nir_l] * uncertainty->derv_Lg_taua[iw] +rhoa[iw] / rhoa[nir_l] / rhoa[nir_l] * uncertainty->derv_Lg_taua[nir_l]);
+            derv_eps_obs_taua_l += (-1 / rhoa[nir_l] * uncertainty->derv_rhog_taua[iw] +rhoa[iw] / rhoa[nir_l] / rhoa[nir_l] * uncertainty->derv_rhog_taua[nir_l]);
         }
     }
     eps_obs /= mbac_wsum;
@@ -4160,7 +4016,7 @@ int smaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
                 derv_temp_rhorc = (derv_rhoa_rhorc_l[im][iw] / rhoa[nir_l] -
                                    rho_all_wav_pred[iw][im] / rhoa[nir_l] / rhoa[nir_l]);
                 derv_chi_rhorc[im][wave_base_index] += derv_temp_rhorc;
-                derv_chi_taua_l[im] += (-derv_temp_rhorc * uncertainty->derv_Lg_taua[nir_l]);
+                derv_chi_taua_l[im] += (-derv_temp_rhorc * uncertainty->derv_rhog_taua[nir_l]);
             }
         }
 
@@ -4255,31 +4111,17 @@ int smaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s,
             for (ib = 0; ib < nbands_ac; ib++) {
                 i=acbands_index[ib];
                 if (i != nir_l) {
-                    uncertainty->derv_La_rhorc[iw][ib] =
+                    uncertainty->derv_La_rhorc[iw*nbands_ac+ib] =
                         (rho_all_wav_pred[iw][*modmax] - rho_all_wav_pred[iw][*modmin]) *
                         derv_modrat_rhorc[ib];
-                    uncertainty->derv_La_rhow_l[iw] +=
-                        -uncertainty->derv_La_rhorc[iw][ib] * uncertainty->ratio_rhow[ib];
                 }
             }
-            uncertainty->derv_La_rhorc[iw][wave_base_index] =
+            uncertainty->derv_La_rhorc[iw*nbands_ac+wave_base_index] =
                 (rho_all_wav_pred[iw][*modmax] - rho_all_wav_pred[iw][*modmin]) *
                 derv_modrat_rhorc[nir_l - iwnir_s];
-            uncertainty->derv_La_rhorc[iw][wave_base_index] +=
+            uncertainty->derv_La_rhorc[iw*nbands_ac+wave_base_index] +=
                 (1 - *modrat) * derv_rhoa_rhorc_l[*modmin][iw];
-            uncertainty->derv_La_rhorc[iw][wave_base_index] += (*modrat) * derv_rhoa_rhorc_l[*modmax][iw];
-            uncertainty->derv_La_rhow_l[iw] += -uncertainty->derv_La_rhorc[iw][wave_base_index];
-
-            uncertainty->derv_La_taua_l[iw]=(rho_all_wav_pred[iw][*modmax]-rho_all_wav_pred[iw][*modmin])*derv_modrat_taua_l;
-            uncertainty->derv_La_taua_l[iw]+=(1-*modrat)*(-derv_rhoa_rhorc_l[*modmin][iw]*uncertainty->derv_Lg_taua[iw]);
-            uncertainty->derv_La_taua_l[iw]+=(*modrat)  *(-derv_rhoa_rhorc_l[*modmax][iw]*uncertainty->derv_Lg_taua[iw]);
-
-            derv_taua_min_rhorc_l[iw]=derv_taua_rhorc_l[*modmin][iw];
-            derv_taua_max_rhorc_l[iw]=derv_taua_rhorc_l[*modmax][iw];
-            derv_taua_min_taua_l[iw]=-derv_taua_rhorc_l[*modmin][iw]*uncertainty->derv_Lg_taua[iw];
-            derv_taua_max_taua_l[iw]=-derv_taua_rhorc_l[*modmax][iw]*uncertainty->derv_Lg_taua[iw];
-            derv_taua_min_rhow_l[iw]=-derv_taua_rhorc_l[*modmin][iw];
-            derv_taua_max_rhow_l[iw]=-derv_taua_rhorc_l[*modmax][iw];
+            uncertainty->derv_La_rhorc[iw*nbands_ac+wave_base_index] += (*modrat) * derv_rhoa_rhorc_l[*modmax][iw];
 
         }
     }
@@ -4591,11 +4433,11 @@ int rhaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int32_
             uncertainty1 = (uncertainty_t *) malloc(sizeof(uncertainty_t));
             uncertainty2 = (uncertainty_t *) malloc(sizeof(uncertainty_t));
 
-            if (alloc_uncertainty(uncertainty->nbands, uncertainty->nbands_ac, uncertainty->npix, uncertainty1) != 0) {
+            if (alloc_uncertainty(uncertainty->nbands,nbands_ac, uncertainty->npix, uncertainty1) != 0) {
                 printf("unable to allocate error record in rhaer()\n");
                 exit(1);
             }
-            if (alloc_uncertainty(uncertainty->nbands, uncertainty->nbands_ac, uncertainty->npix, uncertainty2) != 0) {
+            if (alloc_uncertainty(uncertainty->nbands,nbands_ac, uncertainty->npix, uncertainty2) != 0) {
                 printf("unable to allocate error record in rhaer()\n");
                 exit(1);
             }
@@ -4642,13 +4484,16 @@ int rhaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int32_
     if(uncertainty){
         init_uncertainty(uncertainty1,0);
         init_uncertainty(uncertainty2,0);
-        if (cp_uncertainty(uncertainty, uncertainty1, ip) != 0) {
-            printf("unable to copy the error record in rhaer()\n");
-            exit(1);
+        for(iw=0;iw<nbands_ac;iw++){
+            uncertainty1->ratio_rhow[iw]=uncertainty->ratio_rhow[iw];
+            uncertainty2->ratio_rhow[iw]=uncertainty->ratio_rhow[iw];
         }
-        if (cp_uncertainty(uncertainty, uncertainty2, ip) != 0) {
-            printf("unable to copy the error record in rhaer()\n");
-            exit(1);
+        uncertainty1->aer_l_glint=uncertainty->aer_l_glint;
+        uncertainty2->aer_l_glint=uncertainty->aer_l_glint;
+
+        for(iw=0;iw<nwave;iw++){
+             uncertainty1->derv_rhog_taua[iw]=uncertainty->derv_rhog_taua[iw];
+             uncertainty2->derv_rhog_taua[iw]=uncertainty->derv_rhog_taua[iw];
         }
     }
 
@@ -4901,36 +4746,31 @@ int rhaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int32_
             tsen[iw] = tsen1[iw]*(1 - wt) + tsen2[iw] * wt;
 
             if(uncertainty){
-                for(inir=0;inir<nbands_ac;inir++){
-                    uncertainty->derv_La_rhorc[iw][inir]=(1-wt)*uncertainty1->derv_La_rhorc[iw][inir]+ wt*uncertainty2->derv_La_rhorc[iw][inir];
-                    uncertainty->derv_taua_rhorc[iw][inir]=(1-wt)*uncertainty1->derv_taua_rhorc[iw][inir]+ wt*uncertainty2->derv_taua_rhorc[iw][inir];
-                    uncertainty->derv_tsen_rhorc[iw][inir]=(1-wt)*uncertainty1->derv_tsen_rhorc[iw][inir]+ wt*uncertainty2->derv_tsen_rhorc[iw][inir];
-                    uncertainty->derv_tsol_rhorc[iw][inir]=(1-wt)*uncertainty1->derv_tsol_rhorc[iw][inir]+ wt*uncertainty2->derv_tsol_rhorc[iw][inir];
+                for (inir = 0; inir < nbands_ac; inir++) {
+                    im = iw * nbands_ac + inir;
+                    uncertainty->derv_La_rhorc[im] =
+                        (1 - wt) * uncertainty1->derv_La_rhorc[im] + wt * uncertainty2->derv_La_rhorc[im];
+                    uncertainty->derv_taua_rhorc[im] =
+                        (1 - wt) * uncertainty1->derv_taua_rhorc[im] + wt * uncertainty2->derv_taua_rhorc[im];
+                    uncertainty->derv_tsen_rhorc[im] =
+                        (1 - wt) * uncertainty1->derv_tsen_rhorc[im] + wt * uncertainty2->derv_tsen_rhorc[im];
+                    uncertainty->derv_tsol_rhorc[im] =
+                        (1 - wt) * uncertainty1->derv_tsol_rhorc[im] + wt * uncertainty2->derv_tsol_rhorc[im];
+
+                    uncertainty->derv_La_taua_l[im] =
+                        (1 - wt) * uncertainty1->derv_La_taua_l[im] + wt * uncertainty2->derv_La_taua_l[im];
+                    uncertainty->derv_taua_taua_l[im] = (1 - wt) * uncertainty1->derv_taua_taua_l[im] +
+                                                        wt * uncertainty2->derv_taua_taua_l[im];
+                    uncertainty->derv_tsol_taua[im] =
+                        (1 - wt) * uncertainty1->derv_tsol_taua[im] + wt * uncertainty2->derv_tsol_taua[im];
+                    uncertainty->derv_tsen_taua[im] =
+                        (1 - wt) * uncertainty1->derv_tsen_taua[im] + wt * uncertainty2->derv_tsen_taua[im];
                 }
-                uncertainty->derv_La_taua_l[iw]=(1-wt)*uncertainty1->derv_La_taua_l[iw]+ wt*uncertainty2->derv_La_taua_l[iw];
-                uncertainty->derv_La_rhow_l[iw]=(1-wt)*uncertainty1->derv_La_rhow_l[iw]+ wt*uncertainty2->derv_La_rhow_l[iw];
+
                 uncertainty->derv_La_rh[iw]=(rhoa2[iw]-rhoa1[iw])*derv_wt_rh;
-
-                //uncertainty->derv_taua_rhoa_l[iw]=(1-wt)*uncertainty1->derv_taua_rhoa_l[iw]+ wt*uncertainty2->derv_taua_rhoa_l[iw];
-                uncertainty->derv_taua_taua_l[iw]=(1-wt)*uncertainty1->derv_taua_taua_l[iw]+ wt*uncertainty2->derv_taua_taua_l[iw];
-                //rrrec->derv_taua_rhoa_s[iw]=(1-wt)*uncertainty1->derv_taua_rhoa_s[iw]+ wt*uncertainty2->derv_taua_rhoa_s[iw];
-                uncertainty->derv_taua_rhow_l[iw]=(1-wt)*uncertainty1->derv_taua_rhow_l[iw]+ wt*uncertainty2->derv_taua_rhow_l[iw];
                 uncertainty->derv_taua_rh[iw]=(taua2[iw]-taua1[iw])*derv_wt_rh;
-                //uncertainty->derv_taua_taua_s[iw]=(1-wt)*uncertainty1->derv_taua_taua_s[iw]+ wt*uncertainty2->derv_taua_taua_s[iw];
-
-                // uncertainty->derv_tsol_rhoa_l[iw]=(1-wt)*uncertainty1->derv_tsol_rhoa_l[iw]+ wt*uncertainty2->derv_tsol_rhoa_l[iw];
-                //uncertainty->derv_tsol_rhoa_s[iw]=(1-wt)*uncertainty1->derv_tsol_rhoa_s[iw]+ wt*uncertainty2->derv_tsol_rhoa_s[iw];
-                uncertainty->derv_tsol_taua_l[iw]=(1-wt)*uncertainty1->derv_tsol_taua_l[iw]+ wt*uncertainty2->derv_tsol_taua_l[iw];
-                uncertainty->derv_tsol_rhow_l[iw]=(1-wt)*uncertainty1->derv_tsol_rhow_l[iw]+ wt*uncertainty2->derv_tsol_rhow_l[iw];
                 uncertainty->derv_tsol_rh[iw]=(tsol2[iw]-tsol1[iw])*derv_wt_rh;
-                //uncertainty->derv_tsol_taua_s[iw]=(1-wt)*uncertainty1->derv_tsol_taua_s[iw]+ wt*uncertainty2->derv_tsol_taua_s[iw];
-
-                //uncertainty->derv_tsen_rhoa_l[iw]=(1-wt)*uncertainty1->derv_tsen_rhoa_l[iw]+ wt*uncertainty2->derv_tsen_rhoa_l[iw];
-                //uncertainty->derv_tsen_rhoa_s[iw]=(1-wt)*uncertainty1->derv_tsen_rhoa_s[iw]+ wt*uncertainty2->derv_tsen_rhoa_s[iw];
-                uncertainty->derv_tsen_taua_l[iw]=(1-wt)*uncertainty1->derv_tsen_taua_l[iw]+ wt*uncertainty2->derv_tsen_taua_l[iw];
-                uncertainty->derv_tsen_rhow_l[iw]=(1-wt)*uncertainty1->derv_tsen_rhow_l[iw]+ wt*uncertainty2->derv_tsen_rhow_l[iw];
                 uncertainty->derv_tsen_rh[iw]=(tsen2[iw]-tsen1[iw])*derv_wt_rh;
-                //uncertainty->derv_tsen_taua_s[iw]=(1-wt)*uncertainty1->derv_tsen_taua_s[iw]+ wt*uncertainty2->derv_tsen_taua_s[iw];
             }
         }
         *eps = eps1 * (1 - wt) + eps2*wt;
@@ -4947,34 +4787,11 @@ int rhaer(int32_t sensorID, float wave[], int32_t nwave, int32_t iwnir_s, int32_
 
             if(uncertainty){
                 for(inir=0;inir<nbands_ac;inir++){
-                    uncertainty->derv_La_rhorc[iw][inir]=uncertainty1->derv_La_rhorc[iw][inir];
-                    uncertainty->derv_taua_rhorc[iw][inir]=uncertainty1->derv_taua_rhorc[iw][inir];
-                    uncertainty->derv_tsen_rhorc[iw][inir]=uncertainty1->derv_tsen_rhorc[iw][inir];
-                    uncertainty->derv_tsol_rhorc[iw][inir]=uncertainty1->derv_tsol_rhorc[iw][inir];
+                    uncertainty->derv_La_rhorc[iw*nbands_ac+inir]=uncertainty1->derv_La_rhorc[iw*nbands_ac+inir];
+                    uncertainty->derv_taua_rhorc[iw*nbands_ac+inir]=uncertainty1->derv_taua_rhorc[iw*nbands_ac+inir];
+                    uncertainty->derv_tsen_rhorc[iw*nbands_ac+inir]=uncertainty1->derv_tsen_rhorc[iw*nbands_ac+inir];
+                    uncertainty->derv_tsol_rhorc[iw*nbands_ac+inir]=uncertainty1->derv_tsol_rhorc[iw*nbands_ac+inir];
                 }
-                uncertainty->derv_La_taua_l[iw]=uncertainty1->derv_La_taua_l[iw];
-                //uncertainty->derv_rhoa_l[iw]=uncertainty1->derv_rhoa_l[iw];
-                uncertainty->derv_La_rhow_l[iw]=uncertainty1->derv_La_rhow_l[iw];
-                //uncertainty->derv_rhoa_s[iw]=uncertainty1->derv_rhoa_s[iw];
-                //uncertainty->derv_taua_s[iw]=uncertainty1->derv_taua_s[iw];
-
-                // uncertainty->derv_taua_rhoa_l[iw]=uncertainty1->derv_taua_rhoa_l[iw];
-                uncertainty->derv_taua_taua_l[iw]=uncertainty1->derv_taua_taua_l[iw];
-                // uncertainty->derv_taua_rhoa_s[iw]=uncertainty1->derv_taua_rhoa_s[iw];
-                uncertainty->derv_taua_rhow_l[iw]=uncertainty1->derv_taua_rhow_l[iw];
-                //uncertainty->derv_taua_taua_s[iw]=uncertainty1->derv_taua_taua_s[iw];
-
-                // uncertainty->derv_tsol_rhoa_l[iw]=uncertainty1->derv_tsol_rhoa_l[iw];
-                // uncertainty->derv_tsol_rhoa_s[iw]=uncertainty1->derv_tsol_rhoa_s[iw];
-                uncertainty->derv_tsol_taua_l[iw]=uncertainty1->derv_tsol_taua_l[iw];
-                uncertainty->derv_tsol_rhow_l[iw]=uncertainty1->derv_tsol_rhow_l[iw];
-                //uncertainty->derv_tsol_taua_s[iw]=uncertainty1->derv_tsol_taua_s[iw];
-
-                //uncertainty->derv_tsen_rhoa_l[iw]=uncertainty1->derv_tsen_rhoa_l[iw];
-                //uncertainty->derv_tsen_rhoa_s[iw]=uncertainty1->derv_tsen_rhoa_s[iw];
-                uncertainty->derv_tsen_taua_l[iw]=uncertainty1->derv_tsen_taua_l[iw];
-                uncertainty->derv_tsen_rhow_l[iw]=uncertainty1->derv_tsen_rhow_l[iw];
-                //uncertainty->derv_tsen_taua_s[iw]=uncertainty1->derv_tsen_taua_s[iw];
             }
         }
         *eps = eps1;
@@ -5590,11 +5407,11 @@ int aerosol(l2str *l2rec, int32_t aer_opt_in, aestr *aerec, int32_t ip,
                             La2[iw] = rhoa[iw] / radref[iw];
 
                             if(uncertainty){
-                                uncertainty->derv_La_taua_l[iw] /= radref[iw];
-                                uncertainty->derv_La_rhow_l[iw] /= radref[iw];
                                 uncertainty->derv_La_rh[iw] /= radref[iw];
+
+                                ipb=iw*nbands_ac;
                                 for(inir=0;inir<nbands_ac;inir++){
-                                    uncertainty->derv_La_rhorc[iw][inir] /= radref[iw];
+                                    uncertainty->derv_La_rhorc[ipb+inir]  /= radref[iw];
                                 }
                             }
                         }

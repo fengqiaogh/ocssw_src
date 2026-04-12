@@ -352,7 +352,7 @@ void l1_mask_set(l1str *l1rec, int32_t ip);
 int setflags(l1str *l1rec);
 void setflagbits_l1(int level, l1str *l1rec, int32_t ipix);
 
-char get_cldmask(l1str *l1rec, int32_t ip);
+char get_cloudmask_habs(l1str *l1rec, int32_t ip);
 int modis_cloud_mask(l1str *l1rec, int32_t ip);
 int get_sdps_cld_mask( l1str *, int32_t, char *);
 

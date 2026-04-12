@@ -267,7 +267,12 @@ int main(int argc, char *argv[]) {
     GeoData geoData;
     oel::ProcessingTracker processingTracker;
 
-    geoData = locateOci(l1aFile, outfile, options, locatingContext, processingTracker);
+    try {
+        geoData = locateOci(l1aFile, outfile, options, locatingContext, processingTracker);
+    } catch (const exception& e) {
+        cerr << "-E- Couldn't geolocate file:\n    " << e.what() << endl;
+        exit(100);
+    }
 
     cout << "Preparing to calibrate file" << endl;
 

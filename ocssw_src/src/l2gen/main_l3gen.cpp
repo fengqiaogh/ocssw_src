@@ -536,12 +536,12 @@ int main(int argc, char* argv[]) {
             for (int32 iw = 0; iw < n_nlw; iw++) {
                 ipw = ip * ifile.nbands + nlw_windex[iw];
                 l2rec->nLw[ipw] = inData[nlw_bindex[iw]][2 * ip] / weight;
-                l2rec->Rrs[ipw] = MAX(l2rec->nLw[ipw] / ifile.Fonom[iw], BAD_FLT);
+                l2rec->Rrs[ipw] = MAX(l2rec->nLw[ipw] / ifile.Fonom[nlw_windex[iw]], BAD_FLT);
             }
             for (int32 iw = 0; iw < n_rrs; iw++) {
                 ipw = ip * ifile.nbands + rrs_windex[iw];
                 l2rec->Rrs[ipw] = inData[rrs_bindex[iw]][2 * ip] / weight;
-                l2rec->nLw[ipw] = MAX(l2rec->Rrs[ipw] * ifile.Fonom[iw], BAD_FLT);
+                l2rec->nLw[ipw] = MAX(l2rec->Rrs[ipw] * ifile.Fonom[rrs_windex[iw]], BAD_FLT);
             }
             l1rec->solz[ip] = 0.0;
             l1rec->sola[ip] = 0.0;

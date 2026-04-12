@@ -16,15 +16,19 @@ OCSSW_bash.env (OCSSW.env for csh) is provided for setting needed environment va
 - cmake
 - bison
 - flex
+- m4
 - wget
 - Python3 (we use 3.12)
-- zlib1g-dev
-- libX11-devel
+
+
+- Ubuntu:
+
+  - zlib1g-dev
 
 - Mac:
 
   - use homebrew to install gcc and such
-  - libX11 can be installed by XQuartz
+  - libX11 can be installed by XQuartz (not necessary)
 
 ## Building the code
 

@@ -158,6 +158,18 @@ double resolve2resolution(const char *resolve);
  */
 int check_url(const char *file);
 
+/**
+ * @brief Ensure a buffer has capacity for at least a given number of elements.
+ *
+ * @param ptr Pointer to the buffer pointer to allocate or reallocate.
+ * @param current_capacity Current capacity (in number of elements). Updated on success.
+ * @param required_capacity Minimum required capacity (in number of elements).
+ * @param element_size Type size in bytes i.e. sizeof(float), etc.
+ * @returns a pointer to the new allocation or the original `ptr` if `current_capacity` hasn't changed
+ *
+ */
+void *ensure_capacity(void *ptr, size_t *current_capacity, size_t required_capacity, size_t element_size);
+
 #ifdef __cplusplus
 }
 

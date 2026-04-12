@@ -1422,10 +1422,7 @@ void Kd490_unc(l2str *l2rec,int32_t ip) {
     if(uncertainty){
         dRrs=uncertainty->dRrs;
         dkd490=&uncertainty->dkd490;
-        if(input->proc_uncertainty==2)
-            covariance_matrix=uncertainty->covaraince_matrix;
-        else
-            covariance_matrix=uncertainty->pixel_covariance;
+        covariance_matrix=uncertainty->covariance_matrix;  
     }
 
     if (w == NULL) {

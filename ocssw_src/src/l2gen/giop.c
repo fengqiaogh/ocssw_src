@@ -2877,7 +2877,7 @@ void run_giop(l2str *l2rec) {
 
         switch (g->rrs_opt) {
         case RRSFOQ:
-            foqint_morel(input->fqfile, wave, nwave, 0.0, 0.0, 0.0, g->chl, foq);
+            foqint_morel(input->fqfile, wave, nwave, 0.0, 0.0, 0.0, g->chl, foq,NULL);
             for (iw = 0; iw < g->nwave; iw++) {
                 g->foq[iw] = foq[g->bindx[iw]];
             }

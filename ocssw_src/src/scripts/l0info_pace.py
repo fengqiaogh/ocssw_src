@@ -10,7 +10,7 @@ from l0info_harp import l0info_harp
 from l0info_spex import l0info_spex
 
 
-__version__ = '1.7.3 (2023-08-10)'
+__version__ = '1.7.4 (2026-03-26)'
 
 __instids__ = ['hkt','oci','harp','spex']
 
@@ -64,10 +64,14 @@ def l0info_pace(args):
         # output.write("# Info for %s\n" % args.input_file)
         
     print("datatype=%s\n"%strInst.upper())
-    # Check if the CRC check requested
-    crc_check = args.crc_check
-    if strInst!='oci' and crc_check:
+    # Check if the CRC check is disabled
+    disable_crc_check = not args.crc_check
+
+    # only oci has crc check implemented currently. Issue a warning if crc is not disabled 
+    # and instrument is not oci
+    if strInst!='oci' and not disable_crc_check:
         print("Warning: CRC check is only availible for OCI Science data")
+
     # Call appropriate function depending on data type
     if strInst == 'hkt':    # PACE HKT data
         if output: output.write("datatype=HKT\n")
@@ -75,7 +79,7 @@ def l0info_pace(args):
     
     elif strInst == 'oci': # OCI science data
         # if output: output.write("datatype=OCI\n")
-        rcode = l0info_oci(args,fh,output,bDSB,crc_check)
+        rcode = l0info_oci(args,fh,output,bDSB,disable_crc_check)
 
     elif strInst == 'harp': # HARP science data
         if output: output.write("datatype=HARP\n")
@@ -100,26 +104,26 @@ def main():
     print("l0info_pace", __version__)
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,description=\
         'Reads OCI L0 HKT/science data and reports start/stop times',epilog="""
-EXIT Status:
-0   : All is well in the world
-1   : Dunno, something horrible occurred
-101 : File open error 
-102 : Invalid file or instrument from CFE header
-103 : Problem reading packet information
-104 : Invalid packet [header/datatype/length]
-110 : No [Science] packets found
-111 : Bad image data
-120 : Problem reading time from ancillary packet
-131 : OCI Checksum failure
-13X : OCI science data error
-""")
+        EXIT Status:
+        0   : All is well in the world
+        1   : Dunno, something horrible occurred
+        101 : File open error 
+        102 : Invalid file or instrument from CFE header
+        103 : Problem reading packet information
+        104 : Invalid packet [header/datatype/length]
+        110 : No [Science] packets found
+        111 : Bad image data
+        120 : Problem reading time from ancillary packet
+        131 : OCI Checksum failure
+        13X : OCI science data error
+    """)
     parser.add_argument('--version', action='version', version='%(prog)s ' + __version__)
     parser.add_argument('input_file', type=str, help='path to the input L0 file')
     parser.add_argument('--output', type=str, help='path to the optional output text file')
     parser.add_argument('--verbose', '-v', action='store_true')
     parser.add_argument('--noCFEheader', action='store_true', help="data without CFE header")
     parser.add_argument('--instrument', type=str, help='hkt,oci,harp or spex')
-    parser.add_argument('--crc_check', nargs='?', const=1, type=bool,default=False, help='validate crc checksum')
+    parser.add_argument('--crc_check', action='store_true', help='enable validating crc checksum')
     args = parser.parse_args()        
 
     status = l0info_pace(args)

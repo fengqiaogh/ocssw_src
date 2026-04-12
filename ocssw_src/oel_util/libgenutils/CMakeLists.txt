@@ -28,7 +28,7 @@ ADD_LIBRARY(genutils
   trimBlanks.c
   isValidInt.c
   fileFormatUtils.c
-
+  ensure_capacity.c
   argpar.c
   argpar-help.c
   argpar-json.c

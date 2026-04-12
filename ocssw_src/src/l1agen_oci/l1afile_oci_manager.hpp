@@ -149,6 +149,14 @@ class L1aFileManager {
         void updateLastDataTypeSeen(short dataType);
 
         /**
+         * @brief Generate outlist string for the data type in the format:
+         *          "fileName startTime endTime completeFlag dataType"
+         * @param dataType 
+         * @return std::string 
+         */
+        std::string processOutlistStringFor(short dataType);
+
+        /**
          * @brief if the next file's time gap is too large, move the last
          *         file out of the buffer and into the noMergeOutlist
          * @param dataType file type to process

@@ -878,6 +878,7 @@ VOIDP prodgen(l2prodstr *p, l2str *l2rec) {
     case CAT_calcite_ci2:
     case CAT_calcite_ci748:
     case CAT_calcite_ci869:
+    case CAT_calcite_ci_merged:
         calcite(l2rec, p, fbuf);
         pbuf = (VOIDP) fbuf;
         break;

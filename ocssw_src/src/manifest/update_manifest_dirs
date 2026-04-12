@@ -12,7 +12,7 @@ OCSSW_ODPS_MACHINE=analysis705
 OCSSW_ODPS=${OCSSW_ODPS_MACHINE}:${OCSSW_DIR}
 
 # where to get the linux binaries for HPC (poseidon)
-OCSSW_HPC_MACHINE=poseidon
+OCSSW_HPC_MACHINE=triton
 OCSSW_HPC=${OCSSW_HPC_MACHINE}:${OCSSW_DIR}
 
 # where to get the mac ARM binaries, only used for seadas

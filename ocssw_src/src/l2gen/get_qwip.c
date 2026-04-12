@@ -5,7 +5,7 @@
 const static double p[] = {-8.399885e-9, 1.715532e-5, -1.301670e-2, 4.357838e0, -5.449532e2};
 
 static float* avw = NULL;
-
+static size_t allocation_size = 0;
 void get_qwip(l2str* l2rec, float prod[]) {
     int32_t nbands = l2rec->l1rec->l1file->nbands;
     int32_t npix = l2rec->l1rec->npix;
@@ -17,9 +17,9 @@ void get_qwip(l2str* l2rec, float prod[]) {
             printf("QWIP: incompatible sensor wavelengths for this algorithm\n");
             exit(1);
         }
-        avw = calloc(npix, sizeof(float));
         first = 0;
     }
+    avw = ensure_capacity(avw,&allocation_size,(size_t)npix,sizeof(float));
     float* Rrs = l2rec->Rrs;
     get_avw(l2rec, avw);
     for (int32_t ip = 0; ip < npix; ip++) {

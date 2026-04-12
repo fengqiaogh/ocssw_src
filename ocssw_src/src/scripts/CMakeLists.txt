@@ -59,3 +59,6 @@ install(PROGRAMS pace_hkt_check_limits.py DESTINATION bin RENAME pace_hkt_check_
 install(PROGRAMS hycom_mlt_ts.py DESTINATION bin RENAME hycom_mlt_ts)
 install(PROGRAMS l1aextract_netcdf.py DESTINATION bin RENAME l1aextract_netcdf)
 install(PROGRAMS clone_l2.py DESTINATION bin RENAME clone_l2)
+install(PROGRAMS browse_trim_orbit.py DESTINATION bin RENAME browse_trim_orbit)
+install(PROGRAMS annotate_l3mapgen.py DESTINATION bin RENAME annotate_l3mapgen)
+install(PROGRAMS l1a_oci_navcheck.py DESTINATION bin RENAME l1a_oci_navcheck)

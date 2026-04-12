@@ -85,6 +85,9 @@ if(DOXYGEN_FOUND AND IS_DIRECTORY ${OCSSW_SOURCE_DIR}/doc)
   )
 endif()
 
+# setup variables to switch if X11 is avaliable
+find_package(X11)
+
 # make the build
 set(CMAKE_EXE_LINKER_FLAGS "-mcmodel=large")
 set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")

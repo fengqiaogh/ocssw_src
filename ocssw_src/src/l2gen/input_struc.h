@@ -39,6 +39,7 @@ typedef struct input_struct {
     char sst4jsonfile[FILENAME_MAX];
     char gmpfile[FILENAME_MAX];
     char picfile[FILENAME_MAX];
+    char pic_limits_file[FILENAME_MAX];
     char owtfile[FILENAME_MAX];
     char owtchlerrfile[FILENAME_MAX];
     char vcnnfile[FILENAME_MAX];
