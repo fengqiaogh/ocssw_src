@@ -110,6 +110,15 @@ static file_format chk_hdf5(char *filename) {
                         if (want_verbose) {
                             printf("Input file %s is a VIIRS JPSS-2 SDR L1B HDF 5 file.\n", filename);
                         }
+                    } else if (strstr(buf, "JPSS-4") || strstr(buf, "J04")) {
+                        ret.type = FT_VIIRSL1B;
+                        ret.sensor_id = VIIRSJ4;
+                        ret.subsensor_id = VIIRS_J4;
+                        if (want_verbose) {
+                            printf("Input file %s is a VIIRS JPSS-4 SDR L1B HDF 5 file.\n", filename);
+                        }
+                    } else {
+                        fprintf(stderr, "Input file %s is an unrecognized VIIRS HDF5 format", filename);
                     }
 
                 }
@@ -294,6 +303,15 @@ file_format getFormat(char *filename) {
                         if (want_verbose) {
                             printf("Input file %s is VIIRS JPSS-2 L1A NetCDF4.\n", filename);
                         }
+                    } else if (platformStr.find("jpss-4") != string::npos) {
+                        ret.type = FT_VIIRSL1A;
+                        ret.sensor_id = VIIRSJ4;
+                        ret.subsensor_id = VIIRS_J4;
+                        if (want_verbose) {
+                            printf("Input file %s is VIIRS JPSS-4 L1A NetCDF4.\n", filename);
+                        }
+                    } else {
+                        fprintf(stderr, "Input file %s is an unrecognized VIIRS L1A NetCDF4.\n", filename);
                     }
 
                     return ret;
@@ -319,6 +337,9 @@ file_format getFormat(char *filename) {
                     } else if (platformStr == "jpss-2") {
                         ret.sensor_id = VIIRSJ2;
                         ret.subsensor_id = VIIRS_J2;
+                    } else if (platformStr == "jpss-4") {
+                        ret.sensor_id = VIIRSJ4;
+                        ret.subsensor_id = VIIRS_J4;
                     }
                     return ret;
                 }
@@ -751,6 +772,13 @@ file_format getFormat(char *filename) {
                     ret.type = FT_L1HDF;
                     ret.sensor_id = VIIRSJ2;
                     ret.subsensor_id = VIIRS_J2;
+                    if (want_verbose) {
+                        printf("Input file %s is %s.\n", filename, titleStr.c_str());
+                    }
+                } else if (titleStr == "VIIRSJ4 Level-1B") {
+                    ret.type = FT_L1HDF;
+                    ret.sensor_id = VIIRSJ4;
+                    ret.subsensor_id = VIIRS_J4;
                     if (want_verbose) {
                         printf("Input file %s is %s.\n", filename, titleStr.c_str());
                     }

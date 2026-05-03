@@ -17,6 +17,7 @@ class AreaWeighting {
     std::vector<float> lowerCornerLon;  // lon2 for corner of pixel
     bool lat2Valid{false};              // does lat2 and lon2 contain valid coordinates
     std::optional<size_t> lastLine;     // if no value the last line does not have good lat/lon
+    std::optional<int> lastDetNum;      // last detector number, if applicable
     size_t nsamp{0};
     std::vector<float> lastLat;
     std::vector<float> lastLon;

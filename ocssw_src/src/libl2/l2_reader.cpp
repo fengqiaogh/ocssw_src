@@ -60,16 +60,18 @@ int L2_Reader::setVariables(std::string& product_list, std::string& wave_list,
         std::string l2_name_original = l2_variable.l3_l2_conversion(var_l3_name);
         index.push_back(l2_variable.slice_3d_index(var_l3_name));
         l2_products.push_back(find_nc_variable_cpp<netCDF::NcFile, ScaledNcVar>(l2_name_original, file_nc));
-        products_list.push_back(l2_name_original);
+        products_list_l2.push_back(l2_name_original);
+        products_list_l3b.push_back(var_l3_name);
         min_values.push_back(min_max_product_list.at(var_l3_name).first);
         max_values.push_back(min_max_product_list.at(var_l3_name).second);
         units.push_back(product_units_list.at(l2_name_original));
         product_attributes[var_l3_name] = l2_variable.l3_attrs(var_l3_name);
+        products_l2_l3b_indices[l2_name_original].push_back(products_list_l3b.size() - 1);
     }
     geo_bounds = Geospatialbounds(file_nc);
     if (!geo_bounds.get_time_coverage_start().empty() && !geo_bounds.get_time_coverage_end().empty()) {
-        start_time_unix = isodate2unix(convert_string(geo_bounds.get_time_coverage_start()));
-        end_time_unix = isodate2unix(convert_string(geo_bounds.get_time_coverage_end()));
+        start_time_unix = isodate2unix(geo_bounds.get_time_coverage_start().c_str());
+        end_time_unix = isodate2unix(geo_bounds.get_time_coverage_end().c_str());
     }
     // set number of l3 products
     number_of_l3_products = products_requested.size();
@@ -327,7 +329,7 @@ void L2_Reader::reopenL2() {
     }
     NC_CHECK(file_nc.open(file_path, netCDF::NcFile::read));
     for (size_t i = 0; i < l2_products.size(); i++) {
-        l2_products[i] = find_nc_variable_cpp<netCDF::NcFile, ScaledNcVar>(products_list[i], file_nc);
+        l2_products[i] = find_nc_variable_cpp<netCDF::NcFile, ScaledNcVar>(products_list_l2[i], file_nc);
     }
     NC_CHECK(find_lat_lon<netCDF::NcFile, ScaledNcVar>(file_nc, lat_nc, lon_nc));
     if (flag_l2_set) {
@@ -338,12 +340,21 @@ void L2_Reader::reopenL2() {
     }
 }
 
-int32_t L2_Reader::find_product_index(const std::string& product_name, size_t& index) {
-    auto it = std::find(products_list.begin(), products_list.end(), product_name);
-    if (it == products_list.end())
-        return 1;
-    else {
-        index = std::distance(products_list.begin(), it);
+int32_t L2_Reader::find_product_index(const std::string& product_name, std::vector<size_t> & indices) const {
+    bool found = products_l2_l3b_indices.find(product_name) != products_l2_l3b_indices.end();
+    if (!found) {
+        // check if the product is an L3b expanded product
+        auto it_l3b = std::find(products_list_l3b.begin(), products_list_l3b.end(), product_name);
+        if (it_l3b == products_list_l3b.end()) {
+            return 1;
+        } else {
+            size_t index_l3b = std::distance(products_list_l3b.begin(), it_l3b);
+            indices =  {index_l3b};
+            return 0;
+        }
+
+    } else {
+        indices = products_l2_l3b_indices.at(product_name);
         return 0;
     }
 }

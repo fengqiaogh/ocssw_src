@@ -158,7 +158,7 @@ int32_t freeL2(l2_prod *l2_str);
  * @param units String to store units
  * @return 0 on success, -1 if product not found
  */
-int32_t getL3units(l2_prod *l2_str, int32_t ifile, char *l3b_prodname, char *units);
+int32_t getL3units(l2_prod *l2_str, int32_t ifile, char *l3b_prodname, char **units);
 
 #ifdef __cplusplus
 }

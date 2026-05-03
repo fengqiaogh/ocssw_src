@@ -13,6 +13,7 @@
 
 #include <string.h>
 #include "l1.h"
+#include "l1_oci_private.h"
 
 int l1subpix(filehandle *l1file, l1str *l1rec) {
     int32_t sp = l1file->spix;
@@ -69,6 +70,12 @@ int l1subpix(filehandle *l1file, l1str *l1rec) {
         memmove(l1rec->Bt, &l1rec->Bt [sp * NBANDSIR], length * NBANDSIR);
 
         memmove(l1rec->rho_cirrus, &l1rec->rho_cirrus[sp], length);
+
+        /* polarization correction data*/
+        if (l1file->sensorID == OCI) {
+            PolcorOciData* polcorPrivateData = (PolcorOciData*)l1rec->private_data;
+            memmove(polcorPrivateData->ccdScanAngle, &polcorPrivateData->ccdScanAngle[sp],l1rec->npix*sizeof(float));
+        }
 
         if (l1rec->geom_per_band != NULL) {
             memmove(l1rec->geom_per_band->senz,

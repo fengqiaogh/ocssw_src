@@ -790,6 +790,26 @@ int alloc_scan(const int32_t nvals) {
     return SUCCESS;
 }
 
+static void *safe_realloc(void *ptr, size_t nbytes) {
+    void *tmp = realloc(ptr, nbytes);
+    TRYMEM(__FILE__, __LINE__, tmp);
+    return tmp;
+}
+
+void realloc_scan(int32_t nvals) {
+    scan.lon = safe_realloc(scan.lon, nvals * sizeof(*scan.lon));
+    scan.lat = safe_realloc(scan.lat, nvals * sizeof(*scan.lat));
+    scan.hgt = safe_realloc(scan.hgt, nvals * sizeof(*scan.hgt));
+    scan.solz = safe_realloc(scan.solz, nvals * sizeof(*scan.solz));
+    scan.sola = safe_realloc(scan.sola, nvals * sizeof(*scan.sola));
+    scan.senz = safe_realloc(scan.senz, nvals * sizeof(*scan.senz));
+    scan.sena = safe_realloc(scan.sena, nvals * sizeof(*scan.sena));
+    scan.allbands = safe_realloc(scan.allbands, scan.nbands * nvals * sizeof(*scan.allbands));
+
+    scan.nvals = nvals;
+    scan.npix = nvals / l1b[RSB_250].ndets;  // recalc if necessary
+}
+
 /***********************************************************************/
 
 typedef struct {
@@ -1286,6 +1306,15 @@ int load_modis_scan(const int32_t iscan,
     if (nvals == 0) {
         nvals = l1b[RSB_250].ndets * l1b[RSB_250].nframes * l1b[RSB_250].nsf;
         alloc_scan(nvals);
+    }
+
+    if (geo[GEO_LON].resolution != resolution) {
+        int32_t y = geo[GEO_LON].ndets;
+        int32_t x = geo[GEO_LON].nframes * geo[GEO_LON].nsf;
+
+        nvals = ( y * geo[GEO_LON].resolution / resolution ) * (x * geo[GEO_LON].resolution / resolution);
+        
+        realloc_scan(nvals);
     }
 
     /* Allocate space to hold interpolation buffer for one variable */

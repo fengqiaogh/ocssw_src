@@ -26,8 +26,6 @@
 
 #define HAM_B_STRIPING 2  // red quality flag bit for ghosting
 
-const float SWIR_BANDPASS[NUM_SWIR_WAVELENGTHS] = {45, 80, 30, 30, 15, 75, 75, 50, 75};
-
 class Level1bFile {
    public:
     int numGroups;

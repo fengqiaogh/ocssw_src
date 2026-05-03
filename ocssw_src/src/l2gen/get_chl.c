@@ -645,6 +645,7 @@ float chl_cdr(l2str *l2rec, float Rrs[]) {
         case VIIRSN:
         case VIIRSJ1:
         case VIIRSJ2:
+        case VIIRSJ4:
         case OCRVC:
         case GOCI:
             c = c_null;
@@ -760,6 +761,7 @@ float get_chl_ocx(l2str *l2rec, float Rrs[]) {
     case VIIRSN:
     case VIIRSJ1:
     case VIIRSJ2:
+    case VIIRSJ4:
     case GOCI:
     case OLIL8:
     case OLIL9:

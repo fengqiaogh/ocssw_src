@@ -91,6 +91,10 @@ hdf_bin::hdf_bin() {
     hasQual = false;
     hasNoext = true;
     deflate = 0;
+    // ini product_number_of_attributes
+    for (size_t i = 0; i < MAXNPROD; i++) {
+        product_number_of_attributes[i] = -1;
+    }
 }
 
 hdf_bin::~hdf_bin() {
@@ -2226,7 +2230,18 @@ int cdf4_bin::create(const char *l3b_filename, int32_t nrows) {
         defineBinList_nc(deflate, grp1);
 
     defineBinData_nc(deflate, grp1, n_data_prod, product_array);
-
+    // save variable attributes
+    for (int prod = 0; prod < n_data_prod; prod++) {
+        int varid;
+        status = nc_inq_varid(grp1, product_array[prod], &varid);
+        check_err(status, __LINE__, __FILE__);
+        for (int iattr = 0; iattr < product_number_of_attributes[prod]; iattr++) {
+            status = nc_put_att(grp1, varid, product_attributes_names[prod][iattr],
+                                product_attributes_types[prod][iattr], product_attributes_sizes[prod][iattr],
+                                product_attributes_values[prod][iattr]);
+            check_err(status, __LINE__, __FILE__);
+        }    
+    }
     if(is64bit)
         defineBinIndex64_nc(deflate, grp1);
     else
@@ -3062,5 +3077,54 @@ int hdf_bin::copymeta(int32_t nfiles, Hdf::hdf_bin *input_binfile[]) {
     
     return 0;
 }
+ProductL3Attributes readProductL3Attributes(hdf_bin* binfile, const std::string& productNames) {
+    ProductL3Attributes output;
+    char (*tmpAttVals)[MAXNUMATTR][MAXATTRLEN];
+    char (*tmpAttNames)[MAXNUMATTR][MAXATTRNAMELEN];
+    int (*tmpAttTypes)[MAXNUMATTR];
+    size_t (*tmpAttSize)[MAXNUMATTR];
+    int tempAttNums;
+    if (binfile == nullptr) {
+        fprintf(stderr, "-E- %s %d: binfile is null.\n", __FILE__, __LINE__);
+        exit(EXIT_FAILURE);
+    }
+    binfile->getProdAttrs(productNames.c_str(), &tmpAttVals, &tmpAttNames, &tmpAttTypes, &tmpAttSize,
+                          &tempAttNums);
+    // Need to find averaging_scheme attribute:
+    output.averaging_scheme = ARITHMETIC_MEAN;
+    output.averaging_scheme_name = "arithmetic";
+    for (int i_attr = 0; i_attr < tempAttNums; i_attr++) {
+        char* val = (*tmpAttVals)[i_attr];
+        size_t attr_dim = (*tmpAttSize)[i_attr];
+        std::string attr_name = (*tmpAttNames)[i_attr];
+        if ("averaging_scheme" == attr_name) {
+            char averagingScheme[MAXATTRLEN] = {0};
+            memcpy(averagingScheme, val, attr_dim);
+            output.averaging_scheme_name = std::string(averagingScheme);
+            output.averaging_scheme = get_averaging_scheme_from_string(output.averaging_scheme_name);
+            // printf("-I- Found averaging_scheme attribute for product %s: %s\n", productNames.c_str(),
+            //        output.averaging_scheme_name.c_str());
+        }
+        if("wavelength" == attr_name){
+            float wavelength;
+            memcpy(&wavelength, val, sizeof(float));
+            output.wavelength = wavelength;
+            //printf("-I- Found wavelength attribute for product %s: %f\n", productNames.c_str(), output.wavelength);
+        }
+        if("valid_min" == attr_name){
+            float validMin;
+            memcpy(&validMin, val, sizeof(float));
+            output.valid_min = validMin;
+            // printf("-I- Found valid_min attribute for product %s: %f\n", productNames.c_str(), output.valid_min);
+        }
+        if("valid_max" == attr_name){
+            float validMax;
+            memcpy(&validMax, val, sizeof(float));
+            output.valid_max = validMax;
+            // printf("-I- Found valid_max attribute for product %s: %f\n", productNames.c_str(), output.valid_max);
+        }
 
+    }
+    return output;
 }
+}  // namespace Hdf

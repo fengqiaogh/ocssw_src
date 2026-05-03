@@ -601,6 +601,7 @@ int32_t anc_acq_lin_met(l1str *l1rec)
                 // for these last 2 fill icefr based on underlying sfc type
                 case ICEFR_WTR:
                     if( !l1rec->land[ilon] ) {
+                        val = get_icefrac_oisst(lon,lat);
                         l1rec->icefr[ilon] = val;
                         if (val > input->ice_threshold)
                             l1rec->ice[ilon] = ON;

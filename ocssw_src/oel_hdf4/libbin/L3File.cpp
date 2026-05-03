@@ -857,4 +857,79 @@ int64_t L3File::getBaseBin(int32_t row) const {
 int32_t L3File::getRowExtent(int32_t row) const {
     return extentbin[row];
 }
+
+bool L3File::getProductAttribute(const std::string& prodName, const std::string& attributeName, void * attrValue, size_t attrSize) {
+        char(*tmpAttVals)[MAXNUMATTR][MAXATTRLEN];
+        char(*tmpAttNames)[MAXNUMATTR][MAXATTRNAMELEN];
+        int(*tmpAttTypes)[MAXNUMATTR];
+        size_t(*tmpAttSize)[MAXNUMATTR];
+        int tempAttNums;
+        if (binObj == nullptr) {
+            return false;
+        }
+        binObj->getProdAttrs(prodName.c_str(), &tmpAttVals, &tmpAttNames, &tmpAttTypes, &tmpAttSize, &tempAttNums);
+        for (int i_attr = 0; i_attr < tempAttNums; i_attr++) {
+            if (attributeName == (*tmpAttNames)[i_attr]) {
+                char* val = (*tmpAttVals)[i_attr];
+                size_t attr_dim = (*tmpAttSize)[i_attr];
+                memcpy(attrValue, val, attrSize * attr_dim);
+                return true;
+            }
+        }
+        return false;
+    }
+
+
+ProductL3Attributes readProductL3Attributes(L3File* l3file, const std::string& productNames) {
+    ProductL3Attributes output;
+    if (l3file == nullptr) {
+        fprintf(stderr, "-E- %s %d: l3file is null.\n", __FILE__, __LINE__);
+        exit(EXIT_FAILURE);
+    }
+    char averagingScheme[MAXATTRLEN] = {0};
+    bool status = l3file->getProductAttribute(productNames, "averaging_scheme", averagingScheme, sizeof(char));
+    if (status) {
+        output.averaging_scheme_name = std::string(averagingScheme);
+        //printf("-I- Found averaging_scheme attribute for product %s: %s\n", productNames.c_str(), output.averaging_scheme_name.c_str());
+    }
+    else {
+        output.averaging_scheme_name = "arithmetic"; // default to arithmetic mean if not specified
+    }
+    output.averaging_scheme = get_averaging_scheme_from_string(output.averaging_scheme_name);
+    float wavelength;
+    status = l3file->getProductAttribute(productNames, "wavelength", &wavelength, sizeof(wavelength));
+    if (status) {
+        output.wavelength = wavelength;
+    }
+    // read float first
+    {
+        float valid_max;
+        float valid_min;
+        status = l3file->getProductAttribute(productNames, "valid_max", &valid_max, sizeof(valid_max));
+        status |= l3file->getProductAttribute(productNames, "valid_min", &valid_min, sizeof(valid_min));
+        if (status) {
+            output.valid_max = valid_max;
+            output.valid_min = valid_min;
+        }
+    }
+    // in case if it's short, SMI
+    {
+        short valid_max;
+        short valid_min;
+        status = l3file->getProductAttribute(productNames, "valid_max", &valid_max, sizeof(valid_max));
+        status |= l3file->getProductAttribute(productNames, "valid_min", &valid_min, sizeof(valid_min));
+        if (status) {
+            output.valid_max = valid_max;
+            output.valid_min = valid_min;
+        }
+        float scale_factor{1}, add_offset{0};
+        (void)l3file->getProductAttribute(productNames, "scale_factor", &scale_factor, sizeof(scale_factor));
+        (void)l3file->getProductAttribute(productNames, "add_offset", &add_offset, sizeof(add_offset));
+        if (status) {
+            output.valid_max = output.valid_max * scale_factor + add_offset;
+            output.valid_min = output.valid_min * scale_factor + add_offset;
+        }
+    }
+    return output;
+}
 } // namespace l3

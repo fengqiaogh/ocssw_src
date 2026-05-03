@@ -13,6 +13,53 @@ float northmost = -90.0, southmost = 90.0, eastmost = -180.0, westmost = 180.0;
 
 }  // namespace
 
+std::pair<std::vector<AveragingScheme>, std::vector<std::string>> get_averaging_scheme_per_l3b_product(
+    const L2_Reader& l2_reader, const std::vector<std::string>& product_list,
+    const std::string& averaging_scheme_input) {
+        std::unordered_map<std::string, std::pair<AveragingScheme, std::string>> averaging_scheme_per_product =
+        get_averaging_scheme_per_product(averaging_scheme_input);
+    std::vector<AveragingScheme> averaging_scheme_per_l2_product(product_list.size(), UNDEFINED);
+    std::vector<std::string> method_names(product_list.size(), "undefined"); 
+    if(averaging_scheme_per_product.count("ALL")) {
+        const auto & [default_method, default_method_name] = averaging_scheme_per_product.at("ALL");
+        std::fill(averaging_scheme_per_l2_product.begin(), averaging_scheme_per_l2_product.end(), default_method);
+        std::fill(method_names.begin(), method_names.end(), default_method_name);
+        return std::make_pair(averaging_scheme_per_l2_product, method_names);
+    }
+    for (const auto& [output_prod_name, averaging_scheme_name] : averaging_scheme_per_product) {
+        const auto & [averaging_scheme, method_name] = averaging_scheme_name;
+         
+        std::vector<size_t> l3b_index{};
+        int status = l2_reader.find_product_index(output_prod_name,l3b_index);
+        if (status) {
+            printf("-E- %s:%d Could not find product %s in the input file %s\n", __FILE__, __LINE__, output_prod_name.c_str(),
+                   l2_reader.get_filename().c_str());
+            exit(EXIT_FAILURE);
+        }
+        bool found =
+            averaging_scheme_per_product.find(output_prod_name) != averaging_scheme_per_product.end();
+        for (const auto & index : l3b_index) {
+            if(averaging_scheme_per_l2_product[index] != UNDEFINED) {
+                std::cerr << "-W-: product " << product_list[index] << " has multiple averaging schemes specified. The scheme from " 
+                          << output_prod_name << " will be used. See " << __FILE__ << ":" << __LINE__ << std::endl;
+            }
+            if (found) {
+                averaging_scheme_per_l2_product[index] = averaging_scheme;
+                method_names[index] = method_name;
+            }
+        }
+    }
+    // set all the UNDEFINED methods to ARITHMETIC_MEAN
+    for (size_t i = 0; i < averaging_scheme_per_l2_product.size(); i++) {
+        if (averaging_scheme_per_l2_product[i] == UNDEFINED) {
+            averaging_scheme_per_l2_product[i] = ARITHMETIC_MEAN;
+            method_names[i] = "arithmetic";
+        }
+    }
+
+    return std::make_pair(averaging_scheme_per_l2_product, method_names);
+}
+
 void append_composite_product(std::string &products_requested, const std::string &composite_product_name,
                               const std::string &composite_scheme, int &min_max_scheme) {
     if (products_requested.find(composite_product_name) == std::string::npos) {
@@ -286,7 +333,7 @@ int64_t getbinnum(l3::L3ShapeIsine *shape, float *latitude, float *longitude, si
 }
 
 void fill_data(netCDF::NcGroup &binned_data, L2BinStruct &l2binStruct, size_t n_filled_bins,
-               size_t n_bins_in_group, size_t n_products) {
+               size_t n_bins_in_group, size_t n_products, std::vector<AveragingScheme> & averaging_schemes_per_l3b_product) {
     auto nobs = l2binStruct.nobs;
     auto data_values = l2binStruct.data_values;
     auto data_areas = l2binStruct.data_areas;
@@ -314,6 +361,7 @@ void fill_data(netCDF::NcGroup &binned_data, L2BinStruct &l2binStruct, size_t n_
             // initialize sum for this bin with first file
             int16_t j = 0;
             float pixval = data_values[ibin][j * n_products + iprod];
+            pixval = apply_averaging_scheme(pixval, averaging_schemes_per_l3b_product[iprod]);
             double pixarea = data_areas[ibin][j];
             npix_file = 1;
             (void)npix_file;
@@ -325,6 +373,7 @@ void fill_data(netCDF::NcGroup &binned_data, L2BinStruct &l2binStruct, size_t n_
             // add weighted data for rest of observations (files)
             for (j = 1; j < nobs[ibin]; j++) {
                 pixval = data_values[ibin][j * n_products + iprod];
+                pixval = apply_averaging_scheme(pixval, averaging_schemes_per_l3b_product[iprod]);
                 pixarea = data_areas[ibin][j];
 
                 if (file_index[ibin][j] == prev_file) {  // same file
@@ -732,6 +781,7 @@ void write_l3_metadata(std::vector<uint64_t> &basebin, netCDF::NcFile &ofile, me
         strncpy(meta_l3b.keywords, keywordStr, sizeof(meta_l3b.keywords) - 1);
     else
         strncpy(meta_l3b.keywords, "", sizeof(meta_l3b.keywords) - 1);
+
     time_t tnow;
     time(&tnow);
     strncpy(meta_l3b.ptime, unix2isodate(tnow, 'G'), sizeof(meta_l3b.ptime) - 1);

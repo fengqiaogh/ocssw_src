@@ -675,6 +675,7 @@ extern "C" l2prodstr *get_l2prod_index(const char *prod_name, /* Input SDS name 
         case VIIRSN:
         case VIIRSJ1:
         case VIIRSJ2:
+        case VIIRSJ4:
         case OCRVC:
         case GOCI:
         case SGLI:

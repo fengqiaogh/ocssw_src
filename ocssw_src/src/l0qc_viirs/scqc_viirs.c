@@ -95,19 +95,26 @@ int main(int argc, char *argv[]) {
     // convert_diary,nscd,scdpkts,iyrsc,idysc,otime,orb,atime,quat
 
     // Check spacecraft ID
-    if (scdpkts[14] == 157) {
+    const int NPP = 157;
+    const int JPSS_1 = 159;
+    const int JPSS_2 = 177;
+    // const int JPSS_3 = XXX;
+    const int JPSS_4 = 179;
+    const uint8_t PLATFORM = scdpkts[14];
+
+    if (PLATFORM == NPP) {
         plat = 0;
         apktsize = 355;
         bpktsize = 207;
 		// scanp = 1.7793
     }
-    if (scdpkts[14] == 159) {
+    if (PLATFORM == JPSS_1) {
         plat = 1;
         apktsize = 393;
         bpktsize = 183;
 		//   scanp 1.7864
     }
-    if (scdpkts[14] == 177) {
+    if (PLATFORM == JPSS_2) {
 		plat = 2;
 		apktsize = 493;
 		bpktsize = 212;
@@ -120,6 +127,18 @@ int main(int argc, char *argv[]) {
 			printf("usage: scqc_viirs -s S/C_diary_file -a ADCS_file -b S/C_bus_file -g GPS_file -r QC_report_file\n");
 			return 1;
 		}
+    } else if (PLATFORM == JPSS_4) {
+		if (gfile == NULL) { // JPSS 4 gets GPS files
+			printf("Missing gps file for JPSS-4 (P179).\n");
+			printf("Usage: scqc_viirs -s S/C_diary_file -a ADCS_file -b S/C_bus_file -g GPS_file -r QC_report_file\n");
+			return 1;
+		}
+
+		plat = 3; // JPSS 4 is scheduled to fly before JPSS 3, so it gets the next plat increment
+		apktsize = 493;
+		bpktsize = 212;
+		gpktsize = 374;
+
     }
 
     infile_a = fopen(afile, "r");

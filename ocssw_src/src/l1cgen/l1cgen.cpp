@@ -33,7 +33,7 @@ using namespace netCDF;
 using namespace netCDF::exceptions;
 
 #define PROGRAM_NAME "l1cgen"
-#define VERSION "5.71 10/28/2025"
+#define VERSION "5.8"
 
 int main(int argc, char** argv) {
     int status;

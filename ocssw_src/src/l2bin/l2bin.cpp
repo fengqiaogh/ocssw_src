@@ -107,13 +107,20 @@ int main(int argc, char **argv) {
 
         // Handle composite products if needed
         if (use_composite) {
+            std::vector<size_t> buffer_index{};
             int status =
-                l2_files[ifile].find_product_index(input.composite_prod, composite_product_index[ifile]);
+                l2_files[ifile].find_product_index(input.composite_prod, buffer_index) ;
             if (status) {
                 printf("-E- %s:%d Could not find composite product in the input file %s\n", __FILE__,
                        __LINE__, l2_files[ifile].get_filename().c_str());
                 exit(EXIT_FAILURE);
             }
+            if (buffer_index.size() != 1) {
+                printf("-E- %s:%d Composite product must an L2, wavelength independent product %s\n", __FILE__,
+        __LINE__, l2_files[ifile].get_filename().c_str());
+                exit(EXIT_FAILURE);
+            }
+            composite_product_index[ifile] = buffer_index.at(0);
         }
         l2_files[ifile].reset_cache();
     }
@@ -196,16 +203,20 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
+    // init mean methods for each product
+    auto [averaging_scheme_per_l3b_product, method_names] = get_averaging_scheme_per_l3b_product(l2_files[0], product_list, input.averaging_scheme);
+
     // Set up output product names and attributes
     std::vector<std::string> output_prod_names =
         set_nc_prodnames(input.deflate, product_list, output_l3_filenames, binned_data);
     size_t n_products = product_list.size();
-    for (size_t size = 0; size < n_products; size++) {
-        auto attrs = l2_files[0].get_product_attributes(product_list[size]);
-        netCDF::NcVar var_nc = binned_data.getVar(output_prod_names[size]);
+    for (size_t index = 0; index < n_products; index++) {
+        auto attrs = l2_files[0].get_product_attributes(product_list[index]);
+        netCDF::NcVar var_nc = binned_data.getVar(output_prod_names[index]);
         for (auto &[attr_name, attr_val] : attrs) {
             var_nc.putAtt(attr_name, netCDF::ncFloat, attr_val);
         }
+        var_nc.putAtt("averaging_scheme", method_names[index]);
     }
 
     // Define bin index variables
@@ -440,7 +451,8 @@ int main(int argc, char **argv) {
                     bool bad_value = false;
                     for (size_t iprod = 0; iprod < n_products; iprod++) {
                         float f32 = l2_data[iprod][ipixl];
-                        if (f32 == BAD_FLT || min_values[iprod] > f32 || max_values[iprod] < f32) {
+                        float f32_mean = apply_averaging_scheme(f32, averaging_scheme_per_l3b_product[iprod]);
+                        if (f32 == BAD_FLT || min_values[iprod] > f32 || max_values[iprod] < f32 || f32_mean == BAD_FLT) {
                             bad_value = true;
                             total_skip_bad_float++;
                             break;
@@ -546,7 +558,7 @@ int main(int argc, char **argv) {
                     writeBinList_nc(binned_data.getId(), n_filled_bins, (VOIDP)binList32nc.data());
                 }
 
-                fill_data(binned_data, l2binStruct, n_filled_bins, n_bins_in_group, n_products);
+                fill_data(binned_data, l2binStruct, n_filled_bins, n_bins_in_group, n_products, averaging_scheme_per_l3b_product);
 
                 // Write quality data
                 if (read_quality) {

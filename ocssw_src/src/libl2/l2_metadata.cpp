@@ -104,6 +104,12 @@
                 msec_var.getVar(msec_values.data());
                 attributes["msec"] = msec_values;
             }
+            netCDF::NcVar detnum_var = scan_time_group.getVar("detnum");
+            if (!detnum_var.isNull()) {
+                std::vector<int> detnum_values(detnum_var.getDim(0).getSize());
+                detnum_var.getVar(detnum_values.data());
+                attributes["detnum"] = detnum_values;
+            }
         }
         netCDF::NcGroup processing_control = file.getGroup("processing_control");
         if (!processing_control.isNull()) {
@@ -155,4 +161,7 @@
             day = get_attribute<std::vector<int>>("day").value();
         if (get_attribute<std::vector<int>>("msec").has_value())
             msec = get_attribute<std::vector<int>>("msec").value();
+        if (get_attribute<std::vector<int>>("detnum").has_value()) {
+            detnum = get_attribute<std::vector<int>>("detnum").value();
+        }
     }

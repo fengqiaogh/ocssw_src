@@ -279,6 +279,7 @@ int ice_mask_init(char *file, int year, int day, float threshold);
 char ice_mask(float lon, float lat);
 float ice_fraction(float lon, float lat);
 void get_ice_frac(l2str *l2rec, float ice[]);
+float get_icefrac_oisst(float lon, float lat);
 void get_tauc(l2str *l2rec, float tauc[]);
 void get_mgiop(l2str *l2rec, l2prodstr *p, float prod[]);
 void get_gsm(l2str *l2rec, l2prodstr *p, float prod[]);

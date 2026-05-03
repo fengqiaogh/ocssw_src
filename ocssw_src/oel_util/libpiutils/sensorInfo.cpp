@@ -10,183 +10,188 @@
 // NOTE - some of the sensors have been deleted, but we have to keep
 //        the placeholder to make the index match
 static const char* sensorName[] = {
-    "SeaWiFS",  // 0
-    "MOS(Delete)",      // 1 deleted
-    "OCTS",     // 2
-    "AVHRR",    // 3
-    "OSMI(Delete)",     // 4 deleted
-    "CZCS",     // 5
-    "MODIST",   // 6
-    "MODISA",   // 7
-    "OCM1",     // 8
-    "OCM2",     // 9
-    "MERIS",    // 10
-    "VIIRSN",   // 11
-    "OCRVC",    // 12
-    "HICO",     // 13
-    "GOCI",     // 14
-    "OLIL8",    // 15
-    "Aquarius", // 16
-    "OCIA(Delete)",     // 17 deleted
-    "AVIRIS",   // 18
-    "PRISM",    // 19
-    "OLCIS3A",  // 20
-    "SGLI",     // 21
-    "MSIS2A",   // 22
-    "L5TM",     // 23
-    "L7ETMP",   // 24
-    "VIIRSJ1",  // 25
-    "MSIS2B",   // 26
-    "HAWKEYE",  // 27
-    "MISR",     // 28
-    "OLCIS3B",  // 29
-    "OCI",      // 30
-    "OCIS(Delete)",     // 31 deleted
-    "VIIRSJ2",  // 32
-    "OLIL9",    // 33
-    "SPEXONE",  // 34
-    "HARP2",    // 35
-    "HARP"      // 36
+    "SeaWiFS",       // 0
+    "MOS(Delete)",   // 1 deleted
+    "OCTS",          // 2
+    "AVHRR",         // 3
+    "OSMI(Delete)",  // 4 deleted
+    "CZCS",          // 5
+    "MODIST",        // 6
+    "MODISA",        // 7
+    "OCM1",          // 8
+    "OCM2",          // 9
+    "MERIS",         // 10
+    "VIIRSN",        // 11
+    "OCRVC",         // 12
+    "HICO",          // 13
+    "GOCI",          // 14
+    "OLIL8",         // 15
+    "Aquarius",      // 16
+    "OCIA(Delete)",  // 17 deleted
+    "AVIRIS",        // 18
+    "PRISM",         // 19
+    "OLCIS3A",       // 20
+    "SGLI",          // 21
+    "MSIS2A",        // 22
+    "L5TM",          // 23
+    "L7ETMP",        // 24
+    "VIIRSJ1",       // 25
+    "MSIS2B",        // 26
+    "HAWKEYE",       // 27
+    "MISR",          // 28
+    "OLCIS3B",       // 29
+    "OCI",           // 30
+    "OCIS(Delete)",  // 31 deleted
+    "VIIRSJ2",       // 32
+    "OLIL9",         // 33
+    "SPEXONE",       // 34
+    "HARP2",         // 35
+    "HARP",          // 36
+    "VIIRSJ4"        // 37
 };
 
 // instrument name indexed by sensorId
-static const char *instrumentName[] = {
-    "SeaWiFS",  // 0
-    "MOS(Delete)",      // 1 deleted
-    "OCTS",     // 2
-    "AVHRR",    // 3
-    "OSMI(Delete)",     // 4 deleted
-    "CZCS",     // 5
-    "MODIS",    // 6
-    "MODIS",    // 7
-    "OCM",      // 8
-    "OCM-2",    // 9
-    "MERIS",    // 10
-    "VIIRS",    // 11
-    "OCRVC",    // 12
-    "HICO",     // 13
-    "GOCI",     // 14
-    "OLI",      // 15
-    "Aquarius", // 16
-    "OCIA(Delete)",     // 17 deleted
-    "AVIRIS",   // 18
-    "PRISM",    // 19
-    "OLCI",     // 20
-    "SGLI",     // 21
-    "MSI",      // 22
-    "L5TM",     // 23
-    "L7ETMP",   // 24
-    "VIIRS",    // 25
-    "MSI",      // 26
-    "HAWKEYE",  // 27
-    "MISR",     // 28
-    "OLCI",     // 29
-    "OCI",      // 30
-    "OCIS(Delete)",     // 31 deleted
-    "VIIRS",    // 32
-    "OLI",      // 33
-    "SPEXONE",  // 34
-    "HARP2",    // 35
-    "HARP"      // 36
+static const char* instrumentName[] = {
+    "SeaWiFS",       // 0
+    "MOS(Delete)",   // 1 deleted
+    "OCTS",          // 2
+    "AVHRR",         // 3
+    "OSMI(Delete)",  // 4 deleted
+    "CZCS",          // 5
+    "MODIS",         // 6
+    "MODIS",         // 7
+    "OCM",           // 8
+    "OCM-2",         // 9
+    "MERIS",         // 10
+    "VIIRS",         // 11
+    "OCRVC",         // 12
+    "HICO",          // 13
+    "GOCI",          // 14
+    "OLI",           // 15
+    "Aquarius",      // 16
+    "OCIA(Delete)",  // 17 deleted
+    "AVIRIS",        // 18
+    "PRISM",         // 19
+    "OLCI",          // 20
+    "SGLI",          // 21
+    "MSI",           // 22
+    "L5TM",          // 23
+    "L7ETMP",        // 24
+    "VIIRS",         // 25
+    "MSI",           // 26
+    "HAWKEYE",       // 27
+    "MISR",          // 28
+    "OLCI",          // 29
+    "OCI",           // 30
+    "OCIS(Delete)",  // 31 deleted
+    "VIIRS",         // 32
+    "OLI",           // 33
+    "SPEXONE",       // 34
+    "HARP2",         // 35
+    "HARP",          // 36
+    "VIIRS"          // 37
 };
 
 // platform name indexed by sensorId
-static const char *platformName[] = {
-    "Orbview-2",    // 0
-    "IRS-P3(Delete)",       // 1
-    "ADEOS",        // 2
-    "AVHRR",        // 3
-    "KOMPSAT(Delete)",      // 4
-    "Nimbus-7",     // 5
-    "Terra",        // 6
-    "Aqua",         // 7
-    "IRS-P4",       // 8
-    "Oceansat-2",   // 9
-    "Envisat",      // 10
-    "Suomi-NPP",    // 11
-    "OCRVC",        // 12
-    "ISS",          // 13
-    "COMS",         // 14
-    "Landsat-8",    // 15
-    "SAC-D",        // 16
-    "PACE(Delete)",         // 17
-    "AVIRIS",       // 18
-    "PRISM",        // 19
-    "Sentinel-3A",  // 20
-    "GCOM_C",       // 21
-    "Sentinel-2A",  // 22
-    "L5TM",         // 23
-    "L7ETMP",       // 24
-    "JPSS-1",       // 25
-    "Sentinel-2B",  // 26
-    "Seahawk1",     // 27
-    "Terra",        // 28
-    "Sentinel-3B",  // 29
-    "PACE",         // 30
-    "PACE(Delete)",         // 31
-    "JPSS-2",       // 32
-    "Landsat-9",    // 33
-    "PACE",         // 34
-    "PACE",         // 35
-    "Air-HARP"      // 36
+static const char* platformName[] = {
+    "Orbview-2",        // 0
+    "IRS-P3(Delete)",   // 1
+    "ADEOS",            // 2
+    "AVHRR",            // 3
+    "KOMPSAT(Delete)",  // 4
+    "Nimbus-7",         // 5
+    "Terra",            // 6
+    "Aqua",             // 7
+    "IRS-P4",           // 8
+    "Oceansat-2",       // 9
+    "Envisat",          // 10
+    "Suomi-NPP",        // 11
+    "OCRVC",            // 12
+    "ISS",              // 13
+    "COMS",             // 14
+    "Landsat-8",        // 15
+    "SAC-D",            // 16
+    "PACE(Delete)",     // 17
+    "AVIRIS",           // 18
+    "PRISM",            // 19
+    "Sentinel-3A",      // 20
+    "GCOM_C",           // 21
+    "Sentinel-2A",      // 22
+    "L5TM",             // 23
+    "L7ETMP",           // 24
+    "JPSS-1",           // 25
+    "Sentinel-2B",      // 26
+    "Seahawk1",         // 27
+    "Terra",            // 28
+    "Sentinel-3B",      // 29
+    "PACE",             // 30
+    "PACE(Delete)",     // 31
+    "JPSS-2",           // 32
+    "Landsat-9",        // 33
+    "PACE",             // 34
+    "PACE",             // 35
+    "Air-HARP",         // 36
+    "JPSS-4"            // 37
 };
 
 // sensor directory indexed by sensorId
-static const char *sensorDir[] = {
-    "seawifs",  // 0
-    "mos(Delete)",      // 1 deleted
-    "octs",     // 2
-    "avhrr",    // 3
-    "osmi(Delete)",     // 4 deleted
-    "czcs",     // 5
-    "modis",    // 6
-    "modis",    // 7
-    "ocm1",     // 8
-    "ocm2",     // 9
-    "meris",    // 10
-    "viirs",    // 11
-    "ocrvc",    // 12
-    "hico",     // 13
-    "goci",     // 14
-    "oli",      // 15
-    "aquarius", // 16
-    "ocia(Delete)",     // 17 deleted
-    "aviris",   // 18
-    "prism",    // 19
-    "olci",     // 20
-    "sgli",     // 21
-    "msi",      // 22
-    "l5tm",     // 23
-    "l7etmp",   // 24
-    "viirs",    // 25
-    "msi",      // 26
-    "hawkeye",  // 27
-    "misr",     // 28
-    "olci",     // 29
-    "oci",      // 30
-    "ocis(Delete)",     // 31 deleted
-    "viirs",    // 32
-    "oli",      // 33
-    "spexone",  // 34
-    "harp2",    // 35
-    "harp"      // 36
+static const char* sensorDir[] = {
+    "seawifs",       // 0
+    "mos(Delete)",   // 1 deleted
+    "octs",          // 2
+    "avhrr",         // 3
+    "osmi(Delete)",  // 4 deleted
+    "czcs",          // 5
+    "modis",         // 6
+    "modis",         // 7
+    "ocm1",          // 8
+    "ocm2",          // 9
+    "meris",         // 10
+    "viirs",         // 11
+    "ocrvc",         // 12
+    "hico",          // 13
+    "goci",          // 14
+    "oli",           // 15
+    "aquarius",      // 16
+    "ocia(Delete)",  // 17 deleted
+    "aviris",        // 18
+    "prism",         // 19
+    "olci",          // 20
+    "sgli",          // 21
+    "msi",           // 22
+    "l5tm",          // 23
+    "l7etmp",        // 24
+    "viirs",         // 25
+    "msi",           // 26
+    "hawkeye",       // 27
+    "misr",          // 28
+    "olci",          // 29
+    "oci",           // 30
+    "ocis(Delete)",  // 31 deleted
+    "viirs",         // 32
+    "oli",           // 33
+    "spexone",       // 34
+    "harp2",         // 35
+    "harp",          // 36
+    "viirs"          // 37
 };
 
 // subsensor directory indexed by subsensorId
-static const char *subsensorDir[] = {
-    "gac",      // 0
-    "lac",      // 1
-    "terra",    // 2
-    "aqua",     // 3
-    "npp",      // 4
-    "j1",       // 5
-    "s2a",      // 6
-    "s2b",      // 7
-    "s3a",      // 8
-    "s3b",      // 9
-    "j2",       // 10
-    "l8",       // 11
-    "l9"        // 12
+static const char* subsensorDir[] = {
+    "gac",    // 0
+    "lac",    // 1
+    "terra",  // 2
+    "aqua",   // 3
+    "npp",    // 4
+    "j1",     // 5
+    "s2a",    // 6
+    "s2b",    // 7
+    "s3a",    // 8
+    "s3b",    // 9
+    "j2",     // 10
+    "l8",     // 11
+    "l9",     // 12
+    "j4"      // 13
 };
 
 // instrument ID indexed by sensorId
@@ -227,7 +232,8 @@ static const int instrumentId[] = {
     INSTRUMENT_OLI,     // 33
     INSTRUMENT_SPEXONE, // 34
     INSTRUMENT_HARP2,   // 35
-    INSTRUMENT_HARP     // 36
+    INSTRUMENT_HARP,    // 36
+    INSTRUMENT_VIIRS    // 37
 };
 
 // instrument name indexed by instrumentId

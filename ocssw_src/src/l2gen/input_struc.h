@@ -314,7 +314,7 @@ typedef struct input_struct {
     int *watervapor_bands; /*bands used to retrieve water vapor based on 3-band depth approach*/
     int nbands_watervapor;
     char rayleigh_prefix[FILENAME_MAX];
-
+    char averaging_scheme[512];
 } instr;
 
 #ifdef __cplusplus

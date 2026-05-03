@@ -46,7 +46,8 @@
 #define SPEXONE       34
 #define HARP2         35
 #define HARP          36
-#define SENSOR_NUM    37
+#define VIIRSJ4       37
+#define SENSOR_NUM    38
 
 #define MAXWAVE_VIS  720
 #define MINWAVE_IR  3000
@@ -65,7 +66,8 @@
 #define VIIRS_J2       10
 #define OLI_L8         11
 #define OLI_L9         12
-#define SUBSENSOR_NUM  13
+#define VIIRS_J4       13
+#define SUBSENSOR_NUM  14
 
 /* instrument IDs */
 #define INSTRUMENT_SEAWIFS    0

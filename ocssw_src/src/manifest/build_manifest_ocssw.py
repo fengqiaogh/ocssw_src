@@ -12,11 +12,16 @@ import subprocess
 import multiprocessing as mp
 
 machineInfo = [
-        # RHEL 8, use poseidon
+        # RHEL 8, use container on analysis707
+        # I added this to my .ssh/config file:
+        #
+        # Host redhatbuild
+        #     HostName analysis707
+        #     Port 10022
         {
            "name" : "linux_64",
-           "login" : "poseidon",
-           "initStr" : "source .bash_profile; source setup-linux_64.sh",
+           "login" : "redhatbuild",
+           "initStr" : "source .bash_profile",
            "exitStr" : ""
         },
         # Ubuntu 20.04

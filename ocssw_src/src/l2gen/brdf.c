@@ -489,14 +489,17 @@ void foqint_morel(char *file, float wave[], int32_t nwave, float solz, float sen
         }
     }
 
-    // clamp chl to table minimum
-    if(chl < lchltab[0]) {
-        chl = lchltab[0];
+    if(!(l1_input->evalmask & OLD_BRDF_INTERP)) {
+        // clamp chl to table minimum
+        if(chl < lchltab[0]) {
+            chl = lchltab[0];
+        }
+        // clamp chl to table maximum
+        if(chl > lchltab[n_c-1]) {
+            chl = lchltab[n_c-1];
+        }
     }
-    // clamp chl to table maximum
-    if(chl > lchltab[n_c-1]) {
-        chl = lchltab[n_c-1];
-    }
+
     lchl = log(MAX(chl, 0.01));
 
     if (senzp < senztab[0]) {

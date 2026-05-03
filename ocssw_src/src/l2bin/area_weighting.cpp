@@ -34,6 +34,9 @@ void AreaWeighting::set_scan(size_t iscan, std::vector<uint8_t>& mask) {
         l2file->readLongitude(lastLon.data(), start, count, mask);
     }
     lastLine = iscan;
+    if (!l2file->get_l2_metadata().detnum.empty()) {
+        lastDetNum = l2file->get_l2_metadata().detnum.at(iscan);
+    }
     l2file->readLatitudeScan(&latitude, iscan, mask);
     l2file->readLongitudeScan(&longitude, iscan, mask);
 
@@ -119,6 +122,12 @@ void AreaWeighting::set_corners(size_t iscan, std::vector<uint8_t>& mask) {
         // Check if scan lines are sequential
         if (iscan - lastLine.value() != 1)
             lat2Valid = false;
+        // check for detector number, if applicable
+        if (lastDetNum.has_value()) {
+            int diff = lastDetNum.value() - l2file->get_l2_metadata().detnum.at(iscan);
+            if (std::abs(diff) > 1)
+                lat2Valid = false;
+        }
         set_scan(iscan, mask);
     }
 
@@ -187,7 +196,7 @@ bool AreaWeighting::valid_geolocation(size_t ipixel) const {
     return true;
 }
 
-void clampDeltaLon(float* deltaLon) {
+static void clampDeltaLon(float* deltaLon) {
     if (*deltaLon > 90) {
         if (*deltaLon > 270)
             *deltaLon -= 360.0;
@@ -201,9 +210,22 @@ void clampDeltaLon(float* deltaLon) {
     }
 }
 
+static bool test_pixel_validity(const float* lat1, const float* lon1, const float* lat0, const float* lon0,
+                               int ipixel) {
+    return valid_lat(lat1[ipixel]) && valid_lat(lat0[ipixel]) && valid_lat(lat0[ipixel + 1]) &&
+           valid_lon(lon1[ipixel]) && valid_lon(lon0[ipixel]) && valid_lon(lon0[ipixel + 1]);
+}
+
 void AreaWeighting::interpolatePixelCorners(float* lat0, float* lon0, float* lat1, float* lon1, float* latOut,
                                             float* lonOut, int32_t numPoints) {
+
+    // int to BAD_FLIT
+    std::fill(latOut, latOut + numPoints, BAD_FLT);
+    std::fill(lonOut, lonOut + numPoints, BAD_FLT);
     // calc the delta for first point
+    if (!test_pixel_validity(lat1, lon1, lat0, lon0, 0)) {
+        return;
+    }
     float dLat = (lat1[0] - lat0[0] + lat0[1] - lat0[0]) / 2.0;
     float dLon = (lon1[0] - lon0[0] + lon0[1] - lon0[0]) / 2.0;
     clampDeltaLon(&dLon);
@@ -214,6 +236,9 @@ void AreaWeighting::interpolatePixelCorners(float* lat0, float* lon0, float* lat
 
     // calc the rest of the points
     for (int i = 0; i < numPoints - 1; i++) {
+        if (!test_pixel_validity(lat1, lon1, lat0, lon0, i)) {
+            continue;
+        }
         dLat = (lat1[i] - lat0[i] + lat0[i + 1] - lat0[i]) / 2.0;
         dLon = (lon1[i] - lon0[i] + lon0[i + 1] - lon0[i]) / 2.0;
         clampDeltaLon(&dLon);
@@ -229,7 +254,13 @@ void AreaWeighting::interpolatePixelCorners(float* lat0, float* lon0, float* lat
 
 void AreaWeighting::extrapolatePixelCorners(float* lat0, float* lon0, float* lat1, float* lon1, float* latOut,
                                             float* lonOut, int32_t numPoints) {
+    // int to BAD_FLIT
+    std::fill(latOut, latOut + numPoints, BAD_FLT);
+    std::fill(lonOut, lonOut + numPoints, BAD_FLT);
     // calc the delta for first point
+    if (!test_pixel_validity(lat0, lon0, lat1, lon1, 0)) {
+        return;
+    }
     float dLat = (lat1[1] - lat1[0] + lat0[0] - lat1[0]) / 2.0;
     float dLon = (lon1[1] - lon1[0] + lon0[0] - lon1[0]) / 2.0;
     clampDeltaLon(&dLon);
@@ -240,6 +271,9 @@ void AreaWeighting::extrapolatePixelCorners(float* lat0, float* lon0, float* lat
 
     // calc the rest of the points
     for (int i = 0; i < numPoints - 1; i++) {
+        if (!test_pixel_validity(lat1, lon1, lat0, lon0, i)) {
+            continue;
+        }        
         dLat = (lat1[i] - lat0[i] + lat0[i + 1] - lat0[i]) / 2.0;
         dLon = (lon1[i] - lon0[i] + lon0[i + 1] - lon0[i]) / 2.0;
         clampDeltaLon(&dLon);
@@ -325,6 +359,7 @@ void AreaWeighting::set_l2_reader(L2_Reader& l2file) {
     this->l2file = &l2file;
     size_t nlines, npixels;
     l2file.getDimensions(nlines, npixels);
+    l2file.set_l2_metadata();
     std::vector<float> delta_lat_abs_min(nlines - 1, median_start_value);
     std::vector<float> prev_lat(npixels), curr_lat(npixels);
     std::vector<size_t> start = {0, 0};

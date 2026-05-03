@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.12)
 # Make a version file containing the current version from git.
 #
 set (VERSION_MAJOR 10)
-set (VERSION_MINOR 0)
+set (VERSION_MINOR 1)
 set (VERSION_PATCH 0)
 include(GetOcsswVersion)
 
@@ -19,7 +19,7 @@ set (ATREM_F_CODE )
 #set (ATREM_C_CODE numerical.c get_atrem_corl1.c rdatreminfo.c)
 #set (ATREM_F_CODE atrem_app_refl_plus_gas_removal_l2.f90 atrem_bndprms.f atrem_tpvmr_init.f)
 
-set(LIBS l2 l1 nav libterrain)
+set(LIBS l2 l1 nav libterrain dataday)
 
 find_package(Levmar REQUIRED)
 include_directories(${Levmar_INCLUDE_DIRS})

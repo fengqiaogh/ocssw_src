@@ -519,8 +519,8 @@ bool OutFileNetcdf4::close() {
     return true;
 }
 
-int32_t OutFileNetcdf4::addProduct(productInfo_t* productInfo, bool applyMask) {
-    return addProductNonDisplay(productInfo);
+int32_t OutFileNetcdf4::addProduct(productInfo_t* productInfo, bool applyMask, const ProductL3Attributes & productAttr) {
+    return addProductNonDisplay(productInfo, productAttr);
 }
 
 void OutFileNetcdf4::initCompression(NcVar var) {

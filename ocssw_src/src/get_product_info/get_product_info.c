@@ -132,6 +132,34 @@ void printProductListCSV() {
     freeProductInfo(productInfo);
 }
 
+char* cat_ix_to_productName(char* productName, int sensorId) {
+    static char localProductName[1024];
+
+    // if productName is an integer, convert it to a product name using the catalog index
+    char* endptr;
+    int cat_ix = (int) strtol(productName, &endptr, 10);
+    if (*endptr == '\0') {  // the entire string was an integer
+        productInfo_t* productInfo = allocateProductInfo();
+        getFirstProductInfo(productInfo);
+        do {
+            if (productInfo->cat_ix == cat_ix) {
+                char* fullName = getProductNameFull(productInfo);
+                strcpy(localProductName, fullName);
+                endptr = strstr(localProductName, "_-1");
+                if(endptr) {
+                    *endptr = '\0';
+                }
+                freeProductInfo(productInfo);
+                return localProductName;
+            }
+        } while (getNextProductInfo(productInfo));
+        freeProductInfo(productInfo);
+        printf("-E- No product found with catalog index %d for sensor %d\n", cat_ix, sensorId);
+        exit(1);
+    }
+    return productName;
+}
+
 int main(int argc, char *argv[]) {
     // setup clo
     clo_setEnablePositionOptions(1);
@@ -149,7 +177,7 @@ int main(int argc, char *argv[]) {
     clo_addOption(list, "r", CLO_TYPE_BOOL, "false", "list all of the products recursing through\n        the wavelengths of the sensor specified");
     clo_addOption(list, "csv", CLO_TYPE_BOOL, "false", "list all of the products, output in CSV format");
     clo_addOption(list, "sensor", CLO_TYPE_STRING, "MODISA", "sensor name (or ID) to use for wavelength\n        expansion or product lookup");
-    clo_addOption(list, "<product>", CLO_TYPE_HELP, NULL, "<productName> product to print detailed information about");
+    clo_addOption(list, "<product>", CLO_TYPE_HELP, NULL, "<productName> product (or cat_ix) to print detailed information about");
 
     clo_readArgs(list, argc, argv);
     int numPositionOptions = clo_getPositionNumOptions(list);
@@ -199,6 +227,7 @@ int main(int argc, char *argv[]) {
     }
 
     char* productName = clo_getPositionString(list, 0);
+    productName = cat_ix_to_productName(productName, sensorId);
 
     productInfo_t* productInfo = allocateProductInfo();
     if (findProductInfo(productName, sensorId, productInfo)) {

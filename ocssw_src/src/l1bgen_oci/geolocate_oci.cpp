@@ -636,6 +636,8 @@ int getScanAngles(GeoData &geoData, const Device device, const double earthViewT
     }
 
     if (mceSpinId == -1) {
+        cerr << __FILE__ << ":" << __LINE__ << " No MCE encoder data for spin " << geoData.spinIds[currScan]
+             << endl;
         // Couldn't generate scan angles for this scan, recommend skipping planarity correction and vector
         // conversion
         return EXIT_FAILURE;
@@ -1399,13 +1401,7 @@ GeoData locateOci(NcFile *l1aFile, Level1bFile &outfile, const oel::L1bOptions &
         // Generate pointing vector and relative time arrays in instrument frame
         int getScanAnglesRetCode =
             getScanAngles(geoData, CCD, earthViewTimeOffset, sciencePixelOffset, currScan);
-        if (getScanAnglesRetCode == EXIT_SUCCESS) {
-            getEarthViewVectors(geoData, CCD, currScan, ccdPointingVectors);
-        } else {
-            string errorMessage = "Couldn't get CCD scan angles for scan " + to_string(currScan) +
-                                  " (spin ID " + to_string(geoData.spinIds[currScan]) + ")";
-            throw runtime_error(errorMessage);
-        }
+        getEarthViewVectors(geoData, CCD, currScan, ccdPointingVectors);
         scanQualityFlags[currScan] |= 4 * getScanAnglesRetCode;
 
         // Prototype also makes SWIR pointing vectors, but they're not used. Thus, the call is obviated

@@ -82,7 +82,7 @@ int getSensorId(const char* fileName) {
         // Check if 'platform' exists
         NcGroupAtt att = nc_input.getAtt("platform");
         if (att.isNull()) {
-            platform.empty();
+            platform.clear();
         } else {
             att.getValues(platform);
         }       

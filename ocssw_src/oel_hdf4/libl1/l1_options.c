@@ -140,17 +140,10 @@ void l1_add_options(clo_optionList_t* list) {
 
     strcpy(tmpStr, "evaluation bitmask\n");
     strcat(tmpStr, "          0: standard processing\n");
-    strcat(tmpStr, "          1: init to old aerosol models\n");
-    strcat(tmpStr, "          2: enables MODIS and MERIS cloud Mask for HABS\n");
-    strcat(tmpStr, "         16: enables MODIS cirrus mask\n");
     strcat(tmpStr, "         32: use test sensor info file\n");
     strcat(tmpStr, "         64: use test rayleigh tables\n");
-    strcat(tmpStr, "        128: use test aerosol tables\n");
-    strcat(tmpStr, "        256: use test polarization tables\n");
-    strcat(tmpStr, "       1024: mask modis mirror-side 1 (navfail)\n");
-    strcat(tmpStr, "       2048: mask modis mirror-side 2 (navfail)\n");
+    strcat(tmpStr, "        128: use old brdf interpolation method\n");
     strcat(tmpStr, "       4096: don't apply 'cold-only' or equatorial aerosol tests for SST\n");
-    strcat(tmpStr, "       8192: use alt sensor info file in eval\n");
     strcat(tmpStr, "      32768: enables spherical path geom for dtran");
     clo_addOption(list, "eval", CLO_TYPE_INT, "0", tmpStr);
 

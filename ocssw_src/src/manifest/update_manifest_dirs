@@ -4,8 +4,8 @@ OCSSW_DIR=ocssw
 VIIRS_DIR=viirs_l1
 
 # where to get the linux binaries for seadas
-OCSSW_LINUX_MACHINE="poseidon"
-OCSSW_LINUX=${OCSSW_LINUX_MACHINE}:linux_64/ocssw
+OCSSW_LINUX_MACHINE="redhatbuild"
+OCSSW_LINUX=${OCSSW_LINUX_MACHINE}:${OCSSW_DIR}
 
 # where to get the linux binaries for ODPS
 OCSSW_ODPS_MACHINE=analysis705

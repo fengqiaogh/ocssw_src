@@ -1435,7 +1435,6 @@ void DecomposeTime(
         ) {
     time_t itime = (time_t) dtime;
     struct tm *ts;
-    double rint(double);
 
     ts = gmtime(&itime);
     *year = (int16) (ts->tm_year + 1900);

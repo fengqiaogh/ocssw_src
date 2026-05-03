@@ -90,7 +90,6 @@ void setflagbits_l2(l2str *l2rec, int32_t ipix) {
 
         if (l2rec->num_iter[ip] > input->aer_iter_max) {
             l1rec->flags[ip] |= MAXAERITER;
-            l1rec->flags[ip] |= ATMWARN;
         }
 
         if (input->absaer_opt > 0) {

@@ -17,9 +17,9 @@ protected:
     netCDF::NcFile *ncFile;
     meta_l3bType metaData;
     std::vector<netCDF::NcVar> prodVarList;
-    size_t wvIdx = 0;
-    std::deque<size_t> wvIdxList;
-
+    std::vector<size_t> active_index_list;
+    std::vector<float> wavelengths{};
+    std::unordered_map<std::string, std::pair<size_t, netCDF::NcVar>> twoD_threeD_lookup{};
     virtual int initRecordLookup();
 
     virtual L3Row* readRow(int32_t row);
@@ -28,10 +28,8 @@ public:
     L3FileSMI();
     virtual ~L3FileSMI();
 
-    template <typename T>
-    bool getProductAttribute(const std::string& prodName, const std::string& attributeName, T* attrValue) {
-        return false;
-    }
+    bool getProductAttribute(const std::string &prodName, const std::string &attributeName, void *attrValue,
+                             size_t attrSize) override;
 
     template<typename TheType>
     bool readAttribute(std::string name, TheType &val) {
@@ -102,11 +100,6 @@ public:
     virtual std::string getProductName(size_t index = 0);
     virtual bool setActiveProductList(const char* prodStr);
     virtual bool hasQuality();
-
-    virtual bool getWavelength(std::string name, float& wavelength);
-    virtual bool checkWavelength(const char* wvl);
-    virtual bool getWavelengthList(std::vector<std::string>& wvlist);
-
 };
 
 } // namespace l3

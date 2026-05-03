@@ -1,9 +1,82 @@
 #include "bin_util.h"
 #include "L3Shape.h"
-
+#include <boost/algorithm/string.hpp>
 #include <mfhdf.h>
 
 using namespace std;
+
+
+AveragingScheme get_averaging_scheme_from_string(const std::string& averaging_scheme) {
+    if (averaging_scheme == "arithmetic") {
+        return ARITHMETIC_MEAN;
+    } else if (averaging_scheme == "geometric") {
+        return GEOMETRIC_MEAN;
+    } else if (averaging_scheme == "harmonic") {
+        return HARMONIC_MEAN;
+    } else if (averaging_scheme == "quadratic") {
+        return QUADRATIC_MEAN;
+    } else {
+        std::cerr << "-E-: unidentified averaging scheme: " << averaging_scheme << ". See "
+                  << __FILE__ << ":" << __LINE__ << std::endl;
+        exit(EXIT_FAILURE);
+    }
+}
+
+float apply_averaging_scheme(float val, AveragingScheme method) {
+    switch (method) {
+        case ARITHMETIC_MEAN:
+            return val;
+        case GEOMETRIC_MEAN:
+            if (val <= 0)
+                return BAD_FLT;
+            else
+                return std::log(val);
+        case HARMONIC_MEAN:
+            if (val == 0)
+                return BAD_FLT;
+            else
+                return 1.0f / val;
+        case QUADRATIC_MEAN:
+            return val * val;
+        default:
+            std::cerr << "-E-: unidentified averaging scheme. See " << __FILE__ << ":" << __LINE__ << std::endl;
+            exit(EXIT_FAILURE);
+    }
+}
+
+std::unordered_map<std::string, std::pair<AveragingScheme, std::string>> get_averaging_scheme_per_product(
+    const std::string& averaging_scheme_specification) {
+    std::unordered_map<std::string, std::pair<AveragingScheme, std::string>> averaging_scheme_per_product;
+    if (averaging_scheme_specification.empty()) {
+        return {{"ALL", {ARITHMETIC_MEAN, "arithmetic"}}};
+    }
+    std::string separtors = ",:";
+    bool contains_separator = averaging_scheme_specification.find_first_of(separtors) != std::string::npos;
+    if (!contains_separator) {
+        AveragingScheme method = get_averaging_scheme_from_string(averaging_scheme_specification);
+        return {{"ALL", {method, averaging_scheme_specification}}};
+    }
+
+    std::vector<std::string> product_averaging_scheme_list;
+    boost::split(product_averaging_scheme_list, averaging_scheme_specification, boost::is_any_of(","),
+                 boost::algorithm::token_compress_on);
+    for (const auto& product_averaging_scheme : product_averaging_scheme_list) {
+        std::vector<std::string> prod_and_method;
+        boost::split(prod_and_method, product_averaging_scheme, boost::is_any_of(":"),
+                     boost::algorithm::token_compress_on);
+        if (prod_and_method.size() != 2) {
+            std::cerr << "-E-: Wrong averaging scheme specification: " << product_averaging_scheme << ". See "
+                      << __FILE__ << ":" << __LINE__ << std::endl;
+            exit(EXIT_FAILURE);
+        }
+        std::string prod_name = boost::algorithm::trim_copy(prod_and_method[0]);
+        std::string method_name = boost::algorithm::trim_copy(prod_and_method[1]);
+        AveragingScheme method = get_averaging_scheme_from_string(method_name);
+        averaging_scheme_per_product[prod_name] = std::make_pair(method, method_name);
+    }
+    return averaging_scheme_per_product;
+}
+
 
 namespace Hdf {
 

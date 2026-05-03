@@ -155,14 +155,16 @@ int Level1bFile::createFile(size_t numScans, size_t numBlueBands, size_t numRedB
         createField(sensorBandParameters, "blue_spectral_mode", "Blue CCD spectral aggregation mode", NULL, NULL,
                     "", fillDouble, "0s, 1s, 2s, 4s, 8s", "disabled 1to1 2to1 4to1 8to1", 1, 0,
                     1.0, 0.0, NC_SHORT, dimVec, "");
-    }
-    dimVec = {l1bFile->getDim("number_of_taps")};
-    if (!dimVec[0].isNull()) {
         createField(sensorBandParameters, "red_spectral_mode", "Red CCD spectral aggregation mode", NULL, NULL,
                     "", fillDouble, "0s, 1s, 2s, 4s, 8s", "disabled 1to1 2to1 4to1 8to1", 1, 0,
                     1.0, 0.0, NC_SHORT, dimVec, "");
     }
     sensorBandParameters.putAtt("spatial_aggregation_factor", NC_SHORT, spatialAggregationFactor);
+        // SWIR gain type (low/high) for each SWIR band
+    dimVec = {l1bFile->getDim("SWIR_bands")};
+    createField(sensorBandParameters, "SWIR_gain_type", "Gain types for SWIR bands", NULL, NULL, "", 
+            BAD_UBYTE, "0UB, 1UB", "standard_gain high_gain", 0, 1, 1.0, 0.0, NC_UBYTE, dimVec, "");
+
 
     // scan_line_attributes
     vector<NcDim> scanLineAttrs{l1bFile->getDim("scans")};

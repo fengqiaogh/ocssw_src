@@ -309,6 +309,17 @@ static char *l2gen_optionKeys[] = {
     NULL
 };
 
+static char *l3gen_optionKeys[sizeof(l2gen_optionKeys)/sizeof(char *) + 1];
+
+static void set_l3gen_optionKeys() {
+    const size_t num_l2gen_keys = sizeof(l2gen_optionKeys)/sizeof(char *);
+    for (size_t i = 0; i < num_l2gen_keys - 1; i++) {
+        l3gen_optionKeys[i] = strdup(l2gen_optionKeys[i]);
+    }
+    l3gen_optionKeys[num_l2gen_keys - 1] = "averaging_scheme";
+    l3gen_optionKeys[num_l2gen_keys] = NULL;
+}
+
 static char *l1bgen_optionKeys[] = {
     "-help",
     "-version",
@@ -668,7 +679,7 @@ void msl12_input_init() {
     input->nbands_watervapor = 0;
 
     strcpy(input->doi, "");
-
+    input->averaging_scheme[0] = 0;
     return;
 }
 
@@ -684,7 +695,7 @@ int l2gen_init_options(clo_optionList_t* list, const char* prog) {
 
     // set the min program name
     strcpy(mainProgramName, prog);
-
+    set_l3gen_optionKeys();
     // setup CLO so ofile2,ofile3... will work
     clo_setEnableExtraOptions(1);
 
@@ -693,7 +704,7 @@ int l2gen_init_options(clo_optionList_t* list, const char* prog) {
     } else if (!strcmp(prog, "l2gen")) {
         clo_setSelectOptionKeys(l2gen_optionKeys);
     } else if (!strcmp(prog, "l3gen")) {
-        clo_setSelectOptionKeys(l2gen_optionKeys);
+        clo_setSelectOptionKeys(l3gen_optionKeys);
     } else if (!strcmp(prog, "l1bgen_generic")) {
         clo_setSelectOptionKeys(l1bgen_optionKeys);
     } else if (!strcmp(prog, "l1mapgen")) {
@@ -2920,7 +2931,10 @@ int l2gen_load_input(clo_optionList_t *list, instr *input, int32_t nbands) {
             if (clo_isOptionSet(option)) {
                 strcpy(input->wavelength_3d_str, clo_getOptionRawString(option));
             }
-        // silence errors for libl1 parameters
+        // l3gen averaging scheme
+        } else if (strcmp(keyword, "averaging_scheme") == 0) {
+                strncpy(input->averaging_scheme,clo_getOptionRawString(option),sizeof(input->averaging_scheme));
+            // silence errors for libl1 parameters
         } else if (strcmp(keyword, "pversion") == 0) {
         } else if (strcmp(keyword, "rad_opt") == 0) {
         } else if (strcmp(keyword, "viirscalparfile") == 0) {
@@ -4078,6 +4092,11 @@ int msl12_option_input(int argc, char **argv, clo_optionList_t* list,
     strcat(l1_input->input_parms, str_buf);
     strcat(l1_input->input_parms, "\n");
 
+    if(strcmp(progName,"l3gen" ) == 0) {
+        sprintf(str_buf,"averaging_scheme = %s",input->averaging_scheme);
+        strcat(l1_input->input_parms, str_buf);
+        strcat(l1_input->input_parms, "\n");
+    }
     if(input->mbac_wave){
         strcat(l1_input->input_parms, "mbac_wave = ");
         i = 0;

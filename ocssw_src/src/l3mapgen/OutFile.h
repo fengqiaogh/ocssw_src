@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
-
+#include <cmath>
 #include <png.h>
 #include <xtiffio.h>
 #include <geotiffio.h>
@@ -15,7 +15,7 @@
 #include <string>
 #include <clo.h>
 #include <genutils.h>
-
+#include <bin_util.h>
 // earth radius in meters from WGS84 equatorial radius
 #define EARTH_RADIUS 6378137.0
 // #define EARTH_CIRCUMFERENCE 40075016.6856
@@ -70,7 +70,7 @@ class OutFile {
         double missingValue;      //< missing value from product XML (val stored in file)
         double* lineData;
         double landPixelValue;
-
+        AveragingScheme averaging_scheme = ARITHMETIC_MEAN;
         /**
          * @brief Constructs a ProductStuff object with the specified width and product information; derived from OutFile class.
          * @param width The width of the product.
@@ -184,7 +184,7 @@ class OutFile {
 
     meta_l3bType* metaData;
     std::string mapProjection;
-
+    AveragingScheme averaging_scheme = ARITHMETIC_MEAN;
     std::string proj4String;
     double tiepoints[6];
     double pixscale[3];
@@ -199,9 +199,10 @@ class OutFile {
     /**
      * @brief Adds a product for non-display type output files.
      * @param productInfo Pointer to the product information.
+     * @param productAttr The ProductAttribute object containing the mean method information.
      * @return The index for the new product.
      */
-    virtual int addProductNonDisplay(productInfo_t* productInfo);
+    virtual int addProductNonDisplay(productInfo_t* productInfo, const ProductL3Attributes & productAttr);
 
    public:
     /**
@@ -348,7 +349,7 @@ class OutFile {
      * @param productInfo info structure to copy
      * @return the index for the new product
      */
-    virtual int32_t addProduct(productInfo_t* productInfo, bool applyMask);
+    virtual int32_t addProduct(productInfo_t* productInfo, bool applyMask, const ProductL3Attributes & productAttr = ProductL3Attributes());
 
 
     virtual int32_t getNumProducts() {
@@ -446,6 +447,13 @@ class OutFile {
      * @param maxY The maximum Y coordinate.
      */
     void setProj4Info(std::string projStr, double minX, double maxY);
+
+    /**
+     * @brief Sets the mean method for the specified product.
+     * @param stuff Pointer to the ProductStuff object for which to set the mean method.
+     * @param productAttr The ProductAttribute object containing the mean method information.
+     */
+    void setProductAveragingScheme(ProductStuff* stuff, const ProductL3Attributes & productAttr);
 };
 
 #endif // OUTFILE_H

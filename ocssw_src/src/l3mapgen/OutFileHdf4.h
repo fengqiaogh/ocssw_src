@@ -57,9 +57,10 @@ class OutFileHdf4 : public OutFile {
     /**
      * @brief Adds a product to the HDF4 file without displaying it.
      * @param productInfo Pointer to the product information.
+     * @param productAttr The ProductAttribute object containing the mean method information.
      * @return int32_t The index of the added product. // TODO: Confirm if this is the index
      */
-    virtual int addProduct(productInfo_t* productInfo, bool applyMask);
+    virtual int addProduct(productInfo_t* productInfo, bool applyMask, const ProductL3Attributes & productAttr);
 };
 
 #endif // OUTFILEHDF4_H

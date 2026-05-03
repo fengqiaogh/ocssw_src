@@ -284,8 +284,17 @@ EXIT Status:
         var.valid_min = 0
         var.valid_max = MAX_SECONDS_OF_DAY
         var.units = timeunits
-        var[:] = [seconds_since(rec['Est_Time'], basetime=daystart)
+        attitude_times = [seconds_since(rec['Est_Time'], basetime=daystart)
                   for rec in pktDict[att]['recordlist']]
+
+        cutoff_unix = datetime.datetime(2002, 1, 1, tzinfo=timezone.utc)
+        # Attitude times are relative to the start of the day
+        cutoff_rel = (cutoff_unix - daystart).total_seconds()
+
+        if any(time <= cutoff_rel for time in attitude_times):
+            status = 110
+                  
+        var[:] = attitude_times
 
         var = group.createVariable(  # att_quat
             'att_quat', 'f8', ('att_records', 'quaternion_elements'), fill_value=-32767.)

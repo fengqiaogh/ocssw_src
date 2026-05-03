@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.12)
-
+set (VERSION_MAJOR 8)
+set (VERSION_MINOR 2)
+set (VERSION_PATCH 1)
+include(GetOcsswVersion)
 set(LIBS l2 bin dataday)
 
 find_package(NetCDF REQUIRED COMPONENTS C CXX)

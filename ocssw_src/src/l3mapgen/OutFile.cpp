@@ -1,11 +1,10 @@
 #include "OutFile.h"
 #include "l3mapgen.h"
-
 #include <boost/algorithm/string.hpp>
 #include <fstream>
 #include <sstream>
 #include <regex>
-
+#include "bin_util.h"
 using namespace std;
 
 //------------------------------------------------------------------------------
@@ -110,7 +109,9 @@ double OutFile::ProductStuff::calcOutputVal(double val) const {
 
     if (val == landPixelValue)
         return LAND_PIX;
-
+    val = apply_reverse_averaging_scheme(val, averaging_scheme);
+    if (val == BAD_FLT)
+        return missingValue;
     // don't scale if output type is floating point
     if (dataStorage == FLOAT_DS || dataStorage == DOUBLE_DS)
         return val;
@@ -200,11 +201,11 @@ void OutFile::ProductStuff::calcOutputLineVals(void* lineBuffer) const {
             break;
         case FLOAT_DS:
             for (int i = 0; i < width; i++)
-                ((float*)lineBuffer)[i] = lineData[i];
+                ((float*)lineBuffer)[i] = apply_reverse_averaging_scheme<float>(lineData[i], averaging_scheme);
             break;
         case DOUBLE_DS:
             for (int i = 0; i < width; i++)
-                ((double*)lineBuffer)[i] = lineData[i];
+                ((double*)lineBuffer)[i] = apply_reverse_averaging_scheme<double>(lineData[i], averaging_scheme);
             break;
         default:
             printf("-E- OutFile::ProductStuff::calcOutputLineVals - unrecognized data type = %d\n",
@@ -508,8 +509,9 @@ void OutFile::setMetaData(meta_l3bType* metaData) {
     *this->metaData = *metaData;
 }
 
-int32_t OutFile::addProduct(productInfo_t* productInfo, bool applyMask) {
+int32_t OutFile::addProduct(productInfo_t* productInfo, bool applyMask, const ProductL3Attributes & productAttr) {
     ProductStuff* stuff = new ProductStuff(width, productInfo, landPixelValue);
+    setProductAveragingScheme(stuff,productAttr);
     if(applyMask) {
         stuff->maxOutputVal--;
     }
@@ -530,9 +532,9 @@ int32_t OutFile::addProduct(productInfo_t* productInfo, bool applyMask) {
     return productStuff.size() - 1;
 }
 
-int32_t OutFile::addProductNonDisplay(productInfo_t* productInfo) {
+int32_t OutFile::addProductNonDisplay(productInfo_t* productInfo, const ProductL3Attributes & productAttr) {
     ProductStuff* stuff = new ProductStuff(width, productInfo, landPixelValue);
-
+    setProductAveragingScheme(stuff, productAttr);
     if (!strcmp(productInfo->dataType, "byte")) {
         stuff->dataStorage = BYTE_DS;
         stuff->minOutputVal = SCHAR_MIN;
@@ -650,4 +652,8 @@ bool OutFile::getQualityProcessing() {
         return true;
     else
         return false;
+}
+
+void OutFile::setProductAveragingScheme(ProductStuff* stuff, const ProductL3Attributes & productAttr) {
+    stuff->averaging_scheme = productAttr.averaging_scheme;
 }

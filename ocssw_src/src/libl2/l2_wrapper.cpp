@@ -227,10 +227,12 @@ int32_t freeL2(l2_prod *l2_str) {
 
 int32_t findprod(l2_prod *l2_str, char *prodname) {
     size_t index;
-    int status = l2_reader[current_file_index].find_product_index(prodname, index);
+    std::vector<size_t> buffer_index{};
+    int status = l2_reader[current_file_index].find_product_index(prodname, buffer_index);
     if (status != 0) {
         return -1;
     }
+    index = buffer_index[0];
     return index;
 }
 
@@ -257,12 +259,14 @@ int32_t freeL2meta(meta_l2Type *meta_l2) {
     return 0;
 }
 
-int32_t getL3units(l2_prod *l2_str, int32_t ifile, char *l3b_prodname, char *units) {
+int32_t getL3units(l2_prod *l2_str, int32_t ifile, char *l3b_prodname, char **units) {
     size_t product_index;
-    int status = l2_reader[ifile].find_product_index(l3b_prodname, product_index);
+    std::vector<size_t> buffer_index{};
+    int status = l2_reader[ifile].find_product_index(l3b_prodname, buffer_index);
     if (status != 0) {
         return -1;
     }
-    units = strdup(l2_reader[ifile].get_units()[product_index].c_str());
+    product_index = buffer_index[0];
+    *units = strdup(l2_reader[ifile].get_units()[product_index].c_str());
     return 0;
 }

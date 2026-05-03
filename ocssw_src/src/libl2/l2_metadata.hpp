@@ -35,6 +35,7 @@ class MetaL2 {
     std::vector<int> year;
     std::vector<int> day;
     std::vector<int> msec;
+    std::vector<int> detnum{};
     MetaL2() = default;
     std::string time_coverage_start, time_coverage_end;
 

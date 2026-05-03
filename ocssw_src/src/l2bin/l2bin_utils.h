@@ -19,10 +19,22 @@
 #include <boost/geometry/geometries/polygon.hpp>
 #include <boost/geometry/geometries/box.hpp>
 #include <boost/foreach.hpp>
+#include "bin_util.h"
 namespace bg = boost::geometry;
 typedef bg::model::point<double, 2, bg::cs::geographic<bg::degree>> Point_t;
 typedef bg::model::polygon<Point_t> Polygon_t;
 typedef bg::model::box<Point_t> Box_t;
+
+/**
+ * @brief Get means method for each L3B product based on the input specification and the products available in the L2 file
+ * @param l2_reader The L2_Reader object to access the L2 file and its products
+ * @param product_list The list of l3b products for which to determine the mean method, used to check if the products specified in the input map are present in the L2 file and to apply the default method to products not specified in the input map
+ * @param averaging_scheme_input The original input specification for mean methods, used for error messages
+ * @return A pair of vectors: the first contains the mean methods corresponding to each product in the product list, and the second contains the corresponding method names as strings (useful for logging and error messages). If a product is not specified in the input, it will use the default method (arithmetic mean)
+ */
+std::pair<std::vector<AveragingScheme>, std::vector<std::string>> get_averaging_scheme_per_l3b_product(
+    const L2_Reader& l2_reader, const std::vector<std::string>& product_list,
+    const std::string& averaging_scheme_input);
 
 /**
  * @brief Structure for managing binned L2 data arrays using raw pointers
@@ -313,9 +325,10 @@ std::vector<uint8_t> fill_bins(bool read_quality, L2BinStruct &l2binStruct, l3::
  * @param n_filled_bins Number of filled bins
  * @param n_bins_in_group Number of bins in group
  * @param n_products Number of products
+ * @param averaging_scheme Mean methods, per product, to apply when averaging data 
  */
 void fill_data(netCDF::NcGroup &binned_data, L2BinStruct &l2binStruct, size_t n_filled_bins,
-               size_t n_bins_in_group, size_t n_products);
+               size_t n_bins_in_group, size_t n_products, std::vector<AveragingScheme> & averaging_schemes_per_l3b_product) ;
 
 /**
  * @brief Fills quality data into netCDF output

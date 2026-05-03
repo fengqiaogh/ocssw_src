@@ -404,8 +404,9 @@ bool setupQualityProcessing(L3File* l3File, vector<OutFile*> outFiles, OutFile* 
  * @param measure Measurement type.
  * @param outFile Pointer to the output file.
  * @param outFile2 Pointer to the second output file.
+ * @param productAttr Product attribute.
  */
-void setupProduct(string& productName, MeasurementType measure, OutFile* outFile, OutFile* outFile2) {
+void setupProduct(string& productName, MeasurementType measure, OutFile* outFile, OutFile* outFile2, const ProductL3Attributes & productAttr = ProductL3Attributes()) {
     // get the product info
     productInfo_t* productInfo = allocateProductInfo();
     int sensorId = sensorName2SensorId(outFile->getMetadata()->sensor_name);
@@ -591,10 +592,10 @@ void setupProduct(string& productName, MeasurementType measure, OutFile* outFile
         productInfo->displayScale = strdup(clo_getString(optionList, "scale_type"));
     }
 
-    outFile->addProduct(productInfo, applyMask);
+    outFile->addProduct(productInfo, applyMask, productAttr);
     if (outFile2)
-        outFile2->addProduct(productInfo, applyMask);
-    
+        outFile2->addProduct(productInfo, applyMask, productAttr);
+
     freeProductInfo(productInfo);
 }
 
@@ -677,7 +678,8 @@ void writeRawFile(L3File* l3File, vector<OutFile*> outFiles, OutFile* outFile2) 
             outFile = outFiles[0];
         else
             outFile = outFiles[i];
-        setupProduct(productNameList[i], productMeasurementList[i], outFile, outFile2);
+        const ProductL3Attributes & productAttr = readProductL3Attributes(l3File, productNameList[i]);
+        setupProduct(productNameList[i], productMeasurementList[i], outFile, outFile2, productAttr);
     }
 
     printStartInfo(outFiles);
@@ -857,7 +859,8 @@ void writeSmiFile(L3File* l3File, vector<OutFile*> outFiles, OutFile* outFile2) 
             outFile = outFiles[0];
         else
             outFile = outFiles[i];
-        setupProduct(productNameList[i], productMeasurementList[i], outFile, outFile2);
+        const ProductL3Attributes & productAttr = readProductL3Attributes(l3File, productNameList[i]);
+        setupProduct(productNameList[i], productMeasurementList[i], outFile, outFile2, productAttr);
     }
     // set up quality processing
     setupQualityProcessing(l3File, outFiles, outFile2);
@@ -1479,7 +1482,8 @@ void writeProj4File(L3File* l3File, char* projectionStr, vector<OutFile*> outFil
             outFile = outFiles[0];
         else
             outFile = outFiles[i];
-        setupProduct(productNameList[i], productMeasurementList[i], outFile, outFile2);
+        const ProductL3Attributes & productAttr = readProductL3Attributes(l3File, productNameList[i]);
+        setupProduct(productNameList[i], productMeasurementList[i], outFile, outFile2, productAttr);
     }
 
     // set up quality processing
@@ -1888,11 +1892,11 @@ int main(int argc, char* argv[]) {
     trimNSEW = clo_getBool(optionList, "trimNSEW");
     writeProjectionText = clo_getBool(optionList, "write_projtext");
 
-
+    // read user specified product names and measurements, read wavelengths if specified, and expand product names with the wavelength specifier if applicable
     getProductNames(productName,productNameList,l3File, optionList);
     std::string cleanProdName;
     vector<string> parts;
-    // setup measurements
+    // setup measurements, remove measurement type from product name if specified, and create clean product name list for looking up in file
     for (size_t i = 0; i < productNameList.size(); i++) {
         if (i != 0)
             cleanProdName += ",";

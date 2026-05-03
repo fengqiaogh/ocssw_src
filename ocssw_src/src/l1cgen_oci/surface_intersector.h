@@ -45,7 +45,8 @@ bool is_bad(const Point& p);
 class SurfaceIntersector {
     std::vector<Triangle> triangles;
     Tree tree;
-    [[maybe_unused]] size_t lines, pixels;
+    // [[maybe_unused]] size_t lines, pixels;
+    size_t lines, pixels;
 
    public:
     size_t get_tree_size() const { return triangles.size(); }

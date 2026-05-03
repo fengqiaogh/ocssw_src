@@ -28,7 +28,9 @@ class L2_Reader {
     // attributes
     netCDF::NcVarAtt l2_mask_attr, l2_meaning_attr;
     std::vector<std::vector<float>> data_products_cached{};
-    std::vector<std::string> products_list{};
+    std::vector<std::string> products_list_l2{};
+    std::vector<std::string> products_list_l3b{};
+    std::unordered_map<std::string, std::vector<size_t>> products_l2_l3b_indices{};
     std::vector<float> latitude_cached{};
     std::vector<float> longitude_cached{};
     std::vector<int32_t> l2flags_cached{};
@@ -535,12 +537,12 @@ class L2_Reader {
     void reopenL2();
 
     /**
-     * @brief Finds the index of a product in the internal product list
+     * @brief Finds the indices of an L2 or L3b product in the internal product list
      * @param product_name Name of the product to find
-     * @param index Output parameter to store the found index
+     * @param indices Output vector to store the found indices
      * @return 0 if product found, non-zero if not found
      */
-    int32_t find_product_index(const std::string& product_name, size_t& index);
+    int32_t find_product_index(const std::string& product_name, std::vector<size_t> & indices) const;
 
     /**
      * @brief Gets the attributes associated with a product
@@ -562,7 +564,8 @@ class L2_Reader {
      *     
      * */
     void set_l2_metadata() {
-        l2_metadata = std::make_unique<MetaL2>(file_nc);
+        if(!l2_metadata)
+            l2_metadata = std::make_unique<MetaL2>(file_nc);
     }
 
     /**

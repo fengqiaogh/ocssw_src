@@ -58,15 +58,12 @@ const unordered_map<string, float>& getWavelength2dMap() {
 
 void getProductNames(const string &productName ,vector<string>& productNameList, l3::L3File* l3File, clo_optionList_t* optionList) {
     // make temp unordered set for quick lookup;
-    unordered_set<string> table_product_availiable_list;
+    unordered_set<string> table_product_available_list;
     const int number_of_products = l3File->getNumProducts();
     for (int i = 0; i < number_of_products; i++) {
         const string& name = l3File->getProductName(i);
-        table_product_availiable_list.insert(name);
+        table_product_available_list.insert(name);
     }
-
-    bool l3IsSMI = false;
-    if(dynamic_cast<l3::L3FileSMI*>(l3File) != nullptr) l3IsSMI = true;
 
     boost::split(productNameList, productName, boost::is_any_of(","));
     // all the wavelength for the sensor
@@ -154,24 +151,17 @@ void getProductNames(const string &productName ,vector<string>& productNameList,
         string prefix = productInfo->prefix;
 
         // fill up wavelength map for 2D products
-        if(prod_rank == 2 && table_product_availiable_list.count(cleanName) != 0 ) {
+        if(prod_rank == 2 && table_product_available_list.count(cleanName) != 0 ) {
             float wavelength_floating;
-            l3::L3FileSMI* l3FileSMI = dynamic_cast<l3::L3FileSMI*>(l3File);
-
-            if(l3FileSMI != nullptr) {
-                if(l3FileSMI->getWavelength(cleanName, wavelength_floating)) {
-                    wv3d::wavelength2dMap.insert({cleanName,wavelength_floating});
-                }
-            }
-            if (l3File->getProductAttribute(cleanName, "wavelength", &wavelength_floating)) {
+            if (l3File->getProductAttribute(cleanName, "wavelength", &wavelength_floating,sizeof(float))) {
                 wv3d::wavelength2dMap.insert({cleanName,wavelength_floating});
             }
             temp_prod_name_list.push_back(productNameList.at(i));
 
         } else if(prod_rank == 3) {
-            if (!l3IsSMI) {
+           {
                 if (wv3d::waveLength3DListSeparated.empty()) {
-                    for (const auto& product_in_l3in : table_product_availiable_list) {
+                    for (const auto& product_in_l3in : table_product_available_list) {
                         int res = findProductInfo(product_in_l3in.c_str(), sensorID, productInfo);
 
                         if (res != 1) {
@@ -204,7 +194,7 @@ void getProductNames(const string &productName ,vector<string>& productNameList,
                 for (size_t i = 0; i < wv3d::waveLength3DListSeparated.size(); i++) {
                     string wv = wv3d::waveLength3DListSeparated.at(i);
                     string prod_3d_name = prefix + "_" + wv + suffix;
-                    if (table_product_availiable_list.count(prod_3d_name) == 0) {
+                    if (table_product_available_list.count(prod_3d_name) == 0) {
                         EXIT_LOG(cerr << "--Error--: Neither product " << cleanName
                                 << " or its wavelength 3d slice " << prod_3d_name
                                 << " are found. \nExiting ... " << endl);
@@ -220,7 +210,7 @@ void getProductNames(const string &productName ,vector<string>& productNameList,
                                     "numbers. \nExiting...");
                         }
                         float wavelength_floating = static_cast<float>(wavelength);
-                        if (l3File->getProductAttribute(prod_3d_name, "wavelength", &wavelength_floating)) {
+                        if (l3File->getProductAttribute(prod_3d_name, "wavelength", &wavelength_floating,sizeof(float))) {
                             if (wavelength != std::lroundf(wavelength_floating)) {
                                 fprintf(stderr, "-E-: The wavelength %d from the product name %s. \n", wavelength,
                                         prod_3d_name.c_str());
@@ -254,77 +244,8 @@ void getProductNames(const string &productName ,vector<string>& productNameList,
                     EXIT_LOG(cerr << "--Error--: Product not found : " << cleanName << endl);
                 }
 
-            } else {
-                // check if the list empty
-                if (wv3d::waveLength3DListSeparated.empty()) { 
-                    for (const auto& product_in_l3in : table_product_availiable_list) {
-                        int res = findProductInfo(product_in_l3in.c_str(), sensorID, productInfo);
-
-                        if (res != 1) {
-                            EXIT_LOG(cerr << "--Error--: Could not read the product info " << product_in_l3in
-                                    << endl);
-                        }
-                        const string local_suffix = productInfo->suffix;
-                        const string localName = productInfo->productName;
-                        if(productInfo->rank == 2) {
-                            if (boost::contains(cleanName, localName)) {
-                                if (!local_suffix.empty()) {
-                                    if (!boost::contains(cleanName, local_suffix))
-                                        continue;
-                                } else {
-                                    if (cleanName != localName)
-                                        continue;
-                                }
-
-                                const string wave_length = boost::lexical_cast<string>(productInfo->prod_ix);
-                                if (wave_length.empty()) {
-                                    EXIT_LOG(cerr << "--Error--: Not valid 2D slice of " << cleanName
-                                            << "in the l3bin file " << endl);
-                                }
-                                wv3d::waveLength3DListSeparated.push_back(wave_length);
-                            }
-                        } else {
-                            vector<string> wavelengthList;
-                            l3::L3FileSMI* l3FileSMI = dynamic_cast<l3::L3FileSMI*>(l3File);
-                            if(!l3FileSMI->getWavelengthList(wavelengthList))
-                                EXIT_LOG(cerr << "wavelength variable not found" << endl);
-                            wv3d::waveLength3DListSeparated.insert(wv3d::waveLength3DListSeparated.end(), wavelengthList.begin(),
-                                    wavelengthList.end());
-                        }
-                    }
-                    sort(wv3d::waveLength3DListSeparated.begin(), wv3d::waveLength3DListSeparated.end(),
-                            wv3d::numericalOrder);
-                }
-                for (size_t i = 0; i < wv3d::waveLength3DListSeparated.size(); i++) {
-                    string wv = wv3d::waveLength3DListSeparated.at(i);
-                    string prod_3d_name = prefix + "_" + wv + suffix;
-                    temp_prod_name_list.push_back(prod_3d_name); //temporary
-                    //temp_prod_name_list.push_back(productNameList.at(i));
-                    float wavelength_floating;
-                    l3::L3FileSMI* l3FileSMI = dynamic_cast<l3::L3FileSMI*>(l3File);
-                    if(l3FileSMI->checkWavelength(wv.c_str())) {
-                        wavelength_floating = stof(wv);
-                    } else if(!l3FileSMI->getWavelength(prod_3d_name, wavelength_floating)) {
-                        EXIT_LOG(cerr << "--Error--: wavelength " << wv << " not found" << endl);
-                    }
-                    wv3d::wv3dName2dTo3dExpansion[cleanName].push_back(wavelength_floating);
-                    wv3d::wv3d3dNameTo2D[prod_3d_name] = cleanName;
-                }
             }
             wv3d::outputProductsWith3d.push_back(cleanName);
-        } else if(table_product_availiable_list.count(cleanName) == 0) {
-            temp_prod_name_list.push_back(productNameList.at(i));
-            vector<string> cleanName_parts;
-            boost::split(cleanName_parts, cleanName, boost::is_any_of("_"));
-            string wv = cleanName_parts.at(1);
-            float wavelength_floating;
-            l3::L3FileSMI* l3FileSMI = dynamic_cast<l3::L3FileSMI*>(l3File);
-            if(l3FileSMI->checkWavelength(wv.c_str())) {
-                wavelength_floating = stof(wv);
-            } else {
-                EXIT_LOG(cerr << "--Error--: wavelength " << wv << " not found" << endl);
-            }
-            wv3d::wavelength2dMap.insert({cleanName,wavelength_floating});
         }
     }
     freeProductInfo(productInfo);

@@ -63,9 +63,11 @@ class OutFileNetcdf4 : public OutFile {
     /**
      * @brief Adds a product to the NetCDF file.
      * @param productInfo Pointer to the product information structure.
+     * @param applyMask Whether to apply a mask to the product data.
+     * @param productAttr The ProductAttribute object containing the mean method information.
      * @return int32_t The index of the added product.
      */
-    virtual int addProduct(productInfo_t* productInfo, bool applyMask);
+    virtual int addProduct(productInfo_t* productInfo, bool applyMask, const ProductL3Attributes & productAttr);
 
    private:
 

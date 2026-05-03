@@ -106,6 +106,10 @@ int l2bin_init_options(clo_optionList_t* list, const char* prog, const char* ver
     strncat(tmpStr, "        This option allows the user to specify the output product names which differ from the original l2 product names.\n", sizeof(tmpStr) - strlen(tmpStr) - 1);
     strncat(tmpStr, "        Usage - 'original_l2_name:output_l3_name', i.e. 'oprodname=cloud_flag:cloud_fraction'", sizeof(tmpStr) - strlen(tmpStr) - 1);   
     clo_addOption(list, "oprodname", CLO_TYPE_STRING, NULL, tmpStr);
+    clo_addOption(list, "averaging_scheme", CLO_TYPE_STRING, NULL, "Averaging scheme to apply when averaging data\n        Usage - 'averaging_scheme=prod1:method1,prod2:method2,...'\n"
+                  "        Averaging method specification:\n                arithmetic: arithmetic mean\n        "
+                  "        geometric: geometric mean\n                harmonic: harmonic mean\n        "
+                  "        quadratic: quadratic mean\n");
     clo_setVersion(version);
     return 0;
 }
@@ -273,6 +277,11 @@ int l2bin_load_input(clo_optionList_t* list, instr *input) {
             if (clo_isOptionSet(option)) {
                 strncpy(input->doi, clo_getOptionString(option), sizeof(input->doi) - 1);
             }
+        } else if (strcmp(keyword, "averaging_scheme") == 0) {
+            if (clo_isOptionSet(option)) {
+                parm_str = clo_getOptionRawString(option);
+                strncpy(input->averaging_scheme, parm_str, sizeof(input->averaging_scheme) - 1);
+            }
         } else {
             printf("-E- Invalid argument \"%s\"\n", keyword);
             exit(EXIT_FAILURE);
@@ -324,7 +333,7 @@ int input_init(instr *input_str) {
     input_str->deflate = 0;
 
     strncpy(input_str->suite, "", sizeof(input_str->suite) - 1);
-    
+    strncpy(input_str->averaging_scheme, "arithmetic", sizeof(input_str->averaging_scheme) - 1);
     input_str->area_weighting = 0;
     input_str->doi[0] = '\0';
 
@@ -595,6 +604,9 @@ int l2bin_input(int argc, char **argv, instr *input, const char* prog, const cha
     snprintf(str_buf, sizeof(str_buf), "oprodname = %s\n", input->output_product_names);
     strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
     
+    snprintf(str_buf, sizeof(str_buf), "averaging_scheme = %s\n", input->averaging_scheme);
+    strncat(input->parms, str_buf, sizeof(input->parms) - strlen(input->parms) - 1);
+
     clo_deleteList(list);
 
     return 0;

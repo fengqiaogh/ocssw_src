@@ -680,7 +680,7 @@ public:
     }
 
 };
-
+ProductL3Attributes readProductL3Attributes(hdf_bin* binfile, const std::string& productNames);
 }
 
 #endif

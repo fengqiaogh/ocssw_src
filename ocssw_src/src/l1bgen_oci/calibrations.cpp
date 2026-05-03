@@ -25,6 +25,9 @@
 #include <boost/accumulators/statistics/mean.hpp>
 #include <boost/accumulators/statistics/variance.hpp>
 
+const float SWIR_BANDPASS[NUM_SWIR_WAVELENGTHS] = {45, 80, 30, 30, 15, 75, 75, 50, 75};
+const float SWIR_GAIN_TYPE[NUM_SWIR_WAVELENGTHS] = {0, 0, 0, 1, 0, 0, 1, 0, 0};
+
 const double J2000 = 2451545;
 
 using namespace std;
@@ -755,6 +758,7 @@ void CalibrationData::writeBandInfo(Level1bFile& outfile, const CalibrationLut& 
         sensorBandParameters.getVar("SWIR_bandpass").putVar({0}, {NUM_SWIR_WAVELENGTHS}, SWIR_BANDPASS);
         sensorBandParameters.getVar(color + "_m12_coef").putVar(start, count, &calLut.m12Coefs[0][0][0]);
         sensorBandParameters.getVar(color + "_m13_coef").putVar(start, count, &calLut.m13Coefs[0][0][0]);
+        sensorBandParameters.getVar("SWIR_gain_type").putVar({0}, {NUM_SWIR_WAVELENGTHS}, SWIR_GAIN_TYPE);
     } else {
         sensorBandParameters.getVar(color + "_wavelength").putVar({0}, {numBands}, l1bWavelengths.data());
         sensorBandParameters.getVar(color + "_m12_coef").putVar(start, count, &l1bM12[0][0][0]);

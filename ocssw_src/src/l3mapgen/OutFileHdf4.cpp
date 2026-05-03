@@ -350,6 +350,6 @@ bool OutFileHdf4::close() {
     return true;
 }
 
-int32_t OutFileHdf4::addProduct(productInfo_t* productInfo, bool applyMask) {
-    return addProductNonDisplay(productInfo);
+int32_t OutFileHdf4::addProduct(productInfo_t* productInfo, bool applyMask, const ProductL3Attributes & productAttr) {
+    return addProductNonDisplay(productInfo, productAttr);
 }

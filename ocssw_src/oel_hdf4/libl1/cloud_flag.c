@@ -282,7 +282,8 @@ char get_cloudmask_habs_swir(l1str *l1rec, int32_t ip) {
     if (rhos[ipb + ib667] < 0.0) ftemp = 0.0;
     ftemp2 = cloud_albedo[ip] - ftemp;
 
-    if (ftemp2 > 0.027) flagcld = 1;
+    if (ftemp2 > l1_input->albedo)
+        flagcld = 1;
 
     //        non-water check  1240 is bright relative to 859 and the combination is bright
     //        this may hit glint by accident, need to be checked.
@@ -321,20 +322,28 @@ char get_cloudmask_habs_swir(l1str *l1rec, int32_t ip) {
 
 char get_cloudmask_habs(l1str *l1rec, int32_t ip) {
     //function for cloud mask by pixel
+    char iscloud = 0;
     int instrumentId = sensorId2InstrumentId(l1rec->l1file->sensorID);
+    l1rec->cloud[ip] = 0;
+    l1rec->flags[ip] &= ~(CLOUD);
     switch (instrumentId) {
     case INSTRUMENT_MERIS:
     case INSTRUMENT_OLCI:
     case INSTRUMENT_OCI:
-        return (get_cloudmask_habs_visnir(l1rec, ip));
+        iscloud = get_cloudmask_habs_visnir(l1rec, ip);
         break;
     case INSTRUMENT_MODIS:
-        return (get_cloudmask_habs_swir(l1rec, ip));
+        iscloud = get_cloudmask_habs_swir(l1rec, ip);
         break;
     default:
         printf("HABS cloud mask not supported for this sensor (%s).\n",
                 sensorId2SensorName(l1rec->l1file->sensorID));
         exit(EXIT_FAILURE);
     }
-    return (0);
+    if (iscloud == 1){
+        l1rec->cloud[ip] = 1;
+        l1rec->flags[ip] |= CLOUD;
+    }
+
+    return (iscloud);
 }

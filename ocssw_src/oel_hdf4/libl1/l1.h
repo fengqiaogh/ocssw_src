@@ -67,6 +67,7 @@
 #define STDPROC          0   /* evalmask bit definitions                 */
 #define NEWSENSINFO     32   /* use test sensor info file                */
 #define NEWRAYTAB       64   /* use test rayleigh tables                 */
+#define OLD_BRDF_INTERP 128  /* use old brdf interpolation method        */
 #define SSTMODS       4096   /* reserved for testing SST changes         */
 #define TRANSSPHER   32768   /* enables spherical path geom for dtran    */
 

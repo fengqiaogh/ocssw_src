@@ -1,5 +1,5 @@
 #include <stdint.h>
-
+#include <time.h>
 #ifndef GET_DATADAY_H
 #define GET_DATADAY_H
 
@@ -30,10 +30,15 @@ int get_datadays(const char* path, int32_t* day0, int32_t* day1);
 void printUsage(int32_t exitStatus);
 /**
  * @brief Get the equatorial crossing time 
- * 
+ * @param sensorID - the sensor ID of the input granule
+ * @param dayNight - whether the granule is a day or night granule
+ * @param starttime - the start time of the granule in seconds since 1 Jan. 1970 00:00:00 GMT
+ * @param equatorialCrossingTime - the equatorial crossing time in hours (output)
+ * @param plusDay - whether to add a day to the dataday output of get_datadays (output)
  * @return float 
  */
-float get_equatorial_crossingTime();
+void getEquatorCrossingTime(int32_t sensorID, bool dayNight, time_t starttime, float* equatorialCrossingTime,
+                            int32_t* plusDay);
 /**
  * @brief Set the verbosity 
  * 

@@ -55,6 +55,8 @@ typedef struct input_struct {
 
     int area_weighting;               ///< Area weighting flag
     char doi[1024];                   ///< Digital Object Identifier
+
+    char averaging_scheme[64];             ///< Binning method specification
     
 } instr;
 

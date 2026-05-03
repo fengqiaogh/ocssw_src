@@ -291,6 +291,18 @@ bool L3FileSMI::open(const char* fileName) {
         if (want_verbose)
             printf("Could not find wavelength dimension\n");
     }
+    else {
+        size_t nwave = wavDim.getSize();
+        wavelengths.resize(nwave);
+        NcVar wavelength_nc = ncFile->getVar("wavelength");
+        if (wavelength_nc.isNull()) {
+            cout << "-E- " << __FILE__ << ":" << __LINE__ << " - L3FileSMI::open: Could not find wavelength variable\n";
+            exit(EXIT_FAILURE);
+        }
+        else {
+            wavelength_nc.getVar(wavelengths.data());
+        }
+    }
 
     read_l3b_meta_netcdf4(ncFile->getId(), &metaData);
 
@@ -303,19 +315,49 @@ bool L3FileSMI::open(const char* fileName) {
     prodNameList.clear();
     multimap<string, NcVar> varMap = ncFile->getVars();
     multimap<string, NcVar>::iterator iter = varMap.begin();
+    productInfo_t* productInfo;
+    productInfo = allocateProductInfo();
     while (iter != varMap.end()) {
         string varName = iter->first;
-        if (iter->second.getDimCount() >= 2) {
+        if (iter->second.getDimCount() == 2) {
             size_t varRows = iter->second.getDim(0).getSize();
             size_t varCols = iter->second.getDim(1).getSize();
             size_t fileRows = shape->getNumRows();
             size_t fileCols = shape->getNumCols(0);
-            if (varRows == fileRows && varCols == fileCols)
+            if (varRows == fileRows && varCols == fileCols) {
                 prodNameList.push_back(varName);
+                twoD_threeD_lookup[varName] = {0,ncFile->getVar(varName)};
+            }
+        }
+        else if (iter->second.getDimCount() == 3) {
+            size_t varRows = iter->second.getDim(0).getSize();
+            size_t varCols = iter->second.getDim(1).getSize();
+            size_t fileRows = shape->getNumRows();
+            size_t fileCols = shape->getNumCols(0);
+            size_t numWav = iter->second.getDim(2).getSize();
+            if (wavDim.isNull()) {
+                cout << "-E- " << __FILE__ << ":" << __LINE__ << " - L3FileSMI::open: Wavelength dimension not found in file\n";
+                exit(EXIT_FAILURE);
+            }
+            int result = findProductInfo(varName.c_str(), getMetaData()->sensorID, productInfo);
+            std::string prefix = varName;
+            std::string suffix{};
+            if (result == 1) {
+                 suffix = productInfo->suffix;
+                prefix = productInfo->prefix;
+            }
+            if (varRows == fileRows && varCols == fileCols) {
+                for (size_t wavIdx = 0; wavIdx < numWav; wavIdx++) {
+                    std::string expandedName = prefix + "_" + to_string(std::llroundf(wavelengths[wavIdx])) + suffix;
+                    prodNameList.push_back(expandedName);
+                    twoD_threeD_lookup[expandedName] = {wavIdx,ncFile->getVar(varName)};
+                }
+            }
+
         }
         iter++;
     }
-
+    freeProductInfo(productInfo);
     return true;
 }
 
@@ -396,29 +438,18 @@ bool L3FileSMI::setActiveProductList(const char* prodStr) {
     boost::split(activeProdNameList, prodStr, boost::is_any_of(","));
     vector<string>activeProdName;
     for (size_t i = 0; i < activeProdNameList.size(); i++) {
-        bool nullVar1 = false;
-        bool nullVar2 = false;
         boost::trim(activeProdNameList[i]);
-        NcVar tmpVar = ncFile->getVar(activeProdNameList[i]);
+        // lookup
+        NcVar tmpVar = twoD_threeD_lookup.at(activeProdNameList[i]).second;
+        size_t index_3d = twoD_threeD_lookup.at(activeProdNameList[i]).first;
         if (tmpVar.isNull()) {
-            nullVar1 = true;
+            cout << "-E- " << __FILE__ << ":" << __LINE__ << " - L3FileSMI::setActiveProductList: Could not find product " << activeProdNameList[i] << endl;
+            exit(EXIT_FAILURE);
         } else {
             prodVarList.push_back(tmpVar);
+            active_index_list.push_back(index_3d);
         }
-        boost::split(activeProdName, activeProdNameList[i], boost::is_any_of("_"));
-        boost::trim(activeProdName[0]);
-        tmpVar = ncFile->getVar(activeProdName[0]);
-        if (tmpVar.isNull()) {
-            nullVar2 = true;
-        } else {
-            prodVarList.push_back(tmpVar);
-        }
-        if (nullVar1 && nullVar2) {
-            if (want_verbose)
-                printf("Error - 2d product %s and 3d product %s not found in file\n",
-                    activeProdNameList[i].c_str(), activeProdName[0].c_str());
-            return false;
-        }
+
     }
     outBin.setNumProducts(activeProdNameList.size());
     return true;
@@ -450,28 +481,13 @@ L3Row* L3FileSMI::readRow(int32_t row) {
     start.push_back(0);
     count.push_back(1);
     count.push_back(shape->getNumCols(row));
+    start.push_back(0); //first wavelength
+    count.push_back(1); //one wavelength
 
-    //slice the product by wavelength
-    NcDim wavDim = ncFile->getDim("wavelength");
-    if(!wavDim.isNull()) {
-        wvIdx = wvIdxList.front();
-        start.push_back(wvIdx); //first wavelength
-        count.push_back(1); //one wavelength
-    }
 
     for (size_t prodIndex = 0; prodIndex < prodVarList.size(); prodIndex++) {
+        start[2] = active_index_list[prodIndex];
         readVarCF(prodVarList[prodIndex], start, count, sumBuffer);
-
-        //Cycle through the wavelength indices for 3D products
-        if(!wavDim.isNull()) {
-            size_t tmpIdx = wvIdxList.front();
-            wvIdxList.push_back(tmpIdx);
-            wvIdxList.pop_front();
-            wvIdx = wvIdxList.front();
-            start.pop_back();
-            start.push_back(wvIdx);
-        }
-
         L3Bin* l3Bin;
         for (int32_t i = 0; i < shape->getNumCols(row); i++) {
             l3Bin = l3Row->binArray[i];
@@ -497,72 +513,41 @@ L3Row* L3FileSMI::readRow(int32_t row) {
     return l3Row;
 }
 
-bool L3FileSMI::getWavelengthList(std::vector<std::string>& wvlist){
-    NcDim wavDim = ncFile->getDim("wavelength");
-    if(wavDim.isNull())
-        return false;
-    size_t wavSiz = wavDim.getSize();
-    NcVar wavVar = ncFile->getVar("wavelength");
-    if(wavVar.isNull()){
-        return false;
-    } else {
-        std::vector<float> wvdata(wavSiz);
-        wavVar.getVar(wvdata.data());
-        for(float wv : wvdata){
-            wvlist.push_back(to_string(static_cast<int>(wv)));
-        }
-        return true;
-    }
-}
-
-bool L3FileSMI::getWavelength(string name, float& wavelength){
-    NcVar tmpVar = ncFile->getVar(name);
-    if(tmpVar.isNull()){
-        return false;
-    } else {
-        try {
-            NcVarAtt att = tmpVar.getAtt("wavelength");
-            att.getValues(&wavelength);
-        } catch (NcException& e) {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool L3FileSMI::checkWavelength(const char* wvl) {
-    int index = -1;
-    NcDim wavDim = ncFile->getDim("wavelength");
-    if(wavDim.isNull())
-        return false;
-    size_t wavSiz = wavDim.getSize();
-    NcVar wavVar = ncFile->getVar("wavelength");
-    if(wavVar.isNull()){
-        return false;
-    } else {
-        float* wavelengths = (float*) allocateMemory(
-                wavSiz * sizeof (float), "wavelengths");
-        vector<size_t> start = {0};
-        vector<size_t> count = {wavSiz};
-        readVarCF(wavVar, start, count, wavelengths);
-        for(size_t i = 0; i < wavSiz; i++){
-            if(std::roundf(wavelengths[i]) == std::roundf(stof(wvl))){
-                index = i;
-                break;
-            }
-        }
-        free(wavelengths);
-        if(index < 0){
-            return false;
-        } else {
-            wvIdxList.push_back(index);
-        }
-    }
-    return true;
-}
-
 bool L3FileSMI::hasQuality() {
     return false;
 }
-
+bool L3FileSMI::getProductAttribute(const std::string &prodName, const std::string &attributeName, void *attrValue,
+                         size_t attrSize) {
+    // std::cout << "-I-: Reading SMI attributes" << std::endl;
+    netCDF::NcVar tmpVar;
+    // accounts for expanded 2D variables
+    if (twoD_threeD_lookup.count(prodName)) {
+        tmpVar = twoD_threeD_lookup.at(prodName).second;
+        if (tmpVar.getDimCount() == 3 && attributeName == "wavelength") {
+            size_t slice_3d = twoD_threeD_lookup.at(prodName).first;
+            if (slice_3d >= wavelengths.size())
+                return false;
+            memcpy(attrValue, &wavelengths.at(slice_3d), sizeof(float));
+            return true;
+        }
+    } else {
+        // accounts for 3D variables
+        tmpVar = ncFile->getVar(prodName);
+    }
+    if (tmpVar.isNull()) {
+        return false;
+    }
+    std::map<std::string,netCDF::NcVarAtt> var_attrs = tmpVar.getAtts();
+    if (var_attrs.count(attributeName) == 0)
+        return false;
+    netCDF::NcVarAtt tmpAtt = tmpVar.getAtt(attributeName);
+    if (!tmpAtt.isNull()) {
+        netCDF::NcType type = tmpAtt.getType();
+        if (attrSize != type.getSize())
+            return false;
+        tmpAtt.getValues(attrValue);
+        return true;
+    }
+    return false;
+}
 } // namespace l3

@@ -295,7 +295,10 @@ void L2Variable::expand_l2_requested(std::vector<std::string> &products_requeste
             }
         }
     }
-
+    std::unordered_set<std::string> existing_2d_products(products_requested_separated.begin(),products_requested_separated.end());
+    if(existing_2d_products.size() != products_requested_separated.size()){
+        EXIT_LOG(std::cerr << "-E- : User requested duplicated 2D products" << std::endl)
+    }
     if (!remove.empty()) {
         for (const auto &rem : remove) {
             // std::cout << "All wavelength will be binned and sent to output for " << rem << std::endl;
@@ -304,7 +307,9 @@ void L2Variable::expand_l2_requested(std::vector<std::string> &products_requeste
             products_requested_separated.erase(it);
         }
         for (const auto &prod_exp_3d : add_3d_expanded) {
-            products_requested_separated.push_back(prod_exp_3d);
+            // don't add expanded 3d products, if it's already was supplied as 2D
+            if (existing_2d_products.count(prod_exp_3d) == 0)
+                products_requested_separated.push_back(prod_exp_3d);
         }
     }
 }

@@ -3345,13 +3345,16 @@ int32_t L1C::write_L1C_granule2(int swtd, l1c_filehandle* l1cfile, L1C_input* l1
             if (l1cinput->verbose)
                 cout << "ngridlines..." << ngridlines << "tot gridlines..." << totlines << endl;
 
-            if (twodays)  // elapsed from previous day
+            const bool granule_uses_previous_day = (tmgv[NY1] < 0);
+            const int ep_shift = granule_uses_previous_day ? 24 * 3600 : 0;
+
+            if (granule_uses_previous_day)  // elapsed from previous day
             {
                 h_zero = 0;
                 mi_zero = 0;
                 sec_zero = 0;
                 unix2ymdhms(time_zero, &y_zero, &mo_zero, &d_zero, &h_zero, &mi_zero, &sec_zero);
-            } else  // elapsed from the same day
+            } else  // elapsed from the granule start day
             {
                 d_zero = d_ini;
                 mo_zero = mo_ini;
@@ -3432,14 +3435,10 @@ int32_t L1C::write_L1C_granule2(int swtd, l1c_filehandle* l1cfile, L1C_input* l1
             alt_out = allocate2d_float(NY, NX);
             time_nad_out = (double*)calloc(NY, sizeof(double));  // time of the day in seconds
 
-            int cc = 0, ep_shift;
-
-            if (tmgv[NY1] < 0)
-                ep_shift = 3600 * 24;
-            else
-                ep_shift = 0;
+            int cc = 0;
             if (l1cinput->verbose)
-                cout << "twodays flag : ep_shift :" << ep_shift << endl;
+                cout << "granule previous-day flag : " << granule_uses_previous_day
+                     << " ep_shift :" << ep_shift << endl;
             for (int i = NY1; i < NY2 + 1; i++) {
                 for (int j = 0; j < NX; j++) {
                     lat_out[cc][j] = lat_gd[i][j];

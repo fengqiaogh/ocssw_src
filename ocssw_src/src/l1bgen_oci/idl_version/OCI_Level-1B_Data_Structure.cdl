@@ -111,6 +111,13 @@ group: sensor_band_parameters {
   	float SWIR_m13_coef(SWIR_bands, HAM_sides, polarization_coefficients) ;
   		SWIR_m13_coef:long_name = "SWIR band M13/M11 polynomial coefficients" ;
   		SWIR_m13_coef:units = "dimensionless" ;
+	ubyte SWIR_gain_type(SWIR_bands) ;
+		SWIR_gain_type:_FillValue = 255UB ;
+		SWIR_gain_type:flag_values = 0UB, 1UB ;
+		SWIR_gain_type:flag_meanings = "standard_gain high_gain" ;
+		SWIR_gain_type:long_name = "Gain types for SWIR bands" ;
+		SWIR_gain_type = {0, 0, 0, 1, 0, 0, 1, 0, 0 } ;
+
   } // group sensor_band_parameters
 
 group: scan_line_attributes {

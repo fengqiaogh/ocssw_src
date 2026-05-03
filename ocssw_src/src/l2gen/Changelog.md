@@ -2,6 +2,9 @@
 
 
 
+## 10.1.0
+  - added support for VIIRS J4
+
 ## 9.5.1
   - fixed sstref array size to fix memory ocerrun
   - fixed memory leaks in l1bgen_generic writer
